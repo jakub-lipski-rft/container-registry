@@ -113,6 +113,11 @@ type ObjectAttrs struct {
 	// Optional. If nil or empty, existing ACL rules are preserved.
 	ACL []ACLRule
 
+	// MD5 is the MD5 hash of the object's content. This field is read-only,
+	// except when used from a Writer. If set on a Writer, the uploaded
+	// data is rejected if its MD5 hash does not match this field.
+	MD5 []byte
+
 	// Metadata represents user-provided metadata, in key/value pairs.
 	// It can be nil if the current metadata values needs to preserved.
 	Metadata map[string]string
@@ -364,8 +369,14 @@ func (w *Writer) open() {
 	w.opened = true
 
 	go func() {
+		rawObj := attrs.toRawObject(w.bucket)
+
+		if w.MD5 != nil {
+			rawObj.Md5Hash = base64.StdEncoding.EncodeToString(w.MD5)
+		}
+
 		resp, err := rawService(w.ctx).Objects.Insert(
-			w.bucket, attrs.toRawObject(w.bucket)).Media(w.r).Projection("full").Context(w.ctx).Do()
+			w.bucket, rawObj).Media(w.r).Projection("full").Context(w.ctx).Do()
 		w.err = err
 		if err == nil {
 			w.obj = newObject(resp)
