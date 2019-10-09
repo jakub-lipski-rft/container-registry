@@ -17,6 +17,7 @@ package gcs
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -275,6 +276,9 @@ func (d *driver) PutContent(context context.Context, path string, contents []byt
 	return retry(func() error {
 		wc := storage.NewWriter(d.context(context), d.bucket, d.pathToKey(path))
 		wc.ContentType = "application/octet-stream"
+		h := md5.New()
+		h.Write(contents)
+		wc.MD5 = h.Sum(nil)
 		return putContentsClose(wc, contents)
 	})
 }
