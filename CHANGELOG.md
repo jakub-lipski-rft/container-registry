@@ -1,7 +1,12 @@
+## v2.7.4-gitlab
+
+- registry/storage: Fix Google Cloud Storage client authorization with non-default credentials
+- registry/storage: Fix error handling of GCS Delete() call when object does not exist
+
 ## v2.7.3-gitlab
 
-- StorageDriver: Update to Google SDK v0.47.0 and latest storage driver (v1.1.1)
+- registry/storage: Update to Google SDK v0.47.0 and latest storage driver (v1.1.1)
 
 ## v2.7.2-gitlab
 
-- Use MD5 checksums in the registry's Google storage driver
+- registry/storage: Use MD5 checksums in the registry's Google storage driver
