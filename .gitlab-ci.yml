@@ -1,0 +1,34 @@
+image: golang:1.12-buster
+
+variables:
+  BUILDTAGS: "include_gcs include_oss"
+  CGO_ENABLED: 1
+
+stages:
+  - test
+
+# Hack to emulate github.com/docker/distribution paths for Golang
+# Eventually the project files should be renamed to GitLab paths
+.inject-gopath: &inject-gopath
+  - cd $GOPATH/src
+  - mkdir -p github.com/docker
+  - cd $GOPATH/src/github.com/docker
+  - ln -s $CI_PROJECT_DIR distribution
+  - cd distribution
+  - GOOS=linux GO111MODULE=off script/setup/install-dev-tools
+
+static-analysis:
+  stage: test
+  before_script: *inject-gopath
+  script:
+    - make check
+  allow_failure: true
+
+verify:
+  stage: test
+  before_script: *inject-gopath
+  script:
+    - go build -i .
+    - make build
+    - make binaries
+    - make coverage
