@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -287,6 +288,15 @@ func (d *driver) PutContent(context context.Context, path string, contents []byt
 		h := md5.New()
 		h.Write(contents)
 		wc.MD5 = h.Sum(nil)
+
+		if len(contents) == 0 {
+			logrus.WithFields(logrus.Fields{
+				"path":   path,
+				"length": len(contents),
+				"stack":  string(debug.Stack()),
+			}).Info("PutContent called with 0 bytes")
+		}
+
 		return putContentsClose(wc, contents)
 	})
 }
