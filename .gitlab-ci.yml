@@ -56,4 +56,4 @@ s3:
     # Configure the minio client to use the local minio service rather than play.minio.io
     - ./mc config host add s3v4 $REGION_ENDPOINT $AWS_ACCESS_KEY $AWS_SECRET_KEY --api S3v4
     - ./mc mb s3v4/$S3_BUCKET
-    - go test -v github.com/docker/distribution/registry/storage/driver/s3-aws
+    - go test -timeout 20m -v github.com/docker/distribution/registry/storage/driver/s3-aws
