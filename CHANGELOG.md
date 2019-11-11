@@ -1,3 +1,12 @@
+## v2.7.6-gitlab
+
+- CI: Add integration tests for the S3 driver
+- registry/storage: Add compatibilty for S3v1 ListObjects key counts
+
+## v2.7.5-gitlab
+
+- registry/storage: Log a message if PutContent is called with 0 bytes
+
 ## v2.7.4-gitlab
 
 - registry/storage: Fix Google Cloud Storage client authorization with non-default credentials
