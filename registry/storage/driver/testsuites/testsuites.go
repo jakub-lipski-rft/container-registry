@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -957,6 +958,33 @@ func (suite *DriverSuite) TestConcurrentFileStreams(c *check.C) {
 //
 // 	c.Assert(misswrites, check.Not(check.Equals), 1024)
 // }
+
+// TestWalk ensures that all files are visted by Walk.
+func (suite *DriverSuite) TestWalk(c *check.C) {
+
+	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	defer suite.deletePath(c, rootDirectory)
+
+	ctx := context.Background()
+	wantedFiles := 10
+	for i := 0; i < wantedFiles; i++ {
+		filename := rootDirectory + "/walk/subdir/file" + strconv.Itoa(i)
+		contents := []byte("contents")
+		err := suite.StorageDriver.PutContent(ctx, filename, contents)
+		c.Assert(err, check.IsNil)
+	}
+
+	var actualFiles int
+	err := suite.StorageDriver.Walk(ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
+		if !fInfo.IsDir() {
+			actualFiles++
+		}
+		return nil
+	})
+	c.Assert(err, check.IsNil)
+
+	c.Assert(actualFiles, check.Equals, wantedFiles)
+}
 
 // BenchmarkPutGetEmptyFiles benchmarks PutContent/GetContent for 0B files
 func (suite *DriverSuite) BenchmarkPutGetEmptyFiles(c *check.C) {
