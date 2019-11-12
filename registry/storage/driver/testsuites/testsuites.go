@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -968,7 +967,7 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 	ctx := context.Background()
 	wantedFiles := 10
 	for i := 0; i < wantedFiles; i++ {
-		filename := rootDirectory + "/walk/subdir/file" + strconv.Itoa(i)
+		filename := rootDirectory + randomPath(32) + randomFilename(int64(8+rand.Intn(8)))
 		contents := []byte("contents")
 		err := suite.StorageDriver.PutContent(ctx, filename, contents)
 		c.Assert(err, check.IsNil)
