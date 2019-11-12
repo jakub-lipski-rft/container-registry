@@ -963,18 +963,17 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
 	defer suite.deletePath(c, rootDirectory)
 
-	ctx := context.Background()
 	numWantedFiles := 10
 	wantedFiles := make([]string, numWantedFiles)
 	for i := 0; i < numWantedFiles; i++ {
 		wantedFiles[i] = rootDirectory + randomPath(32) + randomFilename(int64(8+rand.Intn(8)))
 
-		err := suite.StorageDriver.PutContent(ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
+		err := suite.StorageDriver.PutContent(suite.ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
 		c.Assert(err, check.IsNil)
 	}
 
 	var actualFiles []string
-	err := suite.StorageDriver.Walk(ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
+	err := suite.StorageDriver.Walk(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
 		if !fInfo.IsDir() {
 			// Use append here to prevent a panic if walk finds more files than we expect.
 			actualFiles = append(actualFiles, fInfo.Path())
