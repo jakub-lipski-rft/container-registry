@@ -969,8 +969,7 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 	for i := 0; i < numWantedFiles; i++ {
 		wantedFiles[i] = rootDirectory + randomPath(32) + randomFilename(int64(8+rand.Intn(8)))
 
-		contents := []byte("contents")
-		err := suite.StorageDriver.PutContent(ctx, wantedFiles[i], contents)
+		err := suite.StorageDriver.PutContent(ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
 		c.Assert(err, check.IsNil)
 	}
 
