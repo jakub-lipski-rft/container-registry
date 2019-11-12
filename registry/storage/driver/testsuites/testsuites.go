@@ -960,29 +960,33 @@ func (suite *DriverSuite) TestConcurrentFileStreams(c *check.C) {
 
 // TestWalk ensures that all files are visted by Walk.
 func (suite *DriverSuite) TestWalk(c *check.C) {
-
 	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
 	defer suite.deletePath(c, rootDirectory)
 
 	ctx := context.Background()
-	wantedFiles := 10
-	for i := 0; i < wantedFiles; i++ {
-		filename := rootDirectory + randomPath(32) + randomFilename(int64(8+rand.Intn(8)))
+	numWantedFiles := 10
+	wantedFiles := make([]string, numWantedFiles)
+	for i := 0; i < numWantedFiles; i++ {
+		wantedFiles[i] = rootDirectory + randomPath(32) + randomFilename(int64(8+rand.Intn(8)))
+
 		contents := []byte("contents")
-		err := suite.StorageDriver.PutContent(ctx, filename, contents)
+		err := suite.StorageDriver.PutContent(ctx, wantedFiles[i], contents)
 		c.Assert(err, check.IsNil)
 	}
 
-	var actualFiles int
+	var actualFiles []string
 	err := suite.StorageDriver.Walk(ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
 		if !fInfo.IsDir() {
-			actualFiles++
+			// Use append here to prevent a panic if walk finds more files than we expect.
+			actualFiles = append(actualFiles, fInfo.Path())
 		}
 		return nil
 	})
 	c.Assert(err, check.IsNil)
 
-	c.Assert(actualFiles, check.Equals, wantedFiles)
+	sort.Strings(actualFiles)
+	sort.Strings(wantedFiles)
+	c.Assert(actualFiles, check.DeepEquals, wantedFiles)
 }
 
 // BenchmarkPutGetEmptyFiles benchmarks PutContent/GetContent for 0B files
