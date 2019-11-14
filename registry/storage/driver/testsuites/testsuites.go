@@ -964,18 +964,34 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 	defer suite.deletePath(c, rootDirectory)
 
 	numWantedFiles := 10
-	wantedFiles := make([]string, numWantedFiles)
+	wantedFiles := randomBranchingFiles(rootDirectory, numWantedFiles)
+	wantedDirectoriesSet := make(map[string]struct{})
+
 	for i := 0; i < numWantedFiles; i++ {
-		wantedFiles[i] = rootDirectory + randomPath(32) + randomFilename(int64(8+rand.Intn(8)))
+
+		// Gather unique directories from the full path, excluding the root directory.
+		p := path.Dir(wantedFiles[i])
+		for {
+			// Guard against non-terminating loops: path.Dir returns "." if the path is empty.
+			if p == rootDirectory || p == "." {
+				break
+			}
+			wantedDirectoriesSet[p] = struct{}{}
+			p = path.Dir(p)
+		}
 
 		err := suite.StorageDriver.PutContent(suite.ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
 		c.Assert(err, check.IsNil)
 	}
 
 	var actualFiles []string
+	var actualDirectories []string
+
 	err := suite.StorageDriver.Walk(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
-		if !fInfo.IsDir() {
-			// Use append here to prevent a panic if walk finds more files than we expect.
+		// Use append here to prevent a panic if walk finds more than we expect.
+		if fInfo.IsDir() {
+			actualDirectories = append(actualDirectories, fInfo.Path())
+		} else {
 			actualFiles = append(actualFiles, fInfo.Path())
 		}
 		return nil
@@ -985,6 +1001,19 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 	sort.Strings(actualFiles)
 	sort.Strings(wantedFiles)
 	c.Assert(actualFiles, check.DeepEquals, wantedFiles)
+
+	// Convert from a set of wanted directories into a slice.
+	wantedDirectories := make([]string, len(wantedDirectoriesSet))
+
+	var i int
+	for k := range wantedDirectoriesSet {
+		wantedDirectories[i] = k
+		i++
+	}
+
+	sort.Strings(actualDirectories)
+	sort.Strings(wantedDirectories)
+	c.Assert(actualDirectories, check.DeepEquals, wantedDirectories)
 }
 
 // BenchmarkPutGetEmptyFiles benchmarks PutContent/GetContent for 0B files
@@ -1236,6 +1265,27 @@ func randomFilename(length int64) string {
 		}
 	}
 	return string(b)
+}
+
+// randomBranchingFiles creates n number of randomly named files at the end of
+// a binary tree of randomly named directories.
+func randomBranchingFiles(root string, n int) []string {
+	var files []string
+
+	subDirectory := path.Join(root, randomFilename(int64(8+(rand.Intn(8)))))
+
+	if n <= 1 {
+		files = append(files, path.Join(subDirectory, randomFilename(int64(8+rand.Intn(8)))))
+		return files
+	}
+
+	half := n / 2
+	remainder := n % 2
+
+	files = append(files, randomBranchingFiles(subDirectory, half+remainder)...)
+	files = append(files, randomBranchingFiles(subDirectory, half)...)
+
+	return files
 }
 
 // randomBytes pre-allocates all of the memory sizes needed for the test. If
