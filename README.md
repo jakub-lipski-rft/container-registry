@@ -1,5 +1,9 @@
 # Distribution
 
+This README is kept in sync with the upstream Docker Distribution.
+The [GitLab README](./docs-gitlab/README.md) can be found under the
+[docs-gitlab](./docs-gitlab/) directory.
+
 The Docker toolset to pack, ship, store, and deliver content.
 
 This repository's main product is the Docker Registry 2.0 implementation
