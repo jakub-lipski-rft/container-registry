@@ -9,6 +9,7 @@ import (
 	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/docker/distribution/testutil"
 )
 
 func TestVerifyManifestForeignLayer(t *testing.T) {
@@ -18,7 +19,10 @@ func TestVerifyManifestForeignLayer(t *testing.T) {
 		ManifestURLsAllowRegexp(regexp.MustCompile("^https?://foo")),
 		ManifestURLsDenyRegexp(regexp.MustCompile("^https?://foo/nope")))
 	repo := makeRepository(t, registry, "test")
-	manifestService := makeManifestService(t, repo)
+	manifestService, err := testutil.MakeManifestService(repo)
+	if err != nil {
+		t.Fatalf("failed to create manifest service: %v", err)
+	}
 
 	config, err := repo.Blobs(ctx).Put(ctx, schema2.MediaTypeImageConfig, nil)
 	if err != nil {
