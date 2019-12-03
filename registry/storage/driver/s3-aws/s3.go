@@ -103,6 +103,7 @@ type DriverParameters struct {
 	UserAgent                   string
 	ObjectACL                   string
 	SessionToken                string
+	PathStyle                   bool
 }
 
 func init() {
@@ -339,6 +340,29 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		objectACL = objectACLString
 	}
 
+	pathStyleBool := false
+
+	// If regionEndpoint is set, default to forcining pathstyle to preserve legacy behavior.
+	if regionEndpoint != "" {
+		pathStyleBool = true
+	}
+
+	pathStyle := parameters["pathstyle"]
+	switch pathStyle := pathStyle.(type) {
+	case string:
+		b, err := strconv.ParseBool(pathStyle)
+		if err != nil {
+			return nil, fmt.Errorf("The pathstyle parameter should be a boolean")
+		}
+		pathStyleBool = b
+	case bool:
+		pathStyleBool = pathStyle
+	case nil:
+		// do nothing
+	default:
+		return nil, fmt.Errorf("The pathstyle parameter should be a boolean")
+	}
+
 	sessionToken := ""
 
 	params := DriverParameters{
@@ -361,6 +385,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		fmt.Sprint(userAgent),
 		objectACL,
 		fmt.Sprint(sessionToken),
+		pathStyleBool,
 	}
 
 	return New(params)
@@ -423,10 +448,10 @@ func New(params DriverParameters) (*Driver, error) {
 	})
 
 	if params.RegionEndpoint != "" {
-		awsConfig.WithS3ForcePathStyle(true)
 		awsConfig.WithEndpoint(params.RegionEndpoint)
 	}
 
+	awsConfig.WithS3ForcePathStyle(params.PathStyle)
 	awsConfig.WithCredentials(creds)
 	awsConfig.WithRegion(params.Region)
 	awsConfig.WithDisableSSL(!params.Secure)

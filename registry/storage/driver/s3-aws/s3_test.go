@@ -38,6 +38,8 @@ func init() {
 	root, err := ioutil.TempDir("", "driver-")
 	regionEndpoint := os.Getenv("REGION_ENDPOINT")
 	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
+	pathStyle := os.Getenv("AWS_PATH_STYLE")
+
 	if err != nil {
 		panic(err)
 	}
@@ -76,6 +78,20 @@ func init() {
 			}
 		}
 
+		pathStyleBool := false
+
+		// If regionEndpoint is set, default to forcing pathstyle to preserve legacy behavior.
+		if regionEndpoint != "" {
+			pathStyleBool = true
+		}
+
+		if pathStyle != "" {
+			pathStyleBool, err = strconv.ParseBool(pathStyle)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		parameters := DriverParameters{
 			accessKey,
 			secretKey,
@@ -96,6 +112,7 @@ func init() {
 			driverName + "-test",
 			objectACL,
 			sessionToken,
+			pathStyleBool,
 		}
 
 		return New(parameters)
@@ -112,6 +129,76 @@ func init() {
 	testsuites.RegisterSuite(func() (storagedriver.StorageDriver, error) {
 		return s3DriverConstructor(root, s3.StorageClassStandard)
 	}, skipS3)
+}
+
+func TestFromParameters(t *testing.T) {
+
+	// Minimal params needed to construct the driver.
+	baseParams := map[string]interface{}{
+		"region": "us-west-2",
+		"bucket": "test",
+		"v4auth": "true",
+	}
+
+	tests := []struct {
+		params              map[string]interface{}
+		wantedForcePathBool bool
+	}{
+		{
+			map[string]interface{}{
+				"pathstyle": "false",
+			}, false,
+		},
+		{
+			map[string]interface{}{
+				"pathstyle": "true",
+			}, true,
+		},
+		{
+			map[string]interface{}{
+				"regionendpoint": "test-endpoint",
+				"pathstyle":      "false",
+			}, false,
+		},
+		{
+			map[string]interface{}{
+				"regionendpoint": "test-endpoint",
+				"pathstyle":      "true",
+			}, true,
+		},
+		{
+			map[string]interface{}{
+				"regionendpoint": "",
+			}, false,
+		},
+		{
+			map[string]interface{}{
+				"regionendpoint": "test-endpoint",
+			}, true,
+		},
+	}
+
+	for _, tt := range tests {
+
+		// add baseParams to testing params
+		for k, v := range baseParams {
+			tt.params[k] = v
+		}
+
+		d, err := FromParameters(tt.params)
+		if err != nil {
+			t.Fatalf("unable to create a new S3 driver: %v", err)
+		}
+
+		pathStyle := d.baseEmbed.Base.StorageDriver.(*driver).S3.Client.Config.S3ForcePathStyle
+		if pathStyle == nil {
+			t.Fatal("expected pathStyle not to be nil")
+		}
+
+		if *pathStyle != tt.wantedForcePathBool {
+			t.Fatalf("expected S3ForcePathStyle to be %v, got %v, with params %#v", tt.wantedForcePathBool, *pathStyle, tt.params)
+		}
+	}
 }
 
 func TestEmptyRootList(t *testing.T) {
