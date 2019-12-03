@@ -1159,6 +1159,41 @@ func (suite *DriverSuite) benchmarkDeleteFiles(c *check.C, numFiles int64) {
 	}
 }
 
+// BenchmarkWalkNop10Files benchmarks Walk with a Nop function that visits 10 files
+func (suite *DriverSuite) BenchmarkWalkNop10Files(c *check.C) {
+	suite.benchmarkWalk(c, 10, func(fInfo storagedriver.FileInfo) error {
+		return nil
+	})
+}
+
+// BenchmarkWalkNop500Files benchmarks Walk with a Nop function that visits 500 files
+func (suite *DriverSuite) BenchmarkWalkNop500Files(c *check.C) {
+	suite.benchmarkWalk(c, 500, func(fInfo storagedriver.FileInfo) error {
+		return nil
+	})
+}
+
+func (suite *DriverSuite) benchmarkWalk(c *check.C, numFiles int, f storagedriver.WalkFn) {
+	for i := 0; i < c.N; i++ {
+		rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+		defer suite.deletePath(c, rootDirectory)
+
+		c.StopTimer()
+
+		wantedFiles := randomBranchingFiles(rootDirectory, numFiles)
+
+		for i := 0; i < numFiles; i++ {
+			err := suite.StorageDriver.PutContent(suite.ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
+			c.Assert(err, check.IsNil)
+		}
+
+		c.StartTimer()
+
+		err := suite.StorageDriver.Walk(suite.ctx, rootDirectory, f)
+		c.Assert(err, check.IsNil)
+	}
+}
+
 func (suite *DriverSuite) testFileStreams(c *check.C, size int64) {
 	tf, err := ioutil.TempFile("", "tf")
 	c.Assert(err, check.IsNil)
