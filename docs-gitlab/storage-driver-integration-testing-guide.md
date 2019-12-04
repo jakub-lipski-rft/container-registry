@@ -21,7 +21,7 @@ export S3_BUCKET="test"
 Next, run the minio server:
 
 ```bash
-docker run -d -p 9000:9000 --name s3-test-mino \
+docker run -d -p 9000:9000 --name s3-test-minio \
   -e "MINIO_ACCESS_KEY=$AWS_ACCESS_KEY" \
   -e "MINIO_SECRET_KEY=$AWS_SECRET_KEY" \
   minio/minio server /data
@@ -48,3 +48,23 @@ integration tests:
 ```bash
 docker stop s3-test-minio
 ```
+
+### Running the Benchmark Suite
+
+To run the benchmarks against any configured driver, run the following
+command, substituting the appropriate driver:
+
+```bash
+go test -v -cpuprofile profile.out github.com/docker/distribution/registry/storage/driver/s3-aws -args -check.v -check.b
+```
+
+Afterwards, the `profile.out` file we generated above can be used to analyze
+the performance of the benchmarks with `pprof`:
+
+```bash
+go tool pprof profile.out
+```
+
+If you are unfamiliar with pprof,
+[Profiling Go Programs](https://blog.golang.org/profiling-go-programs)
+on The Go Blog is an excellent introduction.
