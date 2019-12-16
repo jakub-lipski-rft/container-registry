@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
@@ -12,6 +13,12 @@ import (
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
 )
+
+type Image struct {
+	manifest       distribution.Manifest
+	ManifestDigest digest.Digest
+	Layers         map[digest.Digest]io.ReadSeeker
+}
 
 // MakeManifestList constructs a manifest list out of a list of manifest digests
 func MakeManifestList(blobstatter distribution.BlobStatter, manifestDigests []digest.Digest) (*manifestlist.DeserializedManifestList, error) {
@@ -84,4 +91,93 @@ func MakeSchema2Manifest(repository distribution.Repository, digests []digest.Di
 	}
 
 	return manifest, nil
+}
+
+func UploadRandomSchema1Image(repository distribution.Repository) (Image, error) {
+	randomLayers, err := CreateRandomLayers(2)
+	if err != nil {
+		return Image{}, err
+	}
+
+	digests := []digest.Digest{}
+	for digest := range randomLayers {
+		digests = append(digests, digest)
+	}
+
+	manifest, err := MakeSchema1Manifest(digests)
+	if err != nil {
+		return Image{}, err
+	}
+
+	manifestDigest, err := UploadImage(repository, Image{manifest: manifest, Layers: randomLayers})
+	if err != nil {
+		return Image{}, err
+	}
+
+	return Image{
+		manifest:       manifest,
+		ManifestDigest: manifestDigest,
+		Layers:         randomLayers,
+	}, nil
+}
+
+func UploadRandomSchema2Image(repository distribution.Repository) (Image, error) {
+	randomLayers, err := CreateRandomLayers(2)
+	if err != nil {
+		return Image{}, err
+	}
+
+	digests := []digest.Digest{}
+	for digest := range randomLayers {
+		digests = append(digests, digest)
+	}
+
+	manifest, err := MakeSchema2Manifest(repository, digests)
+	if err != nil {
+		return Image{}, err
+	}
+
+	manifestDigest, err := UploadImage(repository, Image{manifest: manifest, Layers: randomLayers})
+	if err != nil {
+		return Image{}, err
+	}
+
+	return Image{
+		manifest:       manifest,
+		ManifestDigest: manifestDigest,
+		Layers:         randomLayers,
+	}, nil
+}
+
+func UploadImage(repository distribution.Repository, im Image) (digest.Digest, error) {
+	// upload layers
+	err := UploadBlobs(repository, im.Layers)
+	if err != nil {
+		return "", fmt.Errorf("layer upload failed: %v", err)
+	}
+
+	// upload manifest
+	ctx := context.Background()
+
+	manifestService, err := MakeManifestService(repository)
+	if err != nil {
+		return "", fmt.Errorf("failed to create manifest service: %v", err)
+	}
+
+	manifestDigest, err := manifestService.Put(ctx, im.manifest)
+	if err != nil {
+		return "", fmt.Errorf("manifest upload failed: %v", err)
+	}
+
+	return manifestDigest, nil
+}
+
+func MakeManifestService(repository distribution.Repository) (distribution.ManifestService, error) {
+	ctx := context.Background()
+
+	manifestService, err := repository.Manifests(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to construct manifest store: %v", err)
+	}
+	return manifestService, nil
 }

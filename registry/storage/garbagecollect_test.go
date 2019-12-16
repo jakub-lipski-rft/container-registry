@@ -15,12 +15,6 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-type image struct {
-	manifest       distribution.Manifest
-	manifestDigest digest.Digest
-	layers         map[digest.Digest]io.ReadSeeker
-}
-
 func createRegistry(t *testing.T, driver driver.StorageDriver, options ...RegistryOption) distribution.Namespace {
 	ctx := context.Background()
 	k, err := libtrust.GenerateECP256PrivateKey()
@@ -49,16 +43,6 @@ func makeRepository(t *testing.T, registry distribution.Namespace, name string) 
 		t.Fatalf("Failed to construct repository: %v", err)
 	}
 	return repo
-}
-
-func makeManifestService(t *testing.T, repository distribution.Repository) distribution.ManifestService {
-	ctx := context.Background()
-
-	manifestService, err := repository.Manifests(ctx)
-	if err != nil {
-		t.Fatalf("Failed to construct manifest store: %v", err)
-	}
-	return manifestService
 }
 
 func allManifests(t *testing.T, manifestService distribution.ManifestService) map[digest.Digest]struct{} {
@@ -92,72 +76,6 @@ func allBlobs(t *testing.T, registry distribution.Namespace) map[digest.Digest]s
 	return allBlobsMap
 }
 
-func uploadImage(t *testing.T, repository distribution.Repository, im image) digest.Digest {
-	// upload layers
-	err := testutil.UploadBlobs(repository, im.layers)
-	if err != nil {
-		t.Fatalf("layer upload failed: %v", err)
-	}
-
-	// upload manifest
-	ctx := context.Background()
-	manifestService := makeManifestService(t, repository)
-	manifestDigest, err := manifestService.Put(ctx, im.manifest)
-	if err != nil {
-		t.Fatalf("manifest upload failed: %v", err)
-	}
-
-	return manifestDigest
-}
-
-func uploadRandomSchema1Image(t *testing.T, repository distribution.Repository) image {
-	randomLayers, err := testutil.CreateRandomLayers(2)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	digests := []digest.Digest{}
-	for digest := range randomLayers {
-		digests = append(digests, digest)
-	}
-
-	manifest, err := testutil.MakeSchema1Manifest(digests)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	manifestDigest := uploadImage(t, repository, image{manifest: manifest, layers: randomLayers})
-	return image{
-		manifest:       manifest,
-		manifestDigest: manifestDigest,
-		layers:         randomLayers,
-	}
-}
-
-func uploadRandomSchema2Image(t *testing.T, repository distribution.Repository) image {
-	randomLayers, err := testutil.CreateRandomLayers(2)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	digests := []digest.Digest{}
-	for digest := range randomLayers {
-		digests = append(digests, digest)
-	}
-
-	manifest, err := testutil.MakeSchema2Manifest(repository, digests)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	manifestDigest := uploadImage(t, repository, image{manifest: manifest, layers: randomLayers})
-	return image{
-		manifest:       manifest,
-		manifestDigest: manifestDigest,
-		layers:         randomLayers,
-	}
-}
-
 func TestNoDeletionNoEffect(t *testing.T) {
 	ctx := context.Background()
 	inmemoryDriver := inmemory.New()
@@ -166,14 +84,23 @@ func TestNoDeletionNoEffect(t *testing.T) {
 	repo := makeRepository(t, registry, "palailogos")
 	manifestService, _ := repo.Manifests(ctx)
 
-	image1 := uploadRandomSchema1Image(t, repo)
-	image2 := uploadRandomSchema1Image(t, repo)
-	uploadRandomSchema2Image(t, repo)
+	image1, err := testutil.UploadRandomSchema1Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema1 image: %v", err)
+	}
+	image2, err := testutil.UploadRandomSchema1Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema1 image: %v", err)
+	}
+	_, err = testutil.UploadRandomSchema2Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema2 image: %v", err)
+	}
 
 	// construct manifestlist for fun.
 	blobstatter := registry.BlobStatter()
 	manifestList, err := testutil.MakeManifestList(blobstatter, []digest.Digest{
-		image1.manifestDigest, image2.manifestDigest})
+		image1.ManifestDigest, image2.ManifestDigest})
 	if err != nil {
 		t.Fatalf("Failed to make manifest list: %v", err)
 	}
@@ -302,7 +229,10 @@ func TestGCWithMissingManifests(t *testing.T) {
 
 	registry := createRegistry(t, d)
 	repo := makeRepository(t, registry, "testrepo")
-	uploadRandomSchema1Image(t, repo)
+	_, err := testutil.UploadRandomSchema1Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema1 image: %v", err)
+	}
 
 	// Simulate a missing _manifests directory
 	revPath, err := pathFor(manifestRevisionsPathSpec{"testrepo"})
@@ -338,15 +268,24 @@ func TestDeletionHasEffect(t *testing.T) {
 	repo := makeRepository(t, registry, "komnenos")
 	manifests, _ := repo.Manifests(ctx)
 
-	image1 := uploadRandomSchema1Image(t, repo)
-	image2 := uploadRandomSchema1Image(t, repo)
-	image3 := uploadRandomSchema2Image(t, repo)
+	image1, err := testutil.UploadRandomSchema1Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema1 image: %v", err)
+	}
+	image2, err := testutil.UploadRandomSchema1Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema1 image: %v", err)
+	}
+	image3, err := testutil.UploadRandomSchema2Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema2 image: %v", err)
+	}
 
-	manifests.Delete(ctx, image2.manifestDigest)
-	manifests.Delete(ctx, image3.manifestDigest)
+	manifests.Delete(ctx, image2.ManifestDigest)
+	manifests.Delete(ctx, image3.ManifestDigest)
 
 	// Run GC
-	err := MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
+	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: false,
 	})
@@ -357,24 +296,24 @@ func TestDeletionHasEffect(t *testing.T) {
 	blobs := allBlobs(t, registry)
 
 	// check that the image1 manifest and all the layers are still in blobs
-	if _, ok := blobs[image1.manifestDigest]; !ok {
+	if _, ok := blobs[image1.ManifestDigest]; !ok {
 		t.Fatalf("First manifest is missing")
 	}
 
-	for layer := range image1.layers {
+	for layer := range image1.Layers {
 		if _, ok := blobs[layer]; !ok {
 			t.Fatalf("manifest 1 layer is missing: %v", layer)
 		}
 	}
 
 	// check that image2 and image3 layers are not still around
-	for layer := range image2.layers {
+	for layer := range image2.Layers {
 		if _, ok := blobs[layer]; ok {
 			t.Fatalf("manifest 2 layer is present: %v", layer)
 		}
 	}
 
-	for layer := range image3.layers {
+	for layer := range image3.Layers {
 		if _, ok := blobs[layer]; ok {
 			t.Fatalf("manifest 3 layer is present: %v", layer)
 		}
@@ -436,7 +375,10 @@ func TestDeletionWithSharedLayer(t *testing.T) {
 		t.Fatalf("failed to make manifest: %v", err)
 	}
 
-	manifestService := makeManifestService(t, repo)
+	manifestService, err := testutil.MakeManifestService(repo)
+	if err != nil {
+		t.Fatalf("failed to make manifest service: %v", err)
+	}
 
 	// Upload manifests
 	_, err = manifestService.Put(ctx, manifest1)
@@ -480,7 +422,10 @@ func TestOrphanBlobDeleted(t *testing.T) {
 	}
 
 	// formality to create the necessary directories
-	uploadRandomSchema2Image(t, repo)
+	testutil.UploadRandomSchema2Image(repo)
+	if err != nil {
+		t.Fatalf("failed to upload random schema2 image: %v", err)
+	}
 
 	// Run GC
 	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{

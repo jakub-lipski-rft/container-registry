@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -16,7 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/storage"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/docker/distribution/testutil"
+	"github.com/docker/libtrust"
 	"gopkg.in/check.v1"
 )
 
@@ -1190,6 +1195,78 @@ func (suite *DriverSuite) benchmarkWalk(c *check.C, numFiles int, f storagedrive
 		c.StartTimer()
 
 		err := suite.StorageDriver.Walk(suite.ctx, rootDirectory, f)
+		c.Assert(err, check.IsNil)
+	}
+}
+
+// BenchmarkMarkAndSweep10Images uploads 10 images, deletes half and runs
+// garbage collection on the registry.
+func (suite *DriverSuite) BenchmarkMarkAndSweep10Images(c *check.C) {
+	suite.benchmarkMarkAndSweep(c, 10)
+}
+
+// BenchmarkMarkAndSweep50Images uploads 10 images, deletes half and runs
+// garbage collection on the registry.
+func (suite *DriverSuite) BenchmarkMarkAndSweep50Images(c *check.C) {
+	suite.benchmarkMarkAndSweep(c, 50)
+}
+
+func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int) {
+	// Setup for this test takes a long time, even with small numbers of images,
+	// so keep the skip logic here in the sub test.
+	if testing.Short() {
+		c.Skip("Skipping test in short mode")
+	}
+
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	k, err := libtrust.GenerateECP256PrivateKey()
+	c.Assert(err, check.IsNil)
+
+	registry, err := storage.NewRegistry(suite.ctx, suite.StorageDriver,
+		[]storage.RegistryOption{
+			storage.EnableDelete,
+			storage.Schema1SigningKey(k),
+			storage.EnableSchema1,
+		}...)
+	c.Assert(err, check.IsNil)
+
+	for n := 0; n < c.N; n++ {
+
+		c.StopTimer()
+
+		named, err := reference.WithName(fmt.Sprintf("benchmarks-repo-%d", n))
+		c.Assert(err, check.IsNil)
+
+		repo, err := registry.Repository(suite.ctx, named)
+		c.Assert(err, check.IsNil)
+
+		manifests, err := repo.Manifests(suite.ctx)
+		c.Assert(err, check.IsNil)
+
+		images := make([]testutil.Image, numImages)
+
+		for i := 0; i < numImages; i++ {
+			// Alternate between Schema1 and Schema2 images
+			if i%2 == 0 {
+				images[i], err = testutil.UploadRandomSchema1Image(repo)
+				c.Assert(err, check.IsNil)
+			} else {
+				images[i], err = testutil.UploadRandomSchema2Image(repo)
+				c.Assert(err, check.IsNil)
+			}
+
+			// Delete the manifests, so that their blobs can be garbage collected.
+			manifests.Delete(suite.ctx, images[i].ManifestDigest)
+		}
+
+		c.StartTimer()
+
+		// Run GC
+		err = storage.MarkAndSweep(context.Background(), suite.StorageDriver, registry, storage.GCOpts{
+			DryRun:         false,
+			RemoveUntagged: false,
+		})
 		c.Assert(err, check.IsNil)
 	}
 }
