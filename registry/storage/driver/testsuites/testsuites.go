@@ -1061,6 +1061,9 @@ func (suite *DriverSuite) benchmarkPutGetFiles(c *check.C, size int64) {
 
 // BenchmarkStreamEmptyFiles benchmarks Writer/Reader for 0B files
 func (suite *DriverSuite) BenchmarkStreamEmptyFiles(c *check.C) {
+	if suite.StorageDriver.Name() == "s3aws" {
+		c.Skip("S3 multipart uploads require at least 1 chunk (>0B)")
+	}
 	suite.benchmarkStreamFiles(c, 0)
 }
 
