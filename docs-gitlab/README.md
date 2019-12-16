@@ -2,7 +2,7 @@
 
 ## Guides
 
-[Local Integration Testing](./docs-gitlab/storage-driver-integration-testing-guide.md)
+[Local Integration Testing](storage-driver-integration-testing-guide.md)
 
 ## Differences From Upstream
 
