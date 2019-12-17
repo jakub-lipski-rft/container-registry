@@ -1405,7 +1405,7 @@ func randomBranchingFiles(root string, n int) []string {
 
 // randomBytes pre-allocates all of the memory sizes needed for the test. If
 // anything panics while accessing randomBytes, just make this number bigger.
-var randomBytes = make([]byte, 128<<20)
+var randomBytes = make([]byte, 128<<23)
 
 func init() {
 	_, _ = rand.Read(randomBytes) // always returns len(randomBytes) and nil error
