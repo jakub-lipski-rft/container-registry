@@ -232,6 +232,8 @@ func (lbs *linkedBlobStore) Delete(ctx context.Context, dgst digest.Digest) erro
 	return nil
 }
 
+// Enumerate will traverse the repository looking for link files. When one is found, the content is parsed (digest) and
+// sent to ingestor. If a link file is corrupted (e.g. 0B in size or invalid digest) it is ignored, and the walk continues.
 func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(digest.Digest) error) error {
 	rootPath, err := pathFor(lbs.linkDirectoryPathSpec)
 	if err != nil {
@@ -251,13 +253,18 @@ func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(digest.
 		}
 
 		// read the digest found in link
-		digest, err := lbs.blobStore.readlink(ctx, filePath)
+		d, err := lbs.blobStore.readlink(ctx, filePath)
 		if err != nil {
+			// ignore if the link file is empty or doesn't contain a valid checksum (the GC should erase the blobs during the sweep stage)
+			if err == digest.ErrDigestInvalidFormat {
+				dcontext.GetLoggerWithField(ctx, "path", filePath).Warnf("invalid link file, ignoring")
+				return nil
+			}
 			return err
 		}
 
 		// ensure this conforms to the linkPathFns
-		_, err = lbs.Stat(ctx, digest)
+		_, err = lbs.Stat(ctx, d)
 		if err != nil {
 			// we expect this error to occur so we move on
 			if err == distribution.ErrBlobUnknown {
@@ -266,11 +273,10 @@ func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(digest.
 			return err
 		}
 
-		err = ingestor(digest)
+		err = ingestor(d)
 		if err != nil {
 			return err
 		}
-
 		return nil
 	})
 }
