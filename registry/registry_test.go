@@ -40,9 +40,13 @@ func TestNextProtos(t *testing.T) {
 
 func setupRegistry() (*Registry, error) {
 	config := &configuration.Configuration{}
-	// TODO: this needs to change to something ephemeral as the test will fail if there is any server
-	// already listening on port 5000
-	config.HTTP.Addr = ":5000"
+	// probe free port where the server can listen
+	ln, err := net.Listen("tcp", ":")
+	if err != nil {
+		return nil, err
+	}
+	defer ln.Close()
+	config.HTTP.Addr = ln.Addr().String()
 	config.HTTP.DrainTimeout = time.Duration(10) * time.Second
 	config.Storage = map[string]configuration.Parameters{"inmemory": map[string]interface{}{}}
 	return NewRegistry(context.Background(), config)
@@ -69,7 +73,7 @@ func TestGracefulShutdown(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// send incomplete request
-	conn, err := net.Dial("tcp", "localhost:5000")
+	conn, err := net.Dial("tcp", registry.config.HTTP.Addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +84,7 @@ func TestGracefulShutdown(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// try connecting again. it shouldn't
-	_, err = net.Dial("tcp", "localhost:5000")
+	_, err = net.Dial("tcp", registry.config.HTTP.Addr)
 	if err == nil {
 		t.Fatal("Managed to connect after stopping.")
 	}
