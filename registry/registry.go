@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	prometheus "github.com/docker/distribution/metrics"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -112,6 +113,18 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 	handler = panicHandler(handler)
 	if !config.Log.AccessLog.Disabled {
 		handler = gorhandlers.CombinedLoggingHandler(os.Stdout, handler)
+	}
+
+	// expose build info through Prometheus (`registry_build_info` gauge)
+	if app.Config.HTTP.Debug.Prometheus.Enabled {
+		ns := metrics.NewNamespace(prometheus.NamespacePrefix, "", nil)
+		registryInfo := ns.NewLabeledGauge(
+			"build",
+			"Information about the registry.", metrics.Unit("info"),
+			"version", "revision", "package",
+		)
+		metrics.Register(ns)
+		registryInfo.WithValues(version.Version, version.Revision, version.Package).Set(1)
 	}
 
 	server := &http.Server{
