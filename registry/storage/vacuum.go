@@ -29,13 +29,8 @@ type Vacuum struct {
 }
 
 // RemoveBlob removes a blob from the filesystem
-func (v Vacuum) RemoveBlob(dgst string) error {
-	d, err := digest.Parse(dgst)
-	if err != nil {
-		return err
-	}
-
-	blobPath, err := pathFor(blobPathSpec{digest: d})
+func (v Vacuum) RemoveBlob(dgst digest.Digest) error {
+	blobPath, err := pathFor(blobPathSpec{digest: dgst})
 	if err != nil {
 		return err
 	}
