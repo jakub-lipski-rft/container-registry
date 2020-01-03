@@ -190,7 +190,7 @@ func TestFromParameters(t *testing.T) {
 			t.Fatalf("unable to create a new S3 driver: %v", err)
 		}
 
-		pathStyle := d.baseEmbed.Base.StorageDriver.(*driver).S3.Client.Config.S3ForcePathStyle
+		pathStyle := d.baseEmbed.Base.StorageDriver.(*driver).S3.(*s3.S3).Client.Config.S3ForcePathStyle
 		if pathStyle == nil {
 			t.Fatal("expected pathStyle not to be nil")
 		}

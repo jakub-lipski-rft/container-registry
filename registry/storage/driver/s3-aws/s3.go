@@ -35,6 +35,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/client/transport"
@@ -139,7 +140,7 @@ func (factory *s3DriverFactory) Create(parameters map[string]interface{}) (stora
 }
 
 type driver struct {
-	S3                          *s3.S3
+	S3                          s3iface.S3API
 	Bucket                      string
 	ChunkSize                   int64
 	Encrypt                     bool
