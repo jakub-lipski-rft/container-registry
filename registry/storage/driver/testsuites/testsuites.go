@@ -17,11 +17,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
+	"github.com/docker/libtrust"
+
 	"github.com/docker/distribution/registry/storage"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/testutil"
-	"github.com/docker/libtrust"
 	"gopkg.in/check.v1"
 )
 
@@ -1202,6 +1204,32 @@ func (suite *DriverSuite) benchmarkWalk(c *check.C, numFiles int, f storagedrive
 	}
 }
 
+func (suite *DriverSuite) createRegistry(c *check.C, options ...storage.RegistryOption) distribution.Namespace {
+	k, err := libtrust.GenerateECP256PrivateKey()
+	if err != nil {
+		c.Fatal(err)
+	}
+	options = append([]storage.RegistryOption{storage.EnableDelete, storage.Schema1SigningKey(k), storage.EnableSchema1}, options...)
+	registry, err := storage.NewRegistry(suite.ctx, suite.StorageDriver, options...)
+	if err != nil {
+		c.Fatalf("Failed to construct namespace")
+	}
+	return registry
+}
+
+func (suite *DriverSuite) makeRepository(c *check.C, registry distribution.Namespace, name string) distribution.Repository {
+	named, err := reference.WithName(name)
+	if err != nil {
+		c.Fatalf("Failed to parse name %s:  %v", name, err)
+	}
+
+	repo, err := registry.Repository(suite.ctx, named)
+	if err != nil {
+		c.Fatalf("Failed to construct repository: %v", err)
+	}
+	return repo
+}
+
 // BenchmarkMarkAndSweep10Images uploads 10 images, deletes half and runs
 // garbage collection on the registry.
 func (suite *DriverSuite) BenchmarkMarkAndSweep10Images(c *check.C) {
@@ -1223,26 +1251,12 @@ func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int) {
 
 	defer suite.deletePath(c, firstPart("docker/"))
 
-	k, err := libtrust.GenerateECP256PrivateKey()
-	c.Assert(err, check.IsNil)
-
-	registry, err := storage.NewRegistry(suite.ctx, suite.StorageDriver,
-		[]storage.RegistryOption{
-			storage.EnableDelete,
-			storage.Schema1SigningKey(k),
-			storage.EnableSchema1,
-		}...)
-	c.Assert(err, check.IsNil)
-
 	for n := 0; n < c.N; n++ {
 
 		c.StopTimer()
 
-		named, err := reference.WithName(fmt.Sprintf("benchmarks-repo-%d", n))
-		c.Assert(err, check.IsNil)
-
-		repo, err := registry.Repository(suite.ctx, named)
-		c.Assert(err, check.IsNil)
+		registry := suite.createRegistry(c)
+		repo := suite.makeRepository(c, registry, fmt.Sprintf("benchmarks-repo-%d", n))
 
 		manifests, err := repo.Manifests(suite.ctx)
 		c.Assert(err, check.IsNil)
@@ -1272,6 +1286,110 @@ func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int) {
 		})
 		c.Assert(err, check.IsNil)
 	}
+}
+
+func (suite *DriverSuite) benchmarkRemoveManifest(c *check.C, numManifests, numTagsPerManifest int) {
+	if testing.Short() {
+		c.Skip("Skipping test in short mode")
+	}
+
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	registry := suite.createRegistry(c)
+	repo := suite.makeRepository(c, registry, randomFilename(5))
+	repoName := repo.Named().Name()
+
+	for n := 0; n < c.N; n++ {
+		c.StopTimer()
+
+		images := make([]testutil.Image, numManifests)
+		manifests := make([]storage.ManifestDel, 0)
+
+		var err error
+		for i := 0; i < numManifests; i++ {
+			// build images, alternating between Schema1 and Schema2 manifests
+			if i%2 == 0 {
+				images[i], err = testutil.UploadRandomSchema1Image(repo)
+			} else {
+				images[i], err = testutil.UploadRandomSchema2Image(repo)
+			}
+			c.Assert(err, check.IsNil)
+
+			// tag manifests
+			tags := make([]string, 0, numTagsPerManifest)
+			for j := 0; j < numTagsPerManifest; j++ {
+				t := randomFilename(5)
+				d := images[i].ManifestDigest
+				err := repo.Tags(suite.ctx).Tag(suite.ctx, t, distribution.Descriptor{Digest: d})
+				c.Assert(err, check.IsNil)
+				tags = append(tags, t)
+			}
+
+			// add manifest to delete list
+			manifests = append(manifests, storage.ManifestDel{
+				Name:   repoName,
+				Digest: images[i].ManifestDigest,
+				Tags:   tags,
+			})
+		}
+
+		v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+		c.StartTimer()
+
+		for _, m := range manifests {
+			err := v.RemoveManifest(m.Name, m.Digest, m.Tags)
+			c.Assert(err, check.IsNil)
+		}
+	}
+}
+
+// BenchmarkRemoveManifest1Manifest0Tags creates 1 manifest with no tags and deletes it using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest1Manifest0Tags(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 1, 0)
+}
+
+// BenchmarkRemoveManifest1Manifest1Tag creates 1 manifest with 1 tag and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest1Manifest1Tag(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 1, 1)
+}
+
+// BenchmarkRemoveManifest10Manifests0TagsEach creates 10 manifests with no tags and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest10Manifests0TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 10, 0)
+}
+
+// BenchmarkRemoveManifest10Manifests1TagEach creates 10 manifests with 1 tag each and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest10Manifests1TagEach(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 10, 1)
+}
+
+// BenchmarkRemoveManifest100Manifests0TagsEach creates 100 manifests with no tags and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests0TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 100, 0)
+}
+
+// BenchmarkRemoveManifest100Manifests1TagEach creates 100 manifests with 1 tag each and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests1TagEach(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 100, 1)
+}
+
+// BenchmarkRemoveManifest100Manifests10TagsEach creates 100 manifests with 10 tags each and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests10TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 100, 10)
+}
+
+// BenchmarkRemoveManifest100Manifests20TagsEach creates 100 manifests with 20 tags each and deletes them using the
+// storage.Vacuum.RemoveManifest method.
+func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests20TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifest(c, 100, 20)
 }
 
 func (suite *DriverSuite) testFileStreams(c *check.C, size int64) {
