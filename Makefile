@@ -48,9 +48,9 @@ version/version.go:
 	@echo "$(WHALE) $@"
 	./version/version.sh > $@
 
-check: ## run all linters (TODO: enable "unused", "varcheck", "ineffassign", "unconvert", "staticheck", "goimports", "structcheck")
+check: ## run golangci-lint, with defaults
 	@echo "$(WHALE) $@"
-	gometalinter --config .gometalinter.json ./...
+	golangci-lint run
 
 test: ## run tests, except integration test with test.short
 	@echo "$(WHALE) $@"
