@@ -114,8 +114,8 @@ func (te *testEnv) RemoteStats() *map[string]int {
 }
 
 // Populate remote store and record the digests
-func makeTestEnv(t *testing.T, name string) *testEnv {
-	nameRef, err := reference.WithName(name)
+func makeTestEnv(t *testing.T) *testEnv {
+	nameRef, err := reference.WithName("foo/bar")
 	if err != nil {
 		t.Fatalf("unable to parse reference: %s", err)
 	}
@@ -233,7 +233,7 @@ func populate(t *testing.T, te *testEnv, blobCount, size, numUnique int) {
 	te.numUnique = numUnique
 }
 func TestProxyStoreGet(t *testing.T) {
-	te := makeTestEnv(t, "foo/bar")
+	te := makeTestEnv(t)
 
 	localStats := te.LocalStats()
 	remoteStats := te.RemoteStats()
@@ -268,7 +268,7 @@ func TestProxyStoreGet(t *testing.T) {
 }
 
 func TestProxyStoreStat(t *testing.T) {
-	te := makeTestEnv(t, "foo/bar")
+	te := makeTestEnv(t)
 
 	remoteBlobCount := 1
 	populate(t, te, remoteBlobCount, 10, 1)
@@ -299,7 +299,7 @@ func TestProxyStoreStat(t *testing.T) {
 }
 
 func TestProxyStoreServeHighConcurrency(t *testing.T) {
-	te := makeTestEnv(t, "foo/bar")
+	te := makeTestEnv(t)
 	blobSize := 200
 	blobCount := 10
 	numUnique := 1
@@ -310,7 +310,7 @@ func TestProxyStoreServeHighConcurrency(t *testing.T) {
 }
 
 func TestProxyStoreServeMany(t *testing.T) {
-	te := makeTestEnv(t, "foo/bar")
+	te := makeTestEnv(t)
 	blobSize := 200
 	blobCount := 10
 	numUnique := 4
@@ -322,7 +322,7 @@ func TestProxyStoreServeMany(t *testing.T) {
 
 // todo(richardscothern): blobCount must be smaller than num clients
 func TestProxyStoreServeBig(t *testing.T) {
-	te := makeTestEnv(t, "foo/bar")
+	te := makeTestEnv(t)
 
 	blobSize := 2 << 20
 	blobCount := 4

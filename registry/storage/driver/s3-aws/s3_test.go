@@ -132,7 +132,6 @@ func init() {
 }
 
 func TestFromParameters(t *testing.T) {
-
 	// Minimal params needed to construct the driver.
 	baseParams := map[string]interface{}{
 		"region": "us-west-2",

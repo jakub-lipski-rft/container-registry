@@ -645,6 +645,8 @@ func TestEndpointAuthorizeTokenBasicWithExpiresIn(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error sending get request: %s", err)
 		}
+		defer resp.Body.Close()
+
 		if resp.StatusCode != http.StatusAccepted {
 			t.Fatalf("Unexpected status code: %d, expected %d", resp.StatusCode, http.StatusAccepted)
 		}
@@ -797,6 +799,8 @@ func TestEndpointAuthorizeTokenBasicWithExpiresInAndIssuedAt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error sending get request: %s", err)
 		}
+		defer resp.Body.Close()
+
 		if resp.StatusCode != http.StatusAccepted {
 			t.Fatalf("Unexpected status code: %d, expected %d", resp.StatusCode, http.StatusAccepted)
 		}

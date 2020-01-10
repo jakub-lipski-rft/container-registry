@@ -34,7 +34,6 @@ func init() {
 }
 
 func TestFromParametersImpl(t *testing.T) {
-
 	tests := []struct {
 		params   map[string]interface{} // techincally the yaml can contain anything
 		expected DriverParameters

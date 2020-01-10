@@ -8,7 +8,6 @@ import (
 )
 
 func TestParseHTPasswd(t *testing.T) {
-
 	for _, tc := range []struct {
 		desc    string
 		input   string
