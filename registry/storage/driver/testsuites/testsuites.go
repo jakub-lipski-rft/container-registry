@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/libtrust"
@@ -1286,6 +1288,92 @@ func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int) {
 		})
 		c.Assert(err, check.IsNil)
 	}
+}
+
+func (suite *DriverSuite) buildBlobs(c *check.C, repo distribution.Repository, n int) []digest.Digest {
+	dgsts := make([]digest.Digest, 0, n)
+
+	// build and upload random layers
+	layers, err := testutil.CreateRandomLayers(n)
+	if err != nil {
+		c.Fatalf("failed to create random digest: %v", err)
+	}
+	if err = testutil.UploadBlobs(repo, layers); err != nil {
+		c.Fatalf("failed to upload blob: %v", err)
+	}
+
+	// collect digests from layers map
+	for d := range layers {
+		dgsts = append(dgsts, d)
+	}
+
+	return dgsts
+}
+
+// TestRemoveBlob checks that storage.Vacuum is able to delete a single blob.
+func (suite *DriverSuite) TestRemoveBlob(c *check.C) {
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	registry := suite.createRegistry(c)
+	repo := suite.makeRepository(c, registry, randomFilename(5))
+	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+	// build two blobs, one more than the number to delete, otherwise there will be no /docker/registry/v2/blobs path
+	// for validation after delete
+	blobs := suite.buildBlobs(c, repo, 2)
+	blob := blobs[0]
+
+	err := v.RemoveBlob(blob)
+	c.Assert(err, check.IsNil)
+
+	blobService := registry.Blobs()
+	blobsLeft := make(map[digest.Digest]struct{})
+	err = blobService.Enumerate(suite.ctx, func(dgst digest.Digest) error {
+		blobsLeft[dgst] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		c.Fatalf("error getting all blobs: %v", err)
+	}
+
+	c.Assert(len(blobsLeft), check.Equals, 1)
+	if _, exists := blobsLeft[blob]; exists {
+		c.Errorf("blob %q was not deleted", blob.String())
+	}
+}
+
+func (suite *DriverSuite) benchmarkRemoveBlob(c *check.C, numBlobs int) {
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	registry := suite.createRegistry(c)
+	repo := suite.makeRepository(c, registry, randomFilename(5))
+	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+	for n := 0; n < c.N; n++ {
+		c.StopTimer()
+		blobs := suite.buildBlobs(c, repo, numBlobs)
+		c.StartTimer()
+
+		for _, b := range blobs {
+			err := v.RemoveBlob(b)
+			c.Assert(err, check.IsNil)
+		}
+	}
+}
+
+// BenchmarkRemoveBlob1Blob creates 1 blob and deletes it using the storage.Vacuum.RemoveBlob method.
+func (suite *DriverSuite) BenchmarkRemoveBlob1Blob(c *check.C) {
+	suite.benchmarkRemoveBlob(c, 1)
+}
+
+// BenchmarkRemoveBlob10Blobs creates 10 blobs and deletes them using the storage.Vacuum.RemoveBlob method.
+func (suite *DriverSuite) BenchmarkRemoveBlob10Blobs(c *check.C) {
+	suite.benchmarkRemoveBlob(c, 10)
+}
+
+// BenchmarkRemoveBlob100Blobs creates 100 blobs and deletes them using the storage.Vacuum.RemoveBlob method.
+func (suite *DriverSuite) BenchmarkRemoveBlob100Blobs(c *check.C) {
+	suite.benchmarkRemoveBlob(c, 100)
 }
 
 func (suite *DriverSuite) benchmarkRemoveManifest(c *check.C, numManifests, numTagsPerManifest int) {
