@@ -53,6 +53,16 @@ verify:
     - make binaries
     - make coverage
 
+filesystem:
+  stage: integration
+  before_script: *inject-gopath
+  script: go test -v github.com/docker/distribution/registry/storage/driver/filesystem -args -check.v -test.short
+
+inmemory:
+  stage: integration
+  before_script: *inject-gopath
+  script: go test -v github.com/docker/distribution/registry/storage/driver/inmemory -args -check.v -test.short
+
 s3:
   stage: integration
   before_script: *inject-gopath
