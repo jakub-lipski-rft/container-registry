@@ -104,7 +104,6 @@ const (
 // For more information on the semantic meaning of each path and their
 // contents, please see the path spec documentation.
 func pathFor(spec pathSpec) (string, error) {
-
 	// Switch on the path object type and return the appropriate path. At
 	// first glance, one may wonder why we don't use an interface to
 	// accomplish this. By keep the formatting separate from the pathSpec, we
