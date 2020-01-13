@@ -3,14 +3,6 @@ image: golang:1.12-buster
 variables:
   BUILDTAGS: "include_gcs include_oss"
   CGO_ENABLED: 1
-  AWS_ACCESS_KEY: "AKIAIOSFODNN7EXAMPLE"
-  AWS_SECRET_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-  MINIO_ACCESS_KEY: $AWS_ACCESS_KEY
-  MINIO_SECRET_KEY: $AWS_SECRET_KEY
-  REGION_ENDPOINT: "http://minio:9000"
-  AWS_REGION: "us-east-2"
-  S3_BUCKET: "test-bucket"
-  S3_ENCRYPT: "false"
 
 stages:
   - test
@@ -43,7 +35,6 @@ static-analysis:
       - gl-code-quality-report.json
   allow_failure: true
 
-
 verify:
   stage: test
   before_script: *inject-gopath
@@ -53,28 +44,40 @@ verify:
     - make binaries
     - make coverage
 
-filesystem:
+.storage-driver-test: &storage-driver-test
   stage: integration
   before_script: *inject-gopath
-  script: go test -v github.com/docker/distribution/registry/storage/driver/filesystem -args -check.v -test.short
+  script: go test -v github.com/docker/distribution/registry/storage/driver/$CI_JOB_NAME -args -check.v -test.short
+
+filesystem:
+  <<: *storage-driver-test
 
 inmemory:
-  stage: integration
-  before_script: *inject-gopath
-  script: go test -v github.com/docker/distribution/registry/storage/driver/inmemory -args -check.v -test.short
+  <<: *storage-driver-test
 
-s3:
-  stage: integration
-  before_script: *inject-gopath
+swift:
+  <<: *storage-driver-test
+
+s3-aws:
+  <<: *storage-driver-test
+  variables:
+    AWS_ACCESS_KEY: "AKIAIOSFODNN7EXAMPLE"
+    AWS_SECRET_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+    MINIO_ACCESS_KEY: $AWS_ACCESS_KEY
+    MINIO_SECRET_KEY: $AWS_SECRET_KEY
+    REGION_ENDPOINT: "http://minio:9000"
+    AWS_REGION: "us-east-2"
+    S3_BUCKET: "test-bucket"
+    S3_ENCRYPT: "false"
   services:
-  - name: minio/minio:latest
-    alias: "minio"
-    command: ["server", "/data"]
-  script:
+    - name: minio/minio:latest
+      alias: "minio"
+      command: ["server", "/data"]
+  before_script:
+    - *inject-gopath
     # Download the minio client
     - wget --no-verbose https://dl.min.io/client/mc/release/linux-amd64/mc
     - chmod u+x ./mc
     # Configure the minio client to use the local minio service rather than play.minio.io
     - ./mc config host add s3v4 $REGION_ENDPOINT $AWS_ACCESS_KEY $AWS_SECRET_KEY --api S3v4
     - ./mc mb s3v4/$S3_BUCKET
-    - go test -v github.com/docker/distribution/registry/storage/driver/s3-aws -args -check.v -test.short
