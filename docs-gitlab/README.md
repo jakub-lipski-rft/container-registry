@@ -28,3 +28,23 @@ Blobs related with invalid link files will be automatically swept away in the
 
 See [Cleanup Invalid Link Files](cleanup-invalid-link-files.md) for a guide on
 how to detect and clean these files based on the garbage collector output log.
+
+## Releases
+
+Release planning is done by using the `Release Plan` issue template during the
+planning phase of a new milestone.
+
+The template will include a list of container registry issues which
+are planned for the milestone that should be merged into and included in
+the release.
+
+Since multiple projects need to be updated to ensure a version of the Container
+Registry is released, this issue should have a due date set to one week before
+the milestone. This should allow enough time for the related merge requests to
+go through, especially if feedback is received.
+
+`release.sh`, located at the root of this repository, can be ran to aid in the
+tagging a new release. It will automatically suggest the next release version,
+and create the appropriate tag, and will prompt the user to make a changelog
+entry if the chosen release version is not present in the changelog. Once the
+changelog entry is made, the release tag will be pushed upstream.
