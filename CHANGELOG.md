@@ -1,3 +1,9 @@
+## v2.7.7-gitlab
+
+- registry/storage: Handle bad link files gracefully during garbage collection
+- registry/storage: AWS SDK v1.26.3 update
+- registry: Include build info on Prometheus metrics
+
 ## v2.7.6-gitlab
 
 - CI: Add integration tests for the S3 driver
