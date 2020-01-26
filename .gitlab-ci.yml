@@ -2,7 +2,7 @@ image: golang:1.12-buster
 
 variables:
   BUILDTAGS: "include_gcs include_oss"
-  CGO_ENABLED: 1
+  CGO_ENABLED: "1"
 
 stages:
   - test
