@@ -238,6 +238,22 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 	}
 }
 
+// DeleteFiles deletes a set of files by iterating over their full path list and invoking Delete for each. Returns the
+// number of successfully deleted files and any errors. This method is idempotent, no error is returned if a file does
+// not exist.
+func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
+	count := 0
+	for _, path := range paths {
+		if err := d.Delete(ctx, path); err != nil {
+			if _, ok := err.(storagedriver.PathNotFoundError); !ok {
+				return count, err
+			}
+		}
+		count++
+	}
+	return count, nil
+}
+
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
 // May return an UnsupportedMethodErr in certain StorageDriver implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {

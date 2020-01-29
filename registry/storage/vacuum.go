@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"path"
+	"time"
 
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage/driver"
@@ -45,38 +46,101 @@ func (v Vacuum) RemoveBlob(dgst digest.Digest) error {
 	return nil
 }
 
-// RemoveManifest removes a manifest from the filesystem
-func (v Vacuum) RemoveManifest(name string, dgst digest.Digest, tags []string) error {
-	// remove a tag manifest reference, in case of not found continue to next one
-	for _, tag := range tags {
-
-		tagsPath, err := pathFor(manifestTagIndexEntryPathSpec{name: name, revision: dgst, tag: tag})
+// RemoveBlobs removes a list of blobs from the filesystem. This is used exclusively by the garbage collector and
+// the intention is to leverage on bulk delete requests whenever supported by the storage backend.
+func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
+	start := time.Now()
+	blobPaths := make([]string, 0, len(dgsts))
+	for _, d := range dgsts {
+		// get the full path of the blob's data file
+		p, err := pathFor(blobDataPathSpec{digest: d})
 		if err != nil {
 			return err
 		}
+		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+			"digest": d,
+			"path":   p,
+		}).Info("blob eligible for deletion")
+		blobPaths = append(blobPaths, p)
+	}
 
-		_, err = v.driver.Stat(v.ctx, tagsPath)
+	total := len(blobPaths)
+	dcontext.GetLoggerWithField(v.ctx, "count", total).Info("deleting blobs")
+
+	count, err := v.driver.DeleteFiles(v.ctx, blobPaths)
+
+	l := dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		"count":      count,
+		"duration_s": time.Since(start).Seconds(),
+	})
+	if count < total {
+		l.Warn("blobs partially deleted")
+	} else {
+		l.Info("blobs deleted")
+	}
+
+	return err
+}
+
+// RemoveManifests removes a series of manifests from the filesystem. Unlike RemoveManifest, this bundles all related
+// tag index and manifest link files in a single driver.DeleteFiles request. The link files full path is used instead of
+// their parent directory path (which always contains a single file, the link itself).
+func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
+	start := time.Now()
+	var manifestLinks, tagLinks, allLinks []string
+	for _, m := range mm {
+		// get manifest revision link full path
+		p, err := pathFor(manifestRevisionLinkPathSpec{name: m.Name, revision: m.Digest})
 		if err != nil {
-			switch err := err.(type) {
-			case driver.PathNotFoundError:
-				continue
-			default:
+			return err
+		}
+		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+			"digest": m.Digest,
+			"path":   p,
+		}).Info("manifest eligible for deletion")
+
+		manifestLinks = append(manifestLinks, p)
+
+		for _, t := range m.Tags {
+			// get tag index link full path
+			p, err := pathFor(manifestTagIndexEntryLinkPathSpec{name: m.Name, revision: m.Digest, tag: t})
+			if err != nil {
 				return err
 			}
-		}
-		dcontext.GetLogger(v.ctx).Infof("deleting manifest tag reference: %s", tagsPath)
-		err = v.driver.Delete(v.ctx, tagsPath)
-		if err != nil {
-			return err
+			dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+				"tag":  t,
+				"path": p,
+			}).Info("manifest tag reference eligible for deletion")
+
+			tagLinks = append(tagLinks, p)
 		}
 	}
 
-	manifestPath, err := pathFor(manifestRevisionPathSpec{name: name, revision: dgst})
-	if err != nil {
-		return err
+	allLinks = append(manifestLinks, tagLinks...)
+	total := len(allLinks)
+	if total == 0 {
+		return nil
 	}
-	dcontext.GetLogger(v.ctx).Infof("deleting manifest: %s", manifestPath)
-	return v.driver.Delete(v.ctx, manifestPath)
+
+	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		"manifests": len(manifestLinks),
+		"tags":      len(tagLinks),
+		"total":     total,
+	}).Info("deleting manifests")
+
+	count, err := v.driver.DeleteFiles(v.ctx, allLinks)
+
+	l := dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		"count":      count,
+		"duration_s": time.Since(start).Seconds(),
+	})
+	if count < total {
+		l.Warn("manifests partially deleted")
+	} else {
+		l.Info("manifests deleted")
+	}
+
+	return err
 }
 
 // RemoveRepository removes a repository directory from the

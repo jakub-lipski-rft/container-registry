@@ -78,6 +78,16 @@ type StorageDriver interface {
 	// Delete recursively deletes all objects stored at "path" and its subpaths.
 	Delete(ctx context.Context, path string) error
 
+	// DeleteFiles deletes a set of files in bulk when supported by the
+	// underlying storage system. If not supported, DeleteFiles iterates over
+	// the path list and calls Delete for each one. The intention is to provide
+	// a more efficient method to remove files directly by their full path and
+	// in batches whenever possible. This should only be used for regular files
+	// and not for directories. Returns the number of successfully deleted
+	// files and any errors. This method is idempotent, no error is returned if
+	// a file does not exist.
+	DeleteFiles(ctx context.Context, paths []string) (int, error)
+
 	// URLFor returns a URL which may be used to retrieve the content stored at
 	// the given path, possibly using the given options.
 	// May return an ErrUnsupportedMethod in certain StorageDriver

@@ -336,6 +336,22 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
+// DeleteFiles deletes a set of files by iterating over their full path list and invoking Delete for each. Returns the
+// number of successfully deleted files and any errors. This method is idempotent, no error is returned if a file does
+// not exist.
+func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
+	count := 0
+	for _, path := range paths {
+		if err := d.Delete(ctx, path); err != nil {
+			if _, ok := err.(storagedriver.PathNotFoundError); !ok {
+				return count, err
+			}
+		}
+		count++
+	}
+	return count, nil
+}
+
 // URLFor returns a publicly accessible URL for the blob stored at given path
 // for specified duration by making use of Azure Storage Shared Access Signatures (SAS).
 // See https://msdn.microsoft.com/en-us/library/azure/ee395415.aspx for more info.
