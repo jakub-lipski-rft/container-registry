@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -281,6 +282,43 @@ func (d *driver) Delete(ctx context.Context, subPath string) error {
 
 	err = os.RemoveAll(fullPath)
 	return err
+}
+
+// DeleteFiles deletes a set of files by iterating over their full path list and invoking Delete for each. The parent
+// directory of each file is automatically removed if empty. Returns the number of successfully deleted files (parent
+// directories not included) and any errors. This method is idempotent, no error is returned if a file does not exist.
+func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
+	count := 0
+	for _, path := range paths {
+		if err := d.Delete(ctx, path); err != nil {
+			if _, ok := err.(storagedriver.PathNotFoundError); !ok {
+				return count, err
+			}
+		}
+		count++
+
+		// delete parent directory as well if empty
+		p := d.fullPath(filepath.Dir(path))
+		f, err := os.Open(p)
+		if err != nil {
+			// ignore if not found
+			if _, ok := err.(*os.PathError); !ok {
+				return count, err
+			}
+			continue
+		}
+
+		// Attempt to read info about 1 file within this directory,
+		// if err is of type io.EOF than the directory is empty.
+		if _, err = f.Readdir(1); err == io.EOF {
+			if err := os.Remove(p); err != nil {
+				f.Close()
+				return count, err
+			}
+		}
+		f.Close()
+	}
+	return count, nil
 }
 
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.

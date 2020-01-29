@@ -1,8 +1,10 @@
 package filesystem
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
+	"path"
 	"reflect"
 	"testing"
 
@@ -109,4 +111,120 @@ func TestFromParametersImpl(t *testing.T) {
 		}
 	}
 
+}
+
+// TestDeleteFilesEmptyParentDir checks that DeleteFiles removes parent directories if empty.
+func TestDeleteFilesEmptyParentDir(t *testing.T) {
+	rootDir, err := ioutil.TempDir("", "driver-")
+	if err != nil {
+		t.Fatalf("unexpected error creating temporary directory: %v", err)
+	}
+	defer os.Remove(rootDir)
+
+	d, err := FromParameters(map[string]interface{}{
+		"rootdirectory": rootDir,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating driver: %v", err)
+	}
+
+	parentDir := "/testdir"
+	fp := path.Join(parentDir, "testfile")
+	ctx := context.Background()
+
+	if err = d.PutContent(ctx, fp, []byte("contents")); err != nil {
+		t.Fatalf("unexpected error creating content: %v", err)
+	}
+
+	if _, err = d.DeleteFiles(ctx, []string{fp}); err != nil {
+		t.Errorf("unexpected error deleting files: %v", err)
+	}
+
+	// check deleted file
+	if _, err = d.Stat(ctx, fp); err == nil {
+		t.Errorf("expected error reading deleted file, got nil")
+	}
+	if _, ok := err.(storagedriver.PathNotFoundError); !ok {
+		t.Errorf("expected error to be of type storagedriver.PathNotFoundError, got %T", err)
+	}
+
+	// make sure the parent directory has been removed
+	if _, err = d.Stat(ctx, parentDir); err == nil {
+		t.Errorf("expected error reading parent directory, got nil")
+	}
+	if _, ok := err.(storagedriver.PathNotFoundError); !ok {
+		t.Errorf("expected error to be of type storagedriver.PathNotFoundError, got %T", err)
+	}
+}
+
+// TestDeleteFilesNonEmptyParentDir checks that DeleteFiles does not remove parent directories if not empty.
+func TestDeleteFilesNonEmptyParentDir(t *testing.T) {
+	rootDir, err := ioutil.TempDir("", "driver-")
+	if err != nil {
+		t.Fatalf("unexpected error creating temporary directory: %v", err)
+	}
+	defer os.Remove(rootDir)
+
+	d, err := FromParameters(map[string]interface{}{
+		"rootdirectory": rootDir,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating driver: %v", err)
+	}
+
+	parentDir := "/testdir"
+	fp := path.Join(parentDir, "testfile")
+	ctx := context.Background()
+
+	if err = d.PutContent(ctx, fp, []byte("contents")); err != nil {
+		t.Fatalf("unexpected error creating content: %v", err)
+	}
+
+	// add another test file, this one is not going to be deleted
+	if err = d.PutContent(ctx, path.Join(parentDir, "testfile2"), []byte("contents")); err != nil {
+		t.Fatalf("unexpected error creating content: %v", err)
+	}
+
+	if _, err = d.DeleteFiles(ctx, []string{fp}); err != nil {
+		t.Errorf("unexpected error deleting files: %v", err)
+	}
+
+	// check deleted file
+	if _, err = d.Stat(ctx, fp); err == nil {
+		t.Errorf("expected error reading deleted file, got nil")
+	}
+	if _, ok := err.(storagedriver.PathNotFoundError); !ok {
+		t.Errorf("expected error to be of type storagedriver.PathNotFoundError, got %T", err)
+	}
+
+	// make sure the parent directory has not been removed
+	if _, err = d.Stat(ctx, parentDir); err != nil {
+		t.Errorf("unexpected error reading parent directory: %v", err)
+	}
+}
+
+// TestDeleteFilesNonExistingParentDir checks that DeleteFiles is idempotent and doesn't return an error if a parent dir
+// of a not found file doesn't exist as well.
+func TestDeleteFilesNonExistingParentDir(t *testing.T) {
+	rootDir, err := ioutil.TempDir("", "driver-")
+	if err != nil {
+		t.Fatalf("unexpected error creating temporary directory: %v", err)
+	}
+	defer os.Remove(rootDir)
+
+	d, err := FromParameters(map[string]interface{}{
+		"rootdirectory": rootDir,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating driver: %v", err)
+	}
+
+	fp := path.Join("/non-existing-dir", "non-existing-file")
+	count, err := d.DeleteFiles(context.Background(), []string{fp})
+	if err != nil {
+		t.Errorf("unexpected error deleting files: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected deleted count to be 1, got %d", count)
+	}
 }

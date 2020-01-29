@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -73,6 +74,10 @@ const (
 
 // listMax is the largest amount of objects you can request from S3 in a list call
 const listMax = 1000
+
+// deleteMax is the largest amount of objects you can request to be deleted in S3 using a DeleteObjects call. This is
+// currently set to 1000 as per the S3 specification https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html
+const deleteMax = 1000
 
 // noStorageClass defines the value to be used if storage class is not supported by the S3 endpoint
 const noStorageClass = "NONE"
@@ -130,6 +135,23 @@ func init() {
 	// Register this as the default s3 driver in addition to s3aws
 	factory.Register("s3", &s3DriverFactory{})
 	factory.Register(driverName, &s3DriverFactory{})
+}
+
+// multiError is returned by batch operations when there are errors with particular elements.
+type multiError []error
+
+// Error allows multiError to implement the error interface, generating a single formatted error message.
+func (e multiError) Error() string {
+	if len(e) == 1 {
+		return e[0].Error()
+	}
+
+	var sb strings.Builder
+	for _, err := range e {
+		sb.WriteString(err.Error())
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // s3DriverFactory implements the factory.StorageDriverFactory interface
@@ -870,13 +892,13 @@ ListLoop:
 		}
 	}
 
-	// need to chunk objects into groups of 1000 per s3 restrictions
+	// need to chunk objects into groups of deleteMax per s3 restrictions
 	total := len(s3Objects)
-	for i := 0; i < total; i += 1000 {
+	for i := 0; i < total; i += deleteMax {
 		_, err := d.S3.DeleteObjects(&s3.DeleteObjectsInput{
 			Bucket: aws.String(d.Bucket),
 			Delete: &s3.Delete{
-				Objects: s3Objects[i:min(i+1000, total)],
+				Objects: s3Objects[i:min(i+deleteMax, total)],
 				Quiet:   aws.Bool(false),
 			},
 		})
@@ -885,6 +907,90 @@ ListLoop:
 		}
 	}
 	return nil
+}
+
+// DeleteFiles deletes a set of files using the S3 bulk delete feature, with up to deleteMax files per request. If
+// deleting more than deleteMax files, DeleteFiles will split files in deleteMax requests automatically. A separate
+// goroutine is created for each request. Contrary to Delete, which is a generic method to delete any kind of object,
+// DeleteFiles does not send a ListObjects request before DeleteObjects. Returns the number of successfully deleted
+// files and any errors. This method is idempotent, no error is returned if a file does not exist.
+func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
+	s3Objects := make([]*s3.ObjectIdentifier, 0, len(paths))
+	for i := range paths {
+		p := d.s3Path(paths[i])
+		s3Objects = append(s3Objects, &s3.ObjectIdentifier{Key: &p})
+	}
+
+	// collect errors from concurrent DeleteObjects requests
+	var errs multiError
+	errCh := make(chan multiError)
+	errDone := make(chan struct{})
+	go func() {
+		for err := range errCh {
+			errs = append(errs, err...)
+		}
+		errDone <- struct{}{}
+	}()
+
+	// count the number of successfully deleted files across concurrent DeleteObjects requests
+	count := 0
+	countCh := make(chan int)
+	countDone := make(chan struct{})
+	go func() {
+		for n := range countCh {
+			count += n
+		}
+		countDone <- struct{}{}
+	}()
+
+	// chunk files into batches of deleteMax (as per S3 restrictions), creating a goroutine per batch
+	var wg sync.WaitGroup
+	total := len(s3Objects)
+	for i := 0; i < total; i += deleteMax {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			resp, err := d.S3.DeleteObjects(&s3.DeleteObjectsInput{
+				Bucket: aws.String(d.Bucket),
+				Delete: &s3.Delete{
+					Objects: s3Objects[i:min(i+deleteMax, total)],
+					Quiet:   aws.Bool(false),
+				},
+			})
+			if err != nil {
+				errCh <- multiError{err}
+				return
+			}
+
+			// count successfully deleted files
+			countCh <- len(resp.Deleted)
+
+			// even if err is nil (200 OK response) it's not guaranteed that all files have been successfully deleted,
+			// we need to check the []*s3.Error slice within the S3 response and make sure it's empty
+			if len(resp.Errors) > 0 {
+				// parse s3.Error errors and return a single multiError
+				errs := make(multiError, 0, len(resp.Errors))
+				for _, s3e := range resp.Errors {
+					err := fmt.Errorf("failed to delete file '%s': '%s'", *s3e.Key, *s3e.Message)
+					errs = append(errs, err)
+				}
+				errCh <- errs
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errCh)
+	<-errDone
+	close(countCh)
+	<-countDone
+
+	if len(errs) > 0 {
+		return count, errs
+	}
+	return count, nil
+
 }
 
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.

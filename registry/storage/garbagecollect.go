@@ -3,6 +3,9 @@ package storage
 import (
 	"context"
 	"fmt"
+	"time"
+
+	dcontext "github.com/docker/distribution/context"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
@@ -116,16 +119,6 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 		return fmt.Errorf("failed to mark: %v", err)
 	}
 
-	// sweep
-	vacuum := NewVacuum(ctx, storageDriver)
-	if !opts.DryRun {
-		for _, obj := range manifestArr {
-			err = vacuum.RemoveManifest(obj.Name, obj.Digest, obj.Tags)
-			if err != nil {
-				return fmt.Errorf("failed to delete manifest %s: %v", obj.Digest, err)
-			}
-		}
-	}
 	blobService := registry.Blobs()
 	deleteSet := make(map[digest.Digest]struct{})
 	err = blobService.Enumerate(ctx, func(dgst digest.Digest) error {
@@ -139,16 +132,28 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 		return fmt.Errorf("error enumerating blobs: %v", err)
 	}
 	emit("\n%d blobs marked, %d blobs and %d manifests eligible for deletion", len(markSet), len(deleteSet), len(manifestArr))
-	for dgst := range deleteSet {
-		emit("blob eligible for deletion: %s", dgst)
-		if opts.DryRun {
-			continue
-		}
-		err = vacuum.RemoveBlob(dgst)
-		if err != nil {
-			return fmt.Errorf("failed to delete blob %s: %v", dgst, err)
+
+	// sweep
+	sweepStart := time.Now()
+	dcontext.GetLogger(ctx).Info("starting sweep stage")
+
+	vacuum := NewVacuum(ctx, storageDriver)
+	if !opts.DryRun && len(manifestArr) > 0 {
+		if err := vacuum.RemoveManifests(manifestArr); err != nil {
+			return fmt.Errorf("failed to delete manifests: %v", err)
 		}
 	}
+
+	dgsts := make([]digest.Digest, 0, len(deleteSet))
+	for dgst := range deleteSet {
+		dgsts = append(dgsts, dgst)
+	}
+	if !opts.DryRun && len(dgsts) > 0 {
+		if err := vacuum.RemoveBlobs(dgsts); err != nil {
+			return fmt.Errorf("failed to delete blobs: %v", err)
+		}
+	}
+	dcontext.GetLoggerWithField(ctx, "duration_s", time.Since(sweepStart).Seconds()).Info("sweep stage complete")
 
 	return err
 }

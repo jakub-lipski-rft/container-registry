@@ -5,8 +5,14 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"regexp"
 	"strconv"
 	"testing"
+
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 
 	"gopkg.in/check.v1"
 
@@ -407,5 +413,131 @@ func TestMoveWithMultipartCopy(t *testing.T) {
 	case storagedriver.PathNotFoundError:
 	default:
 		t.Fatalf("unexpected error getting content: %v", err)
+	}
+}
+
+type mockDeleteObjectsError struct {
+	s3iface.S3API
+}
+
+// DeleteObjects mocks a serialization error while processing a DeleteObjects response.
+func (m *mockDeleteObjectsError) DeleteObjects(input *s3.DeleteObjectsInput) (*s3.DeleteObjectsOutput, error) {
+	return nil, awserr.New(request.ErrCodeSerialization, "failed reading response body", nil)
+}
+
+func testDeleteFilesError(t *testing.T, mock s3iface.S3API, numFiles int) (int, error) {
+	if skipS3() != "" {
+		t.Skip(skipS3())
+	}
+
+	rootDir, err := ioutil.TempDir("", "driver-")
+	if err != nil {
+		t.Fatalf("unexpected error creating temporary directory: %v", err)
+	}
+	defer os.Remove(rootDir)
+
+	d, err := s3DriverConstructor(rootDir, s3.StorageClassStandard)
+	if err != nil {
+		t.Fatalf("unexpected error creating driver: %v", err)
+	}
+
+	// mock the underlying S3 client
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = mock
+
+	// simulate deleting numFiles files
+	paths := make([]string, 0, numFiles)
+	for i := 0; i < numFiles; i++ {
+		paths = append(paths, string(rand.Int()))
+	}
+
+	return d.DeleteFiles(context.Background(), paths)
+}
+
+// TestDeleteFilesError checks that DeleteFiles handles network/service errors correctly.
+func TestDeleteFilesError(t *testing.T) {
+	// simulate deleting 2*deleteMax files (should spawn 2 goroutines)
+	count, err := testDeleteFilesError(t, &mockDeleteObjectsError{}, 2*deleteMax)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if count != 0 {
+		t.Errorf("expected the deleted files count to be 0, got %d", count)
+	}
+
+	errs, ok := err.(multiError)
+	if !ok {
+		t.Errorf("expected error to be of type s3.multiError, got %T", err)
+	}
+	if len(errs) != 2 {
+		t.Errorf("expected the number of spawned goroutines to be 2, got %d", len(errs))
+	}
+
+	expected := awserr.New(request.ErrCodeSerialization, "failed reading response body", nil).Error()
+	for _, e := range errs {
+		if e.Error() != expected {
+			t.Errorf("expected error %q, got %q", expected, e)
+		}
+	}
+}
+
+type mockDeleteObjectsPartialError struct {
+	s3iface.S3API
+}
+
+// DeleteObjects mocks an S3 DeleteObjects partial error. Half of the objects are successfully deleted, and the other
+// half fails due to an 'AccessDenied' error.
+func (m *mockDeleteObjectsPartialError) DeleteObjects(input *s3.DeleteObjectsInput) (*s3.DeleteObjectsOutput, error) {
+	var deleted []*s3.DeletedObject
+	var errored []*s3.Error
+	errCode := "AccessDenied"
+	errMsg := "Access Denied"
+
+	for i, o := range input.Delete.Objects {
+		if i%2 == 0 {
+			// error
+			errored = append(errored, &s3.Error{
+				Key:     o.Key,
+				Code:    &errCode,
+				Message: &errMsg,
+			})
+		} else {
+			// success
+			deleted = append(deleted, &s3.DeletedObject{Key: o.Key})
+		}
+	}
+
+	return &s3.DeleteObjectsOutput{Deleted: deleted, Errors: errored}, nil
+}
+
+// TestDeleteFilesPartialError checks that DeleteFiles handles partial deletion errors correctly.
+func TestDeleteFilesPartialError(t *testing.T) {
+	// simulate deleting 2*deleteMax files (should spawn 2 goroutines)
+	n := 2 * deleteMax
+	half := n / 2
+	count, err := testDeleteFilesError(t, &mockDeleteObjectsPartialError{}, n)
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if count != half {
+		t.Errorf("expected the deleted files count to be %d, got %d", half, count)
+	}
+
+	errs, ok := err.(multiError)
+	if !ok {
+		t.Errorf("expected error to be of type s3.multiError, got %T", err)
+	}
+	if len(errs) != half {
+		t.Errorf("expected the number of errors to be %d, got %d", half, len(errs))
+	}
+
+	p := `failed to delete file '.*': 'Access Denied'`
+	for _, e := range errs {
+		matched, err := regexp.MatchString(p, e.Error())
+		if err != nil {
+			t.Errorf("unexpected error matching pattern: %v", err)
+		}
+		if !matched {
+			t.Errorf("expected error %q to match %q", e, p)
+		}
 	}
 }

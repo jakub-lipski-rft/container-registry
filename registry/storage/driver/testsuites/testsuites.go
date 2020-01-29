@@ -629,6 +629,97 @@ func (suite *DriverSuite) TestDelete(c *check.C) {
 	c.Assert(strings.Contains(err.Error(), suite.Name()), check.Equals, true)
 }
 
+// buildFiles builds a num amount of test files with a size of size under parentDir. Returns a slice with the path of
+// the created files.
+func (suite *DriverSuite) buildFiles(c *check.C, parentDir string, num int64, size int64) []string {
+	paths := make([]string, 0, num)
+
+	for i := int64(0); i < num; i++ {
+		p := path.Join(parentDir, randomPath(32))
+		paths = append(paths, p)
+
+		err := suite.StorageDriver.PutContent(suite.ctx, p, randomContents(size))
+		c.Assert(err, check.IsNil)
+	}
+
+	return paths
+}
+
+// assertPathNotFound asserts that path does not exist in the storage driver filesystem.
+func (suite *DriverSuite) assertPathNotFound(c *check.C, path ...string) {
+	for _, p := range path {
+		_, err := suite.StorageDriver.GetContent(suite.ctx, p)
+		c.Assert(err, check.NotNil)
+
+		c.Assert(err, check.FitsTypeOf, storagedriver.PathNotFoundError{})
+		c.Assert(strings.Contains(err.Error(), suite.Name()), check.Equals, true)
+	}
+}
+
+// TestDeleteFiles checks that DeleteFiles removes data from the storage driver for a random (<10) number of files.
+func (suite *DriverSuite) TestDeleteFiles(c *check.C) {
+	parentDir := randomPath(8)
+	defer suite.deletePath(c, firstPart(parentDir))
+
+	blobPaths := suite.buildFiles(c, parentDir, rand.Int63n(10), 32)
+
+	count, err := suite.StorageDriver.DeleteFiles(suite.ctx, blobPaths)
+	c.Assert(err, check.IsNil)
+	c.Assert(count, check.Equals, len(blobPaths))
+
+	suite.assertPathNotFound(c, blobPaths...)
+}
+
+// TestDeleteFilesNotFound checks that DeleteFiles is idempotent and doesn't return an error if a file was not found.
+func (suite *DriverSuite) TestDeleteFilesNotFound(c *check.C) {
+	parentDir := randomPath(8)
+	defer suite.deletePath(c, firstPart(parentDir))
+
+	blobPaths := suite.buildFiles(c, parentDir, 5, 32)
+	// delete the 1st, 3rd and last file so that they don't exist anymore
+	suite.deletePath(c, blobPaths[0])
+	suite.deletePath(c, blobPaths[2])
+	suite.deletePath(c, blobPaths[4])
+
+	count, err := suite.StorageDriver.DeleteFiles(suite.ctx, blobPaths)
+	c.Assert(err, check.IsNil)
+	c.Assert(count, check.Equals, len(blobPaths))
+
+	suite.assertPathNotFound(c, blobPaths...)
+}
+
+// benchmarkDeleteFiles benchmarks DeleteFiles for an amount of num files.
+func (suite *DriverSuite) benchmarkDeleteFiles(c *check.C, num int64) {
+	parentDir := randomPath(8)
+	defer suite.deletePath(c, firstPart(parentDir))
+
+	for i := 0; i < c.N; i++ {
+		c.StopTimer()
+		paths := suite.buildFiles(c, parentDir, num, 32)
+		c.StartTimer()
+		count, err := suite.StorageDriver.DeleteFiles(suite.ctx, paths)
+		c.StopTimer()
+		c.Assert(err, check.IsNil)
+		c.Assert(count, check.Equals, len(paths))
+		suite.assertPathNotFound(c, paths...)
+	}
+}
+
+// BenchmarkDeleteFiles1File benchmarks DeleteFiles for 1 file.
+func (suite *DriverSuite) BenchmarkDeleteFiles1File(c *check.C) {
+	suite.benchmarkDeleteFiles(c, 1)
+}
+
+// BenchmarkDeleteFiles50Files benchmarks DeleteFiles for 50 files.
+func (suite *DriverSuite) BenchmarkDeleteFiles50Files(c *check.C) {
+	suite.benchmarkDeleteFiles(c, 50)
+}
+
+// BenchmarkDeleteFiles100Files benchmarks DeleteFiles for 100 files.
+func (suite *DriverSuite) BenchmarkDeleteFiles100Files(c *check.C) {
+	suite.benchmarkDeleteFiles(c, 100)
+}
+
 // TestURLFor checks that the URLFor method functions properly, but only if it
 // is implemented
 func (suite *DriverSuite) TestURLFor(c *check.C) {
@@ -1145,15 +1236,15 @@ func (suite *DriverSuite) benchmarkListFiles(c *check.C, numFiles int64) {
 
 // BenchmarkDelete5Files benchmarks Delete for 5 small files
 func (suite *DriverSuite) BenchmarkDelete5Files(c *check.C) {
-	suite.benchmarkDeleteFiles(c, 5)
+	suite.benchmarkDelete(c, 5)
 }
 
 // BenchmarkDelete50Files benchmarks Delete for 50 small files
 func (suite *DriverSuite) BenchmarkDelete50Files(c *check.C) {
-	suite.benchmarkDeleteFiles(c, 50)
+	suite.benchmarkDelete(c, 50)
 }
 
-func (suite *DriverSuite) benchmarkDeleteFiles(c *check.C, numFiles int64) {
+func (suite *DriverSuite) benchmarkDelete(c *check.C, numFiles int64) {
 	for i := 0; i < c.N; i++ {
 		parentDir := randomPath(8)
 		defer suite.deletePath(c, firstPart(parentDir))
@@ -1376,7 +1467,110 @@ func (suite *DriverSuite) BenchmarkRemoveBlob100Blobs(c *check.C) {
 	suite.benchmarkRemoveBlob(c, 100)
 }
 
-func (suite *DriverSuite) benchmarkRemoveManifest(c *check.C, numManifests, numTagsPerManifest int) {
+// TestRemoveBlobs checks that storage.Vacuum is able to delete a set of blobs in bulk.
+func (suite *DriverSuite) TestRemoveBlobs(c *check.C) {
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	registry := suite.createRegistry(c)
+	repo := suite.makeRepository(c, registry, randomFilename(5))
+	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+	// build some blobs and remove half of them, otherwise there will be no /docker/registry/v2/blobs path to look at
+	// for validation if there are no blobs left
+	blobs := suite.buildBlobs(c, repo, 4)
+	blobs = blobs[:2]
+
+	err := v.RemoveBlobs(blobs)
+	c.Assert(err, check.IsNil)
+
+	// assert that blobs were deleted
+	blobService := registry.Blobs()
+	blobsLeft := make(map[digest.Digest]struct{})
+	err = blobService.Enumerate(suite.ctx, func(dgst digest.Digest) error {
+		blobsLeft[dgst] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		c.Fatalf("error getting all blobs: %v", err)
+	}
+
+	c.Assert(len(blobsLeft), check.Equals, 2)
+	for _, b := range blobs {
+		if _, exists := blobsLeft[b]; exists {
+			c.Errorf("blob %q was not deleted", b.String())
+		}
+	}
+}
+
+func (suite *DriverSuite) benchmarkRemoveBlobs(c *check.C, numBlobs int) {
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	registry := suite.createRegistry(c)
+	repo := suite.makeRepository(c, registry, randomFilename(5))
+	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+	for n := 0; n < c.N; n++ {
+		c.StopTimer()
+		blobs := suite.buildBlobs(c, repo, numBlobs)
+		c.StartTimer()
+
+		err := v.RemoveBlobs(blobs)
+		c.Assert(err, check.IsNil)
+	}
+}
+
+// BenchmarkRemoveBlobs1Blob creates 1 blob and deletes it using the storage.Vacuum.RemoveBlobs method.
+func (suite *DriverSuite) BenchmarkRemoveBlobs1Blob(c *check.C) {
+	suite.benchmarkRemoveBlobs(c, 1)
+}
+
+// BenchmarkRemoveBlobs10Blobs creates 10 blobs and deletes them using the storage.Vacuum.RemoveBlobs method.
+func (suite *DriverSuite) BenchmarkRemoveBlobs10Blobs(c *check.C) {
+	suite.benchmarkRemoveBlobs(c, 10)
+}
+
+// BenchmarkRemoveBlobs100Blobs creates 100 blobs and deletes them using the storage.Vacuum.RemoveBlobs method.
+func (suite *DriverSuite) BenchmarkRemoveBlobs100Blobs(c *check.C) {
+	suite.benchmarkRemoveBlobs(c, 100)
+}
+
+func (suite *DriverSuite) buildManifests(c *check.C, repo distribution.Repository, numManifests, numTagsPerManifest int) []storage.ManifestDel {
+	images := make([]testutil.Image, numManifests)
+	manifests := make([]storage.ManifestDel, 0)
+	repoName := repo.Named().Name()
+
+	var err error
+	for i := 0; i < numManifests; i++ {
+		// build images, alternating between Schema1 and Schema2 manifests
+		if i%2 == 0 {
+			images[i], err = testutil.UploadRandomSchema1Image(repo)
+		} else {
+			images[i], err = testutil.UploadRandomSchema2Image(repo)
+		}
+		c.Assert(err, check.IsNil)
+
+		// build numTags tags per manifest
+		tags := make([]string, 0, numTagsPerManifest)
+		for j := 0; j < numTagsPerManifest; j++ {
+			t := randomFilename(5)
+			d := images[i].ManifestDigest
+			err := repo.Tags(suite.ctx).Tag(suite.ctx, t, distribution.Descriptor{Digest: d})
+			c.Assert(err, check.IsNil)
+			tags = append(tags, t)
+		}
+
+		manifests = append(manifests, storage.ManifestDel{
+			Name:   repoName,
+			Digest: images[i].ManifestDigest,
+			Tags:   tags,
+		})
+	}
+
+	return manifests
+}
+
+// TestRemoveManifests checks that storage.Vacuum is able to delete a set of manifests in bulk.
+func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
 	if testing.Short() {
 		c.Skip("Skipping test in short mode")
 	}
@@ -1385,99 +1579,110 @@ func (suite *DriverSuite) benchmarkRemoveManifest(c *check.C, numManifests, numT
 
 	registry := suite.createRegistry(c)
 	repo := suite.makeRepository(c, registry, randomFilename(5))
-	repoName := repo.Named().Name()
 
-	for n := 0; n < c.N; n++ {
-		c.StopTimer()
+	// build some manifests
+	manifests := suite.buildManifests(c, repo, 3, 1)
 
-		images := make([]testutil.Image, numManifests)
-		manifests := make([]storage.ManifestDel, 0)
+	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
 
-		var err error
-		for i := 0; i < numManifests; i++ {
-			// build images, alternating between Schema1 and Schema2 manifests
-			if i%2 == 0 {
-				images[i], err = testutil.UploadRandomSchema1Image(repo)
-			} else {
-				images[i], err = testutil.UploadRandomSchema2Image(repo)
-			}
-			c.Assert(err, check.IsNil)
+	// remove all manifests except one, otherwise there will be no `_manifests/revisions` folder to look at for
+	// validation (empty "folders" are not preserved)
+	numToDelete := len(manifests) - 1
+	toDelete := manifests[:numToDelete]
 
-			// tag manifests
-			tags := make([]string, 0, numTagsPerManifest)
-			for j := 0; j < numTagsPerManifest; j++ {
-				t := randomFilename(5)
-				d := images[i].ManifestDigest
-				err := repo.Tags(suite.ctx).Tag(suite.ctx, t, distribution.Descriptor{Digest: d})
-				c.Assert(err, check.IsNil)
-				tags = append(tags, t)
-			}
+	err := v.RemoveManifests(toDelete)
+	c.Assert(err, check.IsNil)
 
-			// add manifest to delete list
-			manifests = append(manifests, storage.ManifestDel{
-				Name:   repoName,
-				Digest: images[i].ManifestDigest,
-				Tags:   tags,
-			})
-		}
+	// assert that toDelete manifests were actually deleted
+	manifestsLeft := make(map[digest.Digest]struct{})
+	manifestService, err := repo.Manifests(suite.ctx)
+	if err != nil {
+		c.Fatalf("error building manifest service: %v", err)
+	}
+	manifestEnumerator, ok := manifestService.(distribution.ManifestEnumerator)
+	if !ok {
+		c.Fatalf("unable to convert ManifestService into ManifestEnumerator")
+	}
+	err = manifestEnumerator.Enumerate(suite.ctx, func(dgst digest.Digest) error {
+		manifestsLeft[dgst] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		c.Fatalf("error getting all manifests: %v", err)
+	}
 
-		v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	c.Assert(len(manifestsLeft), check.Equals, len(manifests)-numToDelete)
 
-		c.StartTimer()
-
-		for _, m := range manifests {
-			err := v.RemoveManifest(m.Name, m.Digest, m.Tags)
-			c.Assert(err, check.IsNil)
+	for _, m := range toDelete {
+		if _, exists := manifestsLeft[m.Digest]; exists {
+			c.Errorf("manifest %q was not deleted as expected", m.Digest)
 		}
 	}
 }
 
-// BenchmarkRemoveManifest1Manifest0Tags creates 1 manifest with no tags and deletes it using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest1Manifest0Tags(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 1, 0)
+func (suite *DriverSuite) benchmarkRemoveManifests(c *check.C, numManifests, numTagsPerManifest int) {
+	if testing.Short() {
+		c.Skip("Skipping test in short mode")
+	}
+
+	defer suite.deletePath(c, firstPart("docker/"))
+
+	registry := suite.createRegistry(c)
+	repo := suite.makeRepository(c, registry, randomFilename(5))
+
+	for n := 0; n < c.N; n++ {
+		c.StopTimer()
+
+		manifests := suite.buildManifests(c, repo, numManifests, numTagsPerManifest)
+		v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+		c.StartTimer()
+
+		err := v.RemoveManifests(manifests)
+		c.Assert(err, check.IsNil)
+	}
 }
 
-// BenchmarkRemoveManifest1Manifest1Tag creates 1 manifest with 1 tag and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest1Manifest1Tag(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 1, 1)
+// BenchmarkRemoveManifests1Manifest0Tags creates 1 manifest with no tags and deletes it using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests1Manifest0Tags(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 1, 0)
 }
 
-// BenchmarkRemoveManifest10Manifests0TagsEach creates 10 manifests with no tags and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest10Manifests0TagsEach(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 10, 0)
+// BenchmarkRemoveManifests1Manifest1Tag creates 1 manifest with 1 tag and deletes them using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests1Manifest1Tag(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 1, 1)
 }
 
-// BenchmarkRemoveManifest10Manifests1TagEach creates 10 manifests with 1 tag each and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest10Manifests1TagEach(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 10, 1)
+// BenchmarkRemoveManifests10Manifests0TagsEach creates 10 manifests with no tags and deletes them using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests10Manifests0TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 10, 0)
 }
 
-// BenchmarkRemoveManifest100Manifests0TagsEach creates 100 manifests with no tags and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests0TagsEach(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 100, 0)
+// BenchmarkRemoveManifests10Manifests1TagEach creates 10 manifests with 1 tag each and deletes them using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests10Manifests1TagEach(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 10, 1)
 }
 
-// BenchmarkRemoveManifest100Manifests1TagEach creates 100 manifests with 1 tag each and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests1TagEach(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 100, 1)
+// BenchmarkRemoveManifests100Manifests0TagsEach creates 100 manifests with no tags and deletes them using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests100Manifests0TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 100, 0)
 }
 
-// BenchmarkRemoveManifest100Manifests10TagsEach creates 100 manifests with 10 tags each and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests10TagsEach(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 100, 10)
+// BenchmarkRemoveManifests100Manifests1TagEach creates 100 manifests with 1 tag each and deletes them using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests100Manifests1TagEach(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 100, 1)
 }
 
-// BenchmarkRemoveManifest100Manifests20TagsEach creates 100 manifests with 20 tags each and deletes them using the
-// storage.Vacuum.RemoveManifest method.
-func (suite *DriverSuite) BenchmarkRemoveManifest100Manifests20TagsEach(c *check.C) {
-	suite.benchmarkRemoveManifest(c, 100, 20)
+// BenchmarkRemoveManifests100Manifests20TagsEach creates 100 manifests with 20 tags each and deletes them using the
+// storage.Vacuum.RemoveManifests method.
+func (suite *DriverSuite) BenchmarkRemoveManifests100Manifests20TagsEach(c *check.C) {
+	suite.benchmarkRemoveManifests(c, 100, 20)
 }
 
 func (suite *DriverSuite) testFileStreams(c *check.C, size int64) {
