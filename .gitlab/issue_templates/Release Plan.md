@@ -1,33 +1,131 @@
 <!--
 Please use the following format for the issue title:
 
-Release Version vX.X.X-gitlab of Container Registry
+Release Version vX.Y.Z-gitlab
 
 Example:
 
-Release Version v2.7.3-gitlab of Container Registry
+Release Version v2.7.7-gitlab
 -->
 
-### Milestone
+## Issues
+<!--
+Please create an unordered list with the issues that this release should include.
 
-(Please enter the Milestone that this release will target e.g. 12.17)
+Example:
 
-### Issues
+* https://gitlab.com/gitlab-org/gitlab/issues/12345
+* https://gitlab.com/gitlab-org/container-registry/issues/12345
+-->
 
-(Please enter the issues that this release should include)
+## Merge Requests
+<!--
+(Optional) Please create an unordered list with the merge requests that this release should include.
 
-* gitlab-org/container-registry#5 **Example, replace with your own**
-* gitlab-org/container-registry#8 **Example, replace with your own**
-* gitlab-org/container-registry#13 **Example, replace with your own**
+Example:
 
-### Release Tasks
+* https://gitlab.com/gitlab-org/gitlab/merge_requests/12345
+* https://gitlab.com/gitlab-org/container-registry/merge_requests/12345
+-->
 
-These tasks must be completed in order for the release to be considered "In Production."
+## Tasks
+All tasks must be completed (in order) for the release to be considered ~"workflow::production".
 
-* [ ]  Follow the release instructions the [Release Instructions](./docs-gitlab/README.md#Releases) in order to Tag a new release. (Do this first!)
-* [ ]  Version Bump in [CNG](https://gitlab.com/gitlab-org/build/CNG) Merged: gitlab-org/build/CNG!317 **Example, replace with your own**
-* [ ]  Version Bump in [Omnibus-GitLab](https://gitlab.com/gitlab-org/omnibus-gitlab) Merged: gitlab-org/omnibus-gitlab!3862 **Example, replace with your own**
-* [ ]  Version Bump in [Charts](https://gitlab.com/gitlab-org/charts) Merged: gitlab-org/charts/gitlab!1105 **Example, replace with your own**
-* [ ]  Version Bump in [k8s-workloads](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com) Merged: gitlab-com/gl-infra/k8s-workloads/gitlab-com!74 **Example, replace with your own**
+### 1. Prepare
 
-/label ~"devops::package" ~"group::package" ~"Category:Container Registry" ~backstage ~golang
+1. [ ] Set the milestone of this issue to the target GitLab release.
+1. [ ] Set the due date of this issue to the 10th of the release month.
+
+<details>
+<summary><b>Instructions</b></summary>
+The due date is set to the 10th of each month to create a buffer of 7 days before the merge deadline on the 17th. See [Product Development Timeline](https://about.gitlab.com/handbook/engineering/workflow/#product-development-timeline) for more information about the GitLab release timings.
+</details>
+
+### 2. Release
+
+1. [ ] Create a merge request to add an entry to the [changelog](https://gitlab.com/gitlab-org/container-registry/blob/release/2.7-gitlab/CHANGELOG.md).
+1. [ ] Create a [tag](https://gitlab.com/gitlab-org/container-registry/-/tags) for the new release.
+
+<details>
+<summary><b>Instructions</b></summary>
+Please mention this issue in the description of the changelog merge request.
+
+See [release instructions](https://gitlab.com/gitlab-org/container-registry/tree/release/2.7-gitlab/docs-gitlab#releases) for additional information.
+</details>
+
+### 3. Deploy
+
+1. [ ] Version bump in [CNG](https://gitlab.com/gitlab-org/build/CNG):
+    - [ ] Update `GITLAB_CONTAINER_REGISTRY_VERSION` in [`ci_files/variables.yml`](https://gitlab.com/gitlab-org/build/CNG/blob/master/ci_files/variables.yml)
+    - [ ] Update `REGISTRY_VERSION` in [`gitlab-container-registry/Dockerfile`](https://gitlab.com/gitlab-org/build/CNG/blob/master/gitlab-container-registry/Dockerfile)
+    - [ ] Update `REGISTRY_VERSION` in [`gitlab-container-registry/Dockerfile.build.ubi8`](https://gitlab.com/gitlab-org/build/CNG/blob/master/gitlab-container-registry/Dockerfile.build.ubi8)
+1. [ ] Version bump in [Omnibus](https://gitlab.com/gitlab-org/omnibus-gitlab):
+    - [ ] Create `bump-registry-version-vX-Y-Z-gitlab.yml` in [`changelogs/unreleased`](https://gitlab.com/gitlab-org/omnibus-gitlab/tree/master/changelogs/unreleased)
+    - [ ] Update `version` in [`config/software/registry.rb`](https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/config/software/registry.rb)
+1. [ ] Version bump in [Charts](https://gitlab.com/gitlab-org/charts):
+    - [ ] Create `bump-registry-version-vX-Y-Z-gitlab.yml` in [`changelogs/unreleased`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/changelogs/unreleased)
+    - [ ] Update `tag` in [`charts/registry/values.yaml`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/charts/registry/values.yaml)
+    - [ ] Update `tag` in [`doc/charts/registry/index.md`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/doc/charts/registry/index.md)
+    - [ ] Replace all mentions to the previous `vX.Y.Z-gitlab` release in [`doc/charts/registry/index.md`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/doc/charts/registry/index.md)
+1. [ ] Version bump in [K8s Workloads](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com):
+    - [ ] Update `CI_APPLICATION_TAG` in [`.gitlab-ci.yml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/.gitlab-ci.yml)
+    - [ ] Update `tag` in [`gprd.yaml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/gprd.yaml)
+    - [ ] Update `tag` in [`gstg.yaml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/gstg.yaml)
+    - [ ] Update `tag` in [`pre.yaml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/pre.yaml)
+
+<details>
+<summary><b>Instructions</b></summary>
+
+Bump the Container Registry version used in [CNG](https://gitlab.com/gitlab-org/build/CNG), [Omnibus](https://gitlab.com/gitlab-org/omnibus-gitlab), [Charts](https://gitlab.com/gitlab-org/charts) and [K8s Workloads](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com).
+
+Create a merge request for each project. Mark parent tasks as completed once the corresponding merge requests are merged.
+
+Version bump merge requests should appear automatically in the `Related merge requests` section of this issue.
+
+#### Template
+
+For consistency, please use the following template for these merge requests:
+
+##### Title
+```
+Bump Container Registry to vX.Y.Z-gitlab
+```
+##### Description
+
+Repeat the version subsection for multiple versions. As an example, to bump to v2.7.7 in a project where the current version is v2.7.5, create an entry for v2.7.6 and v2.7.7.
+
+```md
+## vX.Y.Z-gitlab
+[Changelog](https://gitlab.com/gitlab-org/container-registry/blob/release/X.Y-gitlab/CHANGELOG.md#vXYZ-gitlab)
+
+Related to <!-- link to this release issue -->.
+```
+
+##### Changelog Entries
+
+Some projects require a changelog entry, please use the following template whenever necessary:
+
+```yml
+---
+title: Bump Container Registry to vX.Y.Z-gitlab
+merge_request: # number (not the link) of the version bump merge request
+author:
+type: changed
+```
+</details>
+
+### 4. Complete
+
+1. [ ] Assign label ~"workflow::verification" once all changes have been merged.
+1. [ ] Assign label ~"workflow::production" once all changes have been deployed.
+1. [ ] Update all related issues, informing that the deploy is complete.
+1. [ ] Close this issue.
+
+<details>
+<summary><b>Instructions</b></summary>
+To see the version deployed in each environment, look at the [Grafana Container Registry dashboard](https://dashboards.gitlab.net/d/registry-pod/registry-pod-info?orgId=1):
+
+![image](/uploads/3fd5b4902472f6cdcc56b9c2d333472f/image.png)
+</details>
+
+/label ~"devops::package" ~"group::package" ~"Category:Container Registry" ~golang ~"workflow::scheduling"
