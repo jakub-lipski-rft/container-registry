@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -79,6 +81,16 @@ const listMax = 1000
 // currently set to 1000 as per the S3 specification https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html
 const deleteMax = 1000
 
+// defaultMaxRequestsPerSecond defines the default maximum number of requests
+// per second that can be made to the S3 API per driver instance. 350 is 10%
+// of the requestsPerSecondUpperLimit based on the figures listed in
+// https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
+const defaultMaxRequestsPerSecond = 350
+
+// defaultBurst is how many limiter tokens may be reserved at once. Currently,
+// we only reserve one at a time via Limiter.Wait()
+const defaultBurst = 1
+
 // noStorageClass defines the value to be used if storage class is not supported by the S3 endpoint
 const noStorageClass = "NONE"
 
@@ -110,6 +122,7 @@ type DriverParameters struct {
 	ObjectACL                   string
 	SessionToken                string
 	PathStyle                   bool
+	MaxRequestsPerSecond        int64
 }
 
 func init() {
@@ -148,6 +161,10 @@ func (e multiError) Error() string {
 
 	var sb strings.Builder
 	for _, err := range e {
+		if err == nil {
+			continue
+		}
+
 		sb.WriteString(err.Error())
 		sb.WriteString("\n")
 	}
@@ -162,6 +179,7 @@ func (factory *s3DriverFactory) Create(parameters map[string]interface{}) (stora
 }
 
 type driver struct {
+	*rate.Limiter
 	S3                          s3iface.S3API
 	Bucket                      string
 	ChunkSize                   int64
@@ -386,6 +404,11 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		return nil, fmt.Errorf("The pathstyle parameter should be a boolean")
 	}
 
+	maxRequestsPerSecondInt64, err := getParameterAsInt64(parameters, "maxrequestspersecond", defaultMaxRequestsPerSecond, 0, math.MaxInt64)
+	if err != nil {
+		return nil, err
+	}
+
 	sessionToken := ""
 
 	params := DriverParameters{
@@ -409,6 +432,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		objectACL,
 		fmt.Sprint(sessionToken),
 		pathStyleBool,
+		maxRequestsPerSecondInt64,
 	}
 
 	return New(params)
@@ -535,6 +559,7 @@ func New(params DriverParameters) (*Driver, error) {
 		RootDirectory:               params.RootDirectory,
 		StorageClass:                params.StorageClass,
 		ObjectACL:                   params.ObjectACL,
+		Limiter:                     rate.NewLimiter(rate.Limit(params.MaxRequestsPerSecond), defaultBurst),
 	}
 
 	return &Driver{
@@ -563,6 +588,10 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 // PutContent stores the []byte content at a location designated by "path".
 func (d *driver) PutContent(ctx context.Context, path string, contents []byte) error {
+	if err := d.Wait(ctx); err != nil {
+		return err
+	}
+
 	_, err := d.S3.PutObject(&s3.PutObjectInput{
 		Bucket:               aws.String(d.Bucket),
 		Key:                  aws.String(d.s3Path(path)),
@@ -579,6 +608,10 @@ func (d *driver) PutContent(ctx context.Context, path string, contents []byte) e
 // Reader retrieves an io.ReadCloser for the content stored at "path" with a
 // given byte offset.
 func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
+	if err := d.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	resp, err := d.S3.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(d.Bucket),
 		Key:    aws.String(d.s3Path(path)),
@@ -601,6 +634,11 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 	key := d.s3Path(path)
 	if !append {
 		// TODO (brianbland): cancel other uploads at this path
+
+		if err := d.Wait(ctx); err != nil {
+			return nil, err
+		}
+
 		resp, err := d.S3.CreateMultipartUpload(&s3.CreateMultipartUploadInput{
 			Bucket:               aws.String(d.Bucket),
 			Key:                  aws.String(key),
@@ -615,6 +653,11 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		}
 		return d.newWriter(key, *resp.UploadId, nil), nil
 	}
+
+	if err := d.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	resp, err := d.S3.ListMultipartUploads(&s3.ListMultipartUploadsInput{
 		Bucket: aws.String(d.Bucket),
 		Prefix: aws.String(key),
@@ -627,6 +670,11 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		if key != *multi.Key {
 			continue
 		}
+
+		if err := d.Wait(ctx); err != nil {
+			return nil, err
+		}
+
 		resp, err := d.S3.ListParts(&s3.ListPartsInput{
 			Bucket:   aws.String(d.Bucket),
 			Key:      aws.String(key),
@@ -647,6 +695,10 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 // Stat retrieves the FileInfo for the given path, including the current size
 // in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
+	if err := d.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
 		Bucket:  aws.String(d.Bucket),
 		Prefix:  aws.String(d.s3Path(path)),
@@ -692,6 +744,10 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		prefix = "/"
 	}
 
+	if err := d.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
 		Bucket:    aws.String(d.Bucket),
 		Prefix:    aws.String(d.s3Path(path)),
@@ -716,6 +772,11 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		}
 
 		if *resp.IsTruncated {
+
+			if err := d.Wait(ctx); err != nil {
+				return nil, err
+			}
+
 			resp, err = d.S3.ListObjects(&s3.ListObjectsInput{
 				Bucket:    aws.String(d.Bucket),
 				Prefix:    aws.String(d.s3Path(path)),
@@ -766,6 +827,10 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 	}
 
 	if fileInfo.Size() <= d.MultipartCopyThresholdSize {
+		if err := d.Wait(ctx); err != nil {
+			return err
+		}
+
 		_, err := d.S3.CopyObject(&s3.CopyObjectInput{
 			Bucket:               aws.String(d.Bucket),
 			Key:                  aws.String(d.s3Path(destPath)),
@@ -780,6 +845,10 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 			return parseError(sourcePath, err)
 		}
 		return nil
+	}
+
+	if err := d.Wait(ctx); err != nil {
+		return err
 	}
 
 	createResp, err := d.S3.CreateMultipartUpload(&s3.CreateMultipartUploadInput{
@@ -798,17 +867,26 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 	numParts := (fileInfo.Size() + d.MultipartCopyChunkSize - 1) / d.MultipartCopyChunkSize
 	completedParts := make([]*s3.CompletedPart, numParts)
 	errChan := make(chan error, numParts)
+
+	// Reduce the client/server exposure to long lived connections regardless of
+	// how many requests per second are allowed.
 	limiter := make(chan struct{}, d.MultipartCopyMaxConcurrency)
 
 	for i := range completedParts {
 		i := int64(i)
 		go func() {
 			limiter <- struct{}{}
+
 			firstByte := i * d.MultipartCopyChunkSize
 			lastByte := firstByte + d.MultipartCopyChunkSize - 1
 			if lastByte >= fileInfo.Size() {
 				lastByte = fileInfo.Size() - 1
 			}
+
+			if err := d.Wait(ctx); err != nil {
+				errChan <- err
+			}
+
 			uploadResp, err := d.S3.UploadPartCopy(&s3.UploadPartCopyInput{
 				Bucket:          aws.String(d.Bucket),
 				CopySource:      aws.String(d.Bucket + "/" + d.s3Path(sourcePath)),
@@ -833,6 +911,10 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := d.Wait(ctx); err != nil {
+		return err
 	}
 
 	_, err = d.S3.CompleteMultipartUpload(&s3.CompleteMultipartUploadInput{
@@ -863,6 +945,10 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 ListLoop:
 	for {
 		// list all the objects
+		if err := d.Wait(ctx); err != nil {
+			return err
+		}
+
 		resp, err := d.S3.ListObjects(listObjectsInput)
 
 		// resp.Contents can only be empty on the first call
@@ -1018,11 +1104,21 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 
 	switch methodString {
 	case "GET":
+
+		if err := d.Wait(ctx); err != nil {
+			return "", err
+		}
+
 		req, _ = d.S3.GetObjectRequest(&s3.GetObjectInput{
 			Bucket: aws.String(d.Bucket),
 			Key:    aws.String(d.s3Path(path)),
 		})
 	case "HEAD":
+
+		if err := d.Wait(ctx); err != nil {
+			return "", err
+		}
+
 		req, _ = d.S3.HeadObjectRequest(&s3.HeadObjectInput{
 			Bucket: aws.String(d.Bucket),
 			Key:    aws.String(d.s3Path(path)),
@@ -1055,6 +1151,80 @@ func (d *driver) Walk(ctx context.Context, from string, f storagedriver.WalkFn) 
 	// S3 doesn't have the concept of empty directories, so it'll return path not found if there are no objects
 	if objectCount == 0 {
 		return storagedriver.PathNotFoundError{Path: from}
+	}
+
+	return nil
+}
+
+// WalkParallel traverses a filesystem defined within driver, starting
+// from the given path, calling f on each file.
+func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.WalkFn) error {
+	path := from
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+
+	prefix := ""
+	if d.s3Path("") == "" {
+		prefix = "/"
+	}
+
+	var objectCount int64
+	var retError multiError
+	countChan := make(chan int64)
+	countDone := make(chan struct{})
+	errors := make(chan error)
+	errDone := make(chan struct{})
+	quit := make(chan struct{})
+
+	// Consume object counts from each doWalkParallel call asynchronusly to avoid blocking.
+	go func() {
+		for i := range countChan {
+			objectCount += i
+		}
+		countDone <- struct{}{}
+	}()
+
+	// If we encounter an error from any goroutine called from within doWalkParallel,
+	// return early from any new goroutines and return that error.
+	go func() {
+		var closed bool
+		// Consume all errors to prevent goroutines from blocking and to
+		// report errors from goroutines that were already in progress.
+		for err := range errors {
+			// Signal goroutines to quit only once on the first error.
+			if !closed {
+				close(quit)
+				closed = true
+			}
+
+			retError = append(retError, err)
+		}
+		errDone <- struct{}{}
+	}()
+
+	// doWalkParallel spawns and manages it's own goroutines, but it also calls
+	// itself recursively. Passing in a WaitGroup allows us to wait for the
+	// entire walk to complete without blocking on each doWalkParallel call.
+	var wg sync.WaitGroup
+
+	d.doWalkParallel(ctx, &wg, countChan, quit, errors, d.s3Path(path), prefix, f)
+
+	wg.Wait()
+
+	// Ensure that all object counts have been totaled before continuing.
+	close(countChan)
+	close(errors)
+	<-countDone
+	<-errDone
+
+	// S3 doesn't have the concept of empty directories, so it'll return path not found if there are no objects
+	if objectCount == 0 {
+		return storagedriver.PathNotFoundError{Path: from}
+	}
+
+	if len(retError) > 0 {
+		return retError
 	}
 
 	return nil
@@ -1100,6 +1270,11 @@ func (d *driver) doWalk(parentCtx context.Context, objectCount *int64, path, pre
 
 	ctx, done := dcontext.WithTrace(parentCtx)
 	defer done("s3aws.ListObjectsV2Pages(%s)", path)
+
+	if err := d.Wait(ctx); err != nil {
+		return err
+	}
+
 	listObjectErr := d.S3.ListObjectsV2PagesWithContext(ctx, listObjectsInput, func(objects *s3.ListObjectsV2Output, lastPage bool) bool {
 
 		var count int64
@@ -1108,11 +1283,11 @@ func (d *driver) doWalk(parentCtx context.Context, objectCount *int64, path, pre
 		// calculation of the key count if required
 		if objects.KeyCount != nil {
 			count = *objects.KeyCount
-			*objectCount += *objects.KeyCount
 		} else {
 			count = int64(len(objects.Contents) + len(objects.CommonPrefixes))
-			*objectCount += count
 		}
+
+		*objectCount += count
 
 		walkInfos := make([]walkInfoContainer, 0, count)
 
@@ -1173,6 +1348,94 @@ func (d *driver) doWalk(parentCtx context.Context, objectCount *int64, path, pre
 	}
 
 	return nil
+}
+
+func (d *driver) doWalkParallel(parentCtx context.Context, wg *sync.WaitGroup, countChan chan<- int64, quit <-chan struct{}, errors chan<- error, path, prefix string, f storagedriver.WalkFn) {
+	listObjectsInput := &s3.ListObjectsV2Input{
+		Bucket:    aws.String(d.Bucket),
+		Prefix:    aws.String(path),
+		Delimiter: aws.String("/"),
+		MaxKeys:   aws.Int64(listMax),
+	}
+
+	ctx, done := dcontext.WithTrace(parentCtx)
+	defer done("s3aws.ListObjectsV2Pages(%s)", path)
+
+	if err := d.Wait(ctx); err != nil {
+		errors <- err
+		return
+	}
+
+	listObjectErr := d.S3.ListObjectsV2PagesWithContext(ctx, listObjectsInput, func(objects *s3.ListObjectsV2Output, lastPage bool) bool {
+		select {
+		// The walk was canceled, return to stop requests for pages and prevent gorountines from leaking.
+		case <-quit:
+			return false
+		default:
+
+			var count int64
+			// KeyCount was introduced with version 2 of the GET Bucket operation in S3.
+			// Some S3 implementations don't support V2 now, so we fall back to manual
+			// calculation of the key count if required
+			if objects.KeyCount != nil {
+				count = *objects.KeyCount
+			} else {
+				count = int64(len(objects.Contents) + len(objects.CommonPrefixes))
+			}
+			countChan <- count
+
+			walkInfos := make([]walkInfoContainer, 0, count)
+
+			for _, dir := range objects.CommonPrefixes {
+				commonPrefix := *dir.Prefix
+				walkInfos = append(walkInfos, walkInfoContainer{
+					prefix: dir.Prefix,
+					FileInfoFields: storagedriver.FileInfoFields{
+						IsDir: true,
+						Path:  strings.Replace(commonPrefix[:len(commonPrefix)-1], d.s3Path(""), prefix, 1),
+					},
+				})
+			}
+
+			for _, file := range objects.Contents {
+				walkInfos = append(walkInfos, walkInfoContainer{
+					FileInfoFields: storagedriver.FileInfoFields{
+						IsDir:   false,
+						Size:    *file.Size,
+						ModTime: *file.LastModified,
+						Path:    strings.Replace(*file.Key, d.s3Path(""), prefix, 1),
+					},
+				})
+			}
+
+			for _, walkInfo := range walkInfos {
+				wg.Add(1)
+				wInfo := walkInfo
+				go func() {
+					defer wg.Done()
+
+					err := f(wInfo)
+
+					if err == storagedriver.ErrSkipDir && wInfo.IsDir() {
+						return
+					}
+
+					if err != nil {
+						errors <- err
+					}
+
+					if wInfo.IsDir() {
+						d.doWalkParallel(ctx, wg, countChan, quit, errors, *wInfo.prefix, prefix, f)
+					}
+				}()
+			}
+		}
+		return true
+	})
+
+	if listObjectErr != nil {
+		errors <- listObjectErr
+	}
 }
 
 func (d *driver) s3Path(path string) string {

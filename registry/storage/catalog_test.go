@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"sort"
 	"testing"
 
 	"github.com/docker/distribution"
@@ -177,21 +178,40 @@ func TestCatalogEnumerate(t *testing.T) {
 	env := setupFS(t)
 
 	var repos []string
+	reposChan := make(chan string)
+
+	// Consume found repos in a separate Goroutine to prevent blocking on foundReposChan.
+	done := make(chan struct{})
+	go func() {
+		for r := range reposChan {
+			repos = append(repos, r)
+		}
+		done <- struct{}{}
+	}()
+
 	repositoryEnumerator := env.registry.(distribution.RepositoryEnumerator)
 	err := repositoryEnumerator.Enumerate(env.ctx, func(repoName string) error {
-		repos = append(repos, repoName)
+		reposChan <- repoName
 		return nil
 	})
 	if err != nil {
-		t.Errorf("Expected catalog enumerate err")
+		t.Errorf("Unexpected catalog enumerate err: %v", err)
 	}
+
+	close(reposChan)
+	<-done
 
 	if len(repos) != len(env.expected) {
 		t.Errorf("Expected catalog enumerate doesn't have correct number of values")
 	}
 
+	sort.Slice(repos, func(i, j int) bool {
+		return lessPath(repos[i], repos[j])
+	})
+
 	if !testEq(repos, env.expected, len(env.expected)) {
-		t.Errorf("Expected catalog enumerate not over all values")
+		t.Errorf("Expected catalog to enumerate over all values:\nexpected:\n%v\ngot:\n%v",
+			env.expected, repos)
 	}
 }
 

@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	storageDriver "github.com/docker/distribution/registry/storage/driver"
@@ -24,6 +26,30 @@ func newUploadData() uploadData {
 		// default to far in future to protect against missing startedat
 		startedAt: time.Now().Add(10000 * time.Hour),
 	}
+}
+
+// syncUploadData provides thread-safe operations on a map of uploadData.
+type syncUploadData struct {
+	sync.Mutex
+	members map[string]uploadData
+}
+
+// set the passed uuid's uploadData to data
+func (s *syncUploadData) set(uuid string, data uploadData) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.members[uuid] = data
+}
+
+// get uploadData by uuid
+func (s *syncUploadData) get(uuid string) (uploadData, bool) {
+	s.Lock()
+	defer s.Unlock()
+
+	up, ok := s.members[uuid]
+
+	return up, ok
 }
 
 // PurgeUploads deletes files from the upload directory
@@ -59,20 +85,28 @@ func PurgeUploads(ctx context.Context, driver storageDriver.StorageDriver, older
 // file, so gather files by UUID with a date from startedAt.
 func getOutstandingUploads(ctx context.Context, driver storageDriver.StorageDriver) (map[string]uploadData, []error) {
 	var errors []error
-	uploads := make(map[string]uploadData, 0)
+	uploads := syncUploadData{sync.Mutex{}, make(map[string]uploadData, 0)}
 
-	inUploadDir := false
 	root, err := pathFor(repositoriesRootPathSpec{})
 	if err != nil {
-		return uploads, append(errors, err)
+		return uploads.members, append(errors, err)
 	}
 
-	err = driver.Walk(ctx, root, func(fileInfo storageDriver.FileInfo) error {
+	errCh := make(chan error)
+	errDone := make(chan struct{})
+	go func() {
+		for err := range errCh {
+			errors = append(errors, err)
+		}
+		errDone <- struct{}{}
+	}()
+
+	err = driver.WalkParallel(ctx, root, func(fileInfo storageDriver.FileInfo) error {
 		filePath := fileInfo.Path()
 		_, file := path.Split(filePath)
 		if file[0] == '_' {
 			// Reserved directory
-			inUploadDir = (file == "_uploads")
+			inUploadDir := (file == "_uploads")
 
 			if fileInfo.IsDir() && !inUploadDir {
 				return storageDriver.ErrSkipDir
@@ -85,7 +119,7 @@ func getOutstandingUploads(ctx context.Context, driver storageDriver.StorageDriv
 			// Cannot reliably delete
 			return nil
 		}
-		ud, ok := uploads[uuid]
+		ud, ok := uploads.get(uuid)
 		if !ok {
 			ud = newUploadData()
 		}
@@ -96,19 +130,23 @@ func getOutstandingUploads(ctx context.Context, driver storageDriver.StorageDriv
 			if t, err := readStartedAtFile(driver, filePath); err == nil {
 				ud.startedAt = t
 			} else {
-				errors = pushError(errors, filePath, err)
+				errCh <- fmt.Errorf("%s: %s", filePath, err)
 			}
 
 		}
 
-		uploads[uuid] = ud
+		uploads.set(uuid, ud)
 		return nil
 	})
 
 	if err != nil {
-		errors = pushError(errors, root, err)
+		errCh <- fmt.Errorf("%s: %s", root, err)
 	}
-	return uploads, errors
+
+	close(errCh)
+	<-errDone
+
+	return uploads.members, errors
 }
 
 // uuidFromPath extracts the upload UUID from a given path

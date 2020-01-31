@@ -99,7 +99,13 @@ type StorageDriver interface {
 	// If the returned error from the WalkFn is ErrSkipDir and fileInfo refers
 	// to a directory, the directory will not be entered and Walk
 	// will continue the traversal.  If fileInfo refers to a normal file, processing stops
+	// Files are processed in a stable, lexicographically sorted order.
 	Walk(ctx context.Context, path string, f WalkFn) error
+
+	// WalkParallel is similar to walk, but the filesystem will be traversed in
+	// parallel. This enables improved performance, but the order which files are
+	// processed is not stable and WalkFn must be thread-safe.
+	WalkParallel(ctx context.Context, path string, f WalkFn) error
 }
 
 // FileWriter provides an abstraction for an opened writable file-like object in

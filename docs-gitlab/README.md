@@ -9,12 +9,27 @@
 
 ### Configuration
 
-The S3 storage driver takes an additional parameter, `pathstyle`.
+#### S3 Storage Driver
+
+##### Additional parameters
+
+`pathstyle`
+
 When set to `true`, the driver will use path style routes.
 When not set, the driver will default to virtual path style routes, unless
 `regionendpoint` is set. In which case, the driver will use path style routes.
 When explicitly set to `false`, the driver will continue to default to virtual
 host style routes, even when the `regionendpoint` parameter is set.
+
+`maxrequestspersecond`
+
+This parameter determines the maximum number of requests that
+the driver will make to the configured S3 bucket per second. Defaults to `350`
+with a maximum value of `3500` which corresponds to the current rate limits of
+S3: https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
+`0` is a special value which disables rate limiting. This is not recommended
+for use in production environments, as exceeding your request budget will result
+in errors from the Amazon S3 service.
 
 ### Garbage Collection
 

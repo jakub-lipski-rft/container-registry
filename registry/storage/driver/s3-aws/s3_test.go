@@ -45,6 +45,7 @@ func init() {
 	regionEndpoint := os.Getenv("REGION_ENDPOINT")
 	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
 	pathStyle := os.Getenv("AWS_PATH_STYLE")
+	maxRequestsPerSecond := os.Getenv("S3_MAX_REQUESTS_PER_SEC")
 
 	if err != nil {
 		panic(err)
@@ -98,6 +99,14 @@ func init() {
 			}
 		}
 
+		maxRequestsPerSecondInt64 := int64(defaultMaxRequestsPerSecond)
+
+		if maxRequestsPerSecond != "" {
+			if maxRequestsPerSecondInt64, err = strconv.ParseInt(maxRequestsPerSecond, 10, 64); err != nil {
+				return nil, err
+			}
+		}
+
 		parameters := DriverParameters{
 			accessKey,
 			secretKey,
@@ -119,6 +128,7 @@ func init() {
 			objectACL,
 			sessionToken,
 			pathStyleBool,
+			maxRequestsPerSecondInt64,
 		}
 
 		return New(parameters)
