@@ -501,6 +501,14 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
+// WalkParallel traverses a filesystem defined within driver in parallel, starting
+// from the given path, calling f on each file.
+func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.WalkFn) error {
+	// TODO: Verify that this driver can reliably handle parallel workloads before
+	// using storagedriver.WalkFallbackParallel
+	return d.Walk(ctx, path, f)
+}
+
 func (d *driver) ossPath(path string) string {
 	return strings.TrimLeft(strings.TrimRight(d.RootDirectory, "/")+path, "/")
 }

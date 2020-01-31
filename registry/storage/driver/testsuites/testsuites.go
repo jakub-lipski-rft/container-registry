@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -1058,8 +1060,8 @@ func (suite *DriverSuite) TestConcurrentFileStreams(c *check.C) {
 // 	c.Assert(misswrites, check.Not(check.Equals), 1024)
 // }
 
-// TestWalk ensures that all files are visted by Walk.
-func (suite *DriverSuite) TestWalk(c *check.C) {
+// TestWalkParallel ensures that all files are visted by WalkParallel.
+func (suite *DriverSuite) TestWalkParallel(c *check.C) {
 	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
 	defer suite.deletePath(c, rootDirectory)
 
@@ -1084,19 +1086,44 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 		c.Assert(err, check.IsNil)
 	}
 
+	fChan := make(chan string)
+	dChan := make(chan string)
+
 	var actualFiles []string
 	var actualDirectories []string
 
-	err := suite.StorageDriver.Walk(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
+	var wg sync.WaitGroup
+
+	go func() {
+		defer wg.Done()
+		wg.Add(1)
+		for f := range fChan {
+			actualFiles = append(actualFiles, f)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		wg.Add(1)
+		for d := range dChan {
+			actualDirectories = append(actualDirectories, d)
+		}
+	}()
+
+	err := suite.StorageDriver.WalkParallel(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
 		// Use append here to prevent a panic if walk finds more than we expect.
 		if fInfo.IsDir() {
-			actualDirectories = append(actualDirectories, fInfo.Path())
+			dChan <- fInfo.Path()
 		} else {
-			actualFiles = append(actualFiles, fInfo.Path())
+			fChan <- fInfo.Path()
 		}
 		return nil
 	})
 	c.Assert(err, check.IsNil)
+
+	close(fChan)
+	close(dChan)
+
+	wg.Wait()
 
 	sort.Strings(actualFiles)
 	sort.Strings(wantedFiles)
@@ -1114,6 +1141,81 @@ func (suite *DriverSuite) TestWalk(c *check.C) {
 	sort.Strings(actualDirectories)
 	sort.Strings(wantedDirectories)
 	c.Assert(actualDirectories, check.DeepEquals, wantedDirectories)
+}
+
+// TestWalkParallelError ensures that walk reports WalkFn errors.
+func (suite *DriverSuite) TestWalkParallelError(c *check.C) {
+	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	defer suite.deletePath(c, rootDirectory)
+
+	wantedFiles := randomBranchingFiles(rootDirectory, 100)
+
+	for _, file := range wantedFiles {
+		err := suite.StorageDriver.PutContent(suite.ctx, file, randomContents(int64(8+rand.Intn(8))))
+		c.Assert(err, check.IsNil)
+	}
+
+	wantedError := errors.New("walk: expected test error")
+	errorFile := wantedFiles[0]
+
+	err := suite.StorageDriver.WalkParallel(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
+		if fInfo.Path() == errorFile {
+			return wantedError
+		}
+
+		return nil
+	})
+
+	// The storage driver will prepend extra information on the error,
+	// look for an error that ends with the one that we want.
+	c.Assert(err, check.ErrorMatches, fmt.Sprintf(".*%s$", wantedError.Error()))
+}
+
+// TestWalkParallelStopsProcessingOnError ensures that walk stops processing when an error is encountered.
+func (suite *DriverSuite) TestWalkParallelStopsProcessingOnError(c *check.C) {
+	d := suite.StorageDriver.Name()
+	switch d {
+	case "gcs", "oss", "swift", "filesystem", "azure":
+		c.Skip(fmt.Sprintf("%s driver does not support true WalkParallel", d))
+	}
+
+	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	defer suite.deletePath(c, rootDirectory)
+
+	numWantedFiles := 1000
+	wantedFiles := randomBranchingFiles(rootDirectory, numWantedFiles)
+
+	// Add a file right under the root directory, so that processing is stopped
+	// early in the walk cycle.
+	errorFile := filepath.Join(rootDirectory, randomFilename(int64(8+rand.Intn(8))))
+	wantedFiles = append(wantedFiles, errorFile)
+
+	for _, file := range wantedFiles {
+		err := suite.StorageDriver.PutContent(suite.ctx, file, randomContents(int64(8+rand.Intn(8))))
+		c.Assert(err, check.IsNil)
+	}
+
+	processingTime := time.Second * 1
+	// Rough limit that should scale with longer or shorter processing times. Shorter than full uncancled runtime.
+	limit := time.Second * time.Duration(int64(processingTime)*4)
+
+	start := time.Now()
+
+	suite.StorageDriver.WalkParallel(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
+
+		if fInfo.Path() == errorFile {
+			return errors.New("")
+		}
+
+		// Imitate workload.
+		time.Sleep(processingTime)
+
+		return nil
+	})
+
+	end := time.Now()
+
+	c.Assert(end.Sub(start) < limit, check.Equals, true)
 }
 
 // BenchmarkPutGetEmptyFiles benchmarks PutContent/GetContent for 0B files
@@ -1262,21 +1364,21 @@ func (suite *DriverSuite) benchmarkDelete(c *check.C, numFiles int64) {
 	}
 }
 
-// BenchmarkWalkNop10Files benchmarks Walk with a Nop function that visits 10 files
-func (suite *DriverSuite) BenchmarkWalkNop10Files(c *check.C) {
-	suite.benchmarkWalk(c, 10, func(fInfo storagedriver.FileInfo) error {
+// BenchmarkWalkParallelNop10Files benchmarks WalkParallel with a Nop function that visits 10 files
+func (suite *DriverSuite) BenchmarkWalkParallelNop10Files(c *check.C) {
+	suite.benchmarkWalkParallel(c, 10, func(fInfo storagedriver.FileInfo) error {
 		return nil
 	})
 }
 
-// BenchmarkWalkNop500Files benchmarks Walk with a Nop function that visits 500 files
-func (suite *DriverSuite) BenchmarkWalkNop500Files(c *check.C) {
-	suite.benchmarkWalk(c, 500, func(fInfo storagedriver.FileInfo) error {
+// BenchmarkWalkParallelNop500Files benchmarks WalkParallel with a Nop function that visits 500 files
+func (suite *DriverSuite) BenchmarkWalkParallelNop500Files(c *check.C) {
+	suite.benchmarkWalkParallel(c, 500, func(fInfo storagedriver.FileInfo) error {
 		return nil
 	})
 }
 
-func (suite *DriverSuite) benchmarkWalk(c *check.C, numFiles int, f storagedriver.WalkFn) {
+func (suite *DriverSuite) benchmarkWalkParallel(c *check.C, numFiles int, f storagedriver.WalkFn) {
 	for i := 0; i < c.N; i++ {
 		rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
 		defer suite.deletePath(c, rootDirectory)
@@ -1292,7 +1394,7 @@ func (suite *DriverSuite) benchmarkWalk(c *check.C, numFiles int, f storagedrive
 
 		c.StartTimer()
 
-		err := suite.StorageDriver.Walk(suite.ctx, rootDirectory, f)
+		err := suite.StorageDriver.WalkParallel(suite.ctx, rootDirectory, f)
 		c.Assert(err, check.IsNil)
 	}
 }

@@ -47,33 +47,33 @@ func makeRepository(t *testing.T, registry distribution.Namespace, name string) 
 
 func allManifests(t *testing.T, manifestService distribution.ManifestService) map[digest.Digest]struct{} {
 	ctx := context.Background()
-	allManMap := make(map[digest.Digest]struct{})
+	allManSet := newSyncDigestSet()
 	manifestEnumerator, ok := manifestService.(distribution.ManifestEnumerator)
 	if !ok {
 		t.Fatalf("unable to convert ManifestService into ManifestEnumerator")
 	}
 	err := manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
-		allManMap[dgst] = struct{}{}
+		allManSet.add(dgst)
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("Error getting all manifests: %v", err)
 	}
-	return allManMap
+	return allManSet.members
 }
 
 func allBlobs(t *testing.T, registry distribution.Namespace) map[digest.Digest]struct{} {
 	ctx := context.Background()
 	blobService := registry.Blobs()
-	allBlobsMap := make(map[digest.Digest]struct{})
+	allBlobsSet := newSyncDigestSet()
 	err := blobService.Enumerate(ctx, func(dgst digest.Digest) error {
-		allBlobsMap[dgst] = struct{}{}
+		allBlobsSet.add(dgst)
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("Error getting all blobs: %v", err)
 	}
-	return allBlobsMap
+	return allBlobsSet.members
 }
 
 func TestNoDeletionNoEffect(t *testing.T) {

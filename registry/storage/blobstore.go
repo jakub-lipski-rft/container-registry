@@ -87,13 +87,15 @@ func (bs *blobStore) Put(ctx context.Context, mediaType string, p []byte) (distr
 	}, bs.driver.PutContent(ctx, bp, p)
 }
 
+// Enumerate will travers the repository, calling the ingester function once
+// per digest encountered. The ingester function must be thread-safe.
 func (bs *blobStore) Enumerate(ctx context.Context, ingester func(dgst digest.Digest) error) error {
 	specPath, err := pathFor(blobsPathSpec{})
 	if err != nil {
 		return err
 	}
 
-	return bs.driver.Walk(ctx, specPath, func(fileInfo driver.FileInfo) error {
+	return bs.driver.WalkParallel(ctx, specPath, func(fileInfo driver.FileInfo) error {
 		// skip directories
 		if fileInfo.IsDir() {
 			return nil
