@@ -177,7 +177,7 @@ func MakeManifestService(repository distribution.Repository) (distribution.Manif
 
 	manifestService, err := repository.Manifests(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to construct manifest store: %v", err)
+		return nil, fmt.Errorf("failed to construct manifest store: %v", err)
 	}
 	return manifestService, nil
 }
