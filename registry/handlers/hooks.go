@@ -20,7 +20,7 @@ type logHook struct {
 func (hook *logHook) Fire(entry *logrus.Entry) error {
 	addr := strings.Split(hook.Mail.Addr, ":")
 	if len(addr) != 2 {
-		return errors.New("Invalid Mail Address")
+		return errors.New("invalid Mail Address")
 	}
 	host := addr[0]
 	subject := fmt.Sprintf("[%s] %s: %s", entry.Level, host, entry.Message)

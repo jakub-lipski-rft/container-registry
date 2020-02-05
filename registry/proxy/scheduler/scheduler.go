@@ -118,7 +118,7 @@ func (ttles *TTLExpirationScheduler) Start() error {
 	}
 
 	if !ttles.stopped {
-		return fmt.Errorf("Scheduler already started")
+		return fmt.Errorf("scheduler already started")
 	}
 
 	dcontext.GetLogger(ttles.ctx).Infof("Starting cached object TTL expiration scheduler...")
