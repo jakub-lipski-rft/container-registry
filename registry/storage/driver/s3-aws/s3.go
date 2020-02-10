@@ -123,6 +123,7 @@ type DriverParameters struct {
 	SessionToken                string
 	PathStyle                   bool
 	MaxRequestsPerSecond        int64
+	ParallelWalk                bool
 }
 
 func init() {
@@ -191,6 +192,7 @@ type driver struct {
 	RootDirectory               string
 	StorageClass                string
 	ObjectACL                   string
+	ParallelWalk                bool
 }
 
 type baseEmbed struct {
@@ -404,6 +406,24 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		return nil, fmt.Errorf("the pathstyle parameter should be a boolean")
 	}
 
+	var parallelWalkBool bool
+
+	parallelWalk := parameters["parallelwalk"]
+	switch parallelWalk := parallelWalk.(type) {
+	case string:
+		b, err := strconv.ParseBool(parallelWalk)
+		if err != nil {
+			return nil, fmt.Errorf("the parallelwalk parameter should be a boolean")
+		}
+		parallelWalkBool = b
+	case bool:
+		parallelWalkBool = parallelWalk
+	case nil:
+		// do nothing
+	default:
+		return nil, fmt.Errorf("the parallelwalk parameter should be a boolean")
+	}
+
 	maxRequestsPerSecondInt64, err := getParameterAsInt64(parameters, "maxrequestspersecond", defaultMaxRequestsPerSecond, 0, math.MaxInt64)
 	if err != nil {
 		return nil, err
@@ -433,6 +453,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		fmt.Sprint(sessionToken),
 		pathStyleBool,
 		maxRequestsPerSecondInt64,
+		parallelWalkBool,
 	}
 
 	return New(params)
@@ -560,6 +581,7 @@ func New(params DriverParameters) (*Driver, error) {
 		StorageClass:                params.StorageClass,
 		ObjectACL:                   params.ObjectACL,
 		Limiter:                     rate.NewLimiter(rate.Limit(params.MaxRequestsPerSecond), defaultBurst),
+		ParallelWalk:                params.ParallelWalk,
 	}
 
 	return &Driver{
@@ -1159,6 +1181,11 @@ func (d *driver) Walk(ctx context.Context, from string, f storagedriver.WalkFn) 
 // WalkParallel traverses a filesystem defined within driver, starting
 // from the given path, calling f on each file.
 func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.WalkFn) error {
+	// If the ParallelWalk feature flag is not set, fall back to standard sequential walk.
+	if !d.ParallelWalk {
+		return d.Walk(ctx, from, f)
+	}
+
 	path := from
 	if !strings.HasSuffix(path, "/") {
 		path = path + "/"

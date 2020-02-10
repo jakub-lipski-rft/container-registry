@@ -21,6 +21,14 @@ When not set, the driver will default to virtual path style routes, unless
 When explicitly set to `false`, the driver will continue to default to virtual
 host style routes, even when the `regionendpoint` parameter is set.
 
+`parallelwalk`
+
+When this feature flag is set to `true`, the driver will run certain operations,
+most notably garbage collection, using multiple concurrent goroutines. This
+feature will improve the performance of garbage collection, but will
+increase the memory and CPU usage of this command as compared to the default,
+particularly when the `--delete-untagged` (`-m`) option is specified.
+
 `maxrequestspersecond`
 
 This parameter determines the maximum number of requests that
