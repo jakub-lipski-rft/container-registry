@@ -27,6 +27,19 @@ type ManifestDel struct {
 	Tags   []string
 }
 
+// syncManifestDelContainer provides thead-safe appends of ManifestDel
+type syncManifestDelContainer struct {
+	sync.Mutex
+	manifestDels []ManifestDel
+}
+
+func (c *syncManifestDelContainer) append(md ManifestDel) {
+	c.Lock()
+	defer c.Unlock()
+
+	c.manifestDels = append(c.manifestDels, md)
+}
+
 // syncDigestSet provides thread-safe set operations on digests.
 type syncDigestSet struct {
 	sync.Mutex
@@ -75,7 +88,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	dcontext.GetLogger(ctx).Info("starting mark stage")
 
 	markSet := newSyncDigestSet()
-	manifestArr := make([]ManifestDel, 0)
+	manifestArr := syncManifestDelContainer{sync.Mutex{}, make([]ManifestDel, 0)}
 
 	err := repositoryEnumerator.Enumerate(ctx, func(repoName string) error {
 		dcontext.GetLoggerWithField(ctx, "repo", repoName).Info("marking repository")
@@ -116,7 +129,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 					if err != nil {
 						return fmt.Errorf("failed to retrieve tags %v", err)
 					}
-					manifestArr = append(manifestArr, ManifestDel{Name: repoName, Digest: dgst, Tags: allTags})
+					manifestArr.append(ManifestDel{Name: repoName, Digest: dgst, Tags: allTags})
 					return nil
 				}
 			}
@@ -186,7 +199,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
 		"blobs_marked":        markSet.len(),
 		"blobs_to_delete":     deleteSet.len(),
-		"manifests_to_delete": len(manifestArr),
+		"manifests_to_delete": len(manifestArr.manifestDels),
 		"duration_s":          time.Since(markStart).Seconds(),
 	}).Info("mark stage complete")
 
@@ -198,8 +211,9 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	dcontext.GetLogger(ctx).Info("starting sweep stage")
 
 	vacuum := NewVacuum(ctx, storageDriver)
-	if len(manifestArr) > 0 {
-		if err := vacuum.RemoveManifests(manifestArr); err != nil {
+
+	if len(manifestArr.manifestDels) > 0 {
+		if err := vacuum.RemoveManifests(manifestArr.manifestDels); err != nil {
 			return fmt.Errorf("failed to delete manifests: %v", err)
 		}
 	}
