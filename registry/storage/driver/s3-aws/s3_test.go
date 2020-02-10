@@ -107,6 +107,8 @@ func init() {
 			}
 		}
 
+		parallelWalkBool := true
+
 		parameters := DriverParameters{
 			accessKey,
 			secretKey,
@@ -129,6 +131,7 @@ func init() {
 			sessionToken,
 			pathStyleBool,
 			maxRequestsPerSecondInt64,
+			parallelWalkBool,
 		}
 
 		return New(parameters)
