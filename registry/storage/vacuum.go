@@ -60,7 +60,7 @@ func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
 		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
 			"digest": d,
 			"path":   p,
-		}).Info("blob eligible for deletion")
+		}).Info("preparing to delete blob")
 		blobPaths = append(blobPaths, p)
 	}
 
@@ -97,7 +97,7 @@ func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
 		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
 			"digest": m.Digest,
 			"path":   p,
-		}).Info("manifest eligible for deletion")
+		}).Info("preparing to delete manifest")
 
 		manifestLinks = append(manifestLinks, p)
 
@@ -110,7 +110,7 @@ func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
 			dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
 				"tag":  t,
 				"path": p,
-			}).Info("manifest tag reference eligible for deletion")
+			}).Info("preparing to delete manifest tag reference")
 
 			tagLinks = append(tagLinks, p)
 		}
