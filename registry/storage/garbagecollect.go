@@ -167,9 +167,14 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	blobService := registry.Blobs()
 	deleteSet := newSyncDigestSet()
 
+	dcontext.GetLogger(ctx).Info("finding blobs which can be deleted. This may take some time...")
+
 	err = blobService.Enumerate(ctx, func(dgst digest.Digest) error {
 		// check if digest is in markSet. If not, delete it!
 		if !markSet.contains(dgst) {
+			dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+				"digest": dgst,
+			}).Info("blob eligible for deletion")
 			deleteSet.add(dgst)
 		}
 		return nil
