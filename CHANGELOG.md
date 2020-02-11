@@ -1,3 +1,7 @@
+## v2.8.0-gitlab
+
+- registry/api/v2: Add tag delete route
+
 ## v2.7.8-gitlab
 
 - registry/storage: Improve performance of the garbage collection algorithm for S3
