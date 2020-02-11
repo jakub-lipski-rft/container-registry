@@ -1,3 +1,7 @@
+## v2.7.8-gitlab
+
+- registry/storage: Improve performance of the garbage collection algorithm for S3
+
 ## v2.7.7-gitlab
 
 - registry/storage: Handle bad link files gracefully during garbage collection
