@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	"github.com/docker/distribution"
+	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/api/errcode"
 	"github.com/docker/distribution/registry/api/v2"
+	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/gorilla/handlers"
 )
 
@@ -59,4 +61,50 @@ func (th *tagsHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 		th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		return
 	}
+}
+
+// tagDispatcher constructs the tag handler api endpoint.
+func tagDispatcher(ctx *Context, r *http.Request) http.Handler {
+	thandler := handlers.MethodHandler{}
+
+	tagHandler := &tagHandler{
+		Context: ctx,
+		Tag:     getTag(ctx),
+	}
+
+	if !ctx.readOnly {
+		thandler["DELETE"] = http.HandlerFunc(tagHandler.DeleteTag)
+	}
+
+	return thandler
+}
+
+// tagHandler handles requests for a specific tag under a repository name.
+type tagHandler struct {
+	*Context
+	Tag string
+}
+
+// DeleteTag deletes a tag for a specific image name.
+func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
+	dcontext.GetLogger(th).Debug("DeleteTag")
+
+	if th.App.isCache {
+		th.Errors = append(th.Errors, errcode.ErrorCodeUnsupported)
+		return
+	}
+
+	tagService := th.Repository.Tags(th)
+	if err := tagService.Untag(th.Context, th.Tag); err != nil {
+		switch err.(type) {
+		case distribution.ErrTagUnknown:
+		case storagedriver.PathNotFoundError:
+			th.Errors = append(th.Errors, v2.ErrorCodeManifestUnknown)
+		default:
+			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }

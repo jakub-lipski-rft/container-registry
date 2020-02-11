@@ -792,6 +792,20 @@ func httpDelete(url string) (*http.Response, error) {
 	return resp, err
 }
 
+func httpOptions(url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodOptions, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, err
+}
+
 type manifestArgs struct {
 	imageName reference.Named
 	mediaType string
@@ -2005,6 +2019,187 @@ func testManifestDelete(t *testing.T, env *testEnv, args manifestArgs) {
 
 }
 
+func TestTagsAPITagDeleteAllowedMethods(t *testing.T) {
+	env := newTestEnv(t, false)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	checkErr(t, err, "building named object")
+
+	ref, err := reference.WithTag(imageName, "latest")
+	checkErr(t, err, "building tag reference")
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	checkErr(t, err, "building tag URL")
+
+	checkAllowedMethods(t, tagURL, []string{"DELETE"})
+}
+
+func TestTagsAPITagDeleteAllowedMethodsReadOnly(t *testing.T) {
+	env := newTestEnv(t, false)
+	defer env.Shutdown()
+
+	env.app.readOnly = true
+
+	imageName, err := reference.WithName("foo/bar")
+	checkErr(t, err, "building named object")
+
+	ref, err := reference.WithTag(imageName, "latest")
+	checkErr(t, err, "building tag reference")
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	checkErr(t, err, "building tag URL")
+
+	resp, err := httpOptions(tagURL)
+	msg := "checking allowed methods"
+	checkErr(t, err, msg)
+
+	defer resp.Body.Close()
+
+	checkResponse(t, msg, resp, http.StatusOK)
+	if resp.Header.Get("Allow") != "" {
+		t.Fatal("unexpected Allow header")
+	}
+}
+
+func TestTagsAPITagDelete(t *testing.T) {
+	env := newTestEnv(t, false)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	checkErr(t, err, "building named object")
+
+	tag := "latest"
+	createRepository(env, t, imageName.Name(), tag)
+
+	ref, err := reference.WithTag(imageName, tag)
+	checkErr(t, err, "building tag reference")
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	checkErr(t, err, "building tag URL")
+
+	resp, err := httpDelete(tagURL)
+	msg := "checking tag delete"
+	checkErr(t, err, msg)
+
+	defer resp.Body.Close()
+
+	checkResponse(t, msg, resp, http.StatusAccepted)
+
+	if resp.Body != http.NoBody {
+		t.Fatalf("unexpected response body")
+	}
+}
+
+func TestTagsAPITagDeleteUnknown(t *testing.T) {
+	env := newTestEnv(t, false)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	checkErr(t, err, "building named object")
+
+	ref, err := reference.WithTag(imageName, "latest")
+	checkErr(t, err, "building tag reference")
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	checkErr(t, err, "building tag URL")
+
+	resp, err := httpDelete(tagURL)
+	msg := "checking unknown tag delete"
+	checkErr(t, err, msg)
+
+	defer resp.Body.Close()
+
+	checkResponse(t, msg, resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, msg, resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestTagsAPITagDeleteReadOnly(t *testing.T) {
+	env := newTestEnv(t, false)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	checkErr(t, err, "building named object")
+
+	tag := "latest"
+	createRepository(env, t, imageName.Name(), tag)
+
+	ref, err := reference.WithTag(imageName, tag)
+	checkErr(t, err, "building tag reference")
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	checkErr(t, err, "building tag URL")
+
+	env.app.readOnly = true
+
+	resp, err := httpDelete(tagURL)
+	msg := "checking tag delete"
+	checkErr(t, err, msg)
+
+	defer resp.Body.Close()
+
+	checkResponse(t, msg, resp, http.StatusMethodNotAllowed)
+}
+
+// TestTagsAPITagDeleteWithSameImageID tests that deleting a single image tag will not cause the deletion of other tags
+// pointing to the same image ID.
+func TestTagsAPITagDeleteWithSameImageID(t *testing.T) {
+	env := newTestEnv(t, false)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	checkErr(t, err, "building named object")
+
+	// build two tags pointing to the same image
+	tag1 := "1.0.0"
+	tag2 := "latest"
+	createRepositoryWithMultipleIdenticalTags(env, t, imageName.Name(), []string{tag1, tag2})
+
+	// delete one of the tags
+	ref, err := reference.WithTag(imageName, tag1)
+	checkErr(t, err, "building tag reference")
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	checkErr(t, err, "building tag URL")
+
+	resp, err := httpDelete(tagURL)
+	msg := "checking tag delete"
+	checkErr(t, err, msg)
+
+	defer resp.Body.Close()
+
+	checkResponse(t, msg, resp, http.StatusAccepted)
+
+	// check the other tag is still there
+	tagsURL, err := env.builder.BuildTagsURL(imageName)
+	if err != nil {
+		t.Fatalf("unexpected error building tags url: %v", err)
+	}
+	resp, err = http.Get(tagsURL)
+	if err != nil {
+		t.Fatalf("unexpected error getting tags: %v", err)
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	var tagsResponse tagsAPIResponse
+	if err := dec.Decode(&tagsResponse); err != nil {
+		t.Fatalf("unexpected error decoding response: %v", err)
+	}
+
+	if tagsResponse.Name != imageName.Name() {
+		t.Fatalf("tags name should match image name: %v != %v", tagsResponse.Name, imageName)
+	}
+
+	if len(tagsResponse.Tags) != 1 {
+		t.Fatalf("expected 1 tag, got %d: %v", len(tagsResponse.Tags), tagsResponse.Tags)
+	}
+
+	if tagsResponse.Tags[0] != tag2 {
+		t.Fatalf("expected tag to be %q, got %q", tagsResponse.Tags[0], tag2)
+	}
+}
+
 type testEnv struct {
 	pk      libtrust.PrivateKey
 	ctx     context.Context
@@ -2398,6 +2593,19 @@ func checkHeaders(t *testing.T, resp *http.Response, headers http.Header) {
 	}
 }
 
+func checkAllowedMethods(t *testing.T, url string, allowed []string) {
+	resp, err := httpOptions(url)
+	msg := "checking allowed methods"
+	checkErr(t, err, msg)
+
+	defer resp.Body.Close()
+
+	checkResponse(t, msg, resp, http.StatusOK)
+	checkHeaders(t, resp, http.Header{
+		"Allow": allowed,
+	})
+}
+
 func checkErr(t *testing.T, err error, msg string) {
 	if err != nil {
 		t.Fatalf("unexpected error %s: %v", msg, err)
@@ -2467,6 +2675,77 @@ func createRepository(env *testEnv, t *testing.T, imageName string, tag string) 
 		"Docker-Content-Digest": []string{dgst.String()},
 	})
 	return dgst
+}
+
+func createRepositoryWithMultipleIdenticalTags(env *testEnv, t *testing.T, imageName string, tags []string) []digest.Digest {
+	imageNameRef, err := reference.WithName(imageName)
+	if err != nil {
+		t.Fatalf("unable to parse reference: %v", err)
+	}
+
+	unsignedManifest := &schema1.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 1,
+		},
+		Name: imageName,
+		FSLayers: []schema1.FSLayer{
+			{
+				BlobSum: "asdf",
+			},
+		},
+		History: []schema1.History{
+			{
+				V1Compatibility: "",
+			},
+		},
+	}
+
+	// Push 2 random layers
+	expectedLayers := make(map[digest.Digest]io.ReadSeeker)
+
+	for i := range unsignedManifest.FSLayers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		if err != nil {
+			t.Fatalf("error creating random layer %d: %v", i, err)
+		}
+		dgst := digest.Digest(dgstStr)
+
+		expectedLayers[dgst] = rs
+		unsignedManifest.FSLayers[i].BlobSum = dgst
+		uploadURLBase, _ := startPushLayer(t, env, imageNameRef)
+		pushLayer(t, env.builder, imageNameRef, dgst, uploadURLBase, rs)
+	}
+
+	// upload a manifest per tag
+	var dgsts []digest.Digest
+	for _, tag := range tags {
+		unsignedManifest.Tag = tag
+
+		signedManifest, err := schema1.Sign(unsignedManifest, env.pk)
+		if err != nil {
+			t.Fatalf("unexpected error signing manifest: %v", err)
+		}
+
+		dgst := digest.FromBytes(signedManifest.Canonical)
+
+		tagRef, _ := reference.WithTag(imageNameRef, tag)
+		manifestDigestURL, err := env.builder.BuildManifestURL(tagRef)
+		checkErr(t, err, "building manifest url")
+
+		digestRef, _ := reference.WithDigest(imageNameRef, dgst)
+		location, err := env.builder.BuildManifestURL(digestRef)
+		checkErr(t, err, "building location URL")
+
+		resp := putManifest(t, "putting signed manifest", manifestDigestURL, "", signedManifest)
+		checkResponse(t, "putting signed manifest", resp, http.StatusCreated)
+		checkHeaders(t, resp, http.Header{
+			"Location":              []string{location},
+			"Docker-Content-Digest": []string{dgst.String()},
+		})
+		dgsts = append(dgsts, dgst)
+	}
+
+	return dgsts
 }
 
 // Test mutation operations on a registry configured as a cache.  Ensure that they return
