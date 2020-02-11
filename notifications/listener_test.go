@@ -205,6 +205,11 @@ func checkExerciseRepository(t *testing.T, repository distribution.Repository, r
 		t.Fatalf("unexpected error fetching manifest: %v", err)
 	}
 
+	err = repository.Tags(ctx).Tag(ctx, tag, distribution.Descriptor{Digest: dgst})
+	if err != nil {
+		t.Fatalf("unexpected error tagging manifest: %v", err)
+	}
+
 	err = manifests.Delete(ctx, dgst)
 	if err != nil {
 		t.Fatalf("unexpected error deleting blob: %v", err)

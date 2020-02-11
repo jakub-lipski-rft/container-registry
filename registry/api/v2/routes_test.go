@@ -88,6 +88,46 @@ func TestRouter(t *testing.T) {
 			},
 		},
 		{
+			RouteName:  RouteNameTag,
+			RequestURI: "/v2/foo/tags/reference/bar",
+			Vars: map[string]string{
+				"name": "foo",
+				"tag":  "bar",
+			},
+		},
+		{
+			RouteName:  RouteNameTag,
+			RequestURI: "/v2/foo/bar/tags/reference/tag",
+			Vars: map[string]string{
+				"name": "foo/bar",
+				"tag":  "tag",
+			},
+		},
+		{
+			RouteName:  RouteNameTag,
+			RequestURI: "/v2/foo/bar/tags/reference/tags",
+			Vars: map[string]string{
+				"name": "foo/bar",
+				"tag":  "tags",
+			},
+		},
+		{
+			RouteName:  RouteNameTag,
+			RequestURI: "/v2/tags/tags/tags/reference/tags",
+			Vars: map[string]string{
+				"name": "tags/tags",
+				"tag":  "tags",
+			},
+		},
+		{
+			RouteName:  RouteNameTag,
+			RequestURI: "/v2/tags/reference/tags/reference/tags",
+			Vars: map[string]string{
+				"name": "tags/reference",
+				"tag":  "tags",
+			},
+		},
+		{
 			RouteName:  RouteNameBlob,
 			RequestURI: "/v2/foo/bar/blobs/sha256:abcdef0919234",
 			Vars: map[string]string{

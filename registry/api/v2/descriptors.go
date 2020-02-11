@@ -26,6 +26,14 @@ var (
 		Description: `Tag or digest of the target manifest.`,
 	}
 
+	tagParameterDescriptor = ParameterDescriptor{
+		Name:        "tag",
+		Type:        "string",
+		Format:      reference.TagRegexp.String(),
+		Required:    true,
+		Description: `Tag of the target manifest.`,
+	}
+
 	uuidParameterDescriptor = ParameterDescriptor{
 		Name:        "uuid",
 		Type:        "opaque",
@@ -494,6 +502,75 @@ var routeDescriptors = []RouteDescriptor{
 							repositoryNotFoundResponseDescriptor,
 							deniedResponseDescriptor,
 							tooManyRequestsDescriptor,
+						},
+					},
+				},
+			},
+		},
+	},
+	{
+		Name:        RouteNameTag,
+		Path:        "/v2/{name:" + reference.NameRegexp.String() + "}/tags/reference/{tag:" + reference.TagRegexp.String() + "}",
+		Entity:      "Tag",
+		Description: "Delete tags.",
+		Methods: []MethodDescriptor{
+			{
+				Method:      "DELETE",
+				Description: "Delete a tag identified by `name` and `reference`, where reference can be the tag name. This method never deletes a manifest the tag references.",
+				Requests: []RequestDescriptor{
+					{
+						Headers: []ParameterDescriptor{
+							hostHeader,
+							authHeader,
+						},
+						PathParameters: []ParameterDescriptor{
+							nameParameterDescriptor,
+							tagParameterDescriptor,
+						},
+						Successes: []ResponseDescriptor{
+							{
+								StatusCode: http.StatusAccepted,
+							},
+						},
+						Failures: []ResponseDescriptor{
+							{
+								Name:        "Invalid Name or Reference",
+								Description: "The specified `name` or `reference` were invalid and the delete was unable to proceed.",
+								StatusCode:  http.StatusBadRequest,
+								ErrorCodes: []errcode.ErrorCode{
+									ErrorCodeNameInvalid,
+									ErrorCodeTagInvalid,
+								},
+								Body: BodyDescriptor{
+									ContentType: "application/json; charset=utf-8",
+									Format:      errorsBody,
+								},
+							},
+							unauthorizedResponseDescriptor,
+							repositoryNotFoundResponseDescriptor,
+							deniedResponseDescriptor,
+							tooManyRequestsDescriptor,
+							{
+								Name:        "Unknown Tag",
+								Description: "The specified `name` or `reference` are unknown to the registry and the delete was unable to proceed. Clients can assume the tag was already deleted if this response is returned.",
+								StatusCode:  http.StatusNotFound,
+								ErrorCodes: []errcode.ErrorCode{
+									ErrorCodeNameUnknown,
+									ErrorCodeManifestUnknown,
+								},
+								Body: BodyDescriptor{
+									ContentType: "application/json; charset=utf-8",
+									Format:      errorsBody,
+								},
+							},
+							{
+								Name:        "Not allowed",
+								Description: "Tag delete is not allowed because the registry is configured as a pull-through cache or `delete` has been disabled.",
+								StatusCode:  http.StatusMethodNotAllowed,
+								ErrorCodes: []errcode.ErrorCode{
+									errcode.ErrorCodeUnsupported,
+								},
+							},
 						},
 					},
 				},

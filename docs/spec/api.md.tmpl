@@ -1062,6 +1062,26 @@ set in the response. The behavior of the `last` parameter, the provided
 response result, lexical ordering and encoding of the `Link` header are
 identical to that of catalog pagination.
 
+### Deleting a tag
+
+A tag can be deleted from a repository via its `name` and `reference`, where
+reference can be the tag name. A delete may be issued with the following
+request format:
+
+    DELETE /v2/<name>/tags/reference/<reference>
+
+If the tag exists and has been successfully deleted, the following response
+will be issued:
+
+    202 Accepted
+    Content-Length: 0
+
+If the tag had already been deleted or did not exist, a `404 Not Found`
+response will be issued instead.
+
+This call only deletes tag references to manifests and and never deletes
+manifests themselves.
+
 ### Deleting an Image
 
 An image may be deleted from the registry via its `name` and `reference`. A
