@@ -2,6 +2,7 @@
 
 ## Guides
 
+- [Standalone Development Registry](standalone-dev-registry.md)
 - [Local Integration Testing](storage-driver-integration-testing-guide.md)
 - [Cleanup Invalid Link Files](cleanup-invalid-link-files.md)
 
