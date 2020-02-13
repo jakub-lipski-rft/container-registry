@@ -52,6 +52,13 @@ Blobs related with invalid link files will be automatically swept away in the
 See [Cleanup Invalid Link Files](cleanup-invalid-link-files.md) for a guide on
 how to detect and clean these files based on the garbage collector output log.
 
+### API
+
+#### Tag Delete
+
+A new route, `DELETE /v2/<name>/tags/reference/<reference>`, was added to the
+API, enabling the deletion of tags by name.
+
 ## Releases
 
 Release planning is done by using the `Release Plan` issue template during the

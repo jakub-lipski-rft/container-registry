@@ -1,3 +1,7 @@
+## v2.8.1-gitlab
+
+- registry/storage: Improve consistency of garbage collection logs
+
 ## v2.8.0-gitlab
 
 - registry/api/v2: Add tag delete route
