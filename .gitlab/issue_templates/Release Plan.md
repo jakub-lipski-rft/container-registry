@@ -34,11 +34,11 @@ All tasks must be completed (in order) for the release to be considered ~"workfl
 ### 1. Prepare
 
 1. [ ] Set the milestone of this issue to the target GitLab release.
-1. [ ] Set the due date of this issue to the 10th of the release month.
+1. [ ] Set the due date of this issue to the 12th of the release month.
 
 <details>
 <summary><b>Instructions</b></summary>
-The due date is set to the 10th of each month to create a buffer of 7 days before the merge deadline on the 17th. See [Product Development Timeline](https://about.gitlab.com/handbook/engineering/workflow/#product-development-timeline) for more information about the GitLab release timings.
+The due date is set to the 12th of each month to create a buffer of 5 days before the merge deadline on the 17th. See [Product Development Timeline](https://about.gitlab.com/handbook/engineering/workflow/#product-development-timeline) for more information about the GitLab release timings.
 </details>
 
 ### 2. Release
