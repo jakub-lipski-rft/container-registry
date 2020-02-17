@@ -721,7 +721,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 		return nil, err
 	}
 
-	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+	resp, err := d.S3.ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket:  aws.String(d.Bucket),
 		Prefix:  aws.String(d.s3Path(path)),
 		MaxKeys: aws.Int64(1),
@@ -770,7 +770,7 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		return nil, err
 	}
 
-	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+	resp, err := d.S3.ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket:    aws.String(d.Bucket),
 		Prefix:    aws.String(d.s3Path(path)),
 		Delimiter: aws.String("/"),
@@ -799,12 +799,12 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 				return nil, err
 			}
 
-			resp, err = d.S3.ListObjects(&s3.ListObjectsInput{
-				Bucket:    aws.String(d.Bucket),
-				Prefix:    aws.String(d.s3Path(path)),
-				Delimiter: aws.String("/"),
-				MaxKeys:   aws.Int64(listMax),
-				Marker:    resp.NextMarker,
+			resp, err = d.S3.ListObjectsV2(&s3.ListObjectsV2Input{
+				Bucket:     aws.String(d.Bucket),
+				Prefix:     aws.String(d.s3Path(path)),
+				Delimiter:  aws.String("/"),
+				MaxKeys:    aws.Int64(listMax),
+				StartAfter: resp.StartAfter,
 			})
 			if err != nil {
 				return nil, err
@@ -960,7 +960,7 @@ func min(a, b int) int {
 func (d *driver) Delete(ctx context.Context, path string) error {
 	s3Objects := make([]*s3.ObjectIdentifier, 0, listMax)
 	s3Path := d.s3Path(path)
-	listObjectsInput := &s3.ListObjectsInput{
+	listObjectsV2Input := &s3.ListObjectsV2Input{
 		Bucket: aws.String(d.Bucket),
 		Prefix: aws.String(s3Path),
 	}
@@ -971,7 +971,7 @@ ListLoop:
 			return err
 		}
 
-		resp, err := d.S3.ListObjects(listObjectsInput)
+		resp, err := d.S3.ListObjectsV2(listObjectsV2Input)
 
 		// resp.Contents can only be empty on the first call
 		// if there were no more results to return after the first call, resp.IsTruncated would have been false
@@ -991,7 +991,7 @@ ListLoop:
 		}
 
 		// resp.Contents must have at least one element or we would have returned not found
-		listObjectsInput.Marker = resp.Contents[len(resp.Contents)-1].Key
+		listObjectsV2Input.StartAfter = resp.Contents[len(resp.Contents)-1].Key
 
 		// from the s3 api docs, IsTruncated "specifies whether (true) or not (false) all of the results were returned"
 		// if everything has been returned, break
