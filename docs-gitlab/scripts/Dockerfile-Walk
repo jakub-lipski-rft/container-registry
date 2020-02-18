@@ -1,0 +1,6 @@
+```dockerfile
+FROM alpine:3.11.3
+
+RUN mkdir -p /root/test/
+RUN head -c 524288 </dev/urandom > /root/test/randfile.txt
+RUN date '+%s' > /root/test/date.txt

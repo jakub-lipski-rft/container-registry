@@ -51,46 +51,37 @@ http:
 After configuring and deploying the registry, we need to push images to it to
 seed data for the garbage collection process.
 
-First, we need to create a Dockerfile that will enable us to generate unique
-layers that will not be shared across all images, without needing to alter the
-contents of the Dockerfile itself.
+We can use a Dockerfile included with this repository,
+[Dockerfile-Walk](scripts/Dockerfile-Walk) that will enable us to
+generate unique layers that will not be shared across all images, without
+needing to alter the contents of the Dockerfile itself.
 
-```dockerfile
-FROM alpine:3.11.3
+This [seed.sh](scripts/seed.sh) script will use the Dockerfile we created in
+order to build images and push them to the registry. If you are not running the
+container registry locally, you will need to replace `localhost:5000` with the
+IP address of your container registry.
 
-RUN mkdir -p /root/test/
-RUN head -c 524288 </dev/urandom > /root/test/randfile.txt
-RUN date '+%s' > /root/test/date.txt
-```
+From inside the [docs-gitlab/scripts/](scripts/) directory, you can run the
+script with `./seed.sh`. By default, the script will seed three repositories
+with three tags each. You can customize this by passing the number of
+repositories and tags via the command line. For example, this command will seed
+five repositories with seven tags: `./seed.sh 5 7`.  Please note this operation
+will take a considerable amount of time for even modest numbers of repositories
+and tags.
 
-Now we can run a simple bash loop in the same directory as our
-Dockerfile to seed 1201 images, which should produce around 6000 blobs. If you
-are not running the container registry locally, you will need to replace
-`localhost:5000` with the IP address of your container registry. Please note
-this operation will take a considerable amount of time.
+## Preparing Layers for Garbage Collection
 
-```bash
-for i in {0..1200}; do
-  docker build -t localhost:5000/test/alpine:${i} -f Dockerfile . \
-  && docker push localhost:5000/test/alpine:${i} \
-  && docker rmi localhost:5000/test/alpine:${i}
-done
-```
+Although we have seeded our repository, all layers and manifests are referenced
+and therefore we will not be able to properly test garbage collection. The
+simplest way to do this is to run the script again with the same arguments, or
+you may wish to only override a subset of the repositories and/or tags. This
+method will only produce layers which may be deleted when the
+`--delete-untagged` (`-m`) option is passed to the garbage collection command.
 
-In order to test both the mark and sweep stage, we need to create a further
-layers and remove any references to them. The simplest way to do this is to run
-the loop again, specifying a different repository and then afterwards removing
-that repository directly with the storage backend. This will remove references
-to the layers uploaded to the repository, allowing them to be garbage collected,
-if they are not referenced by other repositories.
-
-```bash
-for i in {0..1200}; do
-  docker build -t localhost:5000/remove/alpine:${i} -f Dockerfile . \
-  && docker push localhost:5000/remove/alpine:${i} \
-  && docker rmi localhost:5000/remove/alpine:${i}
-done
-```
+Removing an entire repository directly with the storage backend can be used as
+a quick way to remove references to the layers uploaded to the repository,
+allowing them to be garbage collected without the `--delete-untagged` option, if
+they are not referenced by other repositories.
 
 After removing the repository, you may wish to create a backup of the registry
 storage in order to restore it. This enables testing garbage collection with
@@ -111,10 +102,10 @@ the following commands.
 
 #### Deleting the Remove Repository
 
-This command will delete the `remove` repository and all the files within:
+This command will delete the `repository-1` repository and all the files within:
 
 ```bash
-s3cmd rm --recursive s3://registry-bucket/docker/registry/v2/repositories/remove/
+s3cmd rm --recursive s3://registry-bucket/docker/registry/v2/repositories/repository-1/
 ```
 
 #### Backing up and Restoring the Registry
