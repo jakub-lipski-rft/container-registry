@@ -76,6 +76,9 @@ type driverParameters struct {
 	// pushes by ensuring we aren't DoSing our own server with many
 	// connections.
 	maxConcurrency uint64
+
+	// parallelWalk enables or disables concurrently walking the filesystem.
+	parallelWalk bool
 }
 
 func init() {
@@ -100,6 +103,7 @@ type driver struct {
 	privateKey    []byte
 	rootDirectory string
 	chunkSize     int
+	parallelWalk  bool
 }
 
 // Wrapper wraps `driver` with a throttler, ensuring that no more than N
@@ -206,6 +210,24 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
 		return nil, fmt.Errorf("storage client error: %s", err)
 	}
 
+	var parallelWalkBool bool
+
+	parallelWalk := parameters["parallelwalk"]
+	switch parallelWalk := parallelWalk.(type) {
+	case string:
+		b, err := strconv.ParseBool(parallelWalk)
+		if err != nil {
+			return nil, fmt.Errorf("the parallelwalk parameter should be a boolean")
+		}
+		parallelWalkBool = b
+	case bool:
+		parallelWalkBool = parallelWalk
+	case nil:
+		// do nothing
+	default:
+		return nil, fmt.Errorf("the parallelwalk parameter should be a boolean")
+	}
+
 	params := driverParameters{
 		bucket:         fmt.Sprint(bucket),
 		rootDirectory:  fmt.Sprint(rootDirectory),
@@ -215,6 +237,7 @@ func FromParameters(parameters map[string]interface{}) (storagedriver.StorageDri
 		storageClient:  storageClient,
 		chunkSize:      chunkSize,
 		maxConcurrency: maxConcurrency,
+		parallelWalk:   parallelWalkBool,
 	}
 
 	return New(params)
@@ -237,6 +260,7 @@ func New(params driverParameters) (storagedriver.StorageDriver, error) {
 		client:        params.client,
 		storageClient: params.storageClient,
 		chunkSize:     params.chunkSize,
+		parallelWalk:  params.parallelWalk,
 	}
 
 	return &Wrapper{
@@ -891,9 +915,12 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 // WalkParallel traverses a filesystem defined within driver in parallel, starting
 // from the given path, calling f on each file.
 func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	// TODO: Verify that this driver can reliably handle parallel workloads before
-	// using storagedriver.WalkFallbackParallel
-	return d.Walk(ctx, path, f)
+	// If the ParallelWalk feature flag is not set, fall back to standard sequential walk.
+	if !d.parallelWalk {
+		return d.Walk(ctx, path, f)
+	}
+
+	return storagedriver.WalkFallbackParallel(ctx, d, path, f)
 }
 
 func startSession(client *http.Client, bucket string, name string) (uri string, err error) {

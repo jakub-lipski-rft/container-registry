@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1175,8 +1176,20 @@ func (suite *DriverSuite) TestWalkParallelError(c *check.C) {
 func (suite *DriverSuite) TestWalkParallelStopsProcessingOnError(c *check.C) {
 	d := suite.StorageDriver.Name()
 	switch d {
-	case "gcs", "oss", "swift", "filesystem", "azure":
+	case "oss", "swift", "filesystem", "azure":
 		c.Skip(fmt.Sprintf("%s driver does not support true WalkParallel", d))
+	case "gcs":
+		parallelWalk := os.Getenv("GCS_PARALLEL_WALK")
+		var parallelWalkBool bool
+		var err error
+		if parallelWalk != "" {
+			parallelWalkBool, err = strconv.ParseBool(parallelWalk)
+			c.Assert(err, check.IsNil)
+		}
+
+		if !parallelWalkBool || parallelWalk == "" {
+			c.Skip(fmt.Sprintf("%s driver is not configured with parallelwalk", d))
+		}
 	}
 
 	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
