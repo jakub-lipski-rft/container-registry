@@ -477,9 +477,9 @@ func TestDeleteFilesError(t *testing.T) {
 		t.Errorf("expected the deleted files count to be 0, got %d", count)
 	}
 
-	errs, ok := err.(multiError)
+	errs, ok := err.(storagedriver.MultiError)
 	if !ok {
-		t.Errorf("expected error to be of type s3.multiError, got %T", err)
+		t.Errorf("expected error to be of type storagedriver.MultiError, got %T", err)
 	}
 	if len(errs) != 2 {
 		t.Errorf("expected the number of spawned goroutines to be 2, got %d", len(errs))
@@ -535,9 +535,9 @@ func TestDeleteFilesPartialError(t *testing.T) {
 		t.Errorf("expected the deleted files count to be %d, got %d", half, count)
 	}
 
-	errs, ok := err.(multiError)
+	errs, ok := err.(storagedriver.MultiError)
 	if !ok {
-		t.Errorf("expected error to be of type s3.multiError, got %T", err)
+		t.Errorf("expected error to be of type storagedriver.MultiError, got %T", err)
 	}
 	if len(errs) != half {
 		t.Errorf("expected the number of errors to be %d, got %d", half, len(errs))

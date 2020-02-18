@@ -151,27 +151,6 @@ func init() {
 	factory.Register(driverName, &s3DriverFactory{})
 }
 
-// multiError is returned by batch operations when there are errors with particular elements.
-type multiError []error
-
-// Error allows multiError to implement the error interface, generating a single formatted error message.
-func (e multiError) Error() string {
-	if len(e) == 1 {
-		return e[0].Error()
-	}
-
-	var sb strings.Builder
-	for _, err := range e {
-		if err == nil {
-			continue
-		}
-
-		sb.WriteString(err.Error())
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
 // s3DriverFactory implements the factory.StorageDriverFactory interface
 type s3DriverFactory struct{}
 
@@ -1030,8 +1009,8 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	}
 
 	// collect errors from concurrent DeleteObjects requests
-	var errs multiError
-	errCh := make(chan multiError)
+	var errs storagedriver.MultiError
+	errCh := make(chan storagedriver.MultiError)
 	errDone := make(chan struct{})
 	go func() {
 		for err := range errCh {
@@ -1067,7 +1046,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 				},
 			})
 			if err != nil {
-				errCh <- multiError{err}
+				errCh <- storagedriver.MultiError{err}
 				return
 			}
 
@@ -1077,8 +1056,8 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 			// even if err is nil (200 OK response) it's not guaranteed that all files have been successfully deleted,
 			// we need to check the []*s3.Error slice within the S3 response and make sure it's empty
 			if len(resp.Errors) > 0 {
-				// parse s3.Error errors and return a single multiError
-				errs := make(multiError, 0, len(resp.Errors))
+				// parse s3.Error errors and return a single storagedriver.MultiError
+				errs := make(storagedriver.MultiError, 0, len(resp.Errors))
 				for _, s3e := range resp.Errors {
 					err := fmt.Errorf("failed to delete file '%s': '%s'", *s3e.Key, *s3e.Message)
 					errs = append(errs, err)
@@ -1197,7 +1176,7 @@ func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.
 	}
 
 	var objectCount int64
-	var retError multiError
+	var retError storagedriver.MultiError
 	countChan := make(chan int64)
 	countDone := make(chan struct{})
 	errors := make(chan error)
