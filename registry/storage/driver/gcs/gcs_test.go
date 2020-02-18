@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -32,6 +33,7 @@ const maxConcurrency = 10
 func init() {
 	bucket := os.Getenv("REGISTRY_STORAGE_GCS_BUCKET")
 	credentials := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	parallelWalk := os.Getenv("GCS_PARALLEL_WALK")
 
 	// Skip GCS storage driver tests if environment variable parameters are not provided
 	skipGCS = func() string {
@@ -78,6 +80,16 @@ func init() {
 		panic(fmt.Sprintf("Error creating storage client: %s", err))
 	}
 
+	var parallelWalkBool bool
+
+	if parallelWalk != "" {
+		parallelWalkBool, err = strconv.ParseBool(parallelWalk)
+
+		if err != nil {
+			panic(fmt.Sprintf("Error parsing parallelwalk: %v", err))
+		}
+	}
+
 	gcsDriverConstructor = func(rootDirectory string) (storagedriver.StorageDriver, error) {
 		parameters := driverParameters{
 			bucket:         bucket,
@@ -88,6 +100,7 @@ func init() {
 			storageClient:  storageClient,
 			chunkSize:      defaultChunkSize,
 			maxConcurrency: maxConcurrency,
+			parallelWalk:   parallelWalkBool,
 		}
 
 		return New(parameters)

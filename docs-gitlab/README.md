@@ -39,6 +39,17 @@ S3: https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
 for use in production environments, as exceeding your request budget will result
 in errors from the Amazon S3 service.
 
+#### GCS Storage Driver
+
+##### Additional parameters
+
+`parallelwalk`
+
+When this feature flag is set to `true`, the driver will run certain operations,
+most notably garbage collection, using multiple concurrent goroutines. This
+feature will improve the performance of garbage collection, but will
+increase the memory and CPU usage of this command as compared to the default.
+
 ### Garbage Collection
 
 #### Invalid Link Files
