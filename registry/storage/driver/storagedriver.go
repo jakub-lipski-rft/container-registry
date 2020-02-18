@@ -185,3 +185,24 @@ type Error struct {
 func (err Error) Error() string {
 	return fmt.Sprintf("%s: %s", err.DriverName, err.Enclosed)
 }
+
+// MultiError is returned by batch operations when there are errors with particular elements.
+type MultiError []error
+
+// Error allows MultiError to implement the error interface, generating a single formatted error message.
+func (e MultiError) Error() string {
+	if len(e) == 1 {
+		return e[0].Error()
+	}
+
+	var sb strings.Builder
+	for _, err := range e {
+		if err == nil {
+			continue
+		}
+
+		sb.WriteString(err.Error())
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
