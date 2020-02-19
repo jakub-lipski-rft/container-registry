@@ -63,6 +63,13 @@ Blobs related with invalid link files will be automatically swept away in the
 See [Cleanup Invalid Link Files](cleanup-invalid-link-files.md) for a guide on
 how to detect and clean these files based on the garbage collector output log.
 
+#### Debug Server
+
+A pprof debug server can be used to collect profiling information on a
+garbage collection run by providing an `address:port` to the command via
+the `--debug-server` (`--s`) flag. Usage information for this server can be
+found in the documentation for pprof: https://golang.org/pkg/net/http/pprof/
+
 ### API
 
 #### Tag Delete

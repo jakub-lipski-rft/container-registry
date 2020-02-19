@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
 	dcontext "github.com/docker/distribution/context"
@@ -19,6 +20,7 @@ func init() {
 	RootCmd.AddCommand(GCCmd)
 	GCCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do everything except remove the blobs")
 	GCCmd.Flags().BoolVarP(&removeUntagged, "delete-untagged", "m", false, "delete manifests that are not currently referenced via tag")
+	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
 	RootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show the version and exit")
 }
 
@@ -38,6 +40,7 @@ var RootCmd = &cobra.Command{
 
 var dryRun bool
 var removeUntagged bool
+var debugAddr string
 
 // GCCmd is the cobra command that corresponds to the garbage-collect subcommand
 var GCCmd = &cobra.Command{
@@ -75,6 +78,15 @@ var GCCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct registry: %v", err)
 			os.Exit(1)
+		}
+
+		if debugAddr != "" {
+			go func() {
+				dcontext.GetLoggerWithField(ctx, "address", debugAddr).Info("debug server listening")
+				if err := http.ListenAndServe(debugAddr, nil); err != nil {
+					dcontext.GetLoggerWithField(ctx, "error", err).Fatal("error listening on debug interface")
+				}
+			}()
 		}
 
 		err = storage.MarkAndSweep(ctx, driver, registry, storage.GCOpts{
