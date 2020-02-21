@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Changed
+- registry/storage: Improve performance of the garbage collection sweep phase for GCS
 
 ## v2.8.1-gitlab
 
