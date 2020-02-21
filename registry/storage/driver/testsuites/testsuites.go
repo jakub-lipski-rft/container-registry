@@ -478,8 +478,18 @@ func (suite *DriverSuite) TestReadNonexistentStream(c *check.C) {
 	c.Assert(strings.Contains(err.Error(), suite.Name()), check.Equals, true)
 }
 
-// TestList checks the returned list of keys after populating a directory tree.
-func (suite *DriverSuite) TestList(c *check.C) {
+// TestList1File tests the validity of List calls for 1 file.
+func (suite *DriverSuite) TestList1File(c *check.C) {
+	suite.testList(c, 1)
+}
+
+// TestList1200Files tests the validity of List calls for 1200 files.
+func (suite *DriverSuite) TestList1200Files(c *check.C) {
+	suite.testList(c, 1200)
+}
+
+// testList checks the returned list of keys after populating a directory tree.
+func (suite *DriverSuite) testList(c *check.C, numFiles int) {
 	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
 	defer suite.deletePath(c, rootDirectory)
 
@@ -491,11 +501,11 @@ func (suite *DriverSuite) TestList(c *check.C) {
 	})
 
 	parentDirectory := rootDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
-	childFiles := make([]string, 50)
-	for i := 0; i < len(childFiles); i++ {
+	childFiles := make([]string, numFiles)
+	for i := range childFiles {
 		childFile := parentDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
 		childFiles[i] = childFile
-		err := suite.StorageDriver.PutContent(suite.ctx, childFile, randomContents(32))
+		err := suite.StorageDriver.PutContent(suite.ctx, childFile, randomContents(8))
 		c.Assert(err, check.IsNil)
 	}
 	sort.Strings(childFiles)
@@ -632,6 +642,59 @@ func (suite *DriverSuite) TestDelete(c *check.C) {
 	c.Assert(strings.Contains(err.Error(), suite.Name()), check.Equals, true)
 }
 
+// TestDeleteDir1File ensures the driver is able to delete all objects in a
+// directory with 1 file.
+func (suite *DriverSuite) TestDeleteDir1File(c *check.C) {
+	suite.testDeleteDir(c, 1)
+}
+
+// TestDeleteDir1200Files ensures the driver is able to delete all objects in a
+// directory with 1200 files.
+func (suite *DriverSuite) TestDeleteDir1200Files(c *check.C) {
+	suite.testDeleteDir(c, 1200)
+}
+
+func (suite *DriverSuite) testDeleteDir(c *check.C, numFiles int) {
+	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	defer suite.deletePath(c, rootDirectory)
+
+	parentDirectory := rootDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
+	childFiles := make([]string, numFiles)
+	for i := range childFiles {
+		childFile := parentDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
+		childFiles[i] = childFile
+		err := suite.StorageDriver.PutContent(suite.ctx, childFile, randomContents(8))
+		c.Assert(err, check.IsNil)
+	}
+
+	err := suite.StorageDriver.Delete(suite.ctx, parentDirectory)
+	c.Assert(err, check.IsNil)
+
+	// Most storage backends delete files in lexicographic order, so we'll access
+	// them in the same way, this should help point out errors due to deletion order.
+	sort.Strings(childFiles)
+
+	// This test can be flaky when large numbers of objects are deleted for
+	// storage backends which are eventually consistent. We'll log any files we
+	// encounter which are not delete and fail later. This way information about
+	// the failure/flake can be preserved to aid in debugging.
+	var filesRemaining bool
+
+	for i, f := range childFiles {
+		if _, err = suite.StorageDriver.GetContent(suite.ctx, f); err == nil {
+			filesRemaining = true
+			c.Logf("able to access file %d after deletion", i)
+		} else {
+			c.Assert(err, check.FitsTypeOf, storagedriver.PathNotFoundError{})
+			c.Assert(strings.Contains(err.Error(), suite.Name()), check.Equals, true)
+		}
+	}
+
+	if filesRemaining {
+		c.Fatal("Encountered files remaining after deletion")
+	}
+}
+
 // buildFiles builds a num amount of test files with a size of size under parentDir. Returns a slice with the path of
 // the created files.
 func (suite *DriverSuite) buildFiles(c *check.C, parentDir string, num int64, size int64) []string {
@@ -711,11 +774,6 @@ func (suite *DriverSuite) benchmarkDeleteFiles(c *check.C, num int64) {
 // BenchmarkDeleteFiles1File benchmarks DeleteFiles for 1 file.
 func (suite *DriverSuite) BenchmarkDeleteFiles1File(c *check.C) {
 	suite.benchmarkDeleteFiles(c, 1)
-}
-
-// BenchmarkDeleteFiles50Files benchmarks DeleteFiles for 50 files.
-func (suite *DriverSuite) BenchmarkDeleteFiles50Files(c *check.C) {
-	suite.benchmarkDeleteFiles(c, 50)
 }
 
 // BenchmarkDeleteFiles100Files benchmarks DeleteFiles for 100 files.
