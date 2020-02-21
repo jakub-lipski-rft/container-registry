@@ -1,4 +1,4 @@
-image: golang:1.12-buster
+image: golang:1.13-buster
 
 variables:
   BUILDTAGS: "include_gcs include_oss"
