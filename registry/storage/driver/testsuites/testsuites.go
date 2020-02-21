@@ -1649,6 +1649,11 @@ func (suite *DriverSuite) BenchmarkRemoveBlobs100Blobs(c *check.C) {
 	suite.benchmarkRemoveBlobs(c, 100)
 }
 
+// BenchmarkRemoveBlobs1000Blobs creates 1000 blobs and deletes them using the storage.Vacuum.RemoveBlobs method.
+func (suite *DriverSuite) BenchmarkRemoveBlobs1000Blobs(c *check.C) {
+	suite.benchmarkRemoveBlobs(c, 1000)
+}
+
 func (suite *DriverSuite) buildManifests(c *check.C, repo distribution.Repository, numManifests, numTagsPerManifest int) []storage.ManifestDel {
 	images := make([]testutil.Image, numManifests)
 	manifests := make([]storage.ManifestDel, 0)

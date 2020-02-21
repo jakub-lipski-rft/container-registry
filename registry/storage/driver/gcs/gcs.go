@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -54,8 +55,8 @@ const (
 	defaultChunkSize         = 20 * minChunkSize
 	defaultMaxConcurrency    = 50
 	minConcurrency           = 25
-
-	maxTries = 5
+	maxDeleteConcurrency     = 1000
+	maxTries                 = 5
 )
 
 var rangeHeader = regexp.MustCompile(`^bytes=([0-9])+-([0-9]+)$`)
@@ -816,18 +817,68 @@ func (d *driver) Delete(context context.Context, path string) error {
 	return err
 }
 
-// DeleteFiles deletes a set of files by iterating over their full path list and invoking Delete for each. Returns the
-// number of successfully deleted files and any errors. This method is idempotent, no error is returned if a file does
-// not exist.
+// DeleteFiles deletes a set of files concurrently, using a separate goroutine for each, up to a maximum of
+// maxDeleteConcurrency. Returns the number of successfully deleted files and any errors. This method is idempotent, no
+// error is returned if a file does not exist.
 func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
-	count := 0
-	for _, path := range paths {
-		if err := d.Delete(ctx, path); err != nil {
-			if _, ok := err.(storagedriver.PathNotFoundError); !ok {
-				return count, err
-			}
+	// collect errors from concurrent requests
+	var errs storagedriver.MultiError
+	errCh := make(chan storagedriver.MultiError)
+	errDone := make(chan struct{})
+	go func() {
+		for err := range errCh {
+			errs = append(errs, err...)
 		}
-		count++
+		errDone <- struct{}{}
+	}()
+
+	// count the number of successfully deleted files across concurrent requests
+	count := 0
+	countCh := make(chan struct{})
+	countDone := make(chan struct{})
+	go func() {
+		for range countCh {
+			count += 1
+		}
+		countDone <- struct{}{}
+	}()
+
+	var wg sync.WaitGroup
+	// limit the number of active goroutines to maxDeleteConcurrency
+	semaphore := make(chan struct{}, maxDeleteConcurrency)
+
+	for _, path := range paths {
+		// block if there are maxDeleteConcurrency goroutines
+		semaphore <- struct{}{}
+		wg.Add(1)
+
+		go func(p string) {
+			defer func() {
+				wg.Done()
+				// signal free spot for another goroutine
+				<-semaphore
+			}()
+
+			if err := storageDeleteObject(d.storageClient, ctx, d.bucket, d.pathToKey(p)); err != nil {
+				if err != storage.ErrObjectNotExist {
+					errCh <- storagedriver.MultiError{err}
+					return
+				}
+			}
+			// count successfully deleted files
+			countCh <- struct{}{}
+		}(path)
+	}
+
+	wg.Wait()
+	close(semaphore)
+	close(errCh)
+	<-errDone
+	close(countCh)
+	<-countDone
+
+	if len(errs) > 0 {
+		return count, errs
 	}
 	return count, nil
 }
