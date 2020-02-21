@@ -1,3 +1,5 @@
+## [Unreleased]
+
 ## v2.8.1-gitlab
 
 - registry/storage: Improve consistency of garbage collection logs
