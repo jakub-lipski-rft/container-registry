@@ -96,3 +96,9 @@ tagging a new release. It will automatically suggest the next release version,
 and create the appropriate tag, and will prompt the user to make a changelog
 entry if the chosen release version is not present in the changelog. Once the
 changelog entry is made, the release tag will be pushed upstream.
+
+## Contributing
+
+Merge requests which make change that will impact users of this project
+should have an accompanying [changelog](../CHANGELOG.md) entry in the same
+merge request. These entries should be added under the `[Unreleased]` header.
