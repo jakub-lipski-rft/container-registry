@@ -445,3 +445,79 @@ func TestOrphanBlobDeleted(t *testing.T) {
 		}
 	}
 }
+
+// TestGarbageCollectAfterLastTagRemoved was added to validate the scenario in which the last tag from the repository
+// is removed which in turn removes the <repository>/_manifests/tags folder. This was throwing a distribution.ErrRepositoryUnknown
+// error that is now being captured in garbagecollect.MarkAndSweep.
+// https://gitlab.com/gitlab-org/gitlab/issues/28201
+func TestGarbageCollectAfterLastTagRemoved(t *testing.T) {
+	ctx := context.Background()
+	inmemoryDriver := inmemory.New()
+
+	registry := createRegistry(t, inmemoryDriver)
+	repo := makeRepository(t, registry, "testgarbagecollectafterlasttagremoved")
+
+	manifestService, err := repo.Manifests(ctx)
+	if err != nil {
+		t.Fatalf("Failed to initialize the manifestService: %v", err)
+	}
+
+	// Setup for tests
+	randomLayers1, err := testutil.CreateRandomLayers(3)
+	if err != nil {
+		t.Fatalf("failed to make layers: %v", err)
+	}
+
+	err = testutil.UploadBlobs(repo, randomLayers1)
+	if err != nil {
+		t.Fatalf("failed to upload layers: %v", err)
+	}
+
+	manifest1, err := testutil.MakeSchema1Manifest(getKeys(randomLayers1))
+	if err != nil {
+		t.Fatalf("failed to make manifest: %v", err)
+	}
+
+	_, err = manifestService.Put(ctx, manifest1)
+	if err != nil {
+		t.Fatalf("manifest upload failed: %v", err)
+	}
+
+	manifestEnumerator, _ := manifestService.(distribution.ManifestEnumerator)
+	manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
+		repo.Tags(ctx).Tag(ctx, "testTag", distribution.Descriptor{Digest: dgst})
+		return nil
+	})
+	// -- End setup
+
+	// Delete the repository's _manifests/tags path
+	tagsPath, err := pathFor(manifestTagsPathSpec{"testgarbagecollectafterlasttagremoved"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf(tagsPath)
+	err = inmemoryDriver.Delete(ctx, tagsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Run garbage collection with tags folder removed to validate error handling
+	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
+		DryRun:         false,
+		RemoveUntagged: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert that no blobs or manifests were left behind (because the only manifest has no tags path)
+	afterBlobs := allBlobs(t, registry)
+	if len(afterBlobs) != 0 {
+		t.Fatalf("No blobs should be left behind: %d remaining", len(afterBlobs))
+	}
+
+	afterManifests := allManifests(t, manifestService)
+	if len(afterManifests) != 0 {
+		t.Fatalf("No manifests should be left behind: %d remaining", len(afterManifests))
+	}
+}
