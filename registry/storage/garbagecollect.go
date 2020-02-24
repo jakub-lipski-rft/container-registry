@@ -127,7 +127,12 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 					// which means that we need check (and delete) those references when deleting manifest
 					allTags, err := repository.Tags(ctx).All(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to retrieve tags %v", err)
+						switch err := err.(type) {
+						case distribution.ErrRepositoryUnknown:
+							// Ignore path not found error on missing tags folder
+						default:
+							return fmt.Errorf("failed to retrieve tags %v", err)
+						}
 					}
 					manifestArr.append(ManifestDel{Name: repoName, Digest: dgst, Tags: allTags})
 					return nil
