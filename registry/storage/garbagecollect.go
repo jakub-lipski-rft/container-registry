@@ -113,10 +113,42 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 			return fmt.Errorf("unable to convert ManifestService into ManifestEnumerator")
 		}
 
+		t, ok := repository.Tags(ctx).(*tagStore)
+		if !ok {
+			return fmt.Errorf("unable to convert tagService into tagStore")
+		}
+
+		cachedTagStore := newCachedTagStore(t)
+
+		// Since we're removing untagged images, retrieving all tags primes the
+		// cache. This isn't strictly necessary, but it prevents a potentially large
+		// amount of goroutines being spawned only to wait for priming to complete
+		// and allows us to report the number of primed tags.
+		if opts.RemoveUntagged {
+			primeStart := time.Now()
+			dcontext.GetLoggerWithField(ctx, "repo", repoName).Info("priming tags cache")
+
+			allTags, err := cachedTagStore.All(ctx)
+			if err != nil {
+				switch err := err.(type) {
+				case distribution.ErrRepositoryUnknown:
+					// Ignore path not found error on missing tags folder
+				default:
+					return fmt.Errorf("failed to retrieve tags %v", err)
+				}
+			}
+
+			dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+				"repo":        repoName,
+				"tags_primed": len(allTags),
+				"duration_s":  time.Since(primeStart).Seconds(),
+			}).Info("tags cache primed")
+		}
+
 		err = manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
 			if opts.RemoveUntagged {
 				// fetch all tags where this manifest is the latest one
-				tags, err := repository.Tags(ctx).Lookup(ctx, distribution.Descriptor{Digest: dgst})
+				tags, err := cachedTagStore.Lookup(ctx, distribution.Descriptor{Digest: dgst})
 				if err != nil {
 					return fmt.Errorf("failed to retrieve tags for digest %v: %v", dgst, err)
 				}
@@ -125,7 +157,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 					// fetch all tags from repository
 					// all of these tags could contain manifest in history
 					// which means that we need check (and delete) those references when deleting manifest
-					allTags, err := repository.Tags(ctx).All(ctx)
+					allTags, err := cachedTagStore.All(ctx)
 					if err != nil {
 						switch err := err.(type) {
 						case distribution.ErrRepositoryUnknown:
