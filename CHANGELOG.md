@@ -2,6 +2,7 @@
 ### Changed
 - registry/storage: Improve performance of the garbage collection sweep phase for GCS
 - registry/storage: Handle missing Tags folder during garbage collect mark and sweep
+- registry/storage: Cache repository tags during the garbage collection mark phase
 
 ## v2.8.1-gitlab
 
