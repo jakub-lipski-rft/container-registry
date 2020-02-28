@@ -88,8 +88,8 @@ func (bs *blobStore) Put(ctx context.Context, mediaType string, p []byte) (distr
 }
 
 // Enumerate will travers the repository, calling the ingester function once
-// per digest encountered. The ingester function must be thread-safe.
-func (bs *blobStore) Enumerate(ctx context.Context, ingester func(dgst digest.Digest) error) error {
+// per descriptor encountered. The ingester function must be thread-safe.
+func (bs *blobStore) Enumerate(ctx context.Context, ingester func(descriptor distribution.Descriptor) error) error {
 	specPath, err := pathFor(blobsPathSpec{})
 	if err != nil {
 		return err
@@ -113,7 +113,10 @@ func (bs *blobStore) Enumerate(ctx context.Context, ingester func(dgst digest.Di
 			return err
 		}
 
-		return ingester(digest)
+		return ingester(distribution.Descriptor{
+			Size:   fileInfo.Size(),
+			Digest: digest,
+		})
 	})
 }
 

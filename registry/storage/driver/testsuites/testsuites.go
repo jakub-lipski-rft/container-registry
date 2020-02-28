@@ -1592,8 +1592,8 @@ func (suite *DriverSuite) TestRemoveBlob(c *check.C) {
 
 	blobService := registry.Blobs()
 	blobsLeft := make(map[digest.Digest]struct{})
-	err = blobService.Enumerate(suite.ctx, func(dgst digest.Digest) error {
-		blobsLeft[dgst] = struct{}{}
+	err = blobService.Enumerate(suite.ctx, func(desc distribution.Descriptor) error {
+		blobsLeft[desc.Digest] = struct{}{}
 		return nil
 	})
 	if err != nil {
@@ -1659,8 +1659,8 @@ func (suite *DriverSuite) TestRemoveBlobs(c *check.C) {
 	// assert that blobs were deleted
 	blobService := registry.Blobs()
 	blobsLeft := make(map[digest.Digest]struct{})
-	err = blobService.Enumerate(suite.ctx, func(dgst digest.Digest) error {
-		blobsLeft[dgst] = struct{}{}
+	err = blobService.Enumerate(suite.ctx, func(desc distribution.Descriptor) error {
+		blobsLeft[desc.Digest] = struct{}{}
 		return nil
 	})
 	if err != nil {
