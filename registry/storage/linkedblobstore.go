@@ -232,10 +232,10 @@ func (lbs *linkedBlobStore) Delete(ctx context.Context, dgst digest.Digest) erro
 	return nil
 }
 
-// Enumerate will traverse the repository looking for link files. When one is found, the content is parsed (digest) and
+// Enumerate will traverse the repository looking for link files. When one is found, the content is parsed (descriptor) and
 // sent to ingestor. If a link file is corrupted (e.g. 0B in size or invalid digest) it is ignored, and the walk continues.
 // The ingestor function must be thread-safe.
-func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(digest.Digest) error) error {
+func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(distribution.Descriptor) error) error {
 	rootPath, err := pathFor(lbs.linkDirectoryPathSpec)
 	if err != nil {
 		return err
@@ -274,7 +274,10 @@ func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(digest.
 			return err
 		}
 
-		err = ingestor(d)
+		err = ingestor(distribution.Descriptor{
+			Size:   fileInfo.Size(),
+			Digest: d,
+		})
 		if err != nil {
 			return err
 		}

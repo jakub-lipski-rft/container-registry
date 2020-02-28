@@ -110,7 +110,7 @@ type BlobDeleter interface {
 
 // BlobEnumerator enables iterating over blobs from storage
 type BlobEnumerator interface {
-	Enumerate(ctx context.Context, ingester func(dgst digest.Digest) error) error
+	Enumerate(ctx context.Context, ingester func(descriptor Descriptor) error) error
 }
 
 // BlobDescriptorService manages metadata about a blob by digest. Most

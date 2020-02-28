@@ -64,6 +64,15 @@ Blobs related with invalid link files will be automatically swept away in the
 See [Cleanup Invalid Link Files](cleanup-invalid-link-files.md) for a guide on
 how to detect and clean these files based on the garbage collector output log.
 
+#### Estimating Freed Storage
+
+Garbage collection now estimates the amount of storage that will be freed.
+It's possible to estimate freed storage without setting the registry to
+read-only mode by doing a garbage collection dry run; however, this will affect
+the accuracy of the estimate. Without the registry being read-only, blobs may be
+re-referenced, which would lead to an overestimate. Blobs might be
+dereferenced, leading to an underestimate.
+
 #### Debug Server
 
 A pprof debug server can be used to collect profiling information on a

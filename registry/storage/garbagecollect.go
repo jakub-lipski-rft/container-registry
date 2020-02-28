@@ -219,13 +219,26 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 
 	dcontext.GetLogger(ctx).Info("finding blobs eligible for deletion. This may take some time...")
 
-	err = blobService.Enumerate(ctx, func(dgst digest.Digest) error {
+	sizeChan := make(chan int64)
+	sizeDone := make(chan struct{})
+	var totalSizeBytes int64
+	go func() {
+		for size := range sizeChan {
+			totalSizeBytes += size
+		}
+		sizeDone <- struct{}{}
+	}()
+
+	err = blobService.Enumerate(ctx, func(desc distribution.Descriptor) error {
 		// check if digest is in markSet. If not, delete it!
-		if !markSet.contains(dgst) {
+		if !markSet.contains(desc.Digest) {
 			dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
-				"digest": dgst,
+				"digest":     desc.Digest,
+				"size_bytes": desc.Size,
 			}).Info("blob eligible for deletion")
-			deleteSet.add(dgst)
+
+			sizeChan <- desc.Size
+			deleteSet.add(desc.Digest)
 		}
 		return nil
 	})
@@ -233,11 +246,15 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 		return fmt.Errorf("error enumerating blobs: %v", err)
 	}
 
+	close(sizeChan)
+	<-sizeDone
+
 	dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
-		"blobs_marked":        markSet.len(),
-		"blobs_to_delete":     deleteSet.len(),
-		"manifests_to_delete": len(manifestArr.manifestDels),
-		"duration_s":          time.Since(markStart).Seconds(),
+		"blobs_marked":               markSet.len(),
+		"blobs_to_delete":            deleteSet.len(),
+		"manifests_to_delete":        len(manifestArr.manifestDels),
+		"storage_use_estimate_bytes": totalSizeBytes,
+		"duration_s":                 time.Since(markStart).Seconds(),
 	}).Info("mark stage complete")
 
 	// sweep

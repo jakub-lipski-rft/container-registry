@@ -66,8 +66,8 @@ func allBlobs(t *testing.T, registry distribution.Namespace) map[digest.Digest]s
 	ctx := context.Background()
 	blobService := registry.Blobs()
 	allBlobsSet := newSyncDigestSet()
-	err := blobService.Enumerate(ctx, func(dgst digest.Digest) error {
-		allBlobsSet.add(dgst)
+	err := blobService.Enumerate(ctx, func(desc distribution.Descriptor) error {
+		allBlobsSet.add(desc.Digest)
 		return nil
 	})
 	if err != nil {

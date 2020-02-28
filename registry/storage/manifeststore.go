@@ -150,8 +150,8 @@ func (ms *manifestStore) Delete(ctx context.Context, dgst digest.Digest) error {
 }
 
 func (ms *manifestStore) Enumerate(ctx context.Context, ingester func(digest.Digest) error) error {
-	err := ms.blobStore.Enumerate(ctx, func(dgst digest.Digest) error {
-		err := ingester(dgst)
+	err := ms.blobStore.Enumerate(ctx, func(desc distribution.Descriptor) error {
+		err := ingester(desc.Digest)
 		if err != nil {
 			return err
 		}
