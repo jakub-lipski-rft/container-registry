@@ -1496,19 +1496,19 @@ func (suite *DriverSuite) makeRepository(c *check.C, registry distribution.Names
 	return repo
 }
 
-// BenchmarkMarkAndSweep10Images uploads 10 images, deletes half and runs
-// garbage collection on the registry.
-func (suite *DriverSuite) BenchmarkMarkAndSweep10Images(c *check.C) {
-	suite.benchmarkMarkAndSweep(c, 10)
+// BenchmarkMarkAndSweep10ImagesKeepUntagged uploads 10 images, deletes half
+// and runs garbage collection on the registry without removing untaged images.
+func (suite *DriverSuite) BenchmarkMarkAndSweep10ImagesKeepUntagged(c *check.C) {
+	suite.benchmarkMarkAndSweep(c, 10, false)
 }
 
-// BenchmarkMarkAndSweep50Images uploads 10 images, deletes half and runs
-// garbage collection on the registry.
-func (suite *DriverSuite) BenchmarkMarkAndSweep50Images(c *check.C) {
-	suite.benchmarkMarkAndSweep(c, 50)
+// BenchmarkMarkAndSweep50ImagesKeepUntagged uploads 50 images, deletes half
+// and runs garbage collection on the registry without removing untaged images.
+func (suite *DriverSuite) BenchmarkMarkAndSweep50ImagesKeepUntagged(c *check.C) {
+	suite.benchmarkMarkAndSweep(c, 50, false)
 }
 
-func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int) {
+func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int, removeUntagged bool) {
 	// Setup for this test takes a long time, even with small numbers of images,
 	// so keep the skip logic here in the sub test.
 	if testing.Short() {
@@ -1548,7 +1548,7 @@ func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int) {
 		// Run GC
 		err = storage.MarkAndSweep(context.Background(), suite.StorageDriver, registry, storage.GCOpts{
 			DryRun:         false,
-			RemoveUntagged: false,
+			RemoveUntagged: removeUntagged,
 		})
 		c.Assert(err, check.IsNil)
 	}
