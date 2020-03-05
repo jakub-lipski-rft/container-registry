@@ -124,7 +124,8 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		tags := imh.Repository.Tags(imh)
 		desc, err := tags.Get(imh, imh.Tag)
 		if err != nil {
-			if _, ok := err.(distribution.ErrTagUnknown); ok {
+			if _, ok := err.(distribution.ErrTagUnknown); ok || err == digest.ErrDigestInvalidFormat {
+				// not found or with broken current/link (invalid digest)
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
 			} else {
 				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))

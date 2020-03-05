@@ -87,6 +87,19 @@ found in the documentation for pprof: https://golang.org/pkg/net/http/pprof/
 A new route, `DELETE /v2/<name>/tags/reference/<reference>`, was added to the
 API, enabling the deletion of tags by name.
 
+#### Broken link files when fetching a manifest by tag
+
+When fetching a manifest by tag, through `GET /v2/<name>/manifests/<tag>`, if
+the manifest link file in 
+`/docker/registry/v2/repositories/<name>/_manifests/tags/<tag>/current/link` is
+empty or corrupted, instead of returning a `500 Internal Server Error` response
+like the upstream implementation, it returns a `404 Not Found` response with a 
+`MANIFEST_UNKNOWN` error in the body.
+
+If for some reason a tag manifest link file is broken, in practice, it's as if
+it didn't exist at all, thus the `404 Not Found`. Re-pushing the tag will fix
+the broken link file.
+
 ## Releases
 
 Release planning is done by using the `Release Plan` issue template during the

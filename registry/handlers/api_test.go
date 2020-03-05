@@ -916,7 +916,7 @@ func TestGetManifestWithStorageError(t *testing.T) {
 	testManifestWithStorageError(t, env1, repo, http.StatusInternalServerError, errcode.ErrorCodeUnknown)
 
 	repo, _ = reference.WithName(repositoryWithManifestBadLink)
-	testManifestWithStorageError(t, env1, repo, http.StatusInternalServerError, errcode.ErrorCodeUnknown)
+	testManifestWithStorageError(t, env1, repo, http.StatusNotFound, v2.ErrorCodeManifestUnknown)
 }
 
 func TestManifestDelete(t *testing.T) {
