@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"sync"
 
@@ -65,21 +64,25 @@ func WalkFallback(ctx context.Context, driver StorageDriver, from string, f Walk
 // WalkFallbackParallel is similar to WalkFallback, but processes files and
 // directories in their own goroutines
 func WalkFallbackParallel(ctx context.Context, driver StorageDriver, from string, f WalkFn) error {
-	var retError error
+	var retError MultiError
 	errors := make(chan error)
 	quit := make(chan struct{})
 	errDone := make(chan struct{})
 
-	// If we encounter an error from any goroutine called from within doWalk,
+	// If we encounter an error from any goroutine called from within doWalkParallel,
 	// return early from any new goroutines and return that error.
 	go func() {
-		// Signal goroutines to quit only once on the first error.
-		retError = <-errors
-		close(quit)
-		// Consume any further errors to prevent goroutines from blocking and to
+		var closed bool
+		// Consume all errors to prevent goroutines from blocking and to
 		// report errors from goroutines that were already in progress.
 		for err := range errors {
-			retError = fmt.Errorf("\n%v", err)
+			// Signal goroutines to quit only once on the first error.
+			if !closed {
+				close(quit)
+				closed = true
+			}
+
+			retError = append(retError, err)
 		}
 		errDone <- struct{}{}
 	}()
@@ -95,7 +98,11 @@ func WalkFallbackParallel(ctx context.Context, driver StorageDriver, from string
 	close(errors)
 	<-errDone
 
-	return retError
+	if len(retError) > 0 {
+		return retError
+	}
+
+	return nil
 }
 
 func doWalkParallel(ctx context.Context, driver StorageDriver, wg *sync.WaitGroup, quit <-chan struct{}, errors chan<- error, from string, f WalkFn) {
