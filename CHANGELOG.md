@@ -6,6 +6,7 @@
 - registry/storage: Garbage collection provides an estimate of how much storage will be removed
 - registry/storage: Upgrade the GCS SDK to v1.2.1
 - registry/api/v2: Return not found error when getting a manifest by tag with a broken link
+- registry/storage: Fix PathNotFoundError not being ignored in repository enumeration during garbage collection when WalkParallel is enabled
 
 ## v2.8.1-gitlab
 
