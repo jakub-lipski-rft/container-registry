@@ -63,11 +63,14 @@ func WalkFallback(ctx context.Context, driver StorageDriver, from string, f Walk
 
 // WalkFallbackParallel is similar to WalkFallback, but processes files and
 // directories in their own goroutines
-func WalkFallbackParallel(ctx context.Context, driver StorageDriver, from string, f WalkFn) error {
+func WalkFallbackParallel(ctx context.Context, driver StorageDriver, maxConcurrency uint64, from string, f WalkFn) error {
 	var retError MultiError
 	errors := make(chan error)
 	quit := make(chan struct{})
 	errDone := make(chan struct{})
+
+	// Limit the number of active walk goroutines to maxConcurrency.
+	semaphore := make(chan struct{}, maxConcurrency)
 
 	// If we encounter an error from any goroutine called from within doWalkParallel,
 	// return early from any new goroutines and return that error.
@@ -92,7 +95,7 @@ func WalkFallbackParallel(ctx context.Context, driver StorageDriver, from string
 	// entire walk to complete without blocking on each doWalk call.
 	var wg sync.WaitGroup
 
-	doWalkParallel(ctx, driver, &wg, quit, errors, from, f)
+	doWalkParallel(ctx, driver, semaphore, &wg, quit, errors, from, f)
 
 	wg.Wait()
 	close(errors)
@@ -105,7 +108,7 @@ func WalkFallbackParallel(ctx context.Context, driver StorageDriver, from string
 	return nil
 }
 
-func doWalkParallel(ctx context.Context, driver StorageDriver, wg *sync.WaitGroup, quit <-chan struct{}, errors chan<- error, from string, f WalkFn) {
+func doWalkParallel(ctx context.Context, driver StorageDriver, semaphore chan struct{}, wg *sync.WaitGroup, quit <-chan struct{}, errors chan<- error, from string, f WalkFn) {
 	select {
 	// The walk was canceled, return to stop requests for pages and prevent gorountines from leaking.
 	case <-quit:
@@ -116,11 +119,23 @@ func doWalkParallel(ctx context.Context, driver StorageDriver, wg *sync.WaitGrou
 			errors <- err
 			return
 		}
+
 		for _, child := range children {
 			wg.Add(1)
 			c := child
+
+			// Wait until there is an open space in the channel before launching a new
+			// goroutine. Doing this now prevents goroutines (and their stacks) from
+			// being allocated only to wait. If we encounter a directory, we must
+			// release the semaphore before calling doWalkParallel recursively,
+			// rather than releasing it just before returning. This means that we will
+			// have to manage releasing the semaphore before returning from the
+			// goroutine without defer via a forward-looking goto.
+			semaphore <- struct{}{}
+
 			go func() {
 				defer wg.Done()
+
 				// TODO(stevvooe): Calling driver.Stat for every entry is quite
 				// expensive when running against backends with a slow Stat
 				// implementation, such as s3. This is very likely a serious
@@ -131,10 +146,10 @@ func doWalkParallel(ctx context.Context, driver StorageDriver, wg *sync.WaitGrou
 					case PathNotFoundError:
 						// repository was removed in between listing and enumeration. Ignore it.
 						logrus.WithField("path", c).Infof("ignoring deleted path")
-						return
+						goto ReleaseSemaphoreAndReturn
 					default:
 						errors <- err
-						return
+						goto ReleaseSemaphoreAndReturn
 					}
 				}
 
@@ -142,19 +157,25 @@ func doWalkParallel(ctx context.Context, driver StorageDriver, wg *sync.WaitGrou
 
 				// Decend down the filesystem if we're in a directory.
 				if err == nil && fileInfo.IsDir() {
-					doWalkParallel(ctx, driver, wg, quit, errors, c, f)
+
+					// Release the semaphore now to pass it to the next call to
+					// doWalkParallel and prevent deadlock.
+					<-semaphore
+					doWalkParallel(ctx, driver, semaphore, wg, quit, errors, c, f)
 					return
 				}
-
 
 				if err != nil {
 					//  If we're skipping this directory, noop to stop descent down this subtree.
 					if err == ErrSkipDir && fileInfo.IsDir() {
-						return
+						goto ReleaseSemaphoreAndReturn
 					}
 					errors <- err
 				}
 
+			ReleaseSemaphoreAndReturn:
+				// Release the semaphore, signaling a free spot for another goroutine.
+				<-semaphore
 				return
 			}()
 		}

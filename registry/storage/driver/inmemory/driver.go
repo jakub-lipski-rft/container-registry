@@ -13,7 +13,10 @@ import (
 	"github.com/docker/distribution/registry/storage/driver/factory"
 )
 
-const driverName = "inmemory"
+const (
+	driverName         = "inmemory"
+	maxWalkConcurrency = 25
+)
 
 func init() {
 	factory.Register(driverName, &inMemoryDriverFactory{})
@@ -269,7 +272,7 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 // WalkParallel traverses a filesystem defined within driver in parallel, starting
 // from the given path, calling f on each file.
 func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	return storagedriver.WalkFallbackParallel(ctx, d, path, f)
+	return storagedriver.WalkFallbackParallel(ctx, d, maxWalkConcurrency, path, f)
 }
 
 type writer struct {
