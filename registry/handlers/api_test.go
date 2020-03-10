@@ -50,6 +50,7 @@ const (
 
 	withDelete configOpt = iota
 	withSchema1Compatibility
+	withAccessLog
 )
 
 // TestCheckAPI hits the base endpoint (/v2/) ensures we return the specified
@@ -232,7 +233,7 @@ func contains(elems []string, e string) bool {
 }
 
 func newConfig(opts ...configOpt) configuration.Configuration {
-	var deleteEnabled, schema1CompatibilityEnabled bool
+	var deleteEnabled, schema1CompatibilityEnabled, accessLogEnabled bool
 
 	for _, o := range opts {
 		switch o {
@@ -240,6 +241,8 @@ func newConfig(opts ...configOpt) configuration.Configuration {
 			deleteEnabled = true
 		case withSchema1Compatibility:
 			schema1CompatibilityEnabled = true
+		case withAccessLog:
+			accessLogEnabled = true
 		}
 	}
 
@@ -252,9 +255,9 @@ func newConfig(opts ...configOpt) configuration.Configuration {
 			}},
 		},
 	}
-
 	config.Compatibility.Schema1.Enabled = schema1CompatibilityEnabled
 	config.HTTP.Headers = headerConfig
+	config.Log.AccessLog.Disabled = !accessLogEnabled
 
 	return config
 }
@@ -2236,7 +2239,14 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 	ctx := context.Background()
 
 	app := NewApp(ctx, config)
-	server := httptest.NewServer(handlers.CombinedLoggingHandler(os.Stderr, app))
+
+	var out io.Writer
+	if config.Log.AccessLog.Disabled {
+		out = ioutil.Discard
+	} else {
+		out = os.Stderr
+	}
+	server := httptest.NewServer(handlers.CombinedLoggingHandler(out, app))
 	builder, err := v2.NewURLBuilderFromString(server.URL+config.HTTP.Prefix, false)
 
 	if err != nil {
