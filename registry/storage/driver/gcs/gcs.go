@@ -56,6 +56,7 @@ const (
 	defaultMaxConcurrency    = 50
 	minConcurrency           = 25
 	maxDeleteConcurrency     = 1000
+	maxWalkConcurrency       = 100
 	maxTries                 = 5
 )
 
@@ -971,7 +972,7 @@ func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.
 		return d.Walk(ctx, path, f)
 	}
 
-	return storagedriver.WalkFallbackParallel(ctx, d, path, f)
+	return storagedriver.WalkFallbackParallel(ctx, d, maxWalkConcurrency, path, f)
 }
 
 func startSession(client *http.Client, bucket string, name string) (uri string, err error) {
