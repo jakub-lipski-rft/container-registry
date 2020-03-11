@@ -46,6 +46,7 @@ func init() {
 	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
 	pathStyle := os.Getenv("AWS_PATH_STYLE")
 	maxRequestsPerSecond := os.Getenv("S3_MAX_REQUESTS_PER_SEC")
+	logLevel := os.Getenv("S3_LOG_LEVEL")
 
 	if err != nil {
 		panic(err)
@@ -109,6 +110,8 @@ func init() {
 
 		parallelWalkBool := true
 
+		logLevelType := parseLogLevelParam(logLevel)
+
 		parameters := DriverParameters{
 			accessKey,
 			secretKey,
@@ -132,6 +135,7 @@ func init() {
 			pathStyleBool,
 			maxRequestsPerSecondInt64,
 			parallelWalkBool,
+			logLevelType,
 		}
 
 		return New(parameters)

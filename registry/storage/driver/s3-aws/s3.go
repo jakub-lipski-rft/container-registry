@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"golang.org/x/time/rate"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -124,6 +126,7 @@ type DriverParameters struct {
 	PathStyle                   bool
 	MaxRequestsPerSecond        int64
 	ParallelWalk                bool
+	LogLevel                    aws.LogLevelType
 }
 
 func init() {
@@ -182,6 +185,39 @@ type baseEmbed struct {
 // Objects are stored at absolute keys in the provided bucket.
 type Driver struct {
 	baseEmbed
+}
+
+func parseLogLevelParam(param interface{}) aws.LogLevelType {
+	logLevel := aws.LogOff
+
+	if param != nil {
+		switch strings.ToLower(param.(string)) {
+		case "logoff":
+			log.Info("S3 logging level set to LogOff")
+		case "logdebug":
+			log.Info("S3 logging level set to LogDebug")
+			logLevel = aws.LogDebug
+		case "logdebugwithsigning":
+			log.Info("S3 logging level set to LogDebugWithSigning")
+			logLevel = aws.LogDebugWithSigning
+		case "logdebugwithhttpbody":
+			log.Info("S3 logging level set to LogDebugWithHTTPBody")
+			logLevel = aws.LogDebugWithHTTPBody
+		case "logdebugwithrequestretries":
+			log.Info("S3 logging level set to LogDebugWithRequestRetries")
+			logLevel = aws.LogDebugWithRequestRetries
+		case "logdebugwithrequesterrors":
+			log.Info("S3 logging level set to LogDebugWithRequestErrors")
+			logLevel = aws.LogDebugWithRequestErrors
+		case "logdebugwitheventstreambody":
+			log.Info("S3 logging level set to LogDebugWithEventStreamBody")
+			logLevel = aws.LogDebugWithEventStreamBody
+		default:
+			log.Infof("unknown loglevel %q, S3 logging level set to LogOff", param)
+		}
+	}
+
+	return logLevel
 }
 
 // FromParameters constructs a new Driver with a given parameters map
@@ -410,6 +446,8 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 
 	sessionToken := ""
 
+	logLevel := parseLogLevelParam(parameters["loglevel"])
+
 	params := DriverParameters{
 		fmt.Sprint(accessKey),
 		fmt.Sprint(secretKey),
@@ -433,6 +471,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		pathStyleBool,
 		maxRequestsPerSecondInt64,
 		parallelWalkBool,
+		logLevel,
 	}
 
 	return New(params)
@@ -476,7 +515,7 @@ func New(params DriverParameters) (*Driver, error) {
 		return nil, fmt.Errorf("on Amazon S3 this storage driver can only be used with v4 authentication")
 	}
 
-	awsConfig := aws.NewConfig()
+	awsConfig := aws.NewConfig().WithLogLevel(params.LogLevel)
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new session: %v", err)
