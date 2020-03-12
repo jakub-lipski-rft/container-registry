@@ -1,4 +1,8 @@
 ## [Unreleased]
+
+### Added
+- registry/storage: Add a configuration for the S3 driver log level
+
 ### Changed
 - registry/storage: Improve performance of the garbage collection sweep phase for GCS
 - registry/storage: Handle missing Tags folder during garbage collect mark and sweep
