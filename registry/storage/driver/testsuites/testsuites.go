@@ -1749,10 +1749,6 @@ func (suite *DriverSuite) buildManifests(c *check.C, repo distribution.Repositor
 
 // TestRemoveManifests checks that storage.Vacuum is able to delete a set of manifests in bulk.
 func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
-	if testing.Short() {
-		c.Skip("Skipping test in short mode")
-	}
-
 	defer suite.deletePath(c, firstPart("docker/"))
 
 	registry := suite.createRegistry(c)
@@ -1796,6 +1792,48 @@ func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
 			c.Errorf("manifest %q was not deleted as expected", m.Digest)
 		}
 	}
+}
+
+func (suite *DriverSuite) testRemoveManifestsPathBuild(c *check.C, numManifests, numTagsPerManifest int) {
+	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+
+	var tags []string
+	for i := 0; i < numTagsPerManifest; i++ {
+		tags = append(tags, "foo")
+	}
+
+	var toDelete []storage.ManifestDel
+	for i := 0; i < numManifests; i++ {
+		m := storage.ManifestDel{
+			Name:   randomFilename(10),
+			Digest: digest.FromString(randomFilename(20)),
+			Tags:   tags,
+		}
+		toDelete = append(toDelete, m)
+	}
+	err := v.RemoveManifests(toDelete)
+	c.Assert(err, check.IsNil)
+}
+
+// TestRemoveManifestsPathBuildLargeScale simulates the execution of vacuum.RemoveManifests for repositories with large
+// numbers of manifests eligible for deletion. No files are created in this test, we only simulate their existence so
+// that we can test and profile the execution of the path build process within vacuum.RemoveManifests. The storage
+// drivers DeleteFiles method is idempotent, so no error will be raised by attempting to delete non-existing files.
+// However, to avoid large number of HTTP requests against cloud storage backends, it's recommended to run this test
+// against the filesystem storage backend only. For safety, the test is skipped when not using the filesystem storage
+// backend. Tweak the method locally to test use cases with different sizes and/or storage drivers.
+func (suite *DriverSuite) TestRemoveManifestsPathBuildLargeScale(c *check.C) {
+	if testing.Short() {
+		c.Skip("Skipping test in short mode")
+	}
+	if suite.StorageDriver.Name() != "filesystem" {
+		c.Skip(fmt.Sprintf("Skipping test for the %s driver", suite.StorageDriver.Name()))
+	}
+
+	numManifests := 100
+	numTagsPerManifest := 10
+
+	suite.testRemoveManifestsPathBuild(c, numManifests, numTagsPerManifest)
 }
 
 func (suite *DriverSuite) benchmarkRemoveManifests(c *check.C, numManifests, numTagsPerManifest int) {

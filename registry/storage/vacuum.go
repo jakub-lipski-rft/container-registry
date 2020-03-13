@@ -60,7 +60,7 @@ func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
 		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
 			"digest": d,
 			"path":   p,
-		}).Info("preparing to delete blob")
+		}).Debug("preparing to delete blob")
 		blobPaths = append(blobPaths, p)
 	}
 
@@ -82,36 +82,28 @@ func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
 	return err
 }
 
-// RemoveManifests removes a series of manifests from the filesystem. Unlike RemoveManifest, this bundles all related
-// tag index and manifest link files in a single driver.DeleteFiles request. The link files full path is used instead of
-// their parent directory path (which always contains a single file, the link itself).
-func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
+func (v Vacuum) removeManifestsBatch(batchNo int, mm []ManifestDel) error {
+	defer func() {
+		if r := recover(); r != nil {
+			dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+				"batch_number": batchNo,
+				"r":            r,
+			}).Error("recovered batch deletion, attempting next one")
+		}
+	}()
+
 	start := time.Now()
 	var manifestLinks, tagLinks, allLinks []string
 	for _, m := range mm {
 		// get manifest revision link full path
-		p, err := pathFor(manifestRevisionLinkPathSpec{name: m.Name, revision: m.Digest})
-		if err != nil {
-			return err
-		}
-		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
-			"digest": m.Digest,
-			"path":   p,
-		}).Info("preparing to delete manifest")
-
+		// Note: we're skipping `storage.pathFor` on purpose inside this method due to major performance concerns, see:
+		// https://gitlab.com/gitlab-org/container-registry/-/merge_requests/101#3-skipping-storagepathfor-92f7ca45
+		p := "/docker/registry/v2/repositories/" + m.Name + "/_manifests/revisions/" + m.Digest.Algorithm().String() + "/" + m.Digest.Hex() + "/link"
 		manifestLinks = append(manifestLinks, p)
 
 		for _, t := range m.Tags {
 			// get tag index link full path
-			p, err := pathFor(manifestTagIndexEntryLinkPathSpec{name: m.Name, revision: m.Digest, tag: t})
-			if err != nil {
-				return err
-			}
-			dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
-				"tag":  t,
-				"path": p,
-			}).Info("preparing to delete manifest tag reference")
-
+			p := "/docker/registry/v2/repositories/" + m.Name + "/_manifests/tags/" + t + "/index/" + m.Digest.Algorithm().String() + "/" + m.Digest.Hex() + "/link"
 			tagLinks = append(tagLinks, p)
 		}
 	}
@@ -123,24 +115,72 @@ func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
 	}
 
 	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
-		"manifests": len(manifestLinks),
-		"tags":      len(tagLinks),
-		"total":     total,
-	}).Info("deleting manifests")
+		"batch_number": batchNo,
+		"manifests":    len(manifestLinks),
+		"tags":         len(tagLinks),
+		"total":        total,
+	}).Info("deleting batch")
 
 	count, err := v.driver.DeleteFiles(v.ctx, allLinks)
 
 	l := dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
-		"count":      count,
-		"duration_s": time.Since(start).Seconds(),
+		"batch_number": batchNo,
+		"count":        count,
+		"duration_s":   time.Since(start).Seconds(),
 	})
 	if count < total {
-		l.Warn("manifests partially deleted")
+		l.Warn("batch partially deleted")
 	} else {
-		l.Info("manifests deleted")
+		l.Info("batch deleted")
 	}
 
 	return err
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// RemoveManifests removes a series of manifests from the filesystem. Unlike RemoveManifest, this bundles all related
+// tag index and manifest link files in a single driver.DeleteFiles request. The link files full path is used instead of
+// their parent directory path (which always contains a single file, the link itself). For really large repositories the
+// amount of manifests and tags eligible for deletion can be really high, which would generate a considerable amount of
+// memory pressure. For this reason, manifests eligible for deletion are processed in batches of maxBatchSize, allowing
+// the Go GC to kick in and free the space required to save their full paths between batches.
+func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
+	start := time.Now()
+
+	maxBatchSize := 100
+	totalToDelete := len(mm)
+	totalBatches := totalToDelete / maxBatchSize
+
+	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		"batch_count":    totalBatches,
+		"batch_max_size": maxBatchSize,
+	}).Info("deleting manifests in batches")
+
+	batchNo := 0
+	for i := 0; i < totalToDelete; i += maxBatchSize {
+		batchNo++
+		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+			"batch_number": batchNo,
+			"batch_total":  totalBatches,
+		}).Info("preparing batch")
+
+		batch := mm[i:min(i+maxBatchSize, totalToDelete)]
+		if err := v.removeManifestsBatch(batchNo, batch); err != nil {
+			return err
+		}
+	}
+
+	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		"duration_s": time.Since(start).Seconds(),
+	}).Info("manifests deleted")
+
+	return nil
 }
 
 // RemoveRepository removes a repository directory from the
