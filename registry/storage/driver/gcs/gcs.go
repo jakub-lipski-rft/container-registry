@@ -55,7 +55,7 @@ const (
 	defaultChunkSize         = 20 * minChunkSize
 	defaultMaxConcurrency    = 50
 	minConcurrency           = 25
-	maxDeleteConcurrency     = 1000
+	maxDeleteConcurrency     = 150
 	maxWalkConcurrency       = 100
 	maxTries                 = 5
 )
