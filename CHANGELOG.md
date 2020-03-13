@@ -1,15 +1,16 @@
 ## [Unreleased]
 
-### Added
-- registry/storage: Add a configuration for the S3 driver log level
-
+## [v2.8.2-gitlab] - 2020-03-13
 ### Changed
-- registry/storage: Improve performance of the garbage collection sweep phase for GCS
-- registry/storage: Handle missing Tags folder during garbage collect mark and sweep
+- registry/storage: Improve performance of the garbage collector for GCS
+- registry/storage: Gracefully handle missing tags folder during garbage collection
 - registry/storage: Cache repository tags during the garbage collection mark phase
-- registry/storage: Garbage collection provides an estimate of how much storage will be removed
 - registry/storage: Upgrade the GCS SDK to v1.2.1
+- registry/storage: Provide an estimate of how much storage will be removed on garbage collection
+- registry/storage: Make the S3 driver log level configurable
 - registry/api/v2: Return not found error when getting a manifest by tag with a broken link
+
+### Fixed
 - registry/storage: Fix PathNotFoundError not being ignored in repository enumeration during garbage collection when WalkParallel is enabled
 
 ## v2.8.1-gitlab
