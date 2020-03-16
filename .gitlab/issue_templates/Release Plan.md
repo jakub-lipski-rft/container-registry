@@ -43,14 +43,14 @@ The due date is set to the 12th of each month to create a buffer of 5 days befor
 
 ### 2. Release
 
-1. [ ] Create a merge request to add an entry to the [changelog](https://gitlab.com/gitlab-org/container-registry/blob/release/2.7-gitlab/CHANGELOG.md).
+1. [ ] Create a merge request to add an entry to the [changelog](https://gitlab.com/gitlab-org/container-registry/blob/release/2.8-gitlab/CHANGELOG.md).
 1. [ ] Create a [tag](https://gitlab.com/gitlab-org/container-registry/-/tags) for the new release.
 
 <details>
 <summary><b>Instructions</b></summary>
 Please mention this issue in the description of the changelog merge request.
 
-See [release instructions](https://gitlab.com/gitlab-org/container-registry/tree/release/2.7-gitlab/docs-gitlab#releases) for additional information.
+See [release instructions](https://gitlab.com/gitlab-org/container-registry/tree/release/2.8-gitlab/docs-gitlab#releases) for additional information.
 </details>
 
 ### 3. Deploy
@@ -59,20 +59,24 @@ See [release instructions](https://gitlab.com/gitlab-org/container-registry/tree
     - [ ] Update `GITLAB_CONTAINER_REGISTRY_VERSION` in [`ci_files/variables.yml`](https://gitlab.com/gitlab-org/build/CNG/blob/master/ci_files/variables.yml)
     - [ ] Update `REGISTRY_VERSION` in [`gitlab-container-registry/Dockerfile`](https://gitlab.com/gitlab-org/build/CNG/blob/master/gitlab-container-registry/Dockerfile)
     - [ ] Update `REGISTRY_VERSION` in [`gitlab-container-registry/Dockerfile.build.ubi8`](https://gitlab.com/gitlab-org/build/CNG/blob/master/gitlab-container-registry/Dockerfile.build.ubi8)
+    - [ ] Label merge request with: `~/label ~backstage ~"group::distribution" ~"devops::enablement"`
 1. [ ] Version bump in [Omnibus](https://gitlab.com/gitlab-org/omnibus-gitlab):
     - [ ] Create `bump-registry-version-vX-Y-Z-gitlab.yml` in [`changelogs/unreleased`](https://gitlab.com/gitlab-org/omnibus-gitlab/tree/master/changelogs/unreleased)
     - [ ] Update `version` in [`config/software/registry.rb`](https://gitlab.com/gitlab-org/omnibus-gitlab/blob/master/config/software/registry.rb)
+    - [ ] Label merge request with: `/label ~backstage ~"group::distribution" ~"devops::enablement"`
 1. [ ] Version bump in [Charts](https://gitlab.com/gitlab-org/charts):
     - [ ] Create `bump-registry-version-vX-Y-Z-gitlab.yml` in [`changelogs/unreleased`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/changelogs/unreleased)
     - [ ] Update `tag` in [`charts/registry/values.yaml`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/charts/registry/values.yaml)
     - [ ] Update `tag` in [`doc/charts/registry/index.md`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/doc/charts/registry/index.md)
     - [ ] Update `version` and `appVersion` in [`charts/registry/Chart.yaml`](https://gitlab.com/gitlab-org/charts/gitlab/-/blob/master/charts/registry/Chart.yaml)
     - [ ] Replace all mentions to the previous `vX.Y.Z-gitlab` release in [`doc/charts/registry/index.md`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/doc/charts/registry/index.md)
+    - [ ] Label merge request with: `/label ~backstage ~"group::distribution" ~"devops::enablement"`
 1. [ ] Version bump in [K8s Workloads](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com):
     - [ ] Update `CI_APPLICATION_TAG` in [`.gitlab-ci.yml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/.gitlab-ci.yml)
     - [ ] Update `tag` in [`gprd.yaml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/gprd.yaml)
     - [ ] Update `tag` in [`gstg.yaml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/gstg.yaml)
     - [ ] Update `tag` in [`pre.yaml`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/blob/master/pre.yaml)
+    - [ ] Label merge request with: `/label ~"Service::Container Registry" ~"group::distribution" ~"devops::enablement"`
 
 <details>
 <summary><b>Instructions</b></summary>
@@ -83,14 +87,22 @@ Create a merge request for each project. Mark parent tasks as completed once the
 
 Version bump merge requests should appear automatically in the `Related merge requests` section of this issue.
 
-#### Template
+#### Merge Request Template
 
 For consistency, please use the following template for these merge requests:
 
+##### Branch Name
+
+`bump-container-registry-vX-Y-Z-gitlab`
+
+##### Commit Message
+
+`Bump Container Registry to vX.Y.Z-gitlab`
+
 ##### Title
-```
-Bump Container Registry to vX.Y.Z-gitlab
-```
+
+`Bump Container Registry to vX.Y.Z-gitlab`
+
 ##### Description
 
 Repeat the version subsection for multiple versions. As an example, to bump to v2.7.7 in a project where the current version is v2.7.5, create an entry for v2.7.6 and v2.7.7.
