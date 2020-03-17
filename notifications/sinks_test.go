@@ -60,7 +60,6 @@ func TestBroadcaster(t *testing.T) {
 			t.Fatalf("sink should have been closed")
 		}
 	}
-
 }
 
 func TestEventQueue(t *testing.T) {
@@ -156,7 +155,6 @@ func TestIgnoredSink(t *testing.T) {
 }
 
 func TestRetryingSink(t *testing.T) {
-
 	// Make a sync that fails most of the time, ensuring that all the events
 	// make it through.
 	var ts testSink

@@ -68,7 +68,6 @@ func (r Request) String() string {
 				headers = append(headers, fmt.Sprintf("%s:%s", k, val))
 			}
 		}
-
 	}
 	return fmt.Sprintf("%s %s%s\n%s\n%s", r.Method, r.Route, queryString, headers, r.Body)
 }

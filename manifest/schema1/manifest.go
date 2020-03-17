@@ -149,7 +149,6 @@ func (sm SignedManifest) References() []distribution.Descriptor {
 	}
 
 	return dependencies
-
 }
 
 // MarshalJSON returns the contents of raw. If Raw is nil, marshals the inner

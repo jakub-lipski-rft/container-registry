@@ -477,7 +477,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	return New(params)
 }
 
-// getParameterAsInt64 converts paramaters[name] to an int64 value (using
+// getParameterAsInt64 converts parameters[name] to an int64 value (using
 // defaultt if nil), verifies it is no smaller than min, and returns it.
 func getParameterAsInt64(parameters map[string]interface{}, name string, defaultt int64, min int64, max int64) (int64, error) {
 	rv := defaultt
@@ -1115,7 +1115,6 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 		return count, errs
 	}
 	return count, nil
-
 }
 
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
@@ -1320,7 +1319,6 @@ func (d *driver) doWalk(parentCtx context.Context, objectCount *int64, path, pre
 	}
 
 	listObjectErr := d.S3.ListObjectsV2PagesWithContext(ctx, listObjectsInput, func(objects *s3.ListObjectsV2Output, lastPage bool) bool {
-
 		var count int64
 		// KeyCount was introduced with version 2 of the GET Bucket operation in S3.
 		// Some S3 implementations don't support V2 now, so we fall back to manual
@@ -1545,7 +1543,7 @@ type writer struct {
 	pendingPart []byte
 	closed      bool
 	committed   bool
-	cancelled   bool
+	canceled    bool
 }
 
 func (d *driver) newWriter(key, uploadID string, parts []*s3.Part) storagedriver.FileWriter {
@@ -1573,8 +1571,8 @@ func (w *writer) Write(p []byte) (int, error) {
 		return 0, fmt.Errorf("already closed")
 	} else if w.committed {
 		return 0, fmt.Errorf("already committed")
-	} else if w.cancelled {
-		return 0, fmt.Errorf("already cancelled")
+	} else if w.canceled {
+		return 0, fmt.Errorf("already canceled")
 	}
 
 	// If the last written part is smaller than minChunkSize, we need to make a
@@ -1713,7 +1711,7 @@ func (w *writer) Cancel() error {
 	} else if w.committed {
 		return fmt.Errorf("already committed")
 	}
-	w.cancelled = true
+	w.canceled = true
 	_, err := w.driver.S3.AbortMultipartUpload(&s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(w.driver.Bucket),
 		Key:      aws.String(w.key),
@@ -1727,8 +1725,8 @@ func (w *writer) Commit() error {
 		return fmt.Errorf("already closed")
 	} else if w.committed {
 		return fmt.Errorf("already committed")
-	} else if w.cancelled {
-		return fmt.Errorf("already cancelled")
+	} else if w.canceled {
+		return fmt.Errorf("already canceled")
 	}
 	err := w.flushPart()
 	if err != nil {

@@ -109,7 +109,6 @@ func main() {
 	if err != nil {
 		logrus.Infof("Error serving: %v", err)
 	}
-
 }
 
 // handlerWithContext wraps the given context-aware handler by setting up the

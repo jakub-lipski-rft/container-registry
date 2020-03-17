@@ -142,7 +142,6 @@ func TestHTTPSink(t *testing.T) {
 			failure: true,
 		},
 	} {
-
 		if tc.failure {
 			expectedMetrics.Failures += len(tc.events)
 		} else {
@@ -188,7 +187,6 @@ func TestHTTPSink(t *testing.T) {
 	if err := sink.Close(); err == nil {
 		t.Fatalf("second close should have returned error: %v", err)
 	}
-
 }
 
 func createTestEvent(action, repo, typ string) Event {

@@ -93,7 +93,6 @@ fallback:
 	}
 
 	return desc, err
-
 }
 
 func (cbds *cachedBlobStatter) Clear(ctx context.Context, dgst digest.Digest) error {

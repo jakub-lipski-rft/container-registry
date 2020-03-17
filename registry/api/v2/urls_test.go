@@ -509,7 +509,6 @@ func TestBuilderFromRequestWithPrefix(t *testing.T) {
 				if !relative {
 					expectedURL = urlBase.String()[0:len(urlBase.String())-1] + expectedURL
 				}
-
 			}
 
 			if buildURL != expectedURL {

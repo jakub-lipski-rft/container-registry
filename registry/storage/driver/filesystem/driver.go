@@ -386,7 +386,7 @@ type fileWriter struct {
 	bw        *bufio.Writer
 	closed    bool
 	committed bool
-	cancelled bool
+	canceled  bool
 }
 
 func newFileWriter(file *os.File, size int64) *fileWriter {
@@ -402,8 +402,8 @@ func (fw *fileWriter) Write(p []byte) (int, error) {
 		return 0, fmt.Errorf("already closed")
 	} else if fw.committed {
 		return 0, fmt.Errorf("already committed")
-	} else if fw.cancelled {
-		return 0, fmt.Errorf("already cancelled")
+	} else if fw.canceled {
+		return 0, fmt.Errorf("already canceled")
 	}
 	n, err := fw.bw.Write(p)
 	fw.size += int64(n)
@@ -439,7 +439,7 @@ func (fw *fileWriter) Cancel() error {
 		return fmt.Errorf("already closed")
 	}
 
-	fw.cancelled = true
+	fw.canceled = true
 	fw.file.Close()
 	return os.Remove(fw.file.Name())
 }
@@ -449,8 +449,8 @@ func (fw *fileWriter) Commit() error {
 		return fmt.Errorf("already closed")
 	} else if fw.committed {
 		return fmt.Errorf("already committed")
-	} else if fw.cancelled {
-		return fmt.Errorf("already cancelled")
+	} else if fw.canceled {
+		return fmt.Errorf("already canceled")
 	}
 
 	if err := fw.bw.Flush(); err != nil {

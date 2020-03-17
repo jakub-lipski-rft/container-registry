@@ -389,7 +389,6 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 			return
 		}
-
 	}
 
 	// Construct a canonical url for the uploaded manifest.
@@ -482,7 +481,6 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 	}
 
 	return nil
-
 }
 
 // DeleteManifest removes the manifest with the given digest from the registry.

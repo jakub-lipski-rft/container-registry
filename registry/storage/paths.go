@@ -120,7 +120,6 @@ func pathFor(spec pathSpec) (string, error) {
 	repoPrefix := append(rootPrefix, "repositories")
 
 	switch v := spec.(type) {
-
 	case manifestRevisionsPathSpec:
 		return path.Join(append(repoPrefix, v.name, "_manifests", "revisions")...), nil
 
@@ -470,7 +469,6 @@ func digestPathComponents(dgst digest.Digest, multilevel bool) ([]string, error)
 
 // Reconstructs a digest from a path
 func digestFromPath(digestPath string) (digest.Digest, error) {
-
 	digestPath = strings.TrimSuffix(digestPath, "/data")
 	dir, hex := path.Split(digestPath)
 	dir = path.Dir(dir)

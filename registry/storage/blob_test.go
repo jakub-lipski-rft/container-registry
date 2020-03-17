@@ -47,7 +47,6 @@ func TestWriteSeek(t *testing.T) {
 	if offset != int64(len(contents)) {
 		t.Fatalf("unexpected value for blobUpload offset:  %v != %v", offset, len(contents))
 	}
-
 }
 
 // TestSimpleBlobUpload covers the blob upload process, exercising common

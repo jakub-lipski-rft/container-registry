@@ -356,7 +356,6 @@ func checkTestRouter(t *testing.T, testCases []routeTestCase, prefix string, dee
 
 		resp.Body.Close()
 	}
-
 }
 
 // -------------- START LICENSED CODE --------------

@@ -80,7 +80,6 @@ func (pms proxyManifestStore) Get(ctx context.Context, dgst digest.Digest, optio
 		pms.scheduler.AddManifest(repoBlob, repositoryTTL)
 		// Ensure the manifest blob is cleaned up
 		//pms.scheduler.AddBlob(blobRef, repositoryTTL)
-
 	}
 
 	return manifest, err
