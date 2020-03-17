@@ -80,11 +80,6 @@ linters-settings:
     # see https://github.com/kisielk/errcheck#excluding-functions for details
     # exclude: /path/to/file.txt
 
-  # Disable error checking, as errorcheck detects more errors and is more configurable.
-  gosec:
-    exclude:
-    - "G104"
-
   govet:
     # report about shadowed variables
     check-shadowing: true
@@ -241,7 +236,6 @@ linters:
     - depguard
     - dogsled
     - dupl
-    - errcheck
     - gocognit
     - goconst
     - gocritic
@@ -266,6 +260,7 @@ linters:
     - unused
     - whitespace
   # don't enable:
+  # - errcheck
   # - deadcode
   # - gochecknoglobals
   # - gochecknoinits
