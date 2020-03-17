@@ -120,7 +120,7 @@ var (
 	ErrorCodeBlobUploadUnknown = errcode.Register(errGroup, errcode.ErrorDescriptor{
 		Value:   "BLOB_UPLOAD_UNKNOWN",
 		Message: "blob upload unknown to registry",
-		Description: `If a blob upload has been cancelled or was never
+		Description: `If a blob upload has been canceled or was never
 		started, this error code may be returned.`,
 		HTTPStatusCode: http.StatusNotFound,
 	})

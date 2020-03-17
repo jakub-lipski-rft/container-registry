@@ -1129,7 +1129,6 @@ func (suite *DriverSuite) TestWalkParallel(c *check.C) {
 	wantedDirectoriesSet := make(map[string]struct{})
 
 	for i := 0; i < numWantedFiles; i++ {
-
 		// Gather unique directories from the full path, excluding the root directory.
 		p := path.Dir(wantedFiles[i])
 		for {
@@ -1273,7 +1272,6 @@ func (suite *DriverSuite) TestWalkParallelStopsProcessingOnError(c *check.C) {
 	start := time.Now()
 
 	suite.StorageDriver.WalkParallel(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
-
 		if fInfo.Path() == errorFile {
 			return errors.New("")
 		}
@@ -1518,7 +1516,6 @@ func (suite *DriverSuite) benchmarkMarkAndSweep(c *check.C, numImages int, remov
 	defer suite.deletePath(c, firstPart("docker/"))
 
 	for n := 0; n < c.N; n++ {
-
 		c.StopTimer()
 
 		registry := suite.createRegistry(c)

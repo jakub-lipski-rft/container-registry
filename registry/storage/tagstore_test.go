@@ -149,7 +149,6 @@ func TestTagStoreAll(t *testing.T) {
 			t.Errorf("unexpected tag in enumerate %s", removed)
 		}
 	}
-
 }
 
 func TestTagLookup(t *testing.T) {
@@ -205,5 +204,4 @@ func TestTagLookup(t *testing.T) {
 	if len(tags) != 2 {
 		t.Errorf("Lookup of descB returned %d tags, expected 2", len(tags))
 	}
-
 }

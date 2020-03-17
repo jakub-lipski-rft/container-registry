@@ -262,7 +262,6 @@ func (d *dir) dump(indent string) {
 		} else {
 			fmt.Println(indent, child.name())
 		}
-
 	}
 }
 

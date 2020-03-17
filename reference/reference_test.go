@@ -231,7 +231,6 @@ func TestReferenceParse(t *testing.T) {
 		} else if ok {
 			failf("unexpected digested type")
 		}
-
 	}
 }
 
@@ -385,7 +384,7 @@ func TestSerialization(t *testing.T) {
 		}
 		b, err := json.Marshal(m)
 		if err != nil {
-			failf("error marshalling: %v", err)
+			failf("error marshaling: %v", err)
 		}
 		t := serializationType{}
 
@@ -462,7 +461,6 @@ func TestSerialization(t *testing.T) {
 		if _, ok := fieldInterface.(Reference); ok {
 			failf("field should not implement Reference interface")
 		}
-
 	}
 }
 
@@ -639,7 +637,7 @@ func TestParseNamed(t *testing.T) {
 			failf("error parsing name: %s", err)
 			continue
 		} else if err == nil && testcase.err != nil {
-			failf("parsing succeded: expected error %v", testcase.err)
+			failf("parsing succeeded: expected error %v", testcase.err)
 			continue
 		} else if err != testcase.err {
 			failf("unexpected error %v, expected %v", err, testcase.err)

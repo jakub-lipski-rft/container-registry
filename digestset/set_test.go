@@ -187,7 +187,6 @@ func TestAll(t *testing.T) {
 			t.Fatalf("Missing element at position %d: %s", i, dgst)
 		}
 	}
-
 }
 
 func assertEqualShort(t *testing.T, actual, expected string) {

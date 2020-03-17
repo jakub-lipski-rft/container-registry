@@ -280,7 +280,7 @@ type writer struct {
 	f         *file
 	closed    bool
 	committed bool
-	cancelled bool
+	canceled  bool
 }
 
 func (d *driver) newWriter(f *file) storagedriver.FileWriter {
@@ -295,8 +295,8 @@ func (w *writer) Write(p []byte) (int, error) {
 		return 0, fmt.Errorf("already closed")
 	} else if w.committed {
 		return 0, fmt.Errorf("already committed")
-	} else if w.cancelled {
-		return 0, fmt.Errorf("already cancelled")
+	} else if w.canceled {
+		return 0, fmt.Errorf("already canceled")
 	}
 
 	w.d.mutex.Lock()
@@ -326,7 +326,7 @@ func (w *writer) Cancel() error {
 	} else if w.committed {
 		return fmt.Errorf("already committed")
 	}
-	w.cancelled = true
+	w.canceled = true
 
 	w.d.mutex.Lock()
 	defer w.d.mutex.Unlock()
@@ -339,8 +339,8 @@ func (w *writer) Commit() error {
 		return fmt.Errorf("already closed")
 	} else if w.committed {
 		return fmt.Errorf("already committed")
-	} else if w.cancelled {
-		return fmt.Errorf("already cancelled")
+	} else if w.canceled {
+		return fmt.Errorf("already canceled")
 	}
 	w.committed = true
 	return nil

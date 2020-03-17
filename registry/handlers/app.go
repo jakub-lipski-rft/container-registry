@@ -969,7 +969,6 @@ func applyRegistryMiddleware(ctx context.Context, registry distribution.Namespac
 		registry = rmw
 	}
 	return registry, nil
-
 }
 
 // applyRepoMiddleware wraps a repository with the configured middlewares

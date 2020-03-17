@@ -51,7 +51,6 @@ func (imbdcp *inMemoryBlobDescriptorCacheProvider) Clear(ctx context.Context, dg
 func (imbdcp *inMemoryBlobDescriptorCacheProvider) SetDescriptor(ctx context.Context, dgst digest.Digest, desc distribution.Descriptor) error {
 	_, err := imbdcp.Stat(ctx, dgst)
 	if err == distribution.ErrBlobUnknown {
-
 		if dgst.Algorithm() != desc.Digest.Algorithm() && dgst != desc.Digest {
 			// if the digests differ, set the other canonical mapping
 			if err := imbdcp.global.SetDescriptor(ctx, desc.Digest, desc); err != nil {

@@ -76,7 +76,6 @@ func (sbs statsBlobStore) ServeBlob(ctx context.Context, w http.ResponseWriter, 
 }
 
 func (sbs statsBlobStore) Stat(ctx context.Context, dgst digest.Digest) (distribution.Descriptor, error) {
-
 	sbsMu.Lock()
 	sbs.stats["stat"]++
 	sbsMu.Unlock()
@@ -264,7 +263,6 @@ func TestProxyStoreGet(t *testing.T) {
 	if (*remoteStats)["get"] != 1 {
 		t.Errorf("Unexpected remote get count")
 	}
-
 }
 
 func TestProxyStoreStat(t *testing.T) {
@@ -295,7 +293,6 @@ func TestProxyStoreStat(t *testing.T) {
 	if te.store.authChallenger.(*mockChallenger).count != len(te.inRemote) {
 		t.Fatalf("Unexpected auth challenge count, got %#v", te.store.authChallenger)
 	}
-
 }
 
 func TestProxyStoreServeHighConcurrency(t *testing.T) {

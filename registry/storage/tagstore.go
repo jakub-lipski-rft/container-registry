@@ -148,7 +148,6 @@ func (ts *tagStore) linkedBlobStore(ctx context.Context, tag string) *linkedBlob
 				tag:      tag,
 				revision: dgst,
 			})
-
 		}},
 	}
 }

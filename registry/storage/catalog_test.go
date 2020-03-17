@@ -103,7 +103,6 @@ func makeRepo(ctx context.Context, t *testing.T, name string, reg distribution.N
 	if err != nil {
 		t.Fatalf("manifest upload failed: %v", err)
 	}
-
 }
 
 func TestCatalog(t *testing.T) {

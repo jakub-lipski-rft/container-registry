@@ -111,7 +111,6 @@ func getOutstandingUploads(ctx context.Context, driver storageDriver.StorageDriv
 			if fileInfo.IsDir() && !inUploadDir {
 				return storageDriver.ErrSkipDir
 			}
-
 		}
 
 		uuid, isContainingDir := uuidFromPath(filePath)
@@ -132,7 +131,6 @@ func getOutstandingUploads(ctx context.Context, driver storageDriver.StorageDriv
 			} else {
 				errCh <- fmt.Errorf("%s: %s", filePath, err)
 			}
-
 		}
 
 		uploads.set(uuid, ud)

@@ -275,5 +275,4 @@ func TestAppendAccessRecords(t *testing.T) {
 	if ok := reflect.DeepEqual(result, expectedResult); !ok {
 		t.Fatalf("Actual access record differs from expected")
 	}
-
 }

@@ -15,7 +15,6 @@ import (
 func blobDispatcher(ctx *Context, r *http.Request) http.Handler {
 	dgst, err := getDigest(ctx)
 	if err != nil {
-
 		if err == errDigestNotAvailable {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				ctx.Errors = append(ctx.Errors, v2.ErrorCodeDigestInvalid.WithDetail(err))

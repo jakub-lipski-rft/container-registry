@@ -201,7 +201,6 @@ func TestFromParameters(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-
 		// add baseParams to testing params
 		for k, v := range baseParams {
 			tt.params[k] = v
@@ -343,7 +342,6 @@ func TestStorageClass(t *testing.T) {
 	} else if *resp.StorageClass != s3.StorageClassReducedRedundancy {
 		t.Fatalf("unexpected storage class for reduced-redundancy file: %v", *resp.StorageClass)
 	}
-
 }
 
 func TestOverThousandBlobs(t *testing.T) {

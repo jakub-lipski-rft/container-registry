@@ -82,7 +82,6 @@ func (pbs *proxyBlobStore) serveLocal(ctx context.Context, w http.ResponseWriter
 	}
 
 	return false, nil
-
 }
 
 func (pbs *proxyBlobStore) storeLocal(ctx context.Context, dgst digest.Digest) error {

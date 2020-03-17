@@ -323,7 +323,6 @@ func TestBlobAPI(t *testing.T) {
 	defer env2.Shutdown()
 	args = makeBlobArgs(t)
 	testBlobAPI(t, env2, args)
-
 }
 
 func TestBlobDelete(t *testing.T) {
@@ -1198,7 +1197,6 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 	sm2, err := schema1.Sign(&fetchedManifestByDigest.Manifest, env.pk)
 	if err != nil {
 		t.Fatal(err)
-
 	}
 
 	// Re-push with a few different Content-Types. The official schema1
@@ -2028,7 +2026,6 @@ func testManifestDelete(t *testing.T, env *testEnv, args manifestArgs) {
 	if len(tagsResponse.Tags) != 0 {
 		t.Fatalf("expected 0 tags in response: %v", tagsResponse.Tags)
 	}
-
 }
 
 func TestTagsAPITagDeleteAllowedMethods(t *testing.T) {
@@ -2226,7 +2223,6 @@ func newTestEnvMirror(t *testing.T, opts ...configOpt) *testEnv {
 	config.Proxy.RemoteURL = "http://example.com"
 
 	return newTestEnvWithConfig(t, &config)
-
 }
 
 func newTestEnv(t *testing.T, opts ...configOpt) *testEnv {
@@ -2549,7 +2545,7 @@ func checkBodyHasErrorCodes(t *testing.T, msg string, resp *http.Response, error
 	// Ensure that counts of expected errors were all non-zero
 	for code := range expected {
 		if counts[code] == 0 {
-			t.Fatalf("expected error code %v not encounterd during %s: %s", code, msg, string(p))
+			t.Fatalf("expected error code %v not encountered during %s: %s", code, msg, string(p))
 		}
 	}
 
@@ -2801,7 +2797,6 @@ func TestRegistryAsCacheMutationAPIs(t *testing.T) {
 	blobURL, _ := env.builder.BuildBlobURL(ref)
 	resp, _ = httpDelete(blobURL)
 	checkResponse(t, "deleting blob from cache", resp, errcode.ErrorCodeUnsupported.Descriptor().HTTPStatusCode)
-
 }
 
 func TestProxyManifestGetByTag(t *testing.T) {

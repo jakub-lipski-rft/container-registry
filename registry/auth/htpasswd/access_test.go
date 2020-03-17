@@ -120,7 +120,6 @@ func TestBasicAccessController(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestCreateHtpasswdFile(t *testing.T) {

@@ -104,7 +104,6 @@ func testManifestStorage(t *testing.T, schema1Enabled bool, options ...RegistryO
 		m.History = append(m.History, schema1.History{
 			V1Compatibility: "",
 		})
-
 	}
 
 	pk, err := libtrust.GenerateECP256PrivateKey()
@@ -542,7 +541,6 @@ func testOCIManifestStorage(t *testing.T, testname string, includeMediaTypes boo
 	if payloadMediaType != v1.MediaTypeImageIndex {
 		t.Fatalf("%s: unexpected MediaType for index payload, %s", testname, payloadMediaType)
 	}
-
 }
 
 // TestLinkPathFuncs ensures that the link path functions behavior are locked

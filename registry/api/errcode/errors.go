@@ -214,7 +214,6 @@ func (errs Errors) MarshalJSON() ([]byte, error) {
 			err = daErr.(Error)
 		default:
 			err = ErrorCodeUnknown.WithDetail(daErr)
-
 		}
 
 		// If the Error struct was setup and they forgot to set the

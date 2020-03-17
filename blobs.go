@@ -184,7 +184,7 @@ type BlobIngester interface {
 	// Create allocates a new blob writer to add a blob to this service. The
 	// returned handle can be written to and later resumed using an opaque
 	// identifier. With this approach, one can Close and Resume a BlobWriter
-	// multiple times until the BlobWriter is committed or cancelled.
+	// multiple times until the BlobWriter is committed or canceled.
 	Create(ctx context.Context, options ...BlobCreateOption) (BlobWriter, error)
 
 	// Resume attempts to resume a write to a blob, identified by an id.

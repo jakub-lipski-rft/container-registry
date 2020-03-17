@@ -27,7 +27,6 @@ import (
 var spaceRegex = regexp.MustCompile(`\n\s*`)
 
 func main() {
-
 	if len(os.Args) != 2 {
 		log.Fatalln("please specify a template to execute.")
 	}
@@ -127,5 +126,4 @@ end:
 	}
 
 	return output
-
 }

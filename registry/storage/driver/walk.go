@@ -157,7 +157,6 @@ func doWalkParallel(ctx context.Context, driver StorageDriver, semaphore chan st
 
 				// Decend down the filesystem if we're in a directory.
 				if err == nil && fileInfo.IsDir() {
-
 					// Release the semaphore now to pass it to the next call to
 					// doWalkParallel and prevent deadlock.
 					<-semaphore

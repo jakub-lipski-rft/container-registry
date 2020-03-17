@@ -55,7 +55,6 @@ asdf
 			err: fmt.Errorf(`htpasswd: invalid entry at line 4: "asdf"`),
 		},
 	} {
-
 		entries, err := parseHTPasswd(strings.NewReader(tc.input))
 		if err != tc.err {
 			if tc.err == nil {
@@ -80,5 +79,4 @@ asdf
 			t.Fatalf("%s: entries not parsed correctly: %v != %v", tc.desc, entries, tc.entries)
 		}
 	}
-
 }
