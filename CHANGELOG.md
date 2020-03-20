@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+### Fixed
+- configuration: Fix pointer initialization in configuration parser
+
 ## [v2.8.2-gitlab] - 2020-03-13
 ### Changed
 - registry/storage: Improve performance of the garbage collector for GCS
