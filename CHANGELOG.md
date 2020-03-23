@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Added
+- registry/storage: Support BYOK for OSS storage driver
 
 ### Fixed
 - configuration: Fix pointer initialization in configuration parser
