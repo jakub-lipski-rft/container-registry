@@ -5,13 +5,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	prometheus "github.com/docker/distribution/metrics"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	prometheus "github.com/docker/distribution/metrics"
 
 	"rsc.io/letsencrypt"
 
@@ -34,6 +35,14 @@ import (
 
 // this channel gets notified when process receives signal. It is global to ease unit testing
 var quit = make(chan os.Signal, 1)
+
+var tlsLookup = map[string]uint16{
+	"":       tls.VersionTLS10,
+	"tls1.0": tls.VersionTLS10,
+	"tls1.1": tls.VersionTLS11,
+	"tls1.2": tls.VersionTLS12,
+	"tls1.3": tls.VersionTLS13,
+}
 
 // ServeCmd is a cobra command for running the registry.
 var ServeCmd = &cobra.Command{
@@ -148,10 +157,19 @@ func (registry *Registry) ListenAndServe() error {
 	}
 
 	if config.HTTP.TLS.Certificate != "" || config.HTTP.TLS.LetsEncrypt.CacheFile != "" {
+		tlsMinVersion, ok := tlsLookup[config.HTTP.TLS.MinimumTLS]
+		if !ok {
+			return fmt.Errorf("unknown minimum TLS level %q specified for http.tls.minimumtls", config.HTTP.TLS.MinimumTLS)
+		}
+
+		if config.HTTP.TLS.MinimumTLS != "" {
+			dcontext.GetLogger(registry.app).Infof("restricting TLS to %s or higher", config.HTTP.TLS.MinimumTLS)
+		}
+
 		tlsConf := &tls.Config{
 			ClientAuth:               tls.NoClientCert,
 			NextProtos:               nextProtos(config),
-			MinVersion:               tls.VersionTLS10,
+			MinVersion:               tlsMinVersion,
 			PreferServerCipherSuites: true,
 			CipherSuites: []uint16{
 				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
