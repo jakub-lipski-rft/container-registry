@@ -27,6 +27,7 @@ require (
 	github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
 	github.com/gorilla/mux v1.3.1-0.20170228224354-599cba5e7b61
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/lib/pq v1.3.1-0.20200116171513-9eb3fc897d6f
 	github.com/marstr/guid v1.1.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v0.0.0-20150528213339-482a9fd5fa83
@@ -42,7 +43,7 @@ require (
 	github.com/sirupsen/logrus v1.0.1-0.20170620144510-3d4380f53a34
 	github.com/spf13/cobra v0.0.0-20150605180824-312092086bed
 	github.com/spf13/pflag v0.0.0-20150601220040-564482062245 // indirect
-	github.com/stretchr/testify v1.5.1 // indirect
+	github.com/stretchr/testify v1.5.1
 	github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43 // indirect
 	github.com/yvasiyarov/gorelic v0.0.7-0.20141212073537-a9bba5b9ab50
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f // indirect
@@ -52,9 +53,9 @@ require (
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20191010194322-b09406accb47 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.11.0
+	google.golang.org/api v0.13.0
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.24.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
-	gopkg.in/yaml.v2 v2.2.1
+	gopkg.in/yaml.v2 v2.2.2
 )

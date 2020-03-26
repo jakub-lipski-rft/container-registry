@@ -6,6 +6,7 @@
 - [Local Integration Testing](storage-driver-integration-testing-guide.md)
 - [Cleanup Invalid Link Files](cleanup-invalid-link-files.md)
 - [Database Migrations](database-migrations.md)
+- [Database Development Guidelines](database-dev-guidelines.md)
 
 ## Differences From Upstream
 

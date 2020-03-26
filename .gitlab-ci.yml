@@ -73,3 +73,20 @@ s3-aws:
     # Configure the minio client to use the local minio service rather than play.minio.io
     - ./mc config host add s3v4 $REGION_ENDPOINT $AWS_ACCESS_KEY $AWS_SECRET_KEY --api S3v4
     - ./mc mb s3v4/$S3_BUCKET
+
+datastore:
+  stage: integration
+  variables:
+    POSTGRES_PASSWORD: "secret"
+    POSTGRES_DB: "registry_test"
+
+    REGISTRY_DATABASE_HOST: "db"
+    REGISTRY_DATABASE_PORT: 5432
+    REGISTRY_DATABASE_USER: "postgres"
+    REGISTRY_DATABASE_PASSWORD: "secret"
+    REGISTRY_DATABASE_DBNAME: "registry_test"
+    REGISTRY_DATABASE_SSLMODE: "disable"
+  services:
+    - name: postgres:12-alpine
+      alias: "db"
+  script: go test -v -tags=integration github.com/docker/distribution/registry/datastore
