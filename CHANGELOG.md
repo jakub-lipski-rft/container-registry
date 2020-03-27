@@ -2,6 +2,9 @@
 ### Added
 - registry/storage: Support BYOK for OSS storage driver
 
+### Changed
+- Switch to Go Modules for dependency management
+
 ### Fixed
 - configuration: Fix pointer initialization in configuration parser
 

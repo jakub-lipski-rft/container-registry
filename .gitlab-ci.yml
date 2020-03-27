@@ -4,24 +4,19 @@ variables:
   BUILDTAGS: "include_gcs include_oss"
   CGO_ENABLED: "1"
 
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - $GOPATH/pkg/mod/
+
 stages:
   - test
   - integration
 
-# Hack to emulate github.com/docker/distribution paths for Golang
-# Eventually the project files should be renamed to GitLab paths
-.inject-gopath: &inject-gopath
-  - cd $GOPATH/src
-  - mkdir -p github.com/docker
-  - cd $GOPATH/src/github.com/docker
-  - ln -s $CI_PROJECT_DIR distribution
-  - cd distribution
-  - GOOS=linux GO111MODULE=off script/setup/install-dev-tools
-
 static-analysis:
+  cache: {}
   image: registry.gitlab.com/gitlab-org/gitlab-build-images:golangci-lint-alpine
   stage: test
-  before_script: *inject-gopath
   script:
     # Use default .golangci.yml file from the image if one is not present in the project root.
     - '[ -e .golangci.yml ] || cp /golangci/.golangci.yml .'
@@ -37,7 +32,6 @@ static-analysis:
 
 verify:
   stage: test
-  before_script: *inject-gopath
   script:
     - go build -i .
     - make build
@@ -46,7 +40,6 @@ verify:
 
 .storage-driver-test: &storage-driver-test
   stage: integration
-  before_script: *inject-gopath
   script: go test -v github.com/docker/distribution/registry/storage/driver/$CI_JOB_NAME -args -check.v -test.short
 
 filesystem:
@@ -74,7 +67,6 @@ s3-aws:
       alias: "minio"
       command: ["server", "/data"]
   before_script:
-    - *inject-gopath
     # Download the minio client
     - wget --no-verbose https://dl.min.io/client/mc/release/linux-amd64/mc
     - chmod u+x ./mc
