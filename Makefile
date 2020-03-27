@@ -5,6 +5,9 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 
+# Build with go modules.
+GOPROXY ?= https://proxy.golang.org
+GO111MODULE=on
 
 PKG=github.com/docker/distribution
 
