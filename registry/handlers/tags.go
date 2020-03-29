@@ -7,7 +7,7 @@ import (
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/api/errcode"
-	"github.com/docker/distribution/registry/api/v2"
+	v2 "github.com/docker/distribution/registry/api/v2"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/gorilla/handlers"
 )
