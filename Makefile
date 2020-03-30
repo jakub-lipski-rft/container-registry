@@ -103,3 +103,10 @@ build:
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
+
+bindata: ## embed binary data
+	@go-bindata -o db/migrations/bindata.go -pkg migrations -ignore=bindata.go -prefix "db/migrations" db/migrations/
+	@go fmt db/migrations/bindata.go
+
+bindata-check: bindata ## assert there are no untracked bindata changes
+	@git diff --exit-code db/migrations/bindata.go

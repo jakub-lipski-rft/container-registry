@@ -5,12 +5,27 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/distribution/db/migrations"
+	bindata "github.com/golang-migrate/migrate/source/go_bindata"
+
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/postgres"
 	_ "github.com/lib/pq"
+)
+
+type migrateDirection int
+
+const (
+	driverName = "postgres"
+
+	up migrateDirection = iota
+	down
 )
 
 // DB is a database connection.
 type DB struct {
 	*sql.DB
+	dsn *DSN
 }
 
 // DSN represents the Data Source Name parameters for a DB connection.
@@ -55,7 +70,7 @@ func (dsn *DSN) String() string {
 
 // Open opens the database connection.
 func Open(dsn *DSN) (*DB, error) {
-	db, err := sql.Open("postgres", dsn.String())
+	db, err := sql.Open(driverName, dsn.String())
 	if err != nil {
 		return nil, err
 	}
@@ -64,5 +79,61 @@ func Open(dsn *DSN) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{db}, nil
+	return &DB{db, dsn}, nil
+}
+
+// MigrateUp applies all up migrations.
+func (db *DB) MigrateUp() error {
+	return db.migrate(up)
+}
+
+// MigrateDown applies all down migrations.
+func (db *DB) MigrateDown() error {
+	return db.migrate(down)
+}
+
+// MigrateVersion returns the current migration version.
+func (db *DB) MigrateVersion() (int, error) {
+	driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
+	if err != nil {
+		return 0, err
+	}
+
+	v, _, err := driver.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		return 0, err
+	}
+
+	return v, nil
+}
+
+func (db *DB) migrate(direction migrateDirection) error {
+	destDriver, err := postgres.WithInstance(db.DB, &postgres.Config{})
+	if err != nil {
+		return err
+	}
+
+	src := bindata.Resource(migrations.AssetNames(), migrations.Asset)
+
+	srcDriver, err := bindata.WithInstance(src)
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithInstance("go-bindata", srcDriver, db.dsn.DBName, destDriver)
+	if err != nil {
+		return err
+	}
+
+	if direction == up {
+		err = m.Up()
+	} else {
+		err = m.Down()
+	}
+
+	if err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	return nil
 }

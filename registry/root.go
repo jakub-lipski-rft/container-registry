@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/docker/distribution/registry/datastore"
+
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/factory"
@@ -18,10 +20,14 @@ var showVersion bool
 func init() {
 	RootCmd.AddCommand(ServeCmd)
 	RootCmd.AddCommand(GCCmd)
+	RootCmd.AddCommand(DBCmd)
+	RootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show the version and exit")
+
 	GCCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do everything except remove the blobs")
 	GCCmd.Flags().BoolVarP(&removeUntagged, "delete-untagged", "m", false, "delete manifests that are not currently referenced via tag")
 	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
-	RootCmd.Flags().BoolVarP(&showVersion, "version", "v", false, "show the version and exit")
+
+	DBCmd.AddCommand(MigrateCmd)
 }
 
 // RootCmd is the main command for the 'registry' binary.
@@ -95,6 +101,49 @@ var GCCmd = &cobra.Command{
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to garbage collect: %v", err)
+			os.Exit(1)
+		}
+	},
+}
+
+// DBCmd is the root of the `database` command.
+var DBCmd = &cobra.Command{
+	Use:   "database",
+	Short: "Manages the registry metadata database",
+	Long:  "Manages the registry metadata database",
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Usage()
+	},
+}
+
+// MigrateCmd is the `migrate` sub-command of `database` that migrates the database to the latest version.
+var MigrateCmd = &cobra.Command{
+	Use:   "migrate",
+	Short: "Run new migrations",
+	Long:  "Run new migrations",
+	Run: func(cmd *cobra.Command, args []string) {
+		config, err := resolveConfiguration(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
+			os.Exit(1)
+		}
+
+		if err := db.MigrateUp(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 			os.Exit(1)
 		}
 	},

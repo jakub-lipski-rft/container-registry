@@ -10,13 +10,14 @@ cache:
     - $GOPATH/pkg/mod/
 
 stages:
+  - validate
   - test
   - integration
 
 static-analysis:
   cache: {}
   image: registry.gitlab.com/gitlab-org/gitlab-build-images:golangci-lint-alpine
-  stage: test
+  stage: validate
   script:
     # Use default .golangci.yml file from the image if one is not present in the project root.
     - '[ -e .golangci.yml ] || cp /golangci/.golangci.yml .'
@@ -29,6 +30,13 @@ static-analysis:
     paths:
       - gl-code-quality-report.json
   allow_failure: true
+
+bindata:
+  cache: {}
+  stage: validate
+  before_script:
+    - go get -u github.com/jteeuwen/go-bindata/...
+  script: make bindata-check
 
 verify:
   stage: test
