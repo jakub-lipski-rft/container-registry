@@ -3,67 +3,49 @@
 package datastore_test
 
 import (
-	"math/rand"
-	"os"
-	"sort"
-	"strconv"
-	"strings"
 	"testing"
 
-	"github.com/docker/distribution/db/migrations"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/testutil"
+	"github.com/stretchr/testify/require"
 )
-
-func dsn(tb testing.TB) *datastore.DSN {
-	tb.Helper()
-
-	port, err := strconv.Atoi(os.Getenv("REGISTRY_DATABASE_PORT"))
-	require.NoError(tb, err, "unexpected error parsing DSN port")
-
-	return &datastore.DSN{
-		Host:     os.Getenv("REGISTRY_DATABASE_HOST"),
-		Port:     port,
-		User:     os.Getenv("REGISTRY_DATABASE_USER"),
-		Password: os.Getenv("REGISTRY_DATABASE_PASSWORD"),
-		DBName:   os.Getenv("REGISTRY_DATABASE_DBNAME"),
-		SSLMode:  os.Getenv("REGISTRY_DATABASE_SSLMODE"),
-	}
-}
 
 func TestOpen(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name       string
-		dsnFactory func(tb testing.TB) *datastore.DSN
+		dsnFactory func() (*datastore.DSN, error)
 		wantErr    bool
 	}{
 		{
 			name:       "success",
-			dsnFactory: dsn,
+			dsnFactory: testutil.NewDSN,
 			wantErr:    false,
 		},
 		{
 			name: "error",
-			dsnFactory: func(tb testing.TB) *datastore.DSN {
-				dsn := dsn(tb)
-				dsn.DBName = strconv.Itoa(rand.Intn(10))
-				return dsn
+			dsnFactory: func() (*datastore.DSN, error) {
+				dsn, err := testutil.NewDSN()
+				if err != nil {
+					return nil, err
+				}
+				dsn.DBName = "nonexistent"
+				return dsn, nil
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, err := datastore.Open(tt.dsnFactory(t))
+			dsn, err := tt.dsnFactory()
+			require.NoError(t, err)
 
+			db, err := datastore.Open(dsn)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
-			    defer db.Close()
+				defer db.Close()
 				require.NoError(t, err)
 				require.IsType(t, new(datastore.DB), db)
 			}
@@ -71,21 +53,8 @@ func TestOpen(t *testing.T) {
 	}
 }
 
-func latestMigrationVersion(tb testing.TB) int {
-	tb.Helper()
-
-	all := migrations.AssetNames()
-	sort.Strings(all)
-	latest := all[len(all)-1]
-
-	v, err := strconv.Atoi(strings.Split(latest, "_")[0])
-	require.NoError(tb, err)
-
-	return v
-}
-
 func TestDB_MigrateUp(t *testing.T) {
-	db, err := datastore.Open(dsn(t))
+	db, err := testutil.NewDB()
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -93,16 +62,16 @@ func TestDB_MigrateUp(t *testing.T) {
 
 	currentVersion, err := db.MigrateVersion()
 	require.NoError(t, err)
-	require.Equal(t, latestMigrationVersion(t), currentVersion)
+	require.Equal(t, testutil.LatestMigrationVersion(t), currentVersion)
 }
 
 func TestDB_MigrateDown(t *testing.T) {
-	db, err := datastore.Open(dsn(t))
+	db, err := testutil.NewDB()
 	require.NoError(t, err)
 	defer db.Close()
 
-	require.NoError(t, db.MigrateUp())
 	require.NoError(t, db.MigrateDown())
+	defer db.MigrateUp()
 
 	currentVersion, err := db.MigrateVersion()
 	require.NoError(t, err)
