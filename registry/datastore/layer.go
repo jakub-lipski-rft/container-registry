@@ -15,6 +15,7 @@ type LayerReader interface {
 	FindByID(ctx context.Context, id int) (*models.Layer, error)
 	FindByDigest(ctx context.Context, digest string) (*models.Layer, error)
 	Count(ctx context.Context) (int, error)
+	Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error)
 }
 
 // LayerWriter is the interface that defines write operations for a layer store.
@@ -110,6 +111,22 @@ func (s *layerStore) Count(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+// Manifests finds all manifests that reference a layer.
+func (s *layerStore) Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error) {
+	q := `SELECT m.id, m.repository_id, m.schema_version, m.media_type, m.digest, m.configuration_id,
+		m.payload, m.created_at, m.marked_at, m.deleted_at FROM manifests as m
+		JOIN manifest_layers as ml ON ml.manifest_id = m.id
+		JOIN layers as l ON l.id = ml.layer_id
+		WHERE l.id = $1`
+
+	rows, err := s.db.QueryContext(ctx, q, l.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding manifests: %w", err)
+	}
+
+	return scanFullManifests(rows)
 }
 
 // Create saves a new layer.
