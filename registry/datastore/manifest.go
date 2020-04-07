@@ -16,6 +16,7 @@ type ManifestReader interface {
 	FindByDigest(ctx context.Context, digest string) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
 	Layers(ctx context.Context, m *models.Manifest) (models.Layers, error)
+	Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error)
 }
 
 // ManifestWriter is the interface that defines write operations for a Manifest store.
@@ -139,6 +140,22 @@ func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.
 	}
 
 	return scanFullLayers(rows)
+}
+
+// Lists finds all manifest lists which reference a manifest, through the ManifestListItem relationship entity.
+func (s *manifestStore) Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error) {
+	q := `SELECT ml.id, ml.repository_id, ml.schema_version, ml.media_type, ml.payload, ml.created_at,
+		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
+		JOIN manifest_list_items as mli ON mli.manifest_list_id = ml.id
+		JOIN manifests as m ON m.id = mli.manifest_id
+		WHERE m.id = $1`
+
+	rows, err := s.db.QueryContext(ctx, q, m.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding manifest lists: %w", err)
+	}
+
+	return scanFullManifestLists(rows)
 }
 
 // Create saves a new Manifest.

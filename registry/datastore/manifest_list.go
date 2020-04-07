@@ -15,6 +15,7 @@ type ManifestListReader interface {
 	FindByID(ctx context.Context, id int) (*models.ManifestList, error)
 	FindByDigest(ctx context.Context, digest string) (*models.ManifestList, error)
 	Count(ctx context.Context) (int, error)
+	Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error)
 }
 
 // ManifestListWriter is the interface that defines write operations for a manifest list store.
@@ -22,6 +23,8 @@ type ManifestListWriter interface {
 	Create(ctx context.Context, ml *models.ManifestList) error
 	Update(ctx context.Context, ml *models.ManifestList) error
 	Mark(ctx context.Context, ml *models.ManifestList) error
+	AssociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error
+	DissociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error
 	SoftDelete(ctx context.Context, ml *models.ManifestList) error
 	Delete(ctx context.Context, id int) error
 }
@@ -123,6 +126,22 @@ func (s *manifestListStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// Manifests finds all manifests associated with a manifest list, through the ManifestListItem relationship entity.
+func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error) {
+	q := `SELECT m.id, m.repository_id, m.schema_version, m.media_type, m.digest, m.configuration_id,
+		m.payload, m.created_at, m.marked_at, m.deleted_at FROM manifests as m
+		JOIN manifest_list_items as mli ON mli.manifest_id = m.id
+		JOIN manifest_lists as ml ON ml.id = mli.manifest_list_id
+		WHERE ml.id = $1`
+
+	rows, err := s.db.QueryContext(ctx, q, ml.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding manifests: %w", err)
+	}
+
+	return scanFullManifests(rows)
+}
+
 // Create saves a new ManifestList.
 func (s *manifestListStore) Create(ctx context.Context, ml *models.ManifestList) error {
 	q := `INSERT INTO manifest_lists (repository_id, schema_version, media_type, payload)
@@ -166,6 +185,37 @@ func (s *manifestListStore) Mark(ctx context.Context, ml *models.ManifestList) e
 			return errors.New("manifest list not found")
 		}
 		return fmt.Errorf("error soft deleting manifest list: %w", err)
+	}
+
+	return nil
+}
+
+// AssociateManifest associates a manifest and a manifest list.
+func (s *manifestListStore) AssociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error {
+	q := "INSERT INTO manifest_list_items (manifest_list_id, manifest_id) VALUES ($1, $2)"
+
+	if _, err := s.db.ExecContext(ctx, q, ml.ID, m.ID); err != nil {
+		return fmt.Errorf("error associating manifest: %w", err)
+	}
+
+	return nil
+}
+
+// DissociateManifest dissociates a manifest and a manifest list.
+func (s *manifestListStore) DissociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error {
+	q := "DELETE FROM manifest_list_items WHERE manifest_list_id = $1 AND manifest_id = $2"
+
+	res, err := s.db.ExecContext(ctx, q, ml.ID, m.ID)
+	if err != nil {
+		return fmt.Errorf("error dissociating manifest: %w", err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error dissociating manifest: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("manifest association not found")
 	}
 
 	return nil
