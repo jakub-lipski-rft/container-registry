@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [v2.9.0-gitlab] - 2020-04-07
 ### Added
 - notifications: Notification related Prometheus metrics
 - registry: Make minimum TLS version user configurable
