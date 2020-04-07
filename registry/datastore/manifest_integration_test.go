@@ -3,8 +3,11 @@
 package datastore_test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"testing"
+
+	"github.com/docker/distribution/manifest/manifestlist"
 
 	"github.com/docker/distribution/registry/datastore"
 
@@ -180,6 +183,36 @@ func TestManifestStore_Layers(t *testing.T) {
 			Digest:    "sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21",
 			Size:      108,
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
+		},
+	}
+	require.Equal(t, expected, ll)
+}
+
+func TestManifestStore_Lists(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewManifestStore(suite.db)
+	ll, err := s.Lists(suite.ctx, &models.Manifest{ID: 1})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/manifest_layers.sql
+	local := ll[0].CreatedAt.Location()
+	expected := models.ManifestLists{
+		{
+			ID:            1,
+			RepositoryID:  3,
+			SchemaVersion: 2,
+			MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
+			CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:03.470711", local),
+		},
+		{
+			ID:            2,
+			RepositoryID:  4,
+			SchemaVersion: 2,
+			MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":42212,"digest":"sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6","platform":{"architecture":"amd64","os":"linux"}}]}`),
+			CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:04.470711", local),
 		},
 	}
 	require.Equal(t, expected, ll)

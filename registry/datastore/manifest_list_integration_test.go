@@ -17,13 +17,21 @@ import (
 )
 
 func reloadManifestListFixtures(tb testing.TB) {
-	// A ManifestList has a foreign key for a Repository (the insert order matters)
-	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.RepositoriesTable, testutil.ManifestListsTable)
+	// A ManifestList has a relationship with Repository and Manifest (the insert order matters)
+	testutil.ReloadFixtures(
+		tb, suite.db, suite.basePath,
+		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable,
+		testutil.ManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+	)
 }
 
 func unloadManifestListFixtures(tb testing.TB) {
-	// A ManifestList has a foreign key for a Repository (the insert order matters)
-	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.RepositoriesTable, testutil.ManifestListsTable))
+	// A ManifestList has a relationship with Repository and Manifest (the insert order matters)
+	require.NoError(tb, testutil.TruncateTables(
+		suite.db,
+		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable,
+		testutil.ManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+	))
 }
 
 func TestManifestListStore_FindByID(t *testing.T) {
@@ -106,6 +114,40 @@ func TestManifestListStore_Count(t *testing.T) {
 	require.Equal(t, 2, count)
 }
 
+func TestManifestListStore_Manifests(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewManifestListStore(suite.db)
+	mm, err := s.Manifests(suite.ctx, &models.ManifestList{ID: 1})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/manifest_list_items.sql
+	local := mm[0].CreatedAt.Location()
+	expected := models.Manifests{
+		{
+			ID:              1,
+			RepositoryID:    3,
+			SchemaVersion:   2,
+			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
+			ConfigurationID: 1,
+			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
+			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+		},
+		{
+			ID:              2,
+			RepositoryID:    3,
+			SchemaVersion:   2,
+			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
+			ConfigurationID: 2,
+			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+		},
+	}
+	require.Equal(t, expected, mm)
+}
+
 func TestManifestListStore_Create(t *testing.T) {
 	unloadManifestListFixtures(t)
 	reloadRepositoryFixtures(t)
@@ -179,6 +221,72 @@ func TestManifestListStore_Mark_NotFound(t *testing.T) {
 	r := &models.ManifestList{ID: 100}
 	err := s.Mark(suite.ctx, r)
 	require.EqualError(t, err, "manifest list not found")
+}
+
+func TestManifestListStore_AssociateManifest(t *testing.T) {
+	reloadManifestListFixtures(t)
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestListItemsTable))
+
+	s := datastore.NewManifestListStore(suite.db)
+
+	// see testdata/fixtures/manifest_list_items.sql
+	ml := &models.ManifestList{ID: 1}
+	m := &models.Manifest{ID: 3}
+	err := s.AssociateManifest(suite.ctx, ml, m)
+	require.NoError(t, err)
+
+	mm, err := s.Manifests(suite.ctx, ml)
+	require.NoError(t, err)
+
+	var assocManifestIDs []int
+	for _, m := range mm {
+		assocManifestIDs = append(assocManifestIDs, m.ID)
+	}
+	require.Contains(t, assocManifestIDs, 3)
+}
+
+func TestManifestListStore_AssociateManifest_AlreadyAssociatedFails(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewManifestListStore(suite.db)
+
+	// see testdata/fixtures/manifest_list_items.sql
+	ml := &models.ManifestList{ID: 1}
+	m := &models.Manifest{ID: 1}
+	err := s.AssociateManifest(suite.ctx, ml, m)
+	require.Error(t, err)
+}
+
+func TestManifestListStore_DissociateManifest(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewManifestListStore(suite.db)
+	ml := &models.ManifestList{ID: 1}
+	m := &models.Manifest{ID: 1}
+
+	err := s.DissociateManifest(suite.ctx, ml, m)
+	require.NoError(t, err)
+
+	mm, err := s.Manifests(suite.ctx, ml)
+	require.NoError(t, err)
+
+	// see testdata/fixtures/manifest_list_items.sql
+	var manifestIDs []int
+	for _, m := range mm {
+		manifestIDs = append(manifestIDs, m.ID)
+	}
+	require.NotContains(t, manifestIDs, 1)
+}
+
+func TestManifestListStore_DissociateManifest_NotAssociatedFails(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewManifestListStore(suite.db)
+	ml := &models.ManifestList{ID: 1}
+	m := &models.Manifest{ID: 3}
+
+	err := s.DissociateManifest(suite.ctx, ml, m)
+	require.Errorf(t, err, "manifest association not found")
 }
 
 func TestManifestListStore_SoftDelete(t *testing.T) {
