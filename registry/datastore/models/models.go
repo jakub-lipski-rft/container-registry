@@ -84,7 +84,6 @@ type ManifestLayer struct {
 	ManifestID int
 	LayerID    int
 	CreatedAt  time.Time
-	MarkedAt   sql.NullTime
 	DeletedAt  sql.NullTime
 
 	Layer    *Layer
