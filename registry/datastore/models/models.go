@@ -53,14 +53,16 @@ type Manifest struct {
 type Manifests []*Manifest
 
 type Tag struct {
-	ID         int
-	Name       string
-	ManifestID int
-	CreatedAt  time.Time
-	UpdatedAt  sql.NullTime
-	DeletedAt  sql.NullTime
+	ID           int
+	Name         string
+	RepositoryID int
+	ManifestID   int
+	CreatedAt    time.Time
+	UpdatedAt    sql.NullTime
+	DeletedAt    sql.NullTime
 
-	Manifest *Manifest
+	Repository *Repository
+	Manifest   *Manifest
 }
 
 // Tags is a slice of Tag pointers.
