@@ -223,6 +223,42 @@ func _20200408192559_update_manifests_table_up_sql() ([]byte, error) {
 	)
 }
 
+var __20200408193126_create_repository_manifest_lists_table_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\x28\x4a\x2d\xc8\x2f\xce\x2c\xc9\x2f\xaa\x8c\xcf\x4d\xcc\xcb\x4c\x4b\x2d\x2e\x89\xcf\xc9\x2c\x2e\x29\xb6\x06\x04\x00\x00\xff\xff\xd8\xa5\xd5\x69\x2f\x00\x00\x00")
+
+func _20200408193126_create_repository_manifest_lists_table_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200408193126_create_repository_manifest_lists_table_down_sql,
+		"20200408193126_create_repository_manifest_lists_table.down.sql",
+	)
+}
+
+var __20200408193126_create_repository_manifest_lists_table_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x52\xc1\x4e\x84\x30\x10\xbd\xf3\x15\xef\x08\xc9\xfe\x81\xa7\xca\x0e\xa6\x11\x8b\x96\x12\xdd\x53\x43\xa4\x6b\x1a\x61\x17\x69\x3d\xf8\xf7\x86\x45\xcd\xd6\xb2\x26\xf6\xd4\x64\xde\x9b\xf7\xde\xcc\xe4\x92\x98\x22\x28\x76\x5d\x12\x78\x01\x51\x29\xd0\x13\xaf\x55\x8d\xc9\x8c\x47\x67\xfd\x71\xfa\xd0\x43\x7b\xb0\x7b\xe3\xbc\xee\xad\xf3\x2e\x49\x13\x00\xb0\x1d\xc2\xe7\xcc\x64\xdb\x7e\xfe\xcd\x5d\x44\x53\x96\x9b\x13\xf0\xac\xd1\xc2\xb1\x07\x6f\x5e\xcc\x14\x01\x03\x99\x19\x7b\x09\xf8\x3c\x99\xd6\x9b\x4e\xb7\xfe\x4b\xda\xdb\xc1\x38\xdf\x0e\xe3\x0f\x10\x5b\x2a\x58\x53\x2a\x88\xea\x31\xcd\x16\x5a\x67\x7a\xb3\x4e\x5b\xea\x79\x25\x6a\x25\x19\x17\x0a\xe3\xab\xbe\x98\x1f\xf7\x92\xdf\x31\xb9\xc3\x2d\xed\x90\xda\x2e\x8b\xd8\xef\x6f\x6b\x6c\xa7\x83\x49\xe8\x28\x6e\x23\xf8\x43\x43\x48\x03\xd8\x26\x1a\x4b\xac\xb7\xff\xc3\x6d\x28\x8a\xa2\x92\xc4\x6f\xc4\xe2\x3d\x28\x65\xc9\xf7\x22\x25\x15\x24\x49\xe4\x74\x76\x04\xd6\xb8\x53\x56\x54\x02\x5b\x2a\x49\x11\x72\x56\xe7\x6c\x4b\xff\x73\x13\x85\x0e\x0c\x45\x51\xd7\x3c\xfd\xda\xc6\xba\xab\x24\xbb\xfa\x0c\x00\x00\xff\xff\x9b\xc5\x42\x4c\xdc\x02\x00\x00")
+
+func _20200408193126_create_repository_manifest_lists_table_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200408193126_create_repository_manifest_lists_table_up_sql,
+		"20200408193126_create_repository_manifest_lists_table.up.sql",
+	)
+}
+
+var __20200408193348_update_manifest_lists_table_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\x8d\xc1\xaa\xc2\x30\x14\x44\xf7\xfd\x8a\x59\xb6\xf0\xfe\xe0\xad\xf2\x92\xdb\x47\x31\xde\x40\x9a\x2e\x5c\x05\xa1\xa9\x5c\xd4\x56\x9a\x6c\xfc\x7b\x51\x10\xed\x6c\x67\xe6\x1c\x65\x03\x79\x04\xf5\x67\x09\xd7\xe3\x2c\x53\xca\x25\x5e\x24\x97\x5c\x01\x80\x32\x06\xda\xd9\x61\xcf\x58\xd3\x6d\xc9\x52\x96\xf5\x1e\x65\x84\xcc\x25\x9d\xd2\x0a\x76\x01\x3c\x58\xfb\xf3\x35\xe7\x3e\x78\xd5\x71\xc0\x74\x8e\x6f\x66\x8e\xdb\x7f\xeb\x3c\x75\xff\x8c\x1d\x1d\x50\x6f\xaa\xe6\x45\x7a\xc6\x53\x4b\x9e\x58\x53\xff\x91\x4b\xca\xa8\x65\x6c\xe0\x18\x86\x2c\x05\x82\x56\xbd\x56\x86\x7e\xab\x47\x00\x00\x00\xff\xff\x0e\xa3\xae\x35\xcc\x00\x00\x00")
+
+func _20200408193348_update_manifest_lists_table_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200408193348_update_manifest_lists_table_down_sql,
+		"20200408193348_update_manifest_lists_table.down.sql",
+	)
+}
+
+var __20200408193348_update_manifest_lists_table_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\xc8\x4d\xcc\xcb\x4c\x4b\x2d\x2e\x89\xcf\xc9\x2c\x2e\x29\xe6\x52\x50\x50\x50\x70\x09\xf2\x0f\x50\x70\xf6\xf7\x0b\x0e\x09\x72\xf4\xf4\x0b\x51\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\x48\xcb\x8e\x87\xa9\x2f\x8e\x2f\x4a\x2d\xc8\x2f\xce\x2c\xc9\x2f\xaa\x8c\xcf\x4c\x51\x70\x76\x0c\x76\x76\x74\x71\xd5\x41\x36\xc1\x27\xd4\xd7\x0f\x49\x37\x56\x0d\xd6\x5c\x5c\x80\x00\x00\x00\xff\xff\xaf\x2f\x03\x2e\x8f\x00\x00\x00")
+
+func _20200408193348_update_manifest_lists_table_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200408193348_update_manifest_lists_table_up_sql,
+		"20200408193348_update_manifest_lists_table.up.sql",
+	)
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -245,28 +281,32 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() ([]byte, error){
-	"20200319122755_create_repositories_table.down.sql":            _20200319122755_create_repositories_table_down_sql,
-	"20200319122755_create_repositories_table.up.sql":              _20200319122755_create_repositories_table_up_sql,
-	"20200319130108_create_manifest_configurations_table.down.sql": _20200319130108_create_manifest_configurations_table_down_sql,
-	"20200319130108_create_manifest_configurations_table.up.sql":   _20200319130108_create_manifest_configurations_table_up_sql,
-	"20200319131222_create_manifests_table.down.sql":               _20200319131222_create_manifests_table_down_sql,
-	"20200319131222_create_manifests_table.up.sql":                 _20200319131222_create_manifests_table_up_sql,
-	"20200319131542_create_layers_table.down.sql":                  _20200319131542_create_layers_table_down_sql,
-	"20200319131542_create_layers_table.up.sql":                    _20200319131542_create_layers_table_up_sql,
-	"20200319131632_create_manifest_layers_table.down.sql":         _20200319131632_create_manifest_layers_table_down_sql,
-	"20200319131632_create_manifest_layers_table.up.sql":           _20200319131632_create_manifest_layers_table_up_sql,
-	"20200319131907_create_manifest_lists_table.down.sql":          _20200319131907_create_manifest_lists_table_down_sql,
-	"20200319131907_create_manifest_lists_table.up.sql":            _20200319131907_create_manifest_lists_table_up_sql,
-	"20200319132010_create_manifest_list_items_table.down.sql":     _20200319132010_create_manifest_list_items_table_down_sql,
-	"20200319132010_create_manifest_list_items_table.up.sql":       _20200319132010_create_manifest_list_items_table_up_sql,
-	"20200319132237_create_tags_table.down.sql":                    _20200319132237_create_tags_table_down_sql,
-	"20200319132237_create_tags_table.up.sql":                      _20200319132237_create_tags_table_up_sql,
-	"20200408191941_update_tags_table.down.sql":                    _20200408191941_update_tags_table_down_sql,
-	"20200408191941_update_tags_table.up.sql":                      _20200408191941_update_tags_table_up_sql,
-	"20200408192311_create_repository_manifests_table.down.sql":    _20200408192311_create_repository_manifests_table_down_sql,
-	"20200408192311_create_repository_manifests_table.up.sql":      _20200408192311_create_repository_manifests_table_up_sql,
-	"20200408192559_update_manifests_table.down.sql":               _20200408192559_update_manifests_table_down_sql,
-	"20200408192559_update_manifests_table.up.sql":                 _20200408192559_update_manifests_table_up_sql,
+	"20200319122755_create_repositories_table.down.sql":              _20200319122755_create_repositories_table_down_sql,
+	"20200319122755_create_repositories_table.up.sql":                _20200319122755_create_repositories_table_up_sql,
+	"20200319130108_create_manifest_configurations_table.down.sql":   _20200319130108_create_manifest_configurations_table_down_sql,
+	"20200319130108_create_manifest_configurations_table.up.sql":     _20200319130108_create_manifest_configurations_table_up_sql,
+	"20200319131222_create_manifests_table.down.sql":                 _20200319131222_create_manifests_table_down_sql,
+	"20200319131222_create_manifests_table.up.sql":                   _20200319131222_create_manifests_table_up_sql,
+	"20200319131542_create_layers_table.down.sql":                    _20200319131542_create_layers_table_down_sql,
+	"20200319131542_create_layers_table.up.sql":                      _20200319131542_create_layers_table_up_sql,
+	"20200319131632_create_manifest_layers_table.down.sql":           _20200319131632_create_manifest_layers_table_down_sql,
+	"20200319131632_create_manifest_layers_table.up.sql":             _20200319131632_create_manifest_layers_table_up_sql,
+	"20200319131907_create_manifest_lists_table.down.sql":            _20200319131907_create_manifest_lists_table_down_sql,
+	"20200319131907_create_manifest_lists_table.up.sql":              _20200319131907_create_manifest_lists_table_up_sql,
+	"20200319132010_create_manifest_list_items_table.down.sql":       _20200319132010_create_manifest_list_items_table_down_sql,
+	"20200319132010_create_manifest_list_items_table.up.sql":         _20200319132010_create_manifest_list_items_table_up_sql,
+	"20200319132237_create_tags_table.down.sql":                      _20200319132237_create_tags_table_down_sql,
+	"20200319132237_create_tags_table.up.sql":                        _20200319132237_create_tags_table_up_sql,
+	"20200408191941_update_tags_table.down.sql":                      _20200408191941_update_tags_table_down_sql,
+	"20200408191941_update_tags_table.up.sql":                        _20200408191941_update_tags_table_up_sql,
+	"20200408192311_create_repository_manifests_table.down.sql":      _20200408192311_create_repository_manifests_table_down_sql,
+	"20200408192311_create_repository_manifests_table.up.sql":        _20200408192311_create_repository_manifests_table_up_sql,
+	"20200408192559_update_manifests_table.down.sql":                 _20200408192559_update_manifests_table_down_sql,
+	"20200408192559_update_manifests_table.up.sql":                   _20200408192559_update_manifests_table_up_sql,
+	"20200408193126_create_repository_manifest_lists_table.down.sql": _20200408193126_create_repository_manifest_lists_table_down_sql,
+	"20200408193126_create_repository_manifest_lists_table.up.sql":   _20200408193126_create_repository_manifest_lists_table_up_sql,
+	"20200408193348_update_manifest_lists_table.down.sql":            _20200408193348_update_manifest_lists_table_down_sql,
+	"20200408193348_update_manifest_lists_table.up.sql":              _20200408193348_update_manifest_lists_table_up_sql,
 }
 
 // AssetDir returns the file names below a certain
@@ -310,26 +350,30 @@ type _bintree_t struct {
 }
 
 var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
-	"20200319122755_create_repositories_table.down.sql":            &_bintree_t{_20200319122755_create_repositories_table_down_sql, map[string]*_bintree_t{}},
-	"20200319122755_create_repositories_table.up.sql":              &_bintree_t{_20200319122755_create_repositories_table_up_sql, map[string]*_bintree_t{}},
-	"20200319130108_create_manifest_configurations_table.down.sql": &_bintree_t{_20200319130108_create_manifest_configurations_table_down_sql, map[string]*_bintree_t{}},
-	"20200319130108_create_manifest_configurations_table.up.sql":   &_bintree_t{_20200319130108_create_manifest_configurations_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131222_create_manifests_table.down.sql":               &_bintree_t{_20200319131222_create_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131222_create_manifests_table.up.sql":                 &_bintree_t{_20200319131222_create_manifests_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131542_create_layers_table.down.sql":                  &_bintree_t{_20200319131542_create_layers_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131542_create_layers_table.up.sql":                    &_bintree_t{_20200319131542_create_layers_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131632_create_manifest_layers_table.down.sql":         &_bintree_t{_20200319131632_create_manifest_layers_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131632_create_manifest_layers_table.up.sql":           &_bintree_t{_20200319131632_create_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131907_create_manifest_lists_table.down.sql":          &_bintree_t{_20200319131907_create_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131907_create_manifest_lists_table.up.sql":            &_bintree_t{_20200319131907_create_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
-	"20200319132010_create_manifest_list_items_table.down.sql":     &_bintree_t{_20200319132010_create_manifest_list_items_table_down_sql, map[string]*_bintree_t{}},
-	"20200319132010_create_manifest_list_items_table.up.sql":       &_bintree_t{_20200319132010_create_manifest_list_items_table_up_sql, map[string]*_bintree_t{}},
-	"20200319132237_create_tags_table.down.sql":                    &_bintree_t{_20200319132237_create_tags_table_down_sql, map[string]*_bintree_t{}},
-	"20200319132237_create_tags_table.up.sql":                      &_bintree_t{_20200319132237_create_tags_table_up_sql, map[string]*_bintree_t{}},
-	"20200408191941_update_tags_table.down.sql":                    &_bintree_t{_20200408191941_update_tags_table_down_sql, map[string]*_bintree_t{}},
-	"20200408191941_update_tags_table.up.sql":                      &_bintree_t{_20200408191941_update_tags_table_up_sql, map[string]*_bintree_t{}},
-	"20200408192311_create_repository_manifests_table.down.sql":    &_bintree_t{_20200408192311_create_repository_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200408192311_create_repository_manifests_table.up.sql":      &_bintree_t{_20200408192311_create_repository_manifests_table_up_sql, map[string]*_bintree_t{}},
-	"20200408192559_update_manifests_table.down.sql":               &_bintree_t{_20200408192559_update_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200408192559_update_manifests_table.up.sql":                 &_bintree_t{_20200408192559_update_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200319122755_create_repositories_table.down.sql":              &_bintree_t{_20200319122755_create_repositories_table_down_sql, map[string]*_bintree_t{}},
+	"20200319122755_create_repositories_table.up.sql":                &_bintree_t{_20200319122755_create_repositories_table_up_sql, map[string]*_bintree_t{}},
+	"20200319130108_create_manifest_configurations_table.down.sql":   &_bintree_t{_20200319130108_create_manifest_configurations_table_down_sql, map[string]*_bintree_t{}},
+	"20200319130108_create_manifest_configurations_table.up.sql":     &_bintree_t{_20200319130108_create_manifest_configurations_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131222_create_manifests_table.down.sql":                 &_bintree_t{_20200319131222_create_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131222_create_manifests_table.up.sql":                   &_bintree_t{_20200319131222_create_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131542_create_layers_table.down.sql":                    &_bintree_t{_20200319131542_create_layers_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131542_create_layers_table.up.sql":                      &_bintree_t{_20200319131542_create_layers_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131632_create_manifest_layers_table.down.sql":           &_bintree_t{_20200319131632_create_manifest_layers_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131632_create_manifest_layers_table.up.sql":             &_bintree_t{_20200319131632_create_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131907_create_manifest_lists_table.down.sql":            &_bintree_t{_20200319131907_create_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131907_create_manifest_lists_table.up.sql":              &_bintree_t{_20200319131907_create_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200319132010_create_manifest_list_items_table.down.sql":       &_bintree_t{_20200319132010_create_manifest_list_items_table_down_sql, map[string]*_bintree_t{}},
+	"20200319132010_create_manifest_list_items_table.up.sql":         &_bintree_t{_20200319132010_create_manifest_list_items_table_up_sql, map[string]*_bintree_t{}},
+	"20200319132237_create_tags_table.down.sql":                      &_bintree_t{_20200319132237_create_tags_table_down_sql, map[string]*_bintree_t{}},
+	"20200319132237_create_tags_table.up.sql":                        &_bintree_t{_20200319132237_create_tags_table_up_sql, map[string]*_bintree_t{}},
+	"20200408191941_update_tags_table.down.sql":                      &_bintree_t{_20200408191941_update_tags_table_down_sql, map[string]*_bintree_t{}},
+	"20200408191941_update_tags_table.up.sql":                        &_bintree_t{_20200408191941_update_tags_table_up_sql, map[string]*_bintree_t{}},
+	"20200408192311_create_repository_manifests_table.down.sql":      &_bintree_t{_20200408192311_create_repository_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200408192311_create_repository_manifests_table.up.sql":        &_bintree_t{_20200408192311_create_repository_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200408192559_update_manifests_table.down.sql":                 &_bintree_t{_20200408192559_update_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200408192559_update_manifests_table.up.sql":                   &_bintree_t{_20200408192559_update_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200408193126_create_repository_manifest_lists_table.down.sql": &_bintree_t{_20200408193126_create_repository_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200408193126_create_repository_manifest_lists_table.up.sql":   &_bintree_t{_20200408193126_create_repository_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200408193348_update_manifest_lists_table.down.sql":            &_bintree_t{_20200408193348_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200408193348_update_manifest_lists_table.up.sql":              &_bintree_t{_20200408193348_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
 }}

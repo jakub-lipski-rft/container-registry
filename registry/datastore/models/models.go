@@ -96,7 +96,6 @@ type ManifestLayers []*ManifestLayer
 
 type ManifestList struct {
 	ID            int
-	RepositoryID  int
 	SchemaVersion int
 	MediaType     sql.NullString
 	Payload       json.RawMessage
