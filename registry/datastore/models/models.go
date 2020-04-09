@@ -13,8 +13,6 @@ type Repository struct {
 	ParentID  sql.NullInt64
 	CreatedAt time.Time
 	DeletedAt sql.NullTime
-
-	Parent *Repository
 }
 
 // Repositories is a slice of Repository pointers.
@@ -43,8 +41,6 @@ type Manifest struct {
 	CreatedAt       time.Time
 	MarkedAt        sql.NullTime
 	DeletedAt       sql.NullTime
-
-	Configuration *ManifestConfiguration
 }
 
 // Manifests is a slice of Manifest pointers.
@@ -58,9 +54,6 @@ type Tag struct {
 	CreatedAt    time.Time
 	UpdatedAt    sql.NullTime
 	DeletedAt    sql.NullTime
-
-	Repository *Repository
-	Manifest   *Manifest
 }
 
 // Tags is a slice of Tag pointers.
@@ -79,20 +72,6 @@ type Layer struct {
 // Layers is a slice of Layer pointers.
 type Layers []*Layer
 
-type ManifestLayer struct {
-	ID         int
-	ManifestID int
-	LayerID    int
-	CreatedAt  time.Time
-	DeletedAt  sql.NullTime
-
-	Layer    *Layer
-	Manifest *Manifest
-}
-
-// ManifestLayers is a slice of ManifestLayer pointers.
-type ManifestLayers []*ManifestLayer
-
 type ManifestList struct {
 	ID            int
 	SchemaVersion int
@@ -107,17 +86,3 @@ type ManifestList struct {
 
 // ManifestLists is a slice of ManifestList pointers.
 type ManifestLists []*ManifestList
-
-type ManifestListItem struct {
-	ID             int
-	ManifestListID int
-	ManifestID     int
-	CreatedAt      time.Time
-	DeletedAt      sql.NullTime
-
-	Manifest     *Manifest
-	ManifestList *ManifestList
-}
-
-// ManifestListItems is a slice of ManifestListItem pointers.
-type ManifestListItems []*ManifestListItem
