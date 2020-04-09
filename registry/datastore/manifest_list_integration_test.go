@@ -126,7 +126,6 @@ func TestManifestListStore_Manifests(t *testing.T) {
 	expected := models.Manifests{
 		{
 			ID:              1,
-			RepositoryID:    3,
 			SchemaVersion:   2,
 			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 			Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
@@ -136,7 +135,6 @@ func TestManifestListStore_Manifests(t *testing.T) {
 		},
 		{
 			ID:              2,
-			RepositoryID:    3,
 			SchemaVersion:   2,
 			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 			Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",

@@ -189,7 +189,6 @@ func TestTagStore_Manifest(t *testing.T) {
 	// see testdata/fixtures/tags.sql
 	excepted := &models.Manifest{
 		ID:              2,
-		RepositoryID:    3,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",

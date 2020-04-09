@@ -18,6 +18,7 @@ type RepositoryReader interface {
 	FindAncestorsOf(ctx context.Context, id int) (models.Repositories, error)
 	FindSiblingsOf(ctx context.Context, id int) (models.Repositories, error)
 	Count(ctx context.Context) (int, error)
+	Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error)
 	Tags(ctx context.Context, r *models.Repository) (models.Tags, error)
 	ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error)
 }
@@ -26,6 +27,8 @@ type RepositoryReader interface {
 type RepositoryWriter interface {
 	Create(ctx context.Context, r *models.Repository) error
 	Update(ctx context.Context, r *models.Repository) error
+	AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
+	DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	SoftDelete(ctx context.Context, r *models.Repository) error
 	Delete(ctx context.Context, id int) error
 }
@@ -192,6 +195,22 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// Manifests finds all manifests associated with a repository.
+func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest, m.configuration_id, m.payload,
+		m.created_at, m.marked_at, m.deleted_at FROM manifests as m
+		JOIN repository_manifests as rm ON rm.manifest_id = m.id
+		JOIN repositories as r ON r.id = rm.repository_id
+		WHERE r.id = $1`
+
+	rows, err := s.db.QueryContext(ctx, q, r.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding manifests: %w", err)
+	}
+
+	return scanFullManifests(rows)
+}
+
 // Create saves a new repository.
 func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) error {
 	q := "INSERT INTO repositories (name, path, parent_id) VALUES ($1, $2, $3) RETURNING id, created_at"
@@ -219,6 +238,37 @@ func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) erro
 	}
 	if n == 0 {
 		return fmt.Errorf("repository not found")
+	}
+
+	return nil
+}
+
+// AssociateManifest associates a manifest and a repository.
+func (s *repositoryStore) AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
+	q := "INSERT INTO repository_manifests (repository_id, manifest_id) VALUES ($1, $2)"
+
+	if _, err := s.db.ExecContext(ctx, q, r.ID, m.ID); err != nil {
+		return fmt.Errorf("error associating manifest: %w", err)
+	}
+
+	return nil
+}
+
+// DissociateManifest dissociates a manifest and a repository.
+func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
+	q := "DELETE FROM repository_manifests WHERE repository_id = $1 AND manifest_id = $2"
+
+	res, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
+	if err != nil {
+		return fmt.Errorf("error dissociating manifest: %w", err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error dissociating manifest: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("manifest association not found")
 	}
 
 	return nil

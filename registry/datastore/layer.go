@@ -115,7 +115,7 @@ func (s *layerStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests that reference a layer.
 func (s *layerStore) Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error) {
-	q := `SELECT m.id, m.repository_id, m.schema_version, m.media_type, m.digest, m.configuration_id,
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest, m.configuration_id,
 		m.payload, m.created_at, m.marked_at, m.deleted_at FROM manifests as m
 		JOIN manifest_layers as ml ON ml.manifest_id = m.id
 		JOIN layers as l ON l.id = ml.layer_id

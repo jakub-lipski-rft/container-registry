@@ -21,7 +21,7 @@ func reloadManifestFixtures(tb testing.TB) {
 		tb, suite.db, suite.basePath,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
 		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
-		testutil.LayersTable, testutil.ManifestLayersTable,
+		testutil.RepositoryManifestsTable, testutil.LayersTable, testutil.ManifestLayersTable,
 	)
 }
 
@@ -30,7 +30,7 @@ func unloadManifestFixtures(tb testing.TB) {
 		suite.db,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
 		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
-		testutil.LayersTable, testutil.ManifestLayersTable,
+		testutil.RepositoryManifestsTable, testutil.LayersTable, testutil.ManifestLayersTable,
 	))
 }
 
@@ -45,7 +45,6 @@ func TestManifestStore_FindByID(t *testing.T) {
 	// see testdata/fixtures/manifests.sql
 	expected := &models.Manifest{
 		ID:              1,
-		RepositoryID:    3,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
@@ -75,7 +74,6 @@ func TestManifestStore_FindByDigest(t *testing.T) {
 	// see testdata/fixtures/manifests.sql
 	excepted := &models.Manifest{
 		ID:              2,
-		RepositoryID:    3,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
@@ -107,7 +105,6 @@ func TestManifestStore_FindAll(t *testing.T) {
 	expected := models.Manifests{
 		{
 			ID:              1,
-			RepositoryID:    3,
 			SchemaVersion:   2,
 			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 			Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
@@ -117,7 +114,6 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:              2,
-			RepositoryID:    3,
 			SchemaVersion:   2,
 			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 			Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
@@ -127,7 +123,6 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:              3,
-			RepositoryID:    4,
 			SchemaVersion:   2,
 			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 			Digest:          "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
@@ -218,6 +213,27 @@ func TestManifestStore_Lists(t *testing.T) {
 	require.Equal(t, expected, ll)
 }
 
+func TestManifestStore_Repositories(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewManifestStore(suite.db)
+	rr, err := s.Repositories(suite.ctx, &models.Manifest{ID: 1})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/repository_manifests.sql
+	local := rr[0].CreatedAt.Location()
+	expected := models.Repositories{
+		{
+			ID:        3,
+			Name:      "backend",
+			Path:      "gitlab-org/gitlab-test/backend",
+			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
+		},
+	}
+	require.Equal(t, expected, rr)
+}
+
 func TestManifestStore_Create(t *testing.T) {
 	unloadManifestFixtures(t)
 	reloadRepositoryFixtures(t)
@@ -225,7 +241,6 @@ func TestManifestStore_Create(t *testing.T) {
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{
-		RepositoryID:    1,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:46b163863b462eadc1b17dca382ccbfb08a853cffc79e2049607f95455cc44fa",
@@ -244,7 +259,6 @@ func TestManifestStore_Create_NonUniqueDigestFails(t *testing.T) {
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{
-		RepositoryID:    4,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
@@ -261,7 +275,6 @@ func TestManifestStore_Update(t *testing.T) {
 	s := datastore.NewManifestStore(suite.db)
 	update := &models.Manifest{
 		ID:              3,
-		RepositoryID:    4,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
@@ -283,7 +296,6 @@ func TestManifestStore_Update_NotFound(t *testing.T) {
 
 	update := &models.Manifest{
 		ID:              4,
-		RepositoryID:    4,
 		SchemaVersion:   2,
 		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
 		Digest:          "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
