@@ -169,6 +169,7 @@ storage:
     readonly:
       enabled: false
 database:
+  disable: false
   host: localhost
   port: 5432
   user: postgres
@@ -589,6 +590,7 @@ The `database` subsection configures the PostgreSQL metadata database.
 
 ```none
 database:
+  disable: false
   host: localhost
   port: 5432
   user: postgres
@@ -600,6 +602,7 @@ database:
 
 | Parameter  | Required | Description                                                                                                                                                                                                                                          |
 |------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `disable`  | no       | When set to `true` the metadata database is bypassed. Defaults to `false`.                                                                                                                                                                           |
 | `host`     | yes      | The database server hostname.                                                                                                                                                                                                                        |
 | `port`     | yes      | The database server port.                                                                                                                                                                                                                            |
 | `user`     | yes      | The database username.                                                                                                                                                                                                                               |

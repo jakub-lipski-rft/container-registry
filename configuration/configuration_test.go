@@ -46,6 +46,7 @@ var configStruct = Configuration{
 		},
 	},
 	Database: Database{
+		Disable:  false,
 		Host:     "localhost",
 		Port:     5432,
 		User:     "postgres",
@@ -155,6 +156,7 @@ storage:
     host: ~
     port: 42
 database:
+  disable: false
   host: localhost
   port: 5432
   user: postgres
@@ -403,6 +405,7 @@ func (suite *ConfigSuite) TestParseWithDifferentEnvReporting(c *C) {
 // TestParseWithDifferentEnvDatabase validates that environment variables properly override database parameters
 func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
 	expected := Database{
+		Disable:  true,
 		Host:     "127.0.0.1",
 		Port:     1234,
 		User:     "user",
@@ -413,6 +416,7 @@ func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
 	}
 	suite.expectedConfig.Database = expected
 
+	os.Setenv("REGISTRY_DATABASE_DISABLE", strconv.FormatBool(expected.Disable))
 	os.Setenv("REGISTRY_DATABASE_HOST", expected.Host)
 	os.Setenv("REGISTRY_DATABASE_PORT", strconv.Itoa(expected.Port))
 	os.Setenv("REGISTRY_DATABASE_USER", expected.User)
