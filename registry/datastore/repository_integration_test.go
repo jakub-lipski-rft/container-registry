@@ -263,6 +263,55 @@ func TestRepositoryStore_SiblingsOf_NotFound(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRepositoryStore_Tags(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	tt, err := s.Tags(suite.ctx, &models.Repository{ID: 4})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/tags.sql
+	local := tt[0].CreatedAt.Location()
+	expected := models.Tags{
+		{
+			ID:           4,
+			Name:         "1.0.0",
+			RepositoryID: 4,
+			ManifestID:   3,
+			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:46.283783", local),
+		},
+		{
+			ID:           5,
+			Name:         "latest",
+			RepositoryID: 4,
+			ManifestID:   3,
+			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:47.283783", local),
+		},
+	}
+	require.Equal(t, expected, tt)
+}
+
+func TestRepositoryStore_ManifestTags(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	tt, err := s.ManifestTags(suite.ctx, &models.Repository{ID: 3}, &models.Manifest{ID: 1})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/tags.sql
+	local := tt[0].CreatedAt.Location()
+	expected := models.Tags{
+		{
+			ID:           1,
+			Name:         "1.0.0",
+			RepositoryID: 3,
+			ManifestID:   1,
+			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:43.283783", local),
+		},
+	}
+	require.Equal(t, expected, tt)
+}
+
 func TestRepositoryStore_Count(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
