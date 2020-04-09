@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/docker/distribution/manifest/manifestlist"
+
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/docker/distribution/registry/datastore/testutil"
@@ -296,6 +298,27 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 	require.Equal(t, expected, mm)
 }
 
+func TestRepositoryStore_ManifestLists(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	mm, err := s.ManifestLists(suite.ctx, &models.Repository{ID: 3})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/repository_manifest_lists.sql
+	local := mm[0].CreatedAt.Location()
+	expected := models.ManifestLists{
+		{
+			ID:            1,
+			SchemaVersion: 2,
+			MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
+			CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:03.470711", local),
+		},
+	}
+	require.Equal(t, expected, mm)
+}
+
 func TestRepositoryStore_Tags(t *testing.T) {
 	reloadTagFixtures(t)
 
@@ -475,6 +498,69 @@ func TestRepositoryStore_DissociateManifest_NotAssociatedFails(t *testing.T) {
 	r := &models.Repository{ID: 4}
 	m := &models.Manifest{ID: 1}
 	err := s.DissociateManifest(suite.ctx, r, m)
+	require.Error(t, err)
+}
+
+func TestRepositoryStore_AssociateManifestList(t *testing.T) {
+	reloadManifestListFixtures(t)
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.RepositoryManifestListsTable))
+
+	s := datastore.NewRepositoryStore(suite.db)
+	// see testdata/fixtures/repository_manifest_lists.sql
+	r := &models.Repository{ID: 4}
+	ml := &models.ManifestList{ID: 2}
+
+	err := s.AssociateManifestList(suite.ctx, r, ml)
+	require.NoError(t, err)
+
+	ll, err := s.ManifestLists(suite.ctx, r)
+	require.NoError(t, err)
+
+	var assocManifestListIDs []int
+	for _, ml := range ll {
+		assocManifestListIDs = append(assocManifestListIDs, ml.ID)
+	}
+	require.Contains(t, assocManifestListIDs, 2)
+}
+
+func TestRepositoryStore_AssociateManifestList_AlreadyAssociatedFails(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	// see testdata/fixtures/repository_manifest_lists.sql
+	r := &models.Repository{ID: 3}
+	ml := &models.ManifestList{ID: 1}
+	err := s.AssociateManifestList(suite.ctx, r, ml)
+	require.Error(t, err)
+}
+
+func TestRepositoryStore_DissociateManifestList(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	// see testdata/fixtures/repository_manifest_lists.sql
+	r := &models.Repository{ID: 3}
+	ml := &models.ManifestList{ID: 1}
+
+	err := s.DissociateManifestList(suite.ctx, r, ml)
+	require.NoError(t, err)
+
+	ll, err := s.ManifestLists(suite.ctx, r)
+	require.NoError(t, err)
+
+	for _, ml := range ll {
+		require.NotEqual(t, 1, ml.ID)
+	}
+}
+
+func TestRepositoryStore_DissociateManifestList_NotAssociatedFails(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	// see testdata/fixtures/repository_manifest_lists.sql
+	r := &models.Repository{ID: 4}
+	ml := &models.ManifestList{ID: 1}
+	err := s.DissociateManifestList(suite.ctx, r, ml)
 	require.Error(t, err)
 }
 

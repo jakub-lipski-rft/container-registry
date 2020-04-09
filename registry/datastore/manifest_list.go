@@ -16,6 +16,7 @@ type ManifestListReader interface {
 	FindByDigest(ctx context.Context, digest string) (*models.ManifestList, error)
 	Count(ctx context.Context) (int, error)
 	Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error)
+	Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error)
 }
 
 // ManifestListWriter is the interface that defines write operations for a manifest list store.
@@ -48,8 +49,7 @@ func NewManifestListStore(db Queryer) *manifestListStore {
 func scanFullManifestList(row *sql.Row) (*models.ManifestList, error) {
 	ml := new(models.ManifestList)
 
-	err := row.Scan(&ml.ID, &ml.RepositoryID, &ml.SchemaVersion, &ml.MediaType, &ml.Payload, &ml.CreatedAt,
-		&ml.MarkedAt, &ml.DeletedAt)
+	err := row.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New("manifest list not found")
@@ -67,8 +67,7 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 	for rows.Next() {
 		ml := new(models.ManifestList)
 
-		err := rows.Scan(&ml.ID, &ml.RepositoryID, &ml.SchemaVersion, &ml.MediaType, &ml.Payload, &ml.CreatedAt,
-			&ml.MarkedAt, &ml.DeletedAt)
+		err := rows.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest list: %w", err)
 		}
@@ -83,7 +82,7 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 
 // FindByID finds a manifest list by ID.
 func (s *manifestListStore) FindByID(ctx context.Context, id int) (*models.ManifestList, error) {
-	q := `SELECT id, repository_id, schema_version, media_type, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
@@ -93,7 +92,7 @@ func (s *manifestListStore) FindByID(ctx context.Context, id int) (*models.Manif
 
 // FindByDigest finds a manifest list by the digest.
 func (s *manifestListStore) FindByDigest(ctx context.Context, digest string) (*models.ManifestList, error) {
-	q := `SELECT id, repository_id, schema_version, media_type, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists WHERE digest = $1`
 
 	row := s.db.QueryRowContext(ctx, q, digest)
@@ -103,7 +102,7 @@ func (s *manifestListStore) FindByDigest(ctx context.Context, digest string) (*m
 
 // FindAll finds all manifest lists.
 func (s *manifestListStore) FindAll(ctx context.Context) (models.ManifestLists, error) {
-	q := `SELECT id, repository_id, schema_version, media_type, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -142,12 +141,27 @@ func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestLi
 	return scanFullManifests(rows)
 }
 
+// Repositories finds all repositories which reference a manifest list.
+func (s *manifestListStore) Repositories(ctx context.Context, ml *models.ManifestList) (models.Repositories, error) {
+	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at, r.deleted_at FROM repositories as r
+		JOIN repository_manifest_lists as rml ON rml.repository_id = r.id
+		JOIN manifest_lists as ml ON ml.id = rml.manifest_list_id
+		WHERE ml.id = $1`
+
+	rows, err := s.db.QueryContext(ctx, q, ml.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding repositories: %w", err)
+	}
+
+	return scanFullRepositories(rows)
+}
+
 // Create saves a new ManifestList.
 func (s *manifestListStore) Create(ctx context.Context, ml *models.ManifestList) error {
-	q := `INSERT INTO manifest_lists (repository_id, schema_version, media_type, payload)
-		VALUES ($1, $2, $3, $4) RETURNING id, created_at`
+	q := `INSERT INTO manifest_lists (schema_version, media_type, payload)
+		VALUES ($1, $2, $3) RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, ml.RepositoryID, ml.SchemaVersion, ml.MediaType, ml.Payload)
+	row := s.db.QueryRowContext(ctx, q, ml.SchemaVersion, ml.MediaType, ml.Payload)
 	if err := row.Scan(&ml.ID, &ml.CreatedAt); err != nil {
 		return fmt.Errorf("error creating manifest list: %w", err)
 	}
@@ -157,10 +171,9 @@ func (s *manifestListStore) Create(ctx context.Context, ml *models.ManifestList)
 
 // Update updates an existing manifest list.
 func (s *manifestListStore) Update(ctx context.Context, ml *models.ManifestList) error {
-	q := `UPDATE manifest_lists
-		SET (repository_id, schema_version, media_type, payload) = ($1, $2, $3, $4) WHERE id = $5`
+	q := "UPDATE manifest_lists SET (schema_version, media_type, payload) = ($1, $2, $3) WHERE id = $4"
 
-	res, err := s.db.ExecContext(ctx, q, ml.RepositoryID, ml.SchemaVersion, ml.MediaType, ml.Payload, ml.ID)
+	res, err := s.db.ExecContext(ctx, q, ml.SchemaVersion, ml.MediaType, ml.Payload, ml.ID)
 	if err != nil {
 		return fmt.Errorf("error updating manifest list: %w", err)
 	}

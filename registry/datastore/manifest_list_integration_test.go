@@ -20,8 +20,8 @@ func reloadManifestListFixtures(tb testing.TB) {
 	// A ManifestList has a relationship with Repository and Manifest (the insert order matters)
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable,
-		testutil.ManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.ManifestListsTable, testutil.ManifestListItemsTable, testutil.RepositoryManifestListsTable,
 	)
 }
 
@@ -29,8 +29,8 @@ func unloadManifestListFixtures(tb testing.TB) {
 	// A ManifestList has a relationship with Repository and Manifest (the insert order matters)
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable,
-		testutil.ManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.ManifestListsTable, testutil.ManifestListItemsTable, testutil.RepositoryManifestListsTable,
 	))
 }
 
@@ -45,7 +45,6 @@ func TestManifestListStore_FindByID(t *testing.T) {
 	// see testdata/fixtures/manifest_lists.sql
 	expected := &models.ManifestList{
 		ID:            1,
-		RepositoryID:  3,
 		SchemaVersion: 2,
 		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
 		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
@@ -75,7 +74,6 @@ func TestManifestListStore_FindAll(t *testing.T) {
 	expected := models.ManifestLists{
 		{
 			ID:            1,
-			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
 			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
@@ -83,7 +81,6 @@ func TestManifestListStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            2,
-			RepositoryID:  4,
 			SchemaVersion: 2,
 			MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
 			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":42212,"digest":"sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6","platform":{"architecture":"amd64","os":"linux"}}]}`),
@@ -146,13 +143,33 @@ func TestManifestListStore_Manifests(t *testing.T) {
 	require.Equal(t, expected, mm)
 }
 
+func TestManifestListStore_Repositories(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	s := datastore.NewManifestListStore(suite.db)
+	rr, err := s.Repositories(suite.ctx, &models.ManifestList{ID: 1})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/repository_manifest_lists.sql
+	local := rr[0].CreatedAt.Location()
+	expected := models.Repositories{
+		{
+			ID:        3,
+			Name:      "backend",
+			Path:      "gitlab-org/gitlab-test/backend",
+			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
+		},
+	}
+	require.Equal(t, expected, rr)
+}
+
 func TestManifestListStore_Create(t *testing.T) {
 	unloadManifestListFixtures(t)
 	reloadRepositoryFixtures(t)
 
 	s := datastore.NewManifestListStore(suite.db)
 	c := &models.ManifestList{
-		RepositoryID:  3,
 		SchemaVersion: 2,
 		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
 		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
@@ -170,7 +187,6 @@ func TestManifestListStore_Update(t *testing.T) {
 	s := datastore.NewManifestListStore(suite.db)
 	update := &models.ManifestList{
 		ID:            1,
-		RepositoryID:  4,
 		SchemaVersion: 2,
 		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
 		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":42212,"digest":"sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6","platform":{"architecture":"amd64","os":"linux"}}]}`),
@@ -190,7 +206,6 @@ func TestManifestListStore_Update_NotFound(t *testing.T) {
 
 	update := &models.ManifestList{
 		ID:            100,
-		RepositoryID:  4,
 		SchemaVersion: 2,
 		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
 		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),

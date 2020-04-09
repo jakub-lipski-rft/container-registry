@@ -20,15 +20,16 @@ import (
 type table string
 
 const (
-	RepositoriesTable           table = "repositories"
-	ManifestConfigurationsTable table = "manifest_configurations"
-	ManifestsTable              table = "manifests"
-	RepositoryManifestsTable    table = "repository_manifests"
-	LayersTable                 table = "layers"
-	ManifestLayersTable         table = "manifest_layers"
-	ManifestListsTable          table = "manifest_lists"
-	ManifestListItemsTable      table = "manifest_list_items"
-	TagsTable                   table = "tags"
+	RepositoriesTable            table = "repositories"
+	ManifestConfigurationsTable  table = "manifest_configurations"
+	ManifestsTable               table = "manifests"
+	RepositoryManifestsTable     table = "repository_manifests"
+	LayersTable                  table = "layers"
+	ManifestLayersTable          table = "manifest_layers"
+	ManifestListsTable           table = "manifest_lists"
+	ManifestListItemsTable       table = "manifest_list_items"
+	RepositoryManifestListsTable table = "repository_manifest_lists"
+	TagsTable                    table = "tags"
 )
 
 // allTables represents all tables in the test database.
@@ -41,6 +42,7 @@ var allTables = []table{
 	ManifestLayersTable,
 	ManifestListsTable,
 	ManifestListItemsTable,
+	RepositoryManifestListsTable,
 	TagsTable,
 }
 
