@@ -128,7 +128,7 @@ func (s *manifestListStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests associated with a manifest list, through the ManifestListItem relationship entity.
 func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error) {
-	q := `SELECT m.id, m.repository_id, m.schema_version, m.media_type, m.digest, m.configuration_id,
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest, m.configuration_id,
 		m.payload, m.created_at, m.marked_at, m.deleted_at FROM manifests as m
 		JOIN manifest_list_items as mli ON mli.manifest_id = m.id
 		JOIN manifest_lists as ml ON ml.id = mli.manifest_list_id

@@ -125,7 +125,7 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 
 // Manifest finds a tag manifest.
 func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error) {
-	q := `SELECT id, repository_id, schema_version, media_type, digest, configuration_id, payload, created_at,
+	q := `SELECT id, schema_version, media_type, digest, configuration_id, payload, created_at,
 		marked_at, deleted_at FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, t.ManifestID)

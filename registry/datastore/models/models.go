@@ -35,7 +35,6 @@ type ManifestConfigurations []*ManifestConfiguration
 
 type Manifest struct {
 	ID              int
-	RepositoryID    int
 	SchemaVersion   int
 	MediaType       string
 	Digest          string
@@ -46,7 +45,6 @@ type Manifest struct {
 	DeletedAt       sql.NullTime
 
 	Configuration *ManifestConfiguration
-	Repository    *Repository
 }
 
 // Manifests is a slice of Manifest pointers.
