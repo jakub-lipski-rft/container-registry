@@ -1,0 +1,553 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+CAUTION: Do not modify this file unless you know what you are doing.
+         Unexpected results may occur if the code is changed deliberately.
+-->
+<dbmodel pgmodeler-ver="0.9.2" last-position="0,0" last-zoom="1" max-obj-count="14"
+	 default-schema="public" default-owner="postgres">
+<role name="withspace"
+      inherit="true"
+      login="true"
+      encrypted="true"
+      password="********">
+</role>
+
+<role name="withspecial"
+      inherit="true"
+      login="true"
+      encrypted="true"
+      password="********">
+</role>
+
+<role name="normal"
+      inherit="true"
+      login="true"
+      encrypted="true"
+      password="********">
+</role>
+
+<database name="registry" encoding="UTF8" lc-collate="en_US.UTF-8" lc-ctype="en_US.UTF-8" is-template="false" allow-conns="true">
+	<role name="postgres"/>
+	<tablespace name="pg_default"/>
+</database>
+
+<schema name="public" layer="0" rect-visible="true" fill-color="#e1e1e1" sql-disabled="true">
+</schema>
+
+<sequence name="repositories_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="repositories" layer="0" collapse-mode="1" max-obj-count="7">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="560" y="40"/>
+	<column name="id" not-null="true" sequence="public.repositories_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="name" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="path" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="parent_id">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_repositories" type="pk-constr" table="public.repositories">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_repositories_path" type="uq-constr" table="public.repositories">
+		<columns names="path" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="manifest_configurations_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="manifest_configurations" layer="0" collapse-mode="1" max-obj-count="8">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="97" y="592"/>
+	<column name="id" not-null="true" sequence="public.manifest_configurations_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="media_type" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="digest" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="size" not-null="true">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="payload" not-null="true">
+		<type name="json" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_manifest_configs" type="pk-constr" table="public.manifest_configurations">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_manifest_configurations_digest" type="uq-constr" table="public.manifest_configurations">
+		<columns names="digest" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="manifests_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="manifests" layer="0" collapse-mode="1" max-obj-count="10">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="205" y="335"/>
+	<column name="id" not-null="true" sequence="public.manifests_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="schema_version" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="media_type" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="digest" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="configuration_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="payload" not-null="true">
+		<type name="json" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="marked_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_manifests" type="pk-constr" table="public.manifests">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_manifests_digest" type="uq-constr" table="public.manifests">
+		<columns names="digest" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="layers_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="layers" layer="0" collapse-mode="1" max-obj-count="8">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="598" y="582"/>
+	<column name="id" not-null="true" sequence="public.layers_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="media_type" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="digest" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="size" not-null="true">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="marked_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_layers" type="pk-constr" table="public.layers">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_layers_digest" type="uq-constr" table="public.layers">
+		<columns names="digest" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="manifest_layers_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="manifest_layers" layer="0" collapse-mode="1" max-obj-count="6">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="329" y="599"/>
+	<column name="id" not-null="true" sequence="public.manifest_layers_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="layer_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_manifest_layers" type="pk-constr" table="public.manifest_layers">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_manifest_layers_manifest_id_layer_id" type="uq-constr" table="public.manifest_layers">
+		<columns names="manifest_id,layer_id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="manifest_lists_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="manifest_lists" layer="0" collapse-mode="1" max-obj-count="8">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="883" y="338"/>
+	<column name="id" not-null="true" sequence="public.manifest_lists_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="schema_version" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="media_type">
+		<type name="text" length="0"/>
+	</column>
+	<column name="payload" not-null="true">
+		<type name="json" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="marked_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="manifest_list_items_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="manifest_list_items" layer="0" collapse-mode="1" max-obj-count="6">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="552" y="423"/>
+	<column name="id" not-null="true" sequence="public.manifest_list_items_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_list_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_manifest_list_items" type="pk-constr" table="public.manifest_list_items">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_manifest_list_items_manifest_list_id_manifest_id" type="uq-constr" table="public.manifest_list_items">
+		<columns names="manifest_list_id,manifest_id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<sequence name="tags_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
+	<schema name="public"/>
+	<role name="postgres"/>
+</sequence>
+
+<table name="tags" layer="0" collapse-mode="1" max-obj-count="8">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="218" y="75"/>
+	<column name="id" not-null="true" sequence="public.tags_id_seq">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="name" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="repository_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="updated_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_tags" type="pk-constr" table="public.tags">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_tags_name_repository_id" type="uq-constr" table="public.tags">
+		<columns names="name,repository_id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="repository_manifests" layer="0" collapse-mode="1" max-obj-count="6">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="552" y="256"/>
+	<column name="id" not-null="true">
+		<type name="serial" length="0"/>
+	</column>
+	<column name="repository_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="NOW()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_repository_manifests" type="pk-constr" table="public.repository_manifests">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_repository_manifests_repository_id_manifest_id" type="uq-constr" table="public.repository_manifests">
+		<columns names="repository_id,manifest_id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<table name="repository_manifest_lists" layer="0" collapse-mode="1" max-obj-count="6">
+	<schema name="public"/>
+	<role name="postgres"/>
+	<position x="876" y="118"/>
+	<column name="id" not-null="true">
+		<type name="serial" length="0"/>
+	</column>
+	<column name="repository_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_list_id" not-null="true">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="NOW()">
+		<type name="timestamp" length="0"/>
+	</column>
+	<column name="deleted_at">
+		<type name="timestamp" length="0"/>
+	</column>
+	<constraint name="pk_repository_manifest_lists" type="pk-constr" table="public.repository_manifest_lists">
+		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_repository_manifests_repository_id_manifest_list_id" type="uq-constr" table="public.repository_manifest_lists">
+		<columns names="repository_id,manifest_list_id" ref-type="src-columns"/>
+	</constraint>
+</table>
+
+<constraint name="fk_repositories_parent_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repositories">
+	<columns names="parent_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_manifests_configuration_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_configurations" table="public.manifests">
+	<columns names="configuration_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_manifest_layers_manifest_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.manifest_layers">
+	<columns names="manifest_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_manifest_layers_layer_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.layers" table="public.manifest_layers">
+	<columns names="layer_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_manifest_list_items_manifest_list_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.manifest_list_items">
+	<columns names="manifest_list_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_manifest_list_items_manifest_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.manifests" table="public.manifest_list_items">
+	<columns names="manifest_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_tags_repository_id" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.tags">
+	<columns names="repository_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_tags_manifest_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.tags">
+	<columns names="manifest_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_repository_manifests_repository_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_manifests">
+	<columns names="repository_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_repository_manifests_manifest_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.repository_manifests">
+	<columns names="manifest_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_repository_manifest_lists_repository_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_manifest_lists">
+	<columns names="repository_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_repository_manifest_lists_manifest_list_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.repository_manifest_lists">
+	<columns names="manifest_list_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<relationship name="rel_repositories_repositories" type="relfk" layer="0"
+	 src-table="public.repositories"
+	 dst-table="public.repositories" reference-fk="fk_repositories_parent_id"
+	 src-required="false" dst-required="false">
+	<line>
+		<position x="779.705" y="84.3333"/>
+	<position x="779.705" y="11.8889"/>
+	<position x="687.729" y="11.8889"/>
+	</line>
+</relationship>
+
+<relationship name="rel_manifests_manifest_configurations" type="relfk" layer="0"
+	 src-table="public.manifests"
+	 dst-table="public.manifest_configurations" reference-fk="fk_manifests_configuration_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_manifest_layers_manifests" type="relfk" layer="0"
+	 src-table="public.manifest_layers"
+	 dst-table="public.manifests" reference-fk="fk_manifest_layers_manifest_id"
+	 src-required="false" dst-required="false">
+	<label ref-type="name-label">
+		<position x="44.0929" y="11.206"/>
+	</label>
+</relationship>
+
+<relationship name="rel_manifest_layers_layers" type="relfk" layer="0"
+	 src-table="public.manifest_layers"
+	 dst-table="public.layers" reference-fk="fk_manifest_layers_layer_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_manifest_list_items_manifest_lists" type="relfk" layer="0"
+	 src-table="public.manifest_list_items"
+	 dst-table="public.manifest_lists" reference-fk="fk_manifest_list_items_manifest_list_id"
+	 src-required="false" dst-required="false">
+	<label ref-type="name-label">
+		<position x="0.0310159" y="-4.19399"/>
+	</label>
+</relationship>
+
+<relationship name="rel_manifest_list_items_manifests" type="relfk" layer="0"
+	 src-table="public.manifest_list_items"
+	 dst-table="public.manifests" reference-fk="fk_manifest_list_items_manifest_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_repository_manifests_repositories" type="relfk" layer="0"
+	 src-table="public.repository_manifests"
+	 dst-table="public.repositories" reference-fk="fk_repository_manifests_repository_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_repository_manifests_manifests" type="relfk" layer="0"
+	 src-table="public.repository_manifests"
+	 dst-table="public.manifests" reference-fk="fk_repository_manifests_manifest_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_repository_manifests_cp_repositories" type="relfk" layer="0"
+	 src-table="public.repository_manifest_lists"
+	 dst-table="public.repositories" reference-fk="fk_repository_manifest_lists_repository_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_repository_manifests_cp_manifest_lists" type="relfk" layer="0"
+	 src-table="public.repository_manifest_lists"
+	 dst-table="public.manifest_lists" reference-fk="fk_repository_manifest_lists_manifest_list_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_tags_manifests" type="relfk" layer="0"
+	 src-table="public.tags"
+	 dst-table="public.manifests" reference-fk="fk_tags_manifest_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_tags_repositories" type="relfk" layer="0"
+	 src-table="public.tags"
+	 dst-table="public.repositories" reference-fk="fk_tags_repository_id"
+	 src-required="false" dst-required="false"/>
+
+<permission>
+	<object name="registry" type="database"/>
+	<privileges connect="true" temporary="true"/>
+</permission>
+<permission>
+	<object name="registry" type="database"/>
+	<roles names="postgres"/>
+	<privileges create="true" connect="true" temporary="true"/>
+</permission>
+<permission>
+	<object name="registry" type="database"/>
+	<roles names="withspace"/>
+	<privileges create="true" connect="true" temporary="true"/>
+</permission>
+<permission>
+	<object name="registry" type="database"/>
+	<roles names="withspecial"/>
+	<privileges create="true" connect="true" temporary="true"/>
+</permission>
+<permission>
+	<object name="registry" type="database"/>
+	<roles names="normal"/>
+	<privileges create="true" connect="true" temporary="true"/>
+</permission>
+</dbmodel>
