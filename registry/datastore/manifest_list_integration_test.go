@@ -258,7 +258,7 @@ func TestManifestListStore_AssociateManifest(t *testing.T) {
 	require.Contains(t, assocManifestIDs, 3)
 }
 
-func TestManifestListStore_AssociateManifest_AlreadyAssociatedFails(t *testing.T) {
+func TestManifestListStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestListFixtures(t)
 
 	s := datastore.NewManifestListStore(suite.db)
@@ -267,7 +267,7 @@ func TestManifestListStore_AssociateManifest_AlreadyAssociatedFails(t *testing.T
 	ml := &models.ManifestList{ID: 1}
 	m := &models.Manifest{ID: 1}
 	err := s.AssociateManifest(suite.ctx, ml, m)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestManifestListStore_DissociateManifest(t *testing.T) {
@@ -291,7 +291,7 @@ func TestManifestListStore_DissociateManifest(t *testing.T) {
 	require.NotContains(t, manifestIDs, 1)
 }
 
-func TestManifestListStore_DissociateManifest_NotAssociatedFails(t *testing.T) {
+func TestManifestListStore_DissociateManifest_NotAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestListFixtures(t)
 
 	s := datastore.NewManifestListStore(suite.db)
@@ -299,7 +299,7 @@ func TestManifestListStore_DissociateManifest_NotAssociatedFails(t *testing.T) {
 	m := &models.Manifest{ID: 3}
 
 	err := s.DissociateManifest(suite.ctx, ml, m)
-	require.Errorf(t, err, "manifest association not found")
+	require.NoError(t, err)
 }
 
 func TestManifestListStore_SoftDelete(t *testing.T) {

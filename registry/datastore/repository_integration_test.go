@@ -460,7 +460,7 @@ func TestRepositoryStore_AssociateManifest(t *testing.T) {
 	require.Contains(t, assocManifestIDs, 2)
 }
 
-func TestRepositoryStore_AssociateManifest_AlreadyAssociatedFails(t *testing.T) {
+func TestRepositoryStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -468,7 +468,7 @@ func TestRepositoryStore_AssociateManifest_AlreadyAssociatedFails(t *testing.T) 
 	r := &models.Repository{ID: 3}
 	m := &models.Manifest{ID: 1}
 	err := s.AssociateManifest(suite.ctx, r, m)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestRepositoryStore_DissociateManifest(t *testing.T) {
@@ -490,7 +490,7 @@ func TestRepositoryStore_DissociateManifest(t *testing.T) {
 	}
 }
 
-func TestRepositoryStore_DissociateManifest_NotAssociatedFails(t *testing.T) {
+func TestRepositoryStore_DissociateManifest_NotAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -498,7 +498,7 @@ func TestRepositoryStore_DissociateManifest_NotAssociatedFails(t *testing.T) {
 	r := &models.Repository{ID: 4}
 	m := &models.Manifest{ID: 1}
 	err := s.DissociateManifest(suite.ctx, r, m)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestRepositoryStore_AssociateManifestList(t *testing.T) {
@@ -523,7 +523,7 @@ func TestRepositoryStore_AssociateManifestList(t *testing.T) {
 	require.Contains(t, assocManifestListIDs, 2)
 }
 
-func TestRepositoryStore_AssociateManifestList_AlreadyAssociatedFails(t *testing.T) {
+func TestRepositoryStore_AssociateManifestList_AlreadyAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestListFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -531,7 +531,7 @@ func TestRepositoryStore_AssociateManifestList_AlreadyAssociatedFails(t *testing
 	r := &models.Repository{ID: 3}
 	ml := &models.ManifestList{ID: 1}
 	err := s.AssociateManifestList(suite.ctx, r, ml)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestRepositoryStore_DissociateManifestList(t *testing.T) {
@@ -553,7 +553,7 @@ func TestRepositoryStore_DissociateManifestList(t *testing.T) {
 	}
 }
 
-func TestRepositoryStore_DissociateManifestList_NotAssociatedFails(t *testing.T) {
+func TestRepositoryStore_DissociateManifestList_NotAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestListFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -561,7 +561,7 @@ func TestRepositoryStore_DissociateManifestList_NotAssociatedFails(t *testing.T)
 	r := &models.Repository{ID: 4}
 	ml := &models.ManifestList{ID: 1}
 	err := s.DissociateManifestList(suite.ctx, r, ml)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestRepositoryStore_SoftDelete(t *testing.T) {

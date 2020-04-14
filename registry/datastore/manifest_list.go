@@ -203,9 +203,10 @@ func (s *manifestListStore) Mark(ctx context.Context, ml *models.ManifestList) e
 	return nil
 }
 
-// AssociateManifest associates a manifest and a manifest list.
+// AssociateManifest associates a manifest and a manifest list. It does nothing if already associated.
 func (s *manifestListStore) AssociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error {
-	q := "INSERT INTO manifest_list_items (manifest_list_id, manifest_id) VALUES ($1, $2)"
+	q := `INSERT INTO manifest_list_items (manifest_list_id, manifest_id) VALUES ($1, $2)
+		ON CONFLICT (manifest_list_id, manifest_id) DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, ml.ID, m.ID); err != nil {
 		return fmt.Errorf("error associating manifest: %w", err)
@@ -214,7 +215,7 @@ func (s *manifestListStore) AssociateManifest(ctx context.Context, ml *models.Ma
 	return nil
 }
 
-// DissociateManifest dissociates a manifest and a manifest list.
+// DissociateManifest dissociates a manifest and a manifest list. It does nothing if not associated.
 func (s *manifestListStore) DissociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error {
 	q := "DELETE FROM manifest_list_items WHERE manifest_list_id = $1 AND manifest_id = $2"
 
@@ -223,12 +224,8 @@ func (s *manifestListStore) DissociateManifest(ctx context.Context, ml *models.M
 		return fmt.Errorf("error dissociating manifest: %w", err)
 	}
 
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating manifest: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("manifest association not found")
 	}
 
 	return nil

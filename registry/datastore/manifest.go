@@ -223,9 +223,10 @@ func (s *manifestStore) Mark(ctx context.Context, m *models.Manifest) error {
 	return nil
 }
 
-// AssociateLayer associates a layer and a manifest.
+// AssociateLayer associates a layer and a manifest. It does nothing if already associated.
 func (s *manifestStore) AssociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error {
-	q := "INSERT INTO manifest_layers (manifest_id, layer_id) VALUES ($1, $2)"
+	q := `INSERT INTO manifest_layers (manifest_id, layer_id) VALUES ($1, $2)
+		ON CONFLICT (manifest_id, layer_id) DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, m.ID, l.ID); err != nil {
 		return fmt.Errorf("error associating layer: %w", err)
@@ -234,7 +235,7 @@ func (s *manifestStore) AssociateLayer(ctx context.Context, m *models.Manifest, 
 	return nil
 }
 
-// DissociateLayer dissociates a layer and a manifest.
+// DissociateLayer dissociates a layer and a manifest. It does nothing if not associated.
 func (s *manifestStore) DissociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error {
 	q := "DELETE FROM manifest_layers WHERE manifest_id = $1 AND layer_id = $2"
 
@@ -243,12 +244,8 @@ func (s *manifestStore) DissociateLayer(ctx context.Context, m *models.Manifest,
 		return fmt.Errorf("error dissociating layer: %w", err)
 	}
 
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating layer: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("layer association not found")
 	}
 
 	return nil
