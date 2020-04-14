@@ -262,9 +262,10 @@ func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) erro
 	return nil
 }
 
-// AssociateManifest associates a manifest and a repository.
+// AssociateManifest associates a manifest and a repository. It does nothing if already associated.
 func (s *repositoryStore) AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
-	q := "INSERT INTO repository_manifests (repository_id, manifest_id) VALUES ($1, $2)"
+	q := `INSERT INTO repository_manifests (repository_id, manifest_id) VALUES ($1, $2)
+		ON CONFLICT (repository_id, manifest_id) DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, r.ID, m.ID); err != nil {
 		return fmt.Errorf("error associating manifest: %w", err)
@@ -273,9 +274,10 @@ func (s *repositoryStore) AssociateManifest(ctx context.Context, r *models.Repos
 	return nil
 }
 
-// AssociateManifestList associates a manifest list and a repository.
+// AssociateManifestList associates a manifest list and a repository. It does nothing if already associated.
 func (s *repositoryStore) AssociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error {
-	q := "INSERT INTO repository_manifest_lists (repository_id, manifest_list_id) VALUES ($1, $2)"
+	q := `INSERT INTO repository_manifest_lists (repository_id, manifest_list_id) VALUES ($1, $2)
+		ON CONFLICT (repository_id, manifest_list_id) DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, r.ID, ml.ID); err != nil {
 		return fmt.Errorf("error associating manifest list: %w", err)
@@ -284,7 +286,7 @@ func (s *repositoryStore) AssociateManifestList(ctx context.Context, r *models.R
 	return nil
 }
 
-// DissociateManifest dissociates a manifest and a repository.
+// DissociateManifest dissociates a manifest and a repository. It does nothing if not associated.
 func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
 	q := "DELETE FROM repository_manifests WHERE repository_id = $1 AND manifest_id = $2"
 
@@ -293,18 +295,14 @@ func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repo
 		return fmt.Errorf("error dissociating manifest: %w", err)
 	}
 
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating manifest: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("manifest association not found")
 	}
 
 	return nil
 }
 
-// DissociateManifestList dissociates a manifest list and a repository.
+// DissociateManifestList dissociates a manifest list and a repository. It does nothing if not associated.
 func (s *repositoryStore) DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error {
 	q := "DELETE FROM repository_manifest_lists WHERE repository_id = $1 AND manifest_list_id = $2"
 
@@ -313,12 +311,8 @@ func (s *repositoryStore) DissociateManifestList(ctx context.Context, r *models.
 		return fmt.Errorf("error dissociating manifest list: %w", err)
 	}
 
-	n, err := res.RowsAffected()
-	if err != nil {
+	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating manifest list: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("manifest list association not found")
 	}
 
 	return nil

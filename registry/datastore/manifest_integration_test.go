@@ -354,7 +354,7 @@ func TestManifestStore_AssociateLayer(t *testing.T) {
 	require.Equal(t, expected, ll)
 }
 
-func TestManifestStore_AssociateLayer_AlreadyAssociatedFails(t *testing.T) {
+func TestManifestStore_AssociateLayer_AlreadyAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
@@ -363,7 +363,7 @@ func TestManifestStore_AssociateLayer_AlreadyAssociatedFails(t *testing.T) {
 	m := &models.Manifest{ID: 1}
 	l := &models.Layer{ID: 1}
 	err := s.AssociateLayer(suite.ctx, m, l)
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestManifestStore_DissociateLayer(t *testing.T) {
@@ -393,7 +393,7 @@ func TestManifestStore_DissociateLayer(t *testing.T) {
 	require.NotContains(t, ll, unexpected)
 }
 
-func TestManifestStore_DissociateLayer_NotAssociatedFails(t *testing.T) {
+func TestManifestStore_DissociateLayer_NotAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
@@ -401,7 +401,7 @@ func TestManifestStore_DissociateLayer_NotAssociatedFails(t *testing.T) {
 	l := &models.Layer{ID: 5}
 
 	err := s.DissociateLayer(suite.ctx, m, l)
-	require.Errorf(t, err, "layer association not found")
+	require.NoError(t, err)
 }
 
 func TestManifestStore_SoftDelete(t *testing.T) {
