@@ -101,7 +101,7 @@ CREATE TABLE public.manifests (
 	schema_version integer NOT NULL,
 	media_type text NOT NULL,
 	digest text NOT NULL,
-	configuration_id integer NOT NULL,
+	configuration_id integer,
 	payload json NOT NULL,
 	created_at timestamp NOT NULL DEFAULT now(),
 	marked_at timestamp,

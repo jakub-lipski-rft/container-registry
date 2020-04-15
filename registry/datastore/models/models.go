@@ -36,7 +36,7 @@ type Manifest struct {
 	SchemaVersion   int
 	MediaType       string
 	Digest          string
-	ConfigurationID int
+	ConfigurationID sql.NullInt64
 	Payload         json.RawMessage
 	CreatedAt       time.Time
 	MarkedAt        sql.NullTime
