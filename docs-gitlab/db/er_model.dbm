@@ -128,7 +128,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="digest" not-null="true">
 		<type name="text" length="0"/>
 	</column>
-	<column name="configuration_id" not-null="true">
+	<column name="configuration_id">
 		<type name="integer" length="0"/>
 	</column>
 	<column name="payload" not-null="true">
