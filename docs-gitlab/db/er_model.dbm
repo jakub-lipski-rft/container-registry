@@ -226,7 +226,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<role name="postgres"/>
 </sequence>
 
-<table name="manifest_lists" layer="0" collapse-mode="1" max-obj-count="8">
+<table name="manifest_lists" layer="0" collapse-mode="1" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="883" y="338"/>
@@ -237,6 +237,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		<type name="integer" length="0"/>
 	</column>
 	<column name="media_type">
+		<type name="text" length="0"/>
+	</column>
+	<column name="digest" not-null="true">
 		<type name="text" length="0"/>
 	</column>
 	<column name="payload" not-null="true">
@@ -253,6 +256,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
 		<columns names="id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="uq_manifest_lists_digest" type="uq-constr" table="public.manifest_lists">
+		<columns names="digest" ref-type="src-columns"/>
 	</constraint>
 </table>
 

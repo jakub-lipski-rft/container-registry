@@ -76,6 +76,7 @@ type ManifestList struct {
 	ID            int
 	SchemaVersion int
 	MediaType     sql.NullString
+	Digest        string
 	Payload       json.RawMessage
 	CreatedAt     time.Time
 	MarkedAt      sql.NullTime
