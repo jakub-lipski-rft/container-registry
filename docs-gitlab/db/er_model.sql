@@ -196,11 +196,13 @@ CREATE TABLE public.manifest_lists (
 	id integer NOT NULL DEFAULT nextval('public.manifest_lists_id_seq'::regclass),
 	schema_version integer NOT NULL,
 	media_type text,
+	digest text NOT NULL,
 	payload json NOT NULL,
 	created_at timestamp NOT NULL DEFAULT now(),
 	marked_at timestamp,
 	deleted_at timestamp,
-	CONSTRAINT pk_manifest_lists PRIMARY KEY (id)
+	CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
+	CONSTRAINT uq_manifest_lists_digest UNIQUE (digest)
 
 );
 -- ddl-end --

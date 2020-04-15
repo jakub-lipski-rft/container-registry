@@ -295,6 +295,24 @@ func _20200414200813_update_manifests_table_up_sql() ([]byte, error) {
 	)
 }
 
+var __20200415175158_update_manifest_lists_table_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\xc8\x4d\xcc\xcb\x4c\x4b\x2d\x2e\x89\xcf\xc9\x2c\x2e\x29\xe6\x52\x50\x50\x50\x70\x09\xf2\x0f\x50\x70\xf6\xf7\x0b\x0e\x09\x72\xf4\xf4\x0b\x51\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\x28\x2d\x8c\x47\x55\x1f\x9f\x92\x99\x9e\x5a\x5c\xa2\xe0\xec\x18\xec\xec\xe8\xe2\xaa\x83\xac\xdf\x27\xd4\xd7\x0f\x49\x2f\xaa\x4a\x6b\x40\x00\x00\x00\xff\xff\xd1\x3e\x17\xe6\x84\x00\x00\x00")
+
+func _20200415175158_update_manifest_lists_table_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200415175158_update_manifest_lists_table_down_sql,
+		"20200415175158_update_manifest_lists_table.down.sql",
+	)
+}
+
+var __20200415175158_update_manifest_lists_table_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\xc8\x4d\xcc\xcb\x4c\x4b\x2d\x2e\x89\xcf\xc9\x2c\x2e\x29\xe6\x52\x50\x50\x50\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\xc9\x4c\x4f\x2d\x2e\x51\x28\x49\xad\x28\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\xd1\x41\x52\xe4\x17\x1c\x12\xe4\xe8\xe9\x17\xa2\x50\x5a\x18\x8f\x6a\x52\x3c\x54\x6b\xa8\x9f\x67\x60\xa8\xab\x82\x06\x84\xab\x69\x0d\x08\x00\x00\xff\xff\x85\x9f\xc3\xec\x7c\x00\x00\x00")
+
+func _20200415175158_update_manifest_lists_table_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200415175158_update_manifest_lists_table_up_sql,
+		"20200415175158_update_manifest_lists_table.up.sql",
+	)
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -347,6 +365,8 @@ var _bindata = map[string]func() ([]byte, error){
 	"20200409102858_update_manifest_layers_table.up.sql":             _20200409102858_update_manifest_layers_table_up_sql,
 	"20200414200813_update_manifests_table.down.sql":                 _20200414200813_update_manifests_table_down_sql,
 	"20200414200813_update_manifests_table.up.sql":                   _20200414200813_update_manifests_table_up_sql,
+	"20200415175158_update_manifest_lists_table.down.sql":            _20200415175158_update_manifest_lists_table_down_sql,
+	"20200415175158_update_manifest_lists_table.up.sql":              _20200415175158_update_manifest_lists_table_up_sql,
 }
 
 // AssetDir returns the file names below a certain
@@ -420,4 +440,6 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"20200409102858_update_manifest_layers_table.up.sql":             &_bintree_t{_20200409102858_update_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
 	"20200414200813_update_manifests_table.down.sql":                 &_bintree_t{_20200414200813_update_manifests_table_down_sql, map[string]*_bintree_t{}},
 	"20200414200813_update_manifests_table.up.sql":                   &_bintree_t{_20200414200813_update_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200415175158_update_manifest_lists_table.down.sql":            &_bintree_t{_20200415175158_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200415175158_update_manifest_lists_table.up.sql":              &_bintree_t{_20200415175158_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
 }}
