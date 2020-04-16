@@ -17,16 +17,20 @@ import (
 func reloadTagFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
-		// A Tag has a foreign key for a Manifest, which in turn references a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable, testutil.TagsTable,
+		// A Tag has a foreign key for a Manifest or a ManifestList, which in turn references
+		// a Repository (insert order matters)
+		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.ManifestListsTable, testutil.TagsTable,
 	)
 }
 
 func unloadTagFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
-		// A Tag has a foreign key for a Manifest, which in turn references a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable, testutil.TagsTable,
+		// A Tag has a foreign key for a Manifest or a ManifestList, which in turn references
+		// a Repository (insert order matters)
+		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.ManifestListsTable, testutil.TagsTable,
 	))
 }
 
@@ -43,7 +47,7 @@ func TestTagStore_FindByID(t *testing.T) {
 		ID:           1,
 		Name:         "1.0.0",
 		RepositoryID: 3,
-		ManifestID:   1,
+		ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
 		CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:43.283783", tag.CreatedAt.Location()),
 	}
 	require.Equal(t, expected, tag)
@@ -70,7 +74,7 @@ func TestTagStore_FindByNameAndRepositoryID(t *testing.T) {
 		ID:           2,
 		Name:         "2.0.0",
 		RepositoryID: 3,
-		ManifestID:   2,
+		ManifestID:   sql.NullInt64{Int64: 2, Valid: true},
 		CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:44.283783", tag.CreatedAt.Location()),
 	}
 	require.Equal(t, excepted, tag)
@@ -99,21 +103,21 @@ func TestTagStore_FindAll(t *testing.T) {
 			ID:           1,
 			Name:         "1.0.0",
 			RepositoryID: 3,
-			ManifestID:   1,
+			ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:43.283783", local),
 		},
 		{
 			ID:           2,
 			Name:         "2.0.0",
 			RepositoryID: 3,
-			ManifestID:   2,
+			ManifestID:   sql.NullInt64{Int64: 2, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:44.283783", local),
 		},
 		{
 			ID:           3,
 			Name:         "latest",
 			RepositoryID: 3,
-			ManifestID:   2,
+			ManifestID:   sql.NullInt64{Int64: 2, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:45.283783", local),
 			UpdatedAt: sql.NullTime{
 				Time:  testutil.ParseTimestamp(t, "2020-03-02 17:57:53.029514", local),
@@ -124,22 +128,36 @@ func TestTagStore_FindAll(t *testing.T) {
 			ID:           4,
 			Name:         "1.0.0",
 			RepositoryID: 4,
-			ManifestID:   3,
+			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:46.283783", local),
 		},
 		{
 			ID:           5,
 			Name:         "latest",
 			RepositoryID: 4,
-			ManifestID:   3,
+			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:47.283783", local),
 		},
 		{
 			ID:           6,
 			Name:         "0.0.1",
 			RepositoryID: 4,
-			ManifestID:   4,
+			ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
+		},
+		{
+			ID:             7,
+			Name:           "0.2.0",
+			RepositoryID:   3,
+			ManifestListID: sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
+		},
+		{
+			ID:             8,
+			Name:           "2.1.0",
+			RepositoryID:   4,
+			ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
 	require.Equal(t, expected, tt)
@@ -163,7 +181,7 @@ func TestTagStore_Count(t *testing.T) {
 	require.NoError(t, err)
 
 	// see testdata/fixtures/tags.sql
-	require.Equal(t, 6, count)
+	require.Equal(t, 8, count)
 }
 
 func TestTagStore_Repository(t *testing.T) {
@@ -190,7 +208,10 @@ func TestTagStore_Manifest(t *testing.T) {
 
 	s := datastore.NewTagStore(suite.db)
 
-	m, err := s.Manifest(suite.ctx, &models.Tag{ID: 2, ManifestID: 2})
+	m, err := s.Manifest(suite.ctx, &models.Tag{
+		ID:         2,
+		ManifestID: sql.NullInt64{Int64: 2, Valid: true},
+	})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/tags.sql
@@ -215,7 +236,7 @@ func TestTagStore_Create(t *testing.T) {
 	tag := &models.Tag{
 		Name:         "3.0.0",
 		RepositoryID: 3,
-		ManifestID:   1,
+		ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
 	}
 	err := s.Create(suite.ctx, tag)
 
@@ -231,7 +252,33 @@ func TestTagStore_Create_DuplicateFails(t *testing.T) {
 	tag := &models.Tag{
 		Name:         "1.0.0",
 		RepositoryID: 3,
-		ManifestID:   1,
+		ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
+	}
+	err := s.Create(suite.ctx, tag)
+	require.Error(t, err)
+}
+
+func TestTagStore_Create_WithManifestIDAndManifestListIDFails(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewTagStore(suite.db)
+	tag := &models.Tag{
+		Name:           "1.0.0",
+		RepositoryID:   3,
+		ManifestID:     sql.NullInt64{Int64: 1, Valid: true},
+		ManifestListID: sql.NullInt64{Int64: 1, Valid: true},
+	}
+	err := s.Create(suite.ctx, tag)
+	require.Error(t, err)
+}
+
+func TestTagStore_Create_WithNoManifestIDOrManifestListIDFails(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewTagStore(suite.db)
+	tag := &models.Tag{
+		Name:         "1.0.0",
+		RepositoryID: 3,
 	}
 	err := s.Create(suite.ctx, tag)
 	require.Error(t, err)
@@ -245,7 +292,7 @@ func TestTagStore_Update(t *testing.T) {
 		ID:           5,
 		Name:         "2.0.0",
 		RepositoryID: 4,
-		ManifestID:   1,
+		ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
 	}
 	err := s.Update(suite.ctx, update)
 	require.NoError(t, err)
@@ -264,7 +311,7 @@ func TestTagStore_Update_NotFound(t *testing.T) {
 		ID:           100,
 		Name:         "foo",
 		RepositoryID: 4,
-		ManifestID:   1,
+		ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
 	}
 
 	err := s.Update(suite.ctx, update)

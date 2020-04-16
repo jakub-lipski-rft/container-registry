@@ -22,6 +22,7 @@ type RepositoryReader interface {
 	ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error)
 	Tags(ctx context.Context, r *models.Repository) (models.Tags, error)
 	ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error)
+	ManifestListTags(ctx context.Context, r *models.Repository, m *models.ManifestList) (models.Tags, error)
 }
 
 // RepositoryWriter is the interface that defines write operations for a repository store.
@@ -162,7 +163,7 @@ func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int) (models.Re
 
 // Tags finds all tags of a given repository.
 func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
 		FROM tags WHERE repository_id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
@@ -175,10 +176,23 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 
 // ManifestTags finds all tags of a given repository manifest.
 func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
 		FROM tags WHERE repository_id = $1 AND manifest_id = $2`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID, m.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding tags: %w", err)
+	}
+
+	return scanFullTags(rows)
+}
+
+// ManifestListTags finds all tags of a given repository manifest list.
+func (s *repositoryStore) ManifestListTags(ctx context.Context, r *models.Repository, ml *models.ManifestList) (models.Tags, error) {
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+		FROM tags WHERE repository_id = $1 AND manifest_list_id = $2`
+
+	rows, err := s.db.QueryContext(ctx, q, r.ID, ml.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error finding tags: %w", err)
 	}
