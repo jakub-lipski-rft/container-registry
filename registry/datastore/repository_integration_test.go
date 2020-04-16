@@ -334,22 +334,29 @@ func TestRepositoryStore_Tags(t *testing.T) {
 			ID:           4,
 			Name:         "1.0.0",
 			RepositoryID: 4,
-			ManifestID:   3,
+			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:46.283783", local),
 		},
 		{
 			ID:           5,
 			Name:         "latest",
 			RepositoryID: 4,
-			ManifestID:   3,
+			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:47.283783", local),
 		},
 		{
 			ID:           6,
 			Name:         "0.0.1",
 			RepositoryID: 4,
-			ManifestID:   4,
+			ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
+		},
+		{
+			ID:             8,
+			Name:           "2.1.0",
+			RepositoryID:   4,
+			ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
 	require.Equal(t, expected, tt)
@@ -369,8 +376,29 @@ func TestRepositoryStore_ManifestTags(t *testing.T) {
 			ID:           1,
 			Name:         "1.0.0",
 			RepositoryID: 3,
-			ManifestID:   1,
+			ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:43.283783", local),
+		},
+	}
+	require.Equal(t, expected, tt)
+}
+
+func TestRepositoryStore_ManifestListTags(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	tt, err := s.ManifestListTags(suite.ctx, &models.Repository{ID: 3}, &models.ManifestList{ID: 1})
+	require.NoError(t, err)
+
+	// see testdata/fixtures/tags.sql
+	local := tt[0].CreatedAt.Location()
+	expected := models.Tags{
+		{
+			ID:             7,
+			Name:           "0.2.0",
+			RepositoryID:   3,
+			ManifestListID: sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
 	require.Equal(t, expected, tt)

@@ -259,12 +259,14 @@ CREATE TABLE public.tags (
 	id integer NOT NULL DEFAULT nextval('public.tags_id_seq'::regclass),
 	name text NOT NULL,
 	repository_id integer NOT NULL,
-	manifest_id integer NOT NULL,
+	manifest_id integer,
+	manifest_list_id integer,
 	created_at timestamp NOT NULL DEFAULT now(),
 	updated_at timestamp,
 	deleted_at timestamp,
 	CONSTRAINT pk_tags PRIMARY KEY (id),
-	CONSTRAINT uq_tags_name_repository_id UNIQUE (name,repository_id)
+	CONSTRAINT uq_tags_name_repository_id UNIQUE (name,repository_id),
+	CONSTRAINT chk_tags_manifest_id_manifest_list_id CHECK (((manifest_id is not null and manifest_list_id is null) or (manifest_id is null and manifest_list_id is not null)))
 
 );
 -- ddl-end --
@@ -356,6 +358,13 @@ ON DELETE CASCADE ON UPDATE NO ACTION;
 -- ALTER TABLE public.tags DROP CONSTRAINT IF EXISTS fk_tags_manifest_id CASCADE;
 ALTER TABLE public.tags ADD CONSTRAINT fk_tags_manifest_id FOREIGN KEY (manifest_id)
 REFERENCES public.manifests (id) MATCH FULL
+ON DELETE CASCADE ON UPDATE NO ACTION;
+-- ddl-end --
+
+-- object: fk_tags_manifest_list_id | type: CONSTRAINT --
+-- ALTER TABLE public.tags DROP CONSTRAINT IF EXISTS fk_tags_manifest_list_id CASCADE;
+ALTER TABLE public.tags ADD CONSTRAINT fk_tags_manifest_list_id FOREIGN KEY (manifest_list_id)
+REFERENCES public.manifest_lists (id) MATCH FULL
 ON DELETE CASCADE ON UPDATE NO ACTION;
 -- ddl-end --
 

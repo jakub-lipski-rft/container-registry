@@ -17,6 +17,7 @@ type TagReader interface {
 	Count(ctx context.Context) (int, error)
 	Repository(ctx context.Context, t *models.Tag) (*models.Repository, error)
 	Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error)
+	ManifestList(ctx context.Context, t *models.Tag) (*models.ManifestList, error)
 }
 
 // TagWriter is the interface that defines write operations for a tag store.
@@ -47,7 +48,7 @@ func NewTagStore(db Queryer) *tagStore {
 func scanFullTag(row *sql.Row) (*models.Tag, error) {
 	t := new(models.Tag)
 
-	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, errors.New("tag not found")
 		}
@@ -63,7 +64,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 	for rows.Next() {
 		t := new(models.Tag)
-		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
 			return nil, fmt.Errorf("error scanning tag: %w", err)
 		}
 		tt = append(tt, t)
@@ -77,7 +78,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 // FindByID finds a Tag by ID.
 func (s *tagStore) FindByID(ctx context.Context, id int) (*models.Tag, error) {
-	q := "SELECT id, name, repository_id, manifest_id, created_at, updated_at, deleted_at FROM tags WHERE id = $1"
+	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at FROM tags WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullTag(row)
@@ -85,7 +86,7 @@ func (s *tagStore) FindByID(ctx context.Context, id int) (*models.Tag, error) {
 
 // FindByNameAndRepositoryID finds a Tag by name and repository ID.
 func (s *tagStore) FindByNameAndRepositoryID(ctx context.Context, name string, repositoryID int) (*models.Tag, error) {
-	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
 		FROM tags WHERE name = $1 AND repository_id = $2`
 	row := s.db.QueryRowContext(ctx, q, name, repositoryID)
 
@@ -94,7 +95,7 @@ func (s *tagStore) FindByNameAndRepositoryID(ctx context.Context, name string, r
 
 // FindAll finds all tags.
 func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
-	q := "SELECT id, name, repository_id, manifest_id, created_at, updated_at, deleted_at FROM tags"
+	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at FROM tags"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding tags: %w", err)
@@ -123,7 +124,7 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 	return scanFullRepository(row)
 }
 
-// Manifest finds a tag manifest.
+// Manifest finds a tag manifest. A tag can be associated with either a manifest or a manifest list.
 func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error) {
 	q := `SELECT id, schema_version, media_type, digest, configuration_id, payload, created_at,
 		marked_at, deleted_at FROM manifests WHERE id = $1`
@@ -133,11 +134,22 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 	return scanFullManifest(row)
 }
 
+// ManifestList finds a tag manifest list. A tag can be associated with either a manifest or a manifest list.
+func (s *tagStore) ManifestList(ctx context.Context, t *models.Tag) (*models.ManifestList, error) {
+	q := `SELECT id, schema_version, media_type, digest, payload, created_at, marked_at, deleted_at
+		FROM manifest_lists WHERE id = $1`
+
+	row := s.db.QueryRowContext(ctx, q, t.ManifestListID)
+
+	return scanFullManifestList(row)
+}
+
 // Create saves a new Tag.
 func (s *tagStore) Create(ctx context.Context, t *models.Tag) error {
-	q := "INSERT INTO tags (name, repository_id, manifest_id) VALUES ($1, $2, $3) RETURNING id, created_at"
+	q := `INSERT INTO tags (name, repository_id, manifest_id, manifest_list_id) VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID)
+	row := s.db.QueryRowContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ManifestListID)
 	if err := row.Scan(&t.ID, &t.CreatedAt); err != nil {
 		return fmt.Errorf("error creating tag: %w", err)
 	}

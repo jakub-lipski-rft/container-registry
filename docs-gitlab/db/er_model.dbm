@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.2" last-position="0,0" last-zoom="1" max-obj-count="14"
+<dbmodel pgmodeler-ver="0.9.2" last-position="0,0" last-zoom="1" max-obj-count="15"
 	 default-schema="public" default-owner="postgres">
 <role name="withspace"
       inherit="true"
@@ -299,7 +299,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<role name="postgres"/>
 </sequence>
 
-<table name="tags" layer="0" collapse-mode="1" max-obj-count="8">
+<table name="tags" layer="0" collapse-mode="1" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="218" y="75"/>
@@ -312,7 +312,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="repository_id" not-null="true">
 		<type name="integer" length="0"/>
 	</column>
-	<column name="manifest_id" not-null="true">
+	<column name="manifest_id">
+		<type name="integer" length="0"/>
+	</column>
+	<column name="manifest_list_id">
 		<type name="integer" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
@@ -329,6 +332,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 	<constraint name="uq_tags_name_repository_id" type="uq-constr" table="public.tags">
 		<columns names="name,repository_id" ref-type="src-columns"/>
+	</constraint>
+	<constraint name="chk_tags_manifest_id_manifest_list_id" type="ck-constr" table="public.tags">
+			<expression><![CDATA[((manifest_id is not null and manifest_list_id is null) or (manifest_id is null and manifest_list_id is not null))]]></expression>
 	</constraint>
 </table>
 
@@ -434,6 +440,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
+<constraint name="fk_tags_manifest_list_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.tags">
+	<columns names="manifest_list_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
 <constraint name="fk_repository_manifests_repository_id" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_manifests">
 	<columns names="repository_id" ref-type="src-columns"/>
@@ -530,6 +542,11 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <relationship name="rel_tags_repositories" type="relfk" layer="0"
 	 src-table="public.tags"
 	 dst-table="public.repositories" reference-fk="fk_tags_repository_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_tags_manifest_lists" type="relfk" layer="0"
+	 src-table="public.tags"
+	 dst-table="public.manifest_lists" reference-fk="fk_tags_manifest_list_id"
 	 src-required="false" dst-required="false"/>
 
 <permission>

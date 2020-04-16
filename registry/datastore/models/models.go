@@ -50,10 +50,12 @@ type Tag struct {
 	ID           int
 	Name         string
 	RepositoryID int
-	ManifestID   int
-	CreatedAt    time.Time
-	UpdatedAt    sql.NullTime
-	DeletedAt    sql.NullTime
+	// a tag can be associated with either a manifest or a manifest list
+	ManifestID     sql.NullInt64
+	ManifestListID sql.NullInt64
+	CreatedAt      time.Time
+	UpdatedAt      sql.NullTime
+	DeletedAt      sql.NullTime
 }
 
 // Tags is a slice of Tag pointers.

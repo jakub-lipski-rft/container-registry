@@ -313,6 +313,24 @@ func _20200415175158_update_manifest_lists_table_up_sql() ([]byte, error) {
 	)
 }
 
+var __20200415185534_update_tags_table_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x84\x8e\x41\x0a\xc2\x30\x10\x45\xf7\x9e\xe2\x1f\xc0\x1b\xb8\x8a\x69\x84\x40\x4c\x24\x33\x05\x77\x43\xd1\x46\x43\xb5\x01\xdb\xfb\x23\xd6\x45\xb5\x08\x2e\x67\x78\xf3\xde\x28\xc7\x26\x82\xd5\xd6\x19\x8c\xcd\x65\x58\x01\x40\x15\xc3\x01\x3a\x78\xe2\xa8\xac\x67\xd8\x1d\xcc\xd1\x12\x13\x4e\xd7\x4e\x4a\xdf\x4a\x49\xf2\xa2\xe5\xde\xf4\x39\xb5\xc3\x28\xf9\x2c\xe5\x31\x8f\xb7\x3c\xed\xa0\x15\x69\x55\x99\xf5\x1f\x6d\xea\x16\xba\x9f\xf7\xef\x5f\x75\x70\xf5\xde\xe3\xa3\x0c\x32\x0c\x1f\x18\xbe\x76\xee\x2b\x35\x91\x73\x66\xa9\xdf\x3c\x03\x00\x00\xff\xff\x19\xaf\x1c\x61\xfe\x00\x00\x00")
+
+func _20200415185534_update_tags_table_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200415185534_update_tags_table_down_sql,
+		"20200415185534_update_tags_table.down.sql",
+	)
+}
+
+var __20200415185534_update_tags_table_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\x90\x41\x4e\xc3\x30\x10\x45\xf7\x9c\xe2\x2f\x63\xa9\x37\x60\x65\xec\x29\x44\x1d\xc6\xc8\x71\x16\xac\xac\x8a\x24\xc5\x2a\x24\x52\xe3\xfb\x0b\xb9\xa0\xaa\x24\x55\x67\xeb\xef\xf7\xdf\x8c\xe6\x40\x1e\x41\x3f\x31\x21\xef\x0f\xf3\x03\x00\x68\x6b\x61\x1c\xb7\xaf\x82\xef\xfd\x98\x86\x7e\xce\xf1\x2b\xcd\x39\xa6\x0e\x69\xcc\xfd\xa1\x3f\x6d\x7e\x83\xe7\xdf\xcb\x68\xea\x60\xbd\x7b\x83\xb8\x00\x69\x99\x37\x57\x50\x69\x82\xd7\xb5\x04\x0c\xc7\x58\xfa\xe2\xaa\x60\xeb\x3c\xd5\xcf\x82\x1d\xbd\xa3\x5a\xbe\xaa\x33\xaa\x8c\xa7\x2d\x79\x12\x43\xcd\x7f\xc7\x19\x55\xea\x14\x9c\xc0\x12\x53\x20\x18\xdd\x18\x6d\xe9\xa6\xc4\xc7\xe7\x31\x4e\x63\x1f\xa7\x61\x21\x93\xba\x38\x9d\xd6\x6e\xe6\x85\xcc\x0e\xd5\x45\xa2\x4c\x75\xbd\x77\xdd\x5c\xb6\x86\x16\xbb\x3e\x5f\x09\xb4\xcc\x0a\xce\xdf\xa7\xdc\x25\xfc\x55\x28\xf5\xf8\x13\x00\x00\xff\xff\xfa\x11\x66\xfb\xc0\x01\x00\x00")
+
+func _20200415185534_update_tags_table_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200415185534_update_tags_table_up_sql,
+		"20200415185534_update_tags_table.up.sql",
+	)
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -367,6 +385,8 @@ var _bindata = map[string]func() ([]byte, error){
 	"20200414200813_update_manifests_table.up.sql":                   _20200414200813_update_manifests_table_up_sql,
 	"20200415175158_update_manifest_lists_table.down.sql":            _20200415175158_update_manifest_lists_table_down_sql,
 	"20200415175158_update_manifest_lists_table.up.sql":              _20200415175158_update_manifest_lists_table_up_sql,
+	"20200415185534_update_tags_table.down.sql":                      _20200415185534_update_tags_table_down_sql,
+	"20200415185534_update_tags_table.up.sql":                        _20200415185534_update_tags_table_up_sql,
 }
 
 // AssetDir returns the file names below a certain
@@ -442,4 +462,6 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"20200414200813_update_manifests_table.up.sql":                   &_bintree_t{_20200414200813_update_manifests_table_up_sql, map[string]*_bintree_t{}},
 	"20200415175158_update_manifest_lists_table.down.sql":            &_bintree_t{_20200415175158_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
 	"20200415175158_update_manifest_lists_table.up.sql":              &_bintree_t{_20200415175158_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200415185534_update_tags_table.down.sql":                      &_bintree_t{_20200415185534_update_tags_table_down_sql, map[string]*_bintree_t{}},
+	"20200415185534_update_tags_table.up.sql":                        &_bintree_t{_20200415185534_update_tags_table_up_sql, map[string]*_bintree_t{}},
 }}
