@@ -32,8 +32,8 @@ const (
 	TagsTable                    table = "tags"
 )
 
-// allTables represents all tables in the test database.
-var allTables = []table{
+// AllTables represents all tables in the test database.
+var AllTables = []table{
 	RepositoriesTable,
 	ManifestConfigurationsTable,
 	ManifestsTable,
@@ -118,7 +118,7 @@ func TruncateTables(db *datastore.DB, tables ...table) error {
 
 // TruncateAllTables truncates all tables in the test database.
 func TruncateAllTables(db *datastore.DB) error {
-	return TruncateTables(db, allTables...)
+	return TruncateTables(db, AllTables...)
 }
 
 // ReloadFixtures truncates all a given set of tables and then injects related fixtures.
@@ -146,4 +146,49 @@ func ParseTimestamp(tb testing.TB, timestamp string, location *time.Location) ti
 	require.NoError(tb, err)
 
 	return t.In(location)
+}
+
+func createGoldenFile(tb testing.TB, path string) {
+	tb.Helper()
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		tb.Log("creating .golden file")
+
+		f, err := os.Create(path)
+		require.NoError(tb, err, "error creating .golden file")
+		require.NoError(tb, f.Close())
+	}
+}
+
+func updateGoldenFile(tb testing.TB, path string, content []byte) {
+	tb.Helper()
+
+	tb.Log("updating .golden file")
+	err := ioutil.WriteFile(path, content, 0644)
+	require.NoError(tb, err, "error updating .golden file")
+}
+
+func readGoldenFile(tb testing.TB, path string) []byte {
+	tb.Helper()
+
+	content, err := ioutil.ReadFile(path)
+	require.NoError(tb, err, "error reading .golden file")
+
+	return content
+}
+
+// CompareWithGoldenFile compares an actual value with the content of a .golden file. If requested, a missing golden
+// file is automatically created and an outdated golden file automatically updated to match the actual content.
+func CompareWithGoldenFile(tb testing.TB, path string, actual []byte, create, update bool) {
+	tb.Helper()
+
+	if create {
+		createGoldenFile(tb, path)
+	}
+	if update {
+		updateGoldenFile(tb, path, actual)
+	}
+
+	expected := readGoldenFile(tb, path)
+	require.Equal(tb, string(expected), string(actual), "does not match .golden file")
 }
