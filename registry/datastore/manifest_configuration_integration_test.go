@@ -46,7 +46,7 @@ func TestManifestConfigurationStore_FindByID_NotFound(t *testing.T) {
 
 	r, err := s.FindByID(suite.ctx, 0)
 	require.Nil(t, r)
-	require.EqualError(t, err, "manifest configuration not found")
+	require.NoError(t, err)
 }
 
 func TestManifestConfigurationStore_FindByDigest(t *testing.T) {
@@ -74,7 +74,7 @@ func TestManifestConfigurationStore_FindByDigest_NotFound(t *testing.T) {
 
 	c, err := s.FindByDigest(suite.ctx, "sha256:78cc6esuite.db833591fb9d0ec5a0ac141571de42a6c3f23f042598810815b08417f2")
 	require.Nil(t, c)
-	require.EqualError(t, err, "manifest configuration not found")
+	require.NoError(t, err)
 }
 
 func TestManifestConfigurationStore_FindAll(t *testing.T) {
@@ -234,8 +234,8 @@ func TestManifestConfigurationStore_Delete(t *testing.T) {
 	err := s.Delete(suite.ctx, 3)
 	require.NoError(t, err)
 
-	_, err = s.FindByID(suite.ctx, 3)
-	require.EqualError(t, err, "manifest configuration not found")
+	mc, err := s.FindByID(suite.ctx, 3)
+	require.Nil(t, mc)
 }
 
 func TestManifestConfigurationStore_Delete_NotFound(t *testing.T) {

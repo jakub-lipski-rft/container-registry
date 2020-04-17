@@ -49,10 +49,10 @@ func scanFullTag(row *sql.Row) (*models.Tag, error) {
 	t := new(models.Tag)
 
 	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("tag not found")
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("error scaning tag: %w", err)
 		}
-		return nil, fmt.Errorf("error scaning tag: %w", err)
+		return nil, nil
 	}
 
 	return t, nil

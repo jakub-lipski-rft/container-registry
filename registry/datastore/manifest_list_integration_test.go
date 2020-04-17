@@ -59,7 +59,7 @@ func TestManifestListStore_FindByID_NotFound(t *testing.T) {
 
 	r, err := s.FindByID(suite.ctx, 0)
 	require.Nil(t, r)
-	require.EqualError(t, err, "manifest list not found")
+	require.NoError(t, err)
 }
 
 func TestManifestListStore_FindAll(t *testing.T) {
@@ -339,8 +339,8 @@ func TestManifestListStore_Delete(t *testing.T) {
 	err := s.Delete(suite.ctx, 1)
 	require.NoError(t, err)
 
-	_, err = s.FindByID(suite.ctx, 1)
-	require.EqualError(t, err, "manifest list not found")
+	ml, err := s.FindByID(suite.ctx, 1)
+	require.Nil(t, ml)
 }
 
 func TestManifestListStore_Delete_NotFound(t *testing.T) {

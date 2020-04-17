@@ -51,10 +51,10 @@ func scanFullManifestList(row *sql.Row) (*models.ManifestList, error) {
 
 	err := row.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &ml.Digest, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("manifest list not found")
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("error scaning manifest list: %w", err)
 		}
-		return nil, fmt.Errorf("error scaning manifest list: %w", err)
+		return nil, nil
 	}
 
 	return ml, nil
