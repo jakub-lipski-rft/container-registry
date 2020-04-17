@@ -1,5 +1,6 @@
 ## [Unreleased]
 ### Added
+- registry: Add tool to scan and import filesystem metadata into the database
 - registry/storage: Support BYOK for OSS storage driver
 
 ### Changed

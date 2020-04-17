@@ -4,8 +4,10 @@ package datastore_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/docker/distribution/registry/datastore"
@@ -13,12 +15,20 @@ import (
 )
 
 type testSuite struct {
-	db       *datastore.DB
-	basePath string
-	ctx      context.Context
+	db           *datastore.DB
+	basePath     string
+	fixturesPath string
+	goldenPath   string
+	ctx          context.Context
 }
 
-var suite *testSuite
+var (
+	suite *testSuite
+
+	// flags for the `go test` tool, e.g. `go test -update ...`
+	create = flag.Bool("create", false, "create missing .golden files")
+	update = flag.Bool("update", false, "update .golden files")
+)
 
 func (s *testSuite) setup() error {
 	db, err := testutil.NewDB()
@@ -35,6 +45,8 @@ func (s *testSuite) setup() error {
 
 	s.db = db
 	s.basePath = basePath
+	s.fixturesPath = path.Join(s.basePath, "testdata", "fixtures")
+	s.goldenPath = path.Join(s.basePath, "testdata", "golden")
 	s.ctx = context.Background()
 
 	return nil

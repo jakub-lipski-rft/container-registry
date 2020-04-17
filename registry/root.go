@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/distribution/registry/datastore"
 
 	dcontext "github.com/docker/distribution/context"
@@ -28,6 +30,8 @@ func init() {
 	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
 
 	DBCmd.AddCommand(MigrateCmd)
+	DBCmd.AddCommand(ImportCmd)
+	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 }
 
 // RootCmd is the main command for the 'registry' binary.
@@ -145,6 +149,104 @@ var MigrateCmd = &cobra.Command{
 		if err := db.MigrateUp(); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 			os.Exit(1)
+		}
+	},
+}
+
+// ImportCmd is the `import` sub-command of `database` that imports metadata from the filesystem into the database.
+var ImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import filesystem metadata into the database",
+	Long: "Import filesystem metadata into the database. This should only be\n" +
+		"used for an one-off migration, starting with an empty database.\n" +
+		"Dangling blobs are not imported. This tool can not be used with\n" +
+		"the parallelwalk storage configuration enabled.",
+	Run: func(cmd *cobra.Command, args []string) {
+		config, err := resolveConfiguration(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		parameters := config.Storage.Parameters()
+		if parameters["parallelwalk"] == true {
+			parameters["parallelwalk"] = false
+			logrus.Info("the 'parallelwalk' configuration parameter has been disabled")
+		}
+
+		driver, err := factory.Create(config.Storage.Type(), parameters)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct %s driver: %v", config.Storage.Type(), err)
+			os.Exit(1)
+		}
+
+		ctx := dcontext.Background()
+		ctx, err = configureLogging(ctx, config)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to configure logging with config: %s", err)
+			os.Exit(1)
+		}
+
+		k, err := libtrust.GenerateECP256PrivateKey()
+		if err != nil {
+			fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		registry, err := storage.NewRegistry(ctx, driver, storage.Schema1SigningKey(k))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct registry: %v", err)
+			os.Exit(1)
+		}
+
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
+			os.Exit(1)
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create database transaction: %v", err)
+			os.Exit(1)
+		}
+
+		// recover from panic, to rollback transaction and re-panic
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Println("recovered from panic, rolling back changes", r)
+				if err := tx.Rollback(); err != nil {
+					fmt.Fprintf(os.Stderr, "failed to rollback changes: %v", err)
+				}
+				panic(r)
+			}
+		}()
+
+		p := datastore.NewImporter(tx, driver, registry)
+		if err := p.Import(ctx); err != nil {
+			tx.Rollback()
+			fmt.Fprintf(os.Stderr, "failed to import metadata: %v", err)
+			os.Exit(1)
+		}
+
+		if dryRun {
+			if err := tx.Rollback(); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to rollback changes: %v", err)
+				os.Exit(1)
+			}
+		} else {
+			if err := tx.Commit(); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to commit changes: %v", err)
+				os.Exit(1)
+			}
 		}
 	},
 }
