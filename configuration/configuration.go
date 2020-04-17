@@ -246,8 +246,8 @@ type Configuration struct {
 
 // Database is the configuration for the registry's metadata database
 type Database struct {
-	// Disable can be used to bypass the metadata database
-	Disable bool `yaml:"disable"`
+	// Enabled can be used to enable or bypass the metadata database
+	Enabled bool `yaml:"enabled"`
 	// Host is the database server hostname
 	Host string `yaml:"host"`
 	// Port is the database server port
