@@ -58,10 +58,10 @@ func scanFullRepository(row *sql.Row) (*models.Repository, error) {
 	r := new(models.Repository)
 
 	if err := row.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("repository not found")
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("error scanning repository: %w", err)
 		}
-		return nil, fmt.Errorf("error scanning repository: %w", err)
+		return nil, nil
 	}
 
 	return r, nil

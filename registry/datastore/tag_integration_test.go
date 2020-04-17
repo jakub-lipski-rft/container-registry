@@ -58,7 +58,7 @@ func TestTagStore_FindByID_NotFound(t *testing.T) {
 
 	r, err := s.FindByID(suite.ctx, 0)
 	require.Nil(t, r)
-	require.EqualError(t, err, "tag not found")
+	require.NoError(t, err)
 }
 
 func TestTagStore_FindByNameAndRepositoryID(t *testing.T) {
@@ -85,7 +85,7 @@ func TestTagStore_FindByNameAndRepositoryID_NotFound(t *testing.T) {
 
 	tag, err := s.FindByNameAndRepositoryID(suite.ctx, "3.0.0", 3)
 	require.Nil(t, tag)
-	require.EqualError(t, err, "tag not found")
+	require.NoError(t, err)
 }
 
 func TestTagStore_FindAll(t *testing.T) {
@@ -349,8 +349,8 @@ func TestTagStore_Delete(t *testing.T) {
 	err := s.Delete(suite.ctx, 1)
 	require.NoError(t, err)
 
-	_, err = s.FindByID(suite.ctx, 1)
-	require.EqualError(t, err, "tag not found")
+	tag, err := s.FindByID(suite.ctx, 1)
+	require.Nil(t, tag)
 }
 
 func TestTagStore_Delete_NotFound(t *testing.T) {

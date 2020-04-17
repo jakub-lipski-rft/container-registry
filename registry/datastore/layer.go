@@ -47,10 +47,10 @@ func scanFullLayer(row *sql.Row) (*models.Layer, error) {
 	l := new(models.Layer)
 
 	if err := row.Scan(&l.ID, &l.MediaType, &l.Digest, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("layer not found")
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("error scanning layer: %w", err)
 		}
-		return nil, fmt.Errorf("error scanning layer: %w", err)
+		return nil, nil
 	}
 
 	return l, nil

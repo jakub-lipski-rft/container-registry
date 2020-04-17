@@ -53,10 +53,10 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &m.Digest, &m.ConfigurationID, &m.Payload,
 		&m.CreatedAt, &m.MarkedAt, &m.DeletedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("manifest not found")
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("error scaning manifest: %w", err)
 		}
-		return nil, fmt.Errorf("error scaning manifest: %w", err)
+		return nil, nil
 	}
 
 	return m, nil

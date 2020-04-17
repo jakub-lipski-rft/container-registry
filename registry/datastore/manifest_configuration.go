@@ -45,10 +45,10 @@ func scanFullManifestConfiguration(row *sql.Row) (*models.ManifestConfiguration,
 	c := new(models.ManifestConfiguration)
 
 	if err := row.Scan(&c.ID, &c.MediaType, &c.Digest, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return nil, errors.New("manifest configuration not found")
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("error scaning manifest configuration: %w", err)
 		}
-		return nil, fmt.Errorf("error scaning manifest configuration: %w", err)
+		return nil, nil
 	}
 
 	return c, nil

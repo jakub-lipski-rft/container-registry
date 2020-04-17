@@ -63,7 +63,7 @@ func parseRepositoryPath(path string) (string, []string) {
 
 func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manifest) (*models.Manifest, error) {
 	dbManifest, err := imp.manifestStore.FindByDigest(ctx, m.Digest)
-	if err != nil && err.Error() != "manifest not found" {
+	if err != nil {
 		return nil, fmt.Errorf("error searching for manifest: %w", err)
 	}
 
@@ -79,7 +79,7 @@ func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manif
 
 func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distribution.Repository, l *models.Layer) (*models.Layer, error) {
 	dbLayer, err := imp.layerStore.FindByDigest(ctx, l.Digest)
-	if err != nil && err.Error() != "layer not found" {
+	if err != nil {
 		return nil, fmt.Errorf("error searching for layer: %w", err)
 	}
 
@@ -106,7 +106,7 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 
 func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, mc *models.ManifestConfiguration) (*models.ManifestConfiguration, error) {
 	dbConfig, err := imp.manifestConfigurationStore.FindByDigest(ctx, mc.Digest)
-	if err != nil && err.Error() != "manifest configuration not found" {
+	if err != nil {
 		return nil, fmt.Errorf("error searching for manifest configuration: %w", err)
 	}
 
@@ -453,22 +453,18 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 		// find corresponding manifest or manifest list in DB
 		dbManifest, err := imp.manifestStore.FindByDigest(ctx, dgst)
 		if err != nil {
-			if err.Error() != "manifest not found" {
-				log.WithError(err).Error("error finding target manifest")
-				continue
-			} else {
-				dbManifestList, err := imp.manifestListStore.FindByDigest(ctx, dgst)
-				if err != nil {
-					if err.Error() != "manifest list not found" {
-						log.WithError(err).Error("error finding target manifest list")
-					} else {
-						log.WithError(err).Errorf("no manifest or manifest list found for digest %q", dgst)
-					}
-					continue
-				} else {
-					dbTag.ManifestListID = sql.NullInt64{Int64: int64(dbManifestList.ID), Valid: true}
-				}
+			return fmt.Errorf("error finding target manifest: %w", err)
+		}
+		if dbManifest == nil {
+			dbManifestList, err := imp.manifestListStore.FindByDigest(ctx, dgst)
+			if err != nil {
+				return fmt.Errorf("error finding target manifest list: %w", err)
 			}
+			if dbManifestList == nil {
+				log.WithError(err).Errorf("no manifest or manifest list found for digest %q", dgst)
+				continue
+			}
+			dbTag.ManifestListID = sql.NullInt64{Int64: int64(dbManifestList.ID), Valid: true}
 		} else {
 			dbTag.ManifestID = sql.NullInt64{Int64: int64(dbManifest.ID), Valid: true}
 		}

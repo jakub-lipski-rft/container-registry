@@ -44,7 +44,7 @@ func TestRepositoryStore_FindByID_NotFound(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 	r, err := s.FindByID(suite.ctx, 0)
 	require.Nil(t, r)
-	require.EqualError(t, err, "repository not found")
+	require.NoError(t, err)
 }
 
 func TestRepositoryStore_FindByPath(t *testing.T) {
@@ -69,7 +69,7 @@ func TestRepositoryStore_FindByPath_NotFound(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 	r, err := s.FindByPath(suite.ctx, "foo/bar")
 	require.Nil(t, r)
-	require.EqualError(t, err, "repository not found")
+	require.NoError(t, err)
 }
 
 func TestRepositoryStore_All(t *testing.T) {
@@ -631,8 +631,8 @@ func TestRepositoryStore_Delete(t *testing.T) {
 	err := s.Delete(suite.ctx, 4)
 	require.NoError(t, err)
 
-	_, err = s.FindByID(suite.ctx, 4)
-	require.EqualError(t, err, "repository not found")
+	r, err := s.FindByID(suite.ctx, 4)
+	require.Nil(t, r)
 }
 
 func TestRepositoryStore_Delete_NotFound(t *testing.T) {
