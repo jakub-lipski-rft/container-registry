@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/db/migrations"
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/stretchr/testify/require"
 )
