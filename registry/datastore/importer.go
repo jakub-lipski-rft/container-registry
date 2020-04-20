@@ -492,9 +492,7 @@ func (imp *Importer) importParentRepositories(ctx context.Context, path string) 
 		// check if already exists
 		dbRepo, err := imp.repositoryStore.FindByPath(ctx, parent)
 		if err != nil {
-			if err.Error() != "repository not found" {
-				return nil, fmt.Errorf("error finding parent repository: %w", err)
-			}
+			return nil, fmt.Errorf("error finding parent repository: %w", err)
 		}
 		if dbRepo == nil {
 			logrus.WithField("path", parent).Info("creating indirect parent")
@@ -550,9 +548,9 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 	if parentPath != "" {
 		parent, err := imp.repositoryStore.FindByPath(ctx, parentPath)
 		if err != nil {
-			if err.Error() != "repository not found" {
-				return fmt.Errorf("error finding parent repository: %w", err)
-			}
+			return fmt.Errorf("error finding parent repository: %w", err)
+		}
+		if parent == nil {
 			parent, err = imp.importParentRepositories(ctx, parentPath)
 			if err != nil {
 				return fmt.Errorf("error importing parent repositories: %w", err)
