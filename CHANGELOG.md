@@ -1,13 +1,19 @@
 ## [Unreleased]
+
+## [v2.9.0-gitlab] - 2020-04-07
 ### Added
-- registry: Add tool to scan and import filesystem metadata into the database
+- notifications: Notification related Prometheus metrics
+- registry: Make minimum TLS version user configurable
 - registry/storage: Support BYOK for OSS storage driver
 
 ### Changed
+- Upgrade to Go 1.13
 - Switch to Go Modules for dependency management
+- registry/handlers: Log authorized username in push/pull requests
 
 ### Fixed
 - configuration: Fix pointer initialization in configuration parser
+- registry/handlers: Process Accept header MIME types in case-insensitive way
 
 ## [v2.8.2-gitlab] - 2020-03-13
 ### Changed
