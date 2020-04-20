@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/distribution/db/migrations"
+	"github.com/docker/distribution/migrations"
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 
 	"github.com/golang-migrate/migrate"
