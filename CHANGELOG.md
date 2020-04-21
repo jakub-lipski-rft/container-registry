@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Fixed
+- registry/storage: Fix panic during uploads purge
 
 ## [v2.9.0-gitlab] - 2020-04-07
 ### Added
