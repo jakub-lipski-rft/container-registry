@@ -331,6 +331,78 @@ func _20200415185534_update_tags_table_up_sql() ([]byte, error) {
 	)
 }
 
+var __20200423151144_update_manifest_configurations_digest_column_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\x8f\xb1\x6a\x80\x30\x18\x84\xf7\x3c\xc5\x6d\x51\x70\x2a\xb4\x43\x9d\xa2\x04\x09\x98\x58\x34\x0e\x9d\x24\xc4\xa8\x19\x9a\xd0\x1a\xc1\xc7\x2f\xc5\x2e\x0e\xa5\xb4\xe3\x0f\xdf\xf7\xdf\x5d\xc5\x1b\xa1\x4a\x42\x58\xab\x79\x0f\xcd\xaa\x96\xe3\xcd\x04\xbf\xb8\x3d\x4d\x36\x86\xc5\xaf\xc7\x87\x49\x3e\x86\x9d\x00\x40\xcf\x15\x93\x1c\x75\xd7\x8e\x52\x61\xf6\xeb\x17\xb7\xb9\x13\xba\xfb\xbe\xfe\xf3\x4c\x0d\xba\x67\x42\x69\x1c\xef\xd3\x0f\xc2\x74\xcf\xfa\x15\xfc\x43\x8d\x8b\xbb\x4d\x82\x7e\x7d\xe1\x48\xee\x4c\x18\x07\xa1\x1a\xd8\x18\xac\x49\x19\xdd\x37\xf3\xf0\xf8\x44\x0b\xd0\x67\x5a\xc0\x05\x1b\x67\x97\x5d\x4e\x01\xba\xb9\x93\xe6\x79\x49\x48\xdd\x49\x29\x74\xf9\x19\x00\x00\xff\xff\x17\x33\x85\xf3\x5e\x01\x00\x00")
+
+func _20200423151144_update_manifest_configurations_digest_column_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423151144_update_manifest_configurations_digest_column_down_sql,
+		"20200423151144_update_manifest_configurations_digest_column.down.sql",
+	)
+}
+
+var __20200423151144_update_manifest_configurations_digest_column_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\x8f\x31\x6b\x86\x30\x18\x84\xf7\xfc\x8a\xdb\xf2\x09\x4e\x1d\xeb\x14\x25\x48\xc0\xc4\xa2\x71\xe8\x14\x52\x8d\x1a\x68\xd5\x9a\x08\xf6\xdf\x97\xd2\x82\x74\x28\xa5\xdd\xde\xe1\x79\x9f\xbb\xcb\x79\x29\x54\x46\x08\xab\x34\x6f\xa0\x59\x5e\x71\xbc\xd8\xc5\x8f\x2e\x44\xd3\xaf\xcb\xe8\xa7\x63\xb7\xd1\xaf\x4b\x20\x00\xd0\x70\xc5\x24\x47\x51\x57\x9d\x54\x18\xfc\xe4\x42\x84\xae\xbf\x2e\x33\xbb\xf3\x3f\x32\xd5\xea\x86\x09\xa5\x71\xbc\x9a\x1f\x1e\xcc\x95\xf5\x2b\xf4\xc7\x1a\x9f\xdc\xb7\x49\x1f\x06\xe8\xc7\x07\x8e\xa7\xb7\xe8\x2c\xba\x56\xa8\x12\x83\xeb\xd7\xc1\xdd\xc2\xf6\xec\xa3\xd9\xec\x1e\x6f\x17\x9d\x82\xde\xd3\x14\x77\x49\x0a\x3a\xbb\x93\x26\x19\x21\x45\x2d\xa5\xd0\xd9\x7b\x00\x00\x00\xff\xff\xc1\x7d\x30\xaa\x64\x01\x00\x00")
+
+func _20200423151144_update_manifest_configurations_digest_column_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423151144_update_manifest_configurations_digest_column_up_sql,
+		"20200423151144_update_manifest_configurations_digest_column.up.sql",
+	)
+}
+
+var __20200423163957_update_manifests_digest_column_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x8e\x31\x8b\x83\x40\x10\x46\xfb\xfd\x15\x5f\xb7\x0a\x56\x07\x77\xc5\x59\xad\xb2\xc8\x82\xbb\x1e\x3a\x16\x57\x89\xe8\x24\x5a\x44\x09\xbb\x01\x7f\x7e\x0a\x43\x40\x08\x21\xe5\xf0\xe6\x3d\xbe\x4c\x17\xc6\xa5\x42\xa8\x92\x74\x0d\x52\x59\xa9\x71\xe9\x97\xf9\xc4\x3e\x78\x01\x00\xb5\x76\xca\x6a\xe4\x55\xd9\x5a\x87\x71\x3e\xb3\x0f\xdd\xc4\x1b\xa8\x7a\x5c\x9f\xe9\xae\xa1\x5a\x19\x47\xb8\x5d\xbb\xe7\x4b\x77\xec\xbd\x40\x6f\xe3\x3b\x39\x4c\x03\xfd\xff\x69\x04\xde\x02\xda\xc6\xb8\x02\xc3\xba\x0c\x7d\x88\xa4\x9f\xfa\xaf\xef\x1f\x99\x40\xfe\xca\x04\xbc\x0c\xeb\xc8\xd1\xee\x24\x90\x13\x6f\x32\x8e\x53\x21\xf2\xca\x5a\x43\xe9\x3d\x00\x00\xff\xff\x5e\xdc\xf3\xc5\x18\x01\x00\x00")
+
+func _20200423163957_update_manifests_digest_column_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423163957_update_manifests_digest_column_down_sql,
+		"20200423163957_update_manifests_digest_column.down.sql",
+	)
+}
+
+var __20200423163957_update_manifests_digest_column_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x8e\x4f\x8b\x83\x30\x10\x47\xef\xf9\x14\xbf\x5b\x14\x3c\xed\x71\x3d\x45\x09\x12\x30\x71\xd1\x78\xd8\x53\x70\xd7\x69\x15\xfa\xc7\x36\x29\xd8\x6f\x5f\x4a\x4b\xa5\x50\x68\x6f\xc3\xcc\x7b\x8f\xc9\x64\xa1\x4c\xca\x98\x28\xad\xac\x61\x45\x56\x4a\x6c\xbb\xdd\xb8\x22\x1f\x3c\x03\x80\x5a\x1a\xa1\x25\xf2\xaa\x6c\xb5\x41\x3f\xae\xc9\x07\xd8\xea\x3e\xb9\x81\xe6\xcf\x74\xd3\xd8\x5a\x28\x63\x71\x3a\xb8\x07\xe2\x96\xde\x8b\xf5\xdb\xf8\xed\xf2\xf4\xda\xd5\x81\xfd\xfd\x91\xf8\x3b\x07\xea\xd0\x36\xca\x14\xe8\xe9\x7f\xdf\x53\xe4\xa7\xcd\x18\xdc\xd4\x1d\x43\xb4\xd0\x09\xf8\x37\x4f\xf0\x15\x27\xe0\x03\xcd\x3c\x4e\x19\xcb\x2b\xad\x95\x4d\x2f\x01\x00\x00\xff\xff\xb6\x70\x68\xaf\x1e\x01\x00\x00")
+
+func _20200423163957_update_manifests_digest_column_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423163957_update_manifests_digest_column_up_sql,
+		"20200423163957_update_manifests_digest_column.up.sql",
+	)
+}
+
+var __20200423171341_update_manifest_lists_digest_column_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x8e\x31\x0b\x83\x30\x14\x84\xf7\xfc\x8a\xdb\xa2\xe0\x54\x68\x87\x3a\x45\x09\x12\x30\xb1\xe8\x73\xe8\x24\xa2\x69\x15\x5a\xa5\x24\x05\x7f\x7e\x29\x76\x71\x28\xa5\xe3\xe3\x7b\xf7\xdd\x25\x32\x53\x26\x66\x4c\xe4\x24\x4b\x90\x48\x72\x89\x7b\x3b\x8d\x17\xeb\x7c\x73\x1b\x9d\x77\x0c\x00\x4a\x69\x84\x96\x48\x8b\xbc\xd6\x06\xfd\x78\x7d\xe3\xc1\x2e\xa0\xe2\x73\xfd\xe1\x30\x15\x95\x42\x19\xc2\xf3\xd1\x6c\xff\x9a\xad\xf9\x1b\xff\xdd\xb5\xe2\xcd\x5c\xd0\xf9\x24\xe1\xed\xe2\x51\x57\xca\x64\xe8\xe6\xa9\x6b\x7d\xc0\xdd\xd0\xee\xf6\x07\x1e\x81\x1f\x79\x04\x3b\x75\x73\x6f\x83\x35\x13\x81\x0f\x76\xe1\x61\x18\x33\x96\x16\x5a\x2b\x8a\x5f\x01\x00\x00\xff\xff\x8f\xda\xa5\x67\x31\x01\x00\x00")
+
+func _20200423171341_update_manifest_lists_digest_column_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423171341_update_manifest_lists_digest_column_down_sql,
+		"20200423171341_update_manifest_lists_digest_column.down.sql",
+	)
+}
+
+var __20200423171341_update_manifest_lists_digest_column_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\x8e\x31\xab\x83\x30\x14\x46\xf7\xfc\x8a\x6f\x8b\x82\xd3\x1b\x9f\x53\x94\x20\x01\x13\x1f\x1a\x87\x37\x05\x5b\xd3\x1a\xb0\xad\x6d\x52\xb0\xff\xbe\x94\x16\xc4\xa1\xd0\x6e\x17\xce\xb9\xe7\xde\x8c\x17\x42\xa5\x84\xb0\x52\xf3\x1a\x9a\x65\x25\xc7\xa1\x3b\xba\x9d\xf5\xc1\x8c\xce\x07\x4f\x00\xa0\xe6\x8a\x49\x8e\xbc\x2a\x5b\xa9\xd0\xbb\xbd\xf5\x01\xba\x7a\x4d\x66\xb0\xf3\x17\x0d\xd5\xe8\x9a\x09\xa5\x71\x3d\x9b\xb5\x67\x96\xf2\x3b\xf6\xd9\xad\x27\x5e\xbd\xfb\x58\x84\xfe\xff\xe3\xd8\xdc\x82\xed\xd0\x36\x42\x15\xe8\xed\xf6\xd4\xdb\xc8\x4f\xa3\x0b\x66\xea\x2e\x21\x5a\xec\x04\xf4\x97\x26\xf8\x89\x13\xd0\xc1\xce\x34\x4e\x09\xc9\x2b\x29\x85\x4e\xef\x01\x00\x00\xff\xff\xcc\x75\xc6\x53\x37\x01\x00\x00")
+
+func _20200423171341_update_manifest_lists_digest_column_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423171341_update_manifest_lists_digest_column_up_sql,
+		"20200423171341_update_manifest_lists_digest_column.up.sql",
+	)
+}
+
+var __20200423172613_update_layers_digest_column_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x8e\x41\x0b\x82\x40\x10\x46\xef\xfb\x2b\xbe\xdb\x2a\x78\x0a\xea\x90\xa7\x55\x16\x59\x70\xd7\xd0\xf1\xd0\x49\x44\x87\x0c\x42\x29\x37\xb0\x7f\xdf\xc1\x2e\x06\x41\xc7\x79\xc3\x7b\x7c\x89\xce\x8c\x8b\x85\x50\x39\xe9\x12\xa4\x92\x5c\xe3\xd6\xbe\xf8\x31\x0b\x00\x28\xb5\x53\x56\x23\x2d\xf2\xda\x3a\xf4\xd7\x0b\xcf\xbe\x19\x78\x01\x15\x9f\xeb\x0f\xd7\x55\x54\x2a\xe3\x08\xcf\x7b\xb3\xfe\x9b\x6d\xe9\x9b\xff\x6e\xae\x78\x33\x07\x74\x3e\x69\x78\x5e\x3c\xea\xca\xb8\x0c\xdd\x34\x76\xad\x0f\xe4\x3c\xb4\xbb\xfd\x41\x46\x90\x47\x19\x81\xc7\x6e\xea\x39\x58\x9d\x08\x72\xe0\x45\x86\x61\x2c\x44\x5a\x58\x6b\x28\x7e\x07\x00\x00\xff\xff\xbd\xf6\x09\x2f\x09\x01\x00\x00")
+
+func _20200423172613_update_layers_digest_column_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423172613_update_layers_digest_column_down_sql,
+		"20200423172613_update_layers_digest_column.down.sql",
+	)
+}
+
+var __20200423172613_update_layers_digest_column_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x8e\x31\xeb\x83\x30\x10\x47\xf7\x7c\x8a\xdf\x16\x05\xa7\xff\xf8\x77\x8a\x12\x24\x60\x62\xd1\x38\x74\x0a\xb6\x1e\x55\x10\x6a\x35\x05\xfd\xf6\xa5\x58\x90\x76\x28\xdd\x8e\x77\xf7\x1e\x97\xc8\x4c\x99\x98\x31\x91\x5b\x59\xc2\x8a\x24\x97\x18\x9a\x95\xa6\x99\x01\x40\x29\x8d\xd0\x12\x69\x91\xd7\xda\xa0\xed\x2f\x34\x7b\xd8\xe2\x35\xb9\x8e\x96\x1f\x5c\x53\xd9\x52\x28\x63\x71\xbf\xb9\x6d\xef\xf6\xd2\x27\xfb\xde\xdc\xf0\xdb\x3b\x4f\x01\xf6\x78\x90\x38\xad\x9e\x1a\xd4\x95\x32\x19\x5a\x3a\x5f\x5b\x0a\xe6\x71\xe8\xbd\x1b\x9b\xc9\x07\xfb\x75\x04\xfe\xcf\x23\xfc\x85\x11\x78\x47\x0b\x0f\x63\xc6\xd2\x42\x6b\x65\xe3\x47\x00\x00\x00\xff\xff\xd9\x0d\x83\xba\x0f\x01\x00\x00")
+
+func _20200423172613_update_layers_digest_column_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200423172613_update_layers_digest_column_up_sql,
+		"20200423172613_update_layers_digest_column.up.sql",
+	)
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -353,40 +425,48 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() ([]byte, error){
-	"20200319122755_create_repositories_table.down.sql":              _20200319122755_create_repositories_table_down_sql,
-	"20200319122755_create_repositories_table.up.sql":                _20200319122755_create_repositories_table_up_sql,
-	"20200319130108_create_manifest_configurations_table.down.sql":   _20200319130108_create_manifest_configurations_table_down_sql,
-	"20200319130108_create_manifest_configurations_table.up.sql":     _20200319130108_create_manifest_configurations_table_up_sql,
-	"20200319131222_create_manifests_table.down.sql":                 _20200319131222_create_manifests_table_down_sql,
-	"20200319131222_create_manifests_table.up.sql":                   _20200319131222_create_manifests_table_up_sql,
-	"20200319131542_create_layers_table.down.sql":                    _20200319131542_create_layers_table_down_sql,
-	"20200319131542_create_layers_table.up.sql":                      _20200319131542_create_layers_table_up_sql,
-	"20200319131632_create_manifest_layers_table.down.sql":           _20200319131632_create_manifest_layers_table_down_sql,
-	"20200319131632_create_manifest_layers_table.up.sql":             _20200319131632_create_manifest_layers_table_up_sql,
-	"20200319131907_create_manifest_lists_table.down.sql":            _20200319131907_create_manifest_lists_table_down_sql,
-	"20200319131907_create_manifest_lists_table.up.sql":              _20200319131907_create_manifest_lists_table_up_sql,
-	"20200319132010_create_manifest_list_items_table.down.sql":       _20200319132010_create_manifest_list_items_table_down_sql,
-	"20200319132010_create_manifest_list_items_table.up.sql":         _20200319132010_create_manifest_list_items_table_up_sql,
-	"20200319132237_create_tags_table.down.sql":                      _20200319132237_create_tags_table_down_sql,
-	"20200319132237_create_tags_table.up.sql":                        _20200319132237_create_tags_table_up_sql,
-	"20200408191941_update_tags_table.down.sql":                      _20200408191941_update_tags_table_down_sql,
-	"20200408191941_update_tags_table.up.sql":                        _20200408191941_update_tags_table_up_sql,
-	"20200408192311_create_repository_manifests_table.down.sql":      _20200408192311_create_repository_manifests_table_down_sql,
-	"20200408192311_create_repository_manifests_table.up.sql":        _20200408192311_create_repository_manifests_table_up_sql,
-	"20200408192559_update_manifests_table.down.sql":                 _20200408192559_update_manifests_table_down_sql,
-	"20200408192559_update_manifests_table.up.sql":                   _20200408192559_update_manifests_table_up_sql,
-	"20200408193126_create_repository_manifest_lists_table.down.sql": _20200408193126_create_repository_manifest_lists_table_down_sql,
-	"20200408193126_create_repository_manifest_lists_table.up.sql":   _20200408193126_create_repository_manifest_lists_table_up_sql,
-	"20200408193348_update_manifest_lists_table.down.sql":            _20200408193348_update_manifest_lists_table_down_sql,
-	"20200408193348_update_manifest_lists_table.up.sql":              _20200408193348_update_manifest_lists_table_up_sql,
-	"20200409102858_update_manifest_layers_table.down.sql":           _20200409102858_update_manifest_layers_table_down_sql,
-	"20200409102858_update_manifest_layers_table.up.sql":             _20200409102858_update_manifest_layers_table_up_sql,
-	"20200414200813_update_manifests_table.down.sql":                 _20200414200813_update_manifests_table_down_sql,
-	"20200414200813_update_manifests_table.up.sql":                   _20200414200813_update_manifests_table_up_sql,
-	"20200415175158_update_manifest_lists_table.down.sql":            _20200415175158_update_manifest_lists_table_down_sql,
-	"20200415175158_update_manifest_lists_table.up.sql":              _20200415175158_update_manifest_lists_table_up_sql,
-	"20200415185534_update_tags_table.down.sql":                      _20200415185534_update_tags_table_down_sql,
-	"20200415185534_update_tags_table.up.sql":                        _20200415185534_update_tags_table_up_sql,
+	"20200319122755_create_repositories_table.down.sql":                    _20200319122755_create_repositories_table_down_sql,
+	"20200319122755_create_repositories_table.up.sql":                      _20200319122755_create_repositories_table_up_sql,
+	"20200319130108_create_manifest_configurations_table.down.sql":         _20200319130108_create_manifest_configurations_table_down_sql,
+	"20200319130108_create_manifest_configurations_table.up.sql":           _20200319130108_create_manifest_configurations_table_up_sql,
+	"20200319131222_create_manifests_table.down.sql":                       _20200319131222_create_manifests_table_down_sql,
+	"20200319131222_create_manifests_table.up.sql":                         _20200319131222_create_manifests_table_up_sql,
+	"20200319131542_create_layers_table.down.sql":                          _20200319131542_create_layers_table_down_sql,
+	"20200319131542_create_layers_table.up.sql":                            _20200319131542_create_layers_table_up_sql,
+	"20200319131632_create_manifest_layers_table.down.sql":                 _20200319131632_create_manifest_layers_table_down_sql,
+	"20200319131632_create_manifest_layers_table.up.sql":                   _20200319131632_create_manifest_layers_table_up_sql,
+	"20200319131907_create_manifest_lists_table.down.sql":                  _20200319131907_create_manifest_lists_table_down_sql,
+	"20200319131907_create_manifest_lists_table.up.sql":                    _20200319131907_create_manifest_lists_table_up_sql,
+	"20200319132010_create_manifest_list_items_table.down.sql":             _20200319132010_create_manifest_list_items_table_down_sql,
+	"20200319132010_create_manifest_list_items_table.up.sql":               _20200319132010_create_manifest_list_items_table_up_sql,
+	"20200319132237_create_tags_table.down.sql":                            _20200319132237_create_tags_table_down_sql,
+	"20200319132237_create_tags_table.up.sql":                              _20200319132237_create_tags_table_up_sql,
+	"20200408191941_update_tags_table.down.sql":                            _20200408191941_update_tags_table_down_sql,
+	"20200408191941_update_tags_table.up.sql":                              _20200408191941_update_tags_table_up_sql,
+	"20200408192311_create_repository_manifests_table.down.sql":            _20200408192311_create_repository_manifests_table_down_sql,
+	"20200408192311_create_repository_manifests_table.up.sql":              _20200408192311_create_repository_manifests_table_up_sql,
+	"20200408192559_update_manifests_table.down.sql":                       _20200408192559_update_manifests_table_down_sql,
+	"20200408192559_update_manifests_table.up.sql":                         _20200408192559_update_manifests_table_up_sql,
+	"20200408193126_create_repository_manifest_lists_table.down.sql":       _20200408193126_create_repository_manifest_lists_table_down_sql,
+	"20200408193126_create_repository_manifest_lists_table.up.sql":         _20200408193126_create_repository_manifest_lists_table_up_sql,
+	"20200408193348_update_manifest_lists_table.down.sql":                  _20200408193348_update_manifest_lists_table_down_sql,
+	"20200408193348_update_manifest_lists_table.up.sql":                    _20200408193348_update_manifest_lists_table_up_sql,
+	"20200409102858_update_manifest_layers_table.down.sql":                 _20200409102858_update_manifest_layers_table_down_sql,
+	"20200409102858_update_manifest_layers_table.up.sql":                   _20200409102858_update_manifest_layers_table_up_sql,
+	"20200414200813_update_manifests_table.down.sql":                       _20200414200813_update_manifests_table_down_sql,
+	"20200414200813_update_manifests_table.up.sql":                         _20200414200813_update_manifests_table_up_sql,
+	"20200415175158_update_manifest_lists_table.down.sql":                  _20200415175158_update_manifest_lists_table_down_sql,
+	"20200415175158_update_manifest_lists_table.up.sql":                    _20200415175158_update_manifest_lists_table_up_sql,
+	"20200415185534_update_tags_table.down.sql":                            _20200415185534_update_tags_table_down_sql,
+	"20200415185534_update_tags_table.up.sql":                              _20200415185534_update_tags_table_up_sql,
+	"20200423151144_update_manifest_configurations_digest_column.down.sql": _20200423151144_update_manifest_configurations_digest_column_down_sql,
+	"20200423151144_update_manifest_configurations_digest_column.up.sql":   _20200423151144_update_manifest_configurations_digest_column_up_sql,
+	"20200423163957_update_manifests_digest_column.down.sql":               _20200423163957_update_manifests_digest_column_down_sql,
+	"20200423163957_update_manifests_digest_column.up.sql":                 _20200423163957_update_manifests_digest_column_up_sql,
+	"20200423171341_update_manifest_lists_digest_column.down.sql":          _20200423171341_update_manifest_lists_digest_column_down_sql,
+	"20200423171341_update_manifest_lists_digest_column.up.sql":            _20200423171341_update_manifest_lists_digest_column_up_sql,
+	"20200423172613_update_layers_digest_column.down.sql":                  _20200423172613_update_layers_digest_column_down_sql,
+	"20200423172613_update_layers_digest_column.up.sql":                    _20200423172613_update_layers_digest_column_up_sql,
 }
 
 // AssetDir returns the file names below a certain
@@ -430,38 +510,46 @@ type _bintree_t struct {
 }
 
 var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
-	"20200319122755_create_repositories_table.down.sql":              {_20200319122755_create_repositories_table_down_sql, map[string]*_bintree_t{}},
-	"20200319122755_create_repositories_table.up.sql":                {_20200319122755_create_repositories_table_up_sql, map[string]*_bintree_t{}},
-	"20200319130108_create_manifest_configurations_table.down.sql":   {_20200319130108_create_manifest_configurations_table_down_sql, map[string]*_bintree_t{}},
-	"20200319130108_create_manifest_configurations_table.up.sql":     {_20200319130108_create_manifest_configurations_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131222_create_manifests_table.down.sql":                 {_20200319131222_create_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131222_create_manifests_table.up.sql":                   {_20200319131222_create_manifests_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131542_create_layers_table.down.sql":                    {_20200319131542_create_layers_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131542_create_layers_table.up.sql":                      {_20200319131542_create_layers_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131632_create_manifest_layers_table.down.sql":           {_20200319131632_create_manifest_layers_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131632_create_manifest_layers_table.up.sql":             {_20200319131632_create_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
-	"20200319131907_create_manifest_lists_table.down.sql":            {_20200319131907_create_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
-	"20200319131907_create_manifest_lists_table.up.sql":              {_20200319131907_create_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
-	"20200319132010_create_manifest_list_items_table.down.sql":       {_20200319132010_create_manifest_list_items_table_down_sql, map[string]*_bintree_t{}},
-	"20200319132010_create_manifest_list_items_table.up.sql":         {_20200319132010_create_manifest_list_items_table_up_sql, map[string]*_bintree_t{}},
-	"20200319132237_create_tags_table.down.sql":                      {_20200319132237_create_tags_table_down_sql, map[string]*_bintree_t{}},
-	"20200319132237_create_tags_table.up.sql":                        {_20200319132237_create_tags_table_up_sql, map[string]*_bintree_t{}},
-	"20200408191941_update_tags_table.down.sql":                      {_20200408191941_update_tags_table_down_sql, map[string]*_bintree_t{}},
-	"20200408191941_update_tags_table.up.sql":                        {_20200408191941_update_tags_table_up_sql, map[string]*_bintree_t{}},
-	"20200408192311_create_repository_manifests_table.down.sql":      {_20200408192311_create_repository_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200408192311_create_repository_manifests_table.up.sql":        {_20200408192311_create_repository_manifests_table_up_sql, map[string]*_bintree_t{}},
-	"20200408192559_update_manifests_table.down.sql":                 {_20200408192559_update_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200408192559_update_manifests_table.up.sql":                   {_20200408192559_update_manifests_table_up_sql, map[string]*_bintree_t{}},
-	"20200408193126_create_repository_manifest_lists_table.down.sql": {_20200408193126_create_repository_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
-	"20200408193126_create_repository_manifest_lists_table.up.sql":   {_20200408193126_create_repository_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
-	"20200408193348_update_manifest_lists_table.down.sql":            {_20200408193348_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
-	"20200408193348_update_manifest_lists_table.up.sql":              {_20200408193348_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
-	"20200409102858_update_manifest_layers_table.down.sql":           {_20200409102858_update_manifest_layers_table_down_sql, map[string]*_bintree_t{}},
-	"20200409102858_update_manifest_layers_table.up.sql":             {_20200409102858_update_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
-	"20200414200813_update_manifests_table.down.sql":                 {_20200414200813_update_manifests_table_down_sql, map[string]*_bintree_t{}},
-	"20200414200813_update_manifests_table.up.sql":                   {_20200414200813_update_manifests_table_up_sql, map[string]*_bintree_t{}},
-	"20200415175158_update_manifest_lists_table.down.sql":            {_20200415175158_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
-	"20200415175158_update_manifest_lists_table.up.sql":              {_20200415175158_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
-	"20200415185534_update_tags_table.down.sql":                      {_20200415185534_update_tags_table_down_sql, map[string]*_bintree_t{}},
-	"20200415185534_update_tags_table.up.sql":                        {_20200415185534_update_tags_table_up_sql, map[string]*_bintree_t{}},
+	"20200319122755_create_repositories_table.down.sql":                    {_20200319122755_create_repositories_table_down_sql, map[string]*_bintree_t{}},
+	"20200319122755_create_repositories_table.up.sql":                      {_20200319122755_create_repositories_table_up_sql, map[string]*_bintree_t{}},
+	"20200319130108_create_manifest_configurations_table.down.sql":         {_20200319130108_create_manifest_configurations_table_down_sql, map[string]*_bintree_t{}},
+	"20200319130108_create_manifest_configurations_table.up.sql":           {_20200319130108_create_manifest_configurations_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131222_create_manifests_table.down.sql":                       {_20200319131222_create_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131222_create_manifests_table.up.sql":                         {_20200319131222_create_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131542_create_layers_table.down.sql":                          {_20200319131542_create_layers_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131542_create_layers_table.up.sql":                            {_20200319131542_create_layers_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131632_create_manifest_layers_table.down.sql":                 {_20200319131632_create_manifest_layers_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131632_create_manifest_layers_table.up.sql":                   {_20200319131632_create_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
+	"20200319131907_create_manifest_lists_table.down.sql":                  {_20200319131907_create_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200319131907_create_manifest_lists_table.up.sql":                    {_20200319131907_create_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200319132010_create_manifest_list_items_table.down.sql":             {_20200319132010_create_manifest_list_items_table_down_sql, map[string]*_bintree_t{}},
+	"20200319132010_create_manifest_list_items_table.up.sql":               {_20200319132010_create_manifest_list_items_table_up_sql, map[string]*_bintree_t{}},
+	"20200319132237_create_tags_table.down.sql":                            {_20200319132237_create_tags_table_down_sql, map[string]*_bintree_t{}},
+	"20200319132237_create_tags_table.up.sql":                              {_20200319132237_create_tags_table_up_sql, map[string]*_bintree_t{}},
+	"20200408191941_update_tags_table.down.sql":                            {_20200408191941_update_tags_table_down_sql, map[string]*_bintree_t{}},
+	"20200408191941_update_tags_table.up.sql":                              {_20200408191941_update_tags_table_up_sql, map[string]*_bintree_t{}},
+	"20200408192311_create_repository_manifests_table.down.sql":            {_20200408192311_create_repository_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200408192311_create_repository_manifests_table.up.sql":              {_20200408192311_create_repository_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200408192559_update_manifests_table.down.sql":                       {_20200408192559_update_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200408192559_update_manifests_table.up.sql":                         {_20200408192559_update_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200408193126_create_repository_manifest_lists_table.down.sql":       {_20200408193126_create_repository_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200408193126_create_repository_manifest_lists_table.up.sql":         {_20200408193126_create_repository_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200408193348_update_manifest_lists_table.down.sql":                  {_20200408193348_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200408193348_update_manifest_lists_table.up.sql":                    {_20200408193348_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200409102858_update_manifest_layers_table.down.sql":                 {_20200409102858_update_manifest_layers_table_down_sql, map[string]*_bintree_t{}},
+	"20200409102858_update_manifest_layers_table.up.sql":                   {_20200409102858_update_manifest_layers_table_up_sql, map[string]*_bintree_t{}},
+	"20200414200813_update_manifests_table.down.sql":                       {_20200414200813_update_manifests_table_down_sql, map[string]*_bintree_t{}},
+	"20200414200813_update_manifests_table.up.sql":                         {_20200414200813_update_manifests_table_up_sql, map[string]*_bintree_t{}},
+	"20200415175158_update_manifest_lists_table.down.sql":                  {_20200415175158_update_manifest_lists_table_down_sql, map[string]*_bintree_t{}},
+	"20200415175158_update_manifest_lists_table.up.sql":                    {_20200415175158_update_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
+	"20200415185534_update_tags_table.down.sql":                            {_20200415185534_update_tags_table_down_sql, map[string]*_bintree_t{}},
+	"20200415185534_update_tags_table.up.sql":                              {_20200415185534_update_tags_table_up_sql, map[string]*_bintree_t{}},
+	"20200423151144_update_manifest_configurations_digest_column.down.sql": {_20200423151144_update_manifest_configurations_digest_column_down_sql, map[string]*_bintree_t{}},
+	"20200423151144_update_manifest_configurations_digest_column.up.sql":   {_20200423151144_update_manifest_configurations_digest_column_up_sql, map[string]*_bintree_t{}},
+	"20200423163957_update_manifests_digest_column.down.sql":               {_20200423163957_update_manifests_digest_column_down_sql, map[string]*_bintree_t{}},
+	"20200423163957_update_manifests_digest_column.up.sql":                 {_20200423163957_update_manifests_digest_column_up_sql, map[string]*_bintree_t{}},
+	"20200423171341_update_manifest_lists_digest_column.down.sql":          {_20200423171341_update_manifest_lists_digest_column_down_sql, map[string]*_bintree_t{}},
+	"20200423171341_update_manifest_lists_digest_column.up.sql":            {_20200423171341_update_manifest_lists_digest_column_up_sql, map[string]*_bintree_t{}},
+	"20200423172613_update_layers_digest_column.down.sql":                  {_20200423172613_update_layers_digest_column_down_sql, map[string]*_bintree_t{}},
+	"20200423172613_update_layers_digest_column.up.sql":                    {_20200423172613_update_layers_digest_column_up_sql, map[string]*_bintree_t{}},
 }}

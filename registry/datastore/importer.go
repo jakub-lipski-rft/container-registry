@@ -135,15 +135,14 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distribution.Repository, dbManifest *models.Manifest, fsLayers []schema1.FSLayer) error {
 	total := len(fsLayers)
 	for i, fsLayer := range fsLayers {
-		dgst := fsLayer.BlobSum.String()
 		log := logrus.WithFields(logrus.Fields{
-			"digest": dgst,
+			"digest": fsLayer.BlobSum,
 			"count":  i + 1,
 			"total":  total,
 		})
 		log.Info("importing layer")
 
-		if err := imp.importLayer(ctx, fsRepo, dbManifest, &models.Layer{Digest: dgst}); err != nil {
+		if err := imp.importLayer(ctx, fsRepo, dbManifest, &models.Layer{Digest: fsLayer.BlobSum}); err != nil {
 			log.WithError(err).Error("error importing layer")
 			continue
 		}
@@ -155,9 +154,8 @@ func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distributio
 func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repository, dbManifest *models.Manifest, fsLayers []distribution.Descriptor) error {
 	total := len(fsLayers)
 	for i, fsLayer := range fsLayers {
-		dgst := fsLayer.Digest.String()
 		log := logrus.WithFields(logrus.Fields{
-			"digest":     dgst,
+			"digest":     fsLayer.Digest,
 			"media_type": fsLayer.MediaType,
 			"size":       fsLayer.Size,
 			"count":      i + 1,
@@ -167,7 +165,7 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 
 		err := imp.importLayer(ctx, fsRepo, dbManifest, &models.Layer{
 			MediaType: fsLayer.MediaType,
-			Digest:    dgst,
+			Digest:    fsLayer.Digest,
 			Size:      fsLayer.Size,
 		})
 		if err != nil {
@@ -190,7 +188,7 @@ func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribut
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
 		SchemaVersion: m.SchemaVersion,
 		MediaType:     schema1.MediaTypeSignedManifest,
-		Digest:        dgst.String(),
+		Digest:        dgst,
 		Payload:       payload,
 	})
 	if err != nil {
@@ -220,7 +218,7 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 	// find or create DB manifest configuration
 	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
 		MediaType: m.Config.MediaType,
-		Digest:    m.Config.Digest.String(),
+		Digest:    m.Config.Digest,
 		Size:      m.Config.Size,
 		Payload:   configPayload,
 	})
@@ -237,7 +235,7 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
 		SchemaVersion: m.SchemaVersion,
 		MediaType:     m.MediaType,
-		Digest:        dgst.String(),
+		Digest:        dgst,
 		ConfigurationID: sql.NullInt64{
 			Int64: int64(dbConfig.ID),
 			Valid: true,
@@ -271,7 +269,7 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 	// find or create DB manifest configuration
 	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
 		MediaType: m.Config.MediaType,
-		Digest:    m.Config.Digest.String(),
+		Digest:    m.Config.Digest,
 		Size:      m.Config.Size,
 		Payload:   configPayload,
 	})
@@ -288,7 +286,7 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
 		SchemaVersion: m.SchemaVersion,
 		MediaType:     v1.MediaTypeImageManifest,
-		Digest:        dgst.String(),
+		Digest:        dgst,
 		ConfigurationID: sql.NullInt64{
 			Int64: int64(dbConfig.ID),
 			Valid: true,
@@ -325,7 +323,7 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 	dbManifestList := &models.ManifestList{
 		SchemaVersion: ml.SchemaVersion,
 		MediaType:     mediaType,
-		Digest:        dgst.String(),
+		Digest:        dgst,
 		Payload:       payload,
 	}
 	if err := imp.manifestListStore.Create(ctx, dbManifestList); err != nil {
@@ -444,24 +442,23 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 			continue
 		}
 
-		dgst := desc.Digest.String()
-		log = log.WithField("target", dgst)
+		log = log.WithField("target", desc.Digest)
 		log.Info("importing tag")
 
 		dbTag := &models.Tag{Name: fsTag, RepositoryID: dbRepo.ID}
 
 		// find corresponding manifest or manifest list in DB
-		dbManifest, err := imp.manifestStore.FindByDigest(ctx, dgst)
+		dbManifest, err := imp.manifestStore.FindByDigest(ctx, desc.Digest)
 		if err != nil {
 			return fmt.Errorf("error finding target manifest: %w", err)
 		}
 		if dbManifest == nil {
-			dbManifestList, err := imp.manifestListStore.FindByDigest(ctx, dgst)
+			dbManifestList, err := imp.manifestListStore.FindByDigest(ctx, desc.Digest)
 			if err != nil {
 				return fmt.Errorf("error finding target manifest list: %w", err)
 			}
 			if dbManifestList == nil {
-				log.WithError(err).Errorf("no manifest or manifest list found for digest %q", dgst)
+				log.WithError(err).Errorf("no manifest or manifest list found for digest %q", desc.Digest)
 				continue
 			}
 			dbTag.ManifestListID = sql.NullInt64{Int64: int64(dbManifestList.ID), Valid: true}

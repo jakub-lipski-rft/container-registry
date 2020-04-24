@@ -244,6 +244,7 @@ func TestLayerStore_Update_NotFound(t *testing.T) {
 
 	update := &models.Layer{
 		ID:        100,
+		Digest:    "sha256:16844840277191fb603cc971dd59c97f05e12b49ae33766d33ae1b1333ab4f2a",
 		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 	}
 	err := s.Update(suite.ctx, update)

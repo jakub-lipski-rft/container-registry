@@ -7,13 +7,14 @@ import (
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/opencontainers/go-digest"
 )
 
 // ManifestReader is the interface that defines read operations for a Manifest store.
 type ManifestReader interface {
 	FindAll(ctx context.Context) (models.Manifests, error)
 	FindByID(ctx context.Context, id int) (*models.Manifest, error)
-	FindByDigest(ctx context.Context, digest string) (*models.Manifest, error)
+	FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
 	Layers(ctx context.Context, m *models.Manifest) (models.Layers, error)
 	Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error)
@@ -48,9 +49,10 @@ func NewManifestStore(db Queryer) *manifestStore {
 }
 
 func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
+	var digestHex []byte
 	m := new(models.Manifest)
 
-	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &m.Digest, &m.ConfigurationID, &m.Payload,
+	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.ConfigurationID, &m.Payload,
 		&m.CreatedAt, &m.MarkedAt, &m.DeletedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
@@ -58,6 +60,7 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 		}
 		return nil, nil
 	}
+	m.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 
 	return m, nil
 }
@@ -67,13 +70,15 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var digestHex []byte
 		m := new(models.Manifest)
 
-		err := rows.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &m.Digest, &m.ConfigurationID,
+		err := rows.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.ConfigurationID,
 			&m.Payload, &m.CreatedAt, &m.MarkedAt, &m.DeletedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest: %w", err)
 		}
+		m.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 		mm = append(mm, m)
 	}
 	if err := rows.Err(); err != nil {
@@ -85,7 +90,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 
 // FindByID finds a Manifest by ID.
 func (s *manifestStore) FindByID(ctx context.Context, id int) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest, configuration_id, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, configuration_id, payload, created_at, marked_at, deleted_at
 		FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
@@ -94,18 +99,18 @@ func (s *manifestStore) FindByID(ctx context.Context, id int) (*models.Manifest,
 }
 
 // FindByDigest finds a Manifest by the digest.
-func (s *manifestStore) FindByDigest(ctx context.Context, digest string) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest, configuration_id, payload, created_at, marked_at, deleted_at
-		FROM manifests WHERE digest = $1`
+func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error) {
+	q := `SELECT id, schema_version, media_type, digest_hex, configuration_id, payload, created_at, marked_at, deleted_at
+		FROM manifests WHERE digest_hex = decode($1, 'hex')`
 
-	row := s.db.QueryRowContext(ctx, q, digest)
+	row := s.db.QueryRowContext(ctx, q, d.Hex())
 
 	return scanFullManifest(row)
 }
 
 // FindAll finds all manifests.
 func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
-	q := `SELECT id, schema_version, media_type, digest, configuration_id, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, configuration_id, payload, created_at, marked_at, deleted_at
 		FROM manifests`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -130,7 +135,7 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 
 // Layers finds layers associated with a manifest, through the ManifestLayer relationship entity.
 func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.Layers, error) {
-	q := `SELECT l.id, l.media_type, l.digest, l.size, l.created_at, l.marked_at, l.deleted_at FROM layers as l
+	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at, l.deleted_at FROM layers as l
 		JOIN manifest_layers as ml ON ml.layer_id = l.id
 		JOIN manifests as m ON m.id = ml.manifest_id
 		WHERE m.id = $1`
@@ -145,7 +150,7 @@ func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.
 
 // Lists finds all manifest lists which reference a manifest, through the ManifestListItem relationship entity.
 func (s *manifestStore) Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest, ml.payload, ml.created_at,
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at,
 		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
 		JOIN manifest_list_items as mli ON mli.manifest_list_id = ml.id
 		JOIN manifests as m ON m.id = mli.manifest_id
@@ -176,10 +181,10 @@ func (s *manifestStore) Repositories(ctx context.Context, m *models.Manifest) (m
 
 // Create saves a new Manifest.
 func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
-	q := `INSERT INTO manifests (schema_version, media_type, digest, configuration_id, payload)
-		VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`
+	q := `INSERT INTO manifests (schema_version, media_type, digest_hex, configuration_id, payload)
+		VALUES ($1, $2, decode($3, 'hex'), $4, $5) RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest, m.ConfigurationID, m.Payload)
+	row := s.db.QueryRowContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest.Hex(), m.ConfigurationID, m.Payload)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
 		return fmt.Errorf("error creating manifest: %w", err)
 	}
@@ -190,10 +195,10 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 // Update updates an existing Manifest.
 func (s *manifestStore) Update(ctx context.Context, m *models.Manifest) error {
 	q := `UPDATE manifests
-		SET (schema_version, media_type, digest, configuration_id, payload) = ($1, $2, $3, $4, $5)
+		SET (schema_version, media_type, digest_hex, configuration_id, payload) = ($1, $2, decode($3, 'hex'), $4, $5)
 		WHERE id = $6`
 
-	res, err := s.db.ExecContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest, m.ConfigurationID, m.Payload, m.ID)
+	res, err := s.db.ExecContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest.Hex(), m.ConfigurationID, m.Payload, m.ID)
 	if err != nil {
 		return fmt.Errorf("error updating manifest: %w", err)
 	}
