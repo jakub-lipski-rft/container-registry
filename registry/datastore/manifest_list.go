@@ -7,13 +7,14 @@ import (
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/opencontainers/go-digest"
 )
 
 // ManifestListReader is the interface that defines read operations for a manifest list store.
 type ManifestListReader interface {
 	FindAll(ctx context.Context) (models.ManifestLists, error)
 	FindByID(ctx context.Context, id int) (*models.ManifestList, error)
-	FindByDigest(ctx context.Context, digest string) (*models.ManifestList, error)
+	FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestList, error)
 	Count(ctx context.Context) (int, error)
 	Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error)
 	Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error)
@@ -47,15 +48,17 @@ func NewManifestListStore(db Queryer) *manifestListStore {
 }
 
 func scanFullManifestList(row *sql.Row) (*models.ManifestList, error) {
+	var digestHex []byte
 	ml := new(models.ManifestList)
 
-	err := row.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &ml.Digest, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
+	err := row.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &digestHex, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest list: %w", err)
 		}
 		return nil, nil
 	}
+	ml.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 
 	return ml, nil
 }
@@ -65,12 +68,14 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var digestHex []byte
 		ml := new(models.ManifestList)
 
-		err := rows.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &ml.Digest, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
+		err := rows.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &digestHex, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest list: %w", err)
 		}
+		ml.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 		mls = append(mls, ml)
 	}
 	if err := rows.Err(); err != nil {
@@ -82,7 +87,7 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 
 // FindByID finds a manifest list by ID.
 func (s *manifestListStore) FindByID(ctx context.Context, id int) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
@@ -91,18 +96,18 @@ func (s *manifestListStore) FindByID(ctx context.Context, id int) (*models.Manif
 }
 
 // FindByDigest finds a manifest list by the digest.
-func (s *manifestListStore) FindByDigest(ctx context.Context, digest string) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest, payload, created_at, marked_at, deleted_at
-		FROM manifest_lists WHERE digest = $1`
+func (s *manifestListStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestList, error) {
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+		FROM manifest_lists WHERE digest_hex = decode($1, 'hex')`
 
-	row := s.db.QueryRowContext(ctx, q, digest)
+	row := s.db.QueryRowContext(ctx, q, d.Hex())
 
 	return scanFullManifestList(row)
 }
 
 // FindAll finds all manifest lists.
 func (s *manifestListStore) FindAll(ctx context.Context) (models.ManifestLists, error) {
-	q := `SELECT id, schema_version, media_type, digest, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -127,7 +132,7 @@ func (s *manifestListStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests associated with a manifest list, through the ManifestListItem relationship entity.
 func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest, m.configuration_id,
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.configuration_id,
 		m.payload, m.created_at, m.marked_at, m.deleted_at FROM manifests as m
 		JOIN manifest_list_items as mli ON mli.manifest_id = m.id
 		JOIN manifest_lists as ml ON ml.id = mli.manifest_list_id
@@ -158,10 +163,10 @@ func (s *manifestListStore) Repositories(ctx context.Context, ml *models.Manifes
 
 // Create saves a new ManifestList.
 func (s *manifestListStore) Create(ctx context.Context, ml *models.ManifestList) error {
-	q := `INSERT INTO manifest_lists (schema_version, media_type, digest, payload)
-		VALUES ($1, $2, $3, $4) RETURNING id, created_at`
+	q := `INSERT INTO manifest_lists (schema_version, media_type, digest_hex, payload)
+		VALUES ($1, $2, decode($3, 'hex'), $4) RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, ml.SchemaVersion, ml.MediaType, ml.Digest, ml.Payload)
+	row := s.db.QueryRowContext(ctx, q, ml.SchemaVersion, ml.MediaType, ml.Digest.Hex(), ml.Payload)
 	if err := row.Scan(&ml.ID, &ml.CreatedAt); err != nil {
 		return fmt.Errorf("error creating manifest list: %w", err)
 	}
@@ -171,9 +176,10 @@ func (s *manifestListStore) Create(ctx context.Context, ml *models.ManifestList)
 
 // Update updates an existing manifest list.
 func (s *manifestListStore) Update(ctx context.Context, ml *models.ManifestList) error {
-	q := "UPDATE manifest_lists SET (schema_version, media_type, digest, payload) = ($1, $2, $3, $4) WHERE id = $5"
+	q := `UPDATE manifest_lists
+		SET (schema_version, media_type, digest_hex, payload) = ($1, $2, decode($3, 'hex'), $4) WHERE id = $5`
 
-	res, err := s.db.ExecContext(ctx, q, ml.SchemaVersion, ml.MediaType, ml.Digest, ml.Payload, ml.ID)
+	res, err := s.db.ExecContext(ctx, q, ml.SchemaVersion, ml.MediaType, ml.Digest.Hex(), ml.Payload, ml.ID)
 	if err != nil {
 		return fmt.Errorf("error updating manifest list: %w", err)
 	}

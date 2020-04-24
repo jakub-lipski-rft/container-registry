@@ -214,7 +214,7 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests associated with a repository.
 func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest, m.configuration_id, m.payload,
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.configuration_id, m.payload,
 		m.created_at, m.marked_at, m.deleted_at FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories as r ON r.id = rm.repository_id
@@ -230,7 +230,7 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 
 // ManifestLists finds all manifest lists associated with a repository.
 func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest, ml.payload, ml.created_at,
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at,
 		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
 		JOIN repositories as r ON r.id = rml.repository_id

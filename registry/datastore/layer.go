@@ -7,13 +7,14 @@ import (
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/opencontainers/go-digest"
 )
 
 // LayerReader is the interface that defines read operations for a layer store.
 type LayerReader interface {
 	FindAll(ctx context.Context) (models.Layers, error)
 	FindByID(ctx context.Context, id int) (*models.Layer, error)
-	FindByDigest(ctx context.Context, digest string) (*models.Layer, error)
+	FindByDigest(ctx context.Context, d digest.Digest) (*models.Layer, error)
 	Count(ctx context.Context) (int, error)
 	Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error)
 }
@@ -44,14 +45,16 @@ func NewLayerStore(db Queryer) *layerStore {
 }
 
 func scanFullLayer(row *sql.Row) (*models.Layer, error) {
+	var digestHex []byte
 	l := new(models.Layer)
 
-	if err := row.Scan(&l.ID, &l.MediaType, &l.Digest, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt); err != nil {
+	if err := row.Scan(&l.ID, &l.MediaType, &digestHex, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scanning layer: %w", err)
 		}
 		return nil, nil
 	}
+	l.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 
 	return l, nil
 }
@@ -61,10 +64,14 @@ func scanFullLayers(rows *sql.Rows) (models.Layers, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var digestHex []byte
 		l := new(models.Layer)
-		if err := rows.Scan(&l.ID, &l.MediaType, &l.Digest, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt); err != nil {
+
+		err := rows.Scan(&l.ID, &l.MediaType, &digestHex, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt)
+		if err != nil {
 			return nil, fmt.Errorf("error scanning layer: %w", err)
 		}
+		l.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 		ll = append(ll, l)
 	}
 	if err := rows.Err(); err != nil {
@@ -76,23 +83,24 @@ func scanFullLayers(rows *sql.Rows) (models.Layers, error) {
 
 // FindByID finds a layer by ID.
 func (s *layerStore) FindByID(ctx context.Context, id int) (*models.Layer, error) {
-	q := "SELECT id, media_type, digest, size, created_at, marked_at, deleted_at FROM layers WHERE id = $1"
+	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at FROM layers WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullLayer(row)
 }
 
 // FindByDigest finds a layer by digest.
-func (s *layerStore) FindByDigest(ctx context.Context, digest string) (*models.Layer, error) {
-	q := "SELECT id, media_type, digest, size, created_at, marked_at, deleted_at FROM layers WHERE digest = $1"
-	row := s.db.QueryRowContext(ctx, q, digest)
+func (s *layerStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Layer, error) {
+	q := `SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at
+		FROM layers WHERE digest_hex = decode($1, 'hex')`
+	row := s.db.QueryRowContext(ctx, q, d.Hex())
 
 	return scanFullLayer(row)
 }
 
 // FindAll finds all layers.
 func (s *layerStore) FindAll(ctx context.Context) (models.Layers, error) {
-	q := "SELECT id, media_type, digest, size, created_at, marked_at, deleted_at FROM layers"
+	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at FROM layers"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding layers: %w", err)
@@ -115,7 +123,7 @@ func (s *layerStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests that reference a layer.
 func (s *layerStore) Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest, m.configuration_id,
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.configuration_id,
 		m.payload, m.created_at, m.marked_at, m.deleted_at FROM manifests as m
 		JOIN manifest_layers as ml ON ml.manifest_id = m.id
 		JOIN layers as l ON l.id = ml.layer_id
@@ -131,9 +139,10 @@ func (s *layerStore) Manifests(ctx context.Context, l *models.Layer) (models.Man
 
 // Create saves a new layer.
 func (s *layerStore) Create(ctx context.Context, l *models.Layer) error {
-	q := "INSERT INTO layers (media_type, digest, size) VALUES ($1, $2, $3) RETURNING id, created_at"
+	q := `INSERT INTO layers (media_type, digest_hex, size) VALUES ($1, decode($2, 'hex'), $3)
+		RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, l.MediaType, l.Digest, l.Size)
+	row := s.db.QueryRowContext(ctx, q, l.MediaType, l.Digest.Hex(), l.Size)
 	if err := row.Scan(&l.ID, &l.CreatedAt); err != nil {
 		return fmt.Errorf("error creating layer: %w", err)
 	}
@@ -143,9 +152,9 @@ func (s *layerStore) Create(ctx context.Context, l *models.Layer) error {
 
 // Update updates an existing layer.
 func (s *layerStore) Update(ctx context.Context, l *models.Layer) error {
-	q := "UPDATE layers SET (media_type, digest, size) = ($1, $2, $3) WHERE id = $4"
+	q := "UPDATE layers SET (media_type, digest_hex, size) = ($1, decode($2, 'hex'), $3) WHERE id = $4"
 
-	res, err := s.db.ExecContext(ctx, q, l.MediaType, l.Digest, l.Size, l.ID)
+	res, err := s.db.ExecContext(ctx, q, l.MediaType, l.Digest.Hex(), l.Size, l.ID)
 	if err != nil {
 		return fmt.Errorf("error updating layer: %w", err)
 	}

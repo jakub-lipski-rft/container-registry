@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/opencontainers/go-digest"
 )
 
 type Repository struct {
@@ -21,7 +23,7 @@ type Repositories []*Repository
 type ManifestConfiguration struct {
 	ID        int
 	MediaType string
-	Digest    string
+	Digest    digest.Digest
 	Size      int64
 	Payload   json.RawMessage
 	CreatedAt time.Time
@@ -35,7 +37,7 @@ type Manifest struct {
 	ID              int
 	SchemaVersion   int
 	MediaType       string
-	Digest          string
+	Digest          digest.Digest
 	ConfigurationID sql.NullInt64
 	Payload         json.RawMessage
 	CreatedAt       time.Time
@@ -64,7 +66,7 @@ type Tags []*Tag
 type Layer struct {
 	ID        int
 	MediaType string
-	Digest    string
+	Digest    digest.Digest
 	Size      int64
 	CreatedAt time.Time
 	MarkedAt  sql.NullTime
@@ -78,7 +80,7 @@ type ManifestList struct {
 	ID            int
 	SchemaVersion int
 	MediaType     sql.NullString
-	Digest        string
+	Digest        digest.Digest
 	Payload       json.RawMessage
 	CreatedAt     time.Time
 	MarkedAt      sql.NullTime

@@ -87,7 +87,7 @@ func TestManifestStore_FindByDigest(t *testing.T) {
 func TestManifestStore_FindByDigest_NotFound(t *testing.T) {
 	s := datastore.NewManifestStore(suite.db)
 
-	m, err := s.FindByDigest(suite.ctx, "sha256:78cc6esuite.db833591fb9d0ec5a0ac141571de42a6c3f23f042598810815b08417f2")
+	m, err := s.FindByDigest(suite.ctx, "sha256:16b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f")
 	require.Nil(t, m)
 	require.NoError(t, err)
 }

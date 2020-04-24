@@ -7,13 +7,14 @@ import (
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/opencontainers/go-digest"
 )
 
 // ManifestConfigurationReader is the interface that defines read operations for a manifest configuration store.
 type ManifestConfigurationReader interface {
 	FindAll(ctx context.Context) (models.ManifestConfigurations, error)
 	FindByID(ctx context.Context, id int) (*models.ManifestConfiguration, error)
-	FindByDigest(ctx context.Context, digest string) (*models.ManifestConfiguration, error)
+	FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestConfiguration, error)
 	Count(ctx context.Context) (int, error)
 }
 
@@ -42,14 +43,16 @@ func NewManifestConfigurationStore(db Queryer) *manifestConfigurationStore {
 }
 
 func scanFullManifestConfiguration(row *sql.Row) (*models.ManifestConfiguration, error) {
+	var digestHex []byte
 	c := new(models.ManifestConfiguration)
 
-	if err := row.Scan(&c.ID, &c.MediaType, &c.Digest, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt); err != nil {
+	if err := row.Scan(&c.ID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest configuration: %w", err)
 		}
 		return nil, nil
 	}
+	c.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 
 	return c, nil
 }
@@ -59,10 +62,12 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 	defer rows.Close()
 
 	for rows.Next() {
+		var digestHex []byte
 		c := new(models.ManifestConfiguration)
-		if err := rows.Scan(&c.ID, &c.MediaType, &c.Digest, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt); err != nil {
 			return nil, fmt.Errorf("error scanning manifest configuration: %w", err)
 		}
+		c.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
 		cc = append(cc, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -74,7 +79,7 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 
 // FindByID finds a manifest configuration by ID.
 func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int) (*models.ManifestConfiguration, error) {
-	q := `SELECT id, media_type, digest, size, payload, created_at, deleted_at
+	q := `SELECT id, media_type, digest_hex, size, payload, created_at, deleted_at
 		FROM manifest_configurations WHERE id = $1`
 	row := s.db.QueryRowContext(ctx, q, id)
 
@@ -82,17 +87,17 @@ func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int) (*mod
 }
 
 // FindByDigest finds a manifest configuration by the digest.
-func (s *manifestConfigurationStore) FindByDigest(ctx context.Context, digest string) (*models.ManifestConfiguration, error) {
-	q := `SELECT id, media_type, digest, size, payload, created_at, deleted_at
-		FROM manifest_configurations WHERE digest = $1`
-	row := s.db.QueryRowContext(ctx, q, digest)
+func (s *manifestConfigurationStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestConfiguration, error) {
+	q := `SELECT id, media_type, digest_hex, size, payload, created_at, deleted_at
+		FROM manifest_configurations WHERE digest_hex = decode($1, 'hex')`
+	row := s.db.QueryRowContext(ctx, q, d.Hex())
 
 	return scanFullManifestConfiguration(row)
 }
 
 // FindAll finds all manifest configurations.
 func (s *manifestConfigurationStore) FindAll(ctx context.Context) ([]*models.ManifestConfiguration, error) {
-	q := "SELECT id, media_type, digest, size, payload, created_at, deleted_at FROM manifest_configurations"
+	q := "SELECT id, media_type, digest_hex, size, payload, created_at, deleted_at FROM manifest_configurations"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding manifest configurations: %w", err)
@@ -115,10 +120,10 @@ func (s *manifestConfigurationStore) Count(ctx context.Context) (int, error) {
 
 // Create saves a new manifest configuration.
 func (s *manifestConfigurationStore) Create(ctx context.Context, c *models.ManifestConfiguration) error {
-	q := `INSERT INTO manifest_configurations (media_type, digest, size, payload)
-		VALUES ($1, $2, $3, $4) RETURNING id, created_at`
+	q := `INSERT INTO manifest_configurations (media_type, digest_hex, size, payload)
+		VALUES ($1, decode($2, 'hex'), $3, $4) RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, c.MediaType, c.Digest, c.Size, c.Payload)
+	row := s.db.QueryRowContext(ctx, q, c.MediaType, c.Digest.Hex(), c.Size, c.Payload)
 	if err := row.Scan(&c.ID, &c.CreatedAt); err != nil {
 		return fmt.Errorf("error creating manifest configuration: %w", err)
 	}
@@ -128,9 +133,10 @@ func (s *manifestConfigurationStore) Create(ctx context.Context, c *models.Manif
 
 // Update updates an existing manifest configuration.
 func (s *manifestConfigurationStore) Update(ctx context.Context, c *models.ManifestConfiguration) error {
-	q := "UPDATE manifest_configurations SET (media_type, digest, size, payload) = ($1, $2, $3, $4) WHERE id = $5"
+	q := `UPDATE manifest_configurations
+		SET (media_type, digest_hex, size, payload) = ($1, decode($2, 'hex'), $3, $4) WHERE id = $5`
 
-	res, err := s.db.ExecContext(ctx, q, c.MediaType, c.Digest, c.Size, c.Payload, c.ID)
+	res, err := s.db.ExecContext(ctx, q, c.MediaType, c.Digest.Hex(), c.Size, c.Payload, c.ID)
 	if err != nil {
 		return fmt.Errorf("error updating manifest configuration: %w", err)
 	}

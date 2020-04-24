@@ -84,8 +84,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
 	</column>
-	<column name="digest" not-null="true">
-		<type name="text" length="0"/>
+	<column name="digest_hex" not-null="true">
+		<type name="bytea" length="0"/>
 	</column>
 	<column name="size" not-null="true">
 		<type name="bigint" length="0"/>
@@ -102,8 +102,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_manifest_configs" type="pk-constr" table="public.manifest_configurations">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifest_configurations_digest" type="uq-constr" table="public.manifest_configurations">
-		<columns names="digest" ref-type="src-columns"/>
+	<constraint name="uq_manifest_configurations_digest_hex" type="uq-constr" table="public.manifest_configurations">
+		<columns names="digest_hex" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -125,8 +125,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
 	</column>
-	<column name="digest" not-null="true">
-		<type name="text" length="0"/>
+	<column name="digest_hex" not-null="true">
+		<type name="bytea" length="0"/>
 	</column>
 	<column name="configuration_id">
 		<type name="integer" length="0"/>
@@ -146,8 +146,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_manifests" type="pk-constr" table="public.manifests">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifests_digest" type="uq-constr" table="public.manifests">
-		<columns names="digest" ref-type="src-columns"/>
+	<constraint name="uq_manifests_digest_hex" type="uq-constr" table="public.manifests">
+		<columns names="digest_hex" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -166,8 +166,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
 	</column>
-	<column name="digest" not-null="true">
-		<type name="text" length="0"/>
+	<column name="digest_hex" not-null="true">
+		<type name="bytea" length="0"/>
 	</column>
 	<column name="size" not-null="true">
 		<type name="bigint" length="0"/>
@@ -184,8 +184,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_layers" type="pk-constr" table="public.layers">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_layers_digest" type="uq-constr" table="public.layers">
-		<columns names="digest" ref-type="src-columns"/>
+	<constraint name="uq_layers_digest_hex" type="uq-constr" table="public.layers">
+		<columns names="digest_hex" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -239,8 +239,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="media_type">
 		<type name="text" length="0"/>
 	</column>
-	<column name="digest" not-null="true">
-		<type name="text" length="0"/>
+	<column name="digest_hex" not-null="true">
+		<type name="bytea" length="0"/>
 	</column>
 	<column name="payload" not-null="true">
 		<type name="json" length="0"/>
@@ -257,8 +257,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifest_lists_digest" type="uq-constr" table="public.manifest_lists">
-		<columns names="digest" ref-type="src-columns"/>
+	<constraint name="uq_manifest_lists_digest_hex" type="uq-constr" table="public.manifest_lists">
+		<columns names="digest_hex" ref-type="src-columns"/>
 	</constraint>
 </table>
 

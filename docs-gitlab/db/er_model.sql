@@ -67,13 +67,13 @@ CREATE SEQUENCE public.manifest_configurations_id_seq
 CREATE TABLE public.manifest_configurations (
 	id integer NOT NULL DEFAULT nextval('public.manifest_configurations_id_seq'::regclass),
 	media_type text NOT NULL,
-	digest text NOT NULL,
+	digest_hex bytea NOT NULL,
 	size bigint NOT NULL,
 	payload json NOT NULL,
 	created_at timestamp NOT NULL DEFAULT now(),
 	deleted_at timestamp,
 	CONSTRAINT pk_manifest_configs PRIMARY KEY (id),
-	CONSTRAINT uq_manifest_configurations_digest UNIQUE (digest)
+	CONSTRAINT uq_manifest_configurations_digest_hex UNIQUE (digest_hex)
 
 );
 -- ddl-end --
@@ -100,14 +100,14 @@ CREATE TABLE public.manifests (
 	id integer NOT NULL DEFAULT nextval('public.manifests_id_seq'::regclass),
 	schema_version integer NOT NULL,
 	media_type text NOT NULL,
-	digest text NOT NULL,
+	digest_hex bytea NOT NULL,
 	configuration_id integer,
 	payload json NOT NULL,
 	created_at timestamp NOT NULL DEFAULT now(),
 	marked_at timestamp,
 	deleted_at timestamp,
 	CONSTRAINT pk_manifests PRIMARY KEY (id),
-	CONSTRAINT uq_manifests_digest UNIQUE (digest)
+	CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex)
 
 );
 -- ddl-end --
@@ -133,13 +133,13 @@ CREATE SEQUENCE public.layers_id_seq
 CREATE TABLE public.layers (
 	id integer NOT NULL DEFAULT nextval('public.layers_id_seq'::regclass),
 	media_type text NOT NULL,
-	digest text NOT NULL,
+	digest_hex bytea NOT NULL,
 	size bigint NOT NULL,
 	created_at timestamp NOT NULL DEFAULT now(),
 	marked_at timestamp,
 	deleted_at timestamp,
 	CONSTRAINT pk_layers PRIMARY KEY (id),
-	CONSTRAINT uq_layers_digest UNIQUE (digest)
+	CONSTRAINT uq_layers_digest_hex UNIQUE (digest_hex)
 
 );
 -- ddl-end --
@@ -196,13 +196,13 @@ CREATE TABLE public.manifest_lists (
 	id integer NOT NULL DEFAULT nextval('public.manifest_lists_id_seq'::regclass),
 	schema_version integer NOT NULL,
 	media_type text,
-	digest text NOT NULL,
+	digest_hex bytea NOT NULL,
 	payload json NOT NULL,
 	created_at timestamp NOT NULL DEFAULT now(),
 	marked_at timestamp,
 	deleted_at timestamp,
 	CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
-	CONSTRAINT uq_manifest_lists_digest UNIQUE (digest)
+	CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex)
 
 );
 -- ddl-end --
