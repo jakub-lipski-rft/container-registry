@@ -1,4 +1,4 @@
-package handlers
+package handlers_test
 
 import (
 	"bytes"
@@ -29,8 +29,10 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
+	registryhandlers "github.com/docker/distribution/registry/handlers"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/factory"
+	"github.com/docker/distribution/registry/storage/driver/inmemory"
 	_ "github.com/docker/distribution/registry/storage/driver/testdriver"
 	"github.com/docker/distribution/testutil"
 	"github.com/docker/libtrust"
@@ -38,20 +40,49 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
-type configOpt int
+func init() {
+	factory.Register("sharedinmemorydriver", &sharedInMemoryDriverFactory{make(map[string]*inmemory.Driver)})
+}
+
+type configOpt func(*configuration.Configuration)
+
+func withDelete(config *configuration.Configuration) {
+	config.Storage["delete"] = configuration.Parameters{"enabled": true}
+}
+
+func withSchema1Compatibility(config *configuration.Configuration) {
+	config.Compatibility.Schema1.Enabled = true
+}
+
+func withAccessLog(config *configuration.Configuration) {
+	config.Log.AccessLog.Disabled = false
+}
+
+func withReadOnly(config *configuration.Configuration) {
+	if _, ok := config.Storage["maintenance"]; !ok {
+		config.Storage["maintenance"] = configuration.Parameters{}
+	}
+
+	config.Storage["maintenance"]["readonly"] = map[interface{}]interface{}{"enabled": true}
+}
+
+func withSharedInMemoryDriver(name string) configOpt {
+	return func(config *configuration.Configuration) {
+		config.Storage["sharedinmemorydriver"] = configuration.Parameters{"name": name}
+	}
+}
 
 var headerConfig = http.Header{
 	"X-Content-Type-Options": []string{"nosniff"},
 }
 
-const (
-	// digestSha256EmptyTar is the canonical sha256 digest of empty data
-	digestSha256EmptyTar = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+type tagsAPIResponse struct {
+	Name string   `json:"name"`
+	Tags []string `json:"tags"`
+}
 
-	withDelete configOpt = iota
-	withSchema1Compatibility
-	withAccessLog
-)
+// digestSha256EmptyTar is the canonical sha256 digest of empty data
+const digestSha256EmptyTar = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 // TestCheckAPI hits the base endpoint (/v2/) ensures we return the specified
 // 200 OK response.
@@ -233,33 +264,51 @@ func contains(elems []string, e string) bool {
 }
 
 func newConfig(opts ...configOpt) configuration.Configuration {
-	var deleteEnabled, schema1CompatibilityEnabled, accessLogEnabled bool
-
-	for _, o := range opts {
-		switch o {
-		case withDelete:
-			deleteEnabled = true
-		case withSchema1Compatibility:
-			schema1CompatibilityEnabled = true
-		case withAccessLog:
-			accessLogEnabled = true
-		}
-	}
-
-	config := configuration.Configuration{
+	config := &configuration.Configuration{
 		Storage: configuration.Storage{
-			"testdriver": configuration.Parameters{},
-			"delete":     configuration.Parameters{"enabled": deleteEnabled},
-			"maintenance": configuration.Parameters{"uploadpurging": map[interface{}]interface{}{
-				"enabled": false,
-			}},
+			"maintenance": configuration.Parameters{
+				"uploadpurging": map[interface{}]interface{}{"enabled": false},
+			},
 		},
 	}
-	config.Compatibility.Schema1.Enabled = schema1CompatibilityEnabled
 	config.HTTP.Headers = headerConfig
-	config.Log.AccessLog.Disabled = !accessLogEnabled
 
-	return config
+	for _, o := range opts {
+		o(config)
+	}
+
+	// If no driver was configured, default to test driver, if multiple drivers
+	// were configured, this will panic.
+	if config.Storage.Type() == "" {
+		config.Storage["testdriver"] = configuration.Parameters{}
+	}
+
+	return *config
+}
+
+// sharedInMemoryDriverFactory implements the factory.StorageDriverFactory interface.
+type sharedInMemoryDriverFactory struct {
+	drivers map[string]*inmemory.Driver
+}
+
+// Create returns a shared instance of the inmemory storage driver by name,
+// or creates a new one if it does not exist.
+func (factory *sharedInMemoryDriverFactory) Create(parameters map[string]interface{}) (storagedriver.StorageDriver, error) {
+	n, ok := parameters["name"]
+	if !ok {
+		return nil, errors.New("sharedInMemoryDriverFactory: parameter 'name' must be specified")
+	}
+
+	name, ok := n.(string)
+	if !ok {
+		return nil, errors.New("sharedInMemoryDriverFactory: parameter 'name' must be a string")
+	}
+
+	if _, ok := factory.drivers[name]; !ok {
+		factory.drivers[name] = inmemory.New()
+	}
+
+	return factory.drivers[name], nil
 }
 
 func TestURLPrefix(t *testing.T) {
@@ -744,8 +793,8 @@ func TestDeleteDisabled(t *testing.T) {
 }
 
 func TestDeleteReadOnly(t *testing.T) {
-	env := newTestEnv(t, withDelete)
-	defer env.Shutdown()
+	setupEnv := newTestEnv(t, withSharedInMemoryDriver("TestDeleteReadOnlyDriver"))
+	defer setupEnv.Shutdown()
 
 	imageName, _ := reference.WithName("foo/bar")
 	// "build" our layer file
@@ -755,14 +804,18 @@ func TestDeleteReadOnly(t *testing.T) {
 	}
 
 	ref, _ := reference.WithDigest(imageName, layerDigest)
+	uploadURLBase, _ := startPushLayer(t, setupEnv, imageName)
+	pushLayer(t, setupEnv.builder, imageName, layerDigest, uploadURLBase, layerFile)
+
+	// Reconfigure environment with withReadOnly enabled.
+	setupEnv.Shutdown()
+	env := newTestEnv(t, withSchema1Compatibility, withSharedInMemoryDriver("TestDeleteReadOnlyDriver"), withReadOnly)
+	defer env.Shutdown()
+
 	layerURL, err := env.builder.BuildBlobURL(ref)
 	if err != nil {
 		t.Fatalf("Error building blob URL")
 	}
-	uploadURLBase, _ := startPushLayer(t, env, imageName)
-	pushLayer(t, env.builder, imageName, layerDigest, uploadURLBase, layerFile)
-
-	env.app.readOnly = true
 
 	resp, err := httpDelete(layerURL)
 	if err != nil {
@@ -773,9 +826,8 @@ func TestDeleteReadOnly(t *testing.T) {
 }
 
 func TestStartPushReadOnly(t *testing.T) {
-	env := newTestEnv(t, withDelete)
+	env := newTestEnv(t, withDelete, withReadOnly)
 	defer env.Shutdown()
-	env.app.readOnly = true
 
 	imageName, _ := reference.WithName("foo/bar")
 
@@ -1387,21 +1439,21 @@ func testManifestAPISchema2(t *testing.T, env *testEnv, imageName reference.Name
 	sampleConfig := []byte(`{
 		"architecture": "amd64",
 		"history": [
-		  {
-		    "created": "2015-10-31T22:22:54.690851953Z",
-		    "created_by": "/bin/sh -c #(nop) ADD file:a3bc1e842b69636f9df5256c49c5374fb4eef1e281fe3f282c65fb853ee171c5 in /"
-		  },
-		  {
-		    "created": "2015-10-31T22:22:55.613815829Z",
-		    "created_by": "/bin/sh -c #(nop) CMD [\"sh\"]"
-		  }
+			{
+				"created": "2015-10-31T22:22:54.690851953Z",
+				"created_by": "/bin/sh -c #(nop) ADD file:a3bc1e842b69636f9df5256c49c5374fb4eef1e281fe3f282c65fb853ee171c5 in /"
+			},
+			{
+				"created": "2015-10-31T22:22:55.613815829Z",
+				"created_by": "/bin/sh -c #(nop) CMD [\"sh\"]"
+			}
 		],
 		"rootfs": {
-		  "diff_ids": [
-		    "sha256:c6f988f4874bb0add23a778f753c65efe992244e148a1d2ec2a8b664fb66bbd1",
-		    "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
-		  ],
-		  "type": "layers"
+			"diff_ids": [
+				"sha256:c6f988f4874bb0add23a778f753c65efe992244e148a1d2ec2a8b664fb66bbd1",
+				"sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+			],
+			"type": "layers"
 		}
 	}`)
 	sampleConfigDigest := digest.FromBytes(sampleConfig)
@@ -2045,10 +2097,8 @@ func TestTagsAPITagDeleteAllowedMethods(t *testing.T) {
 }
 
 func TestTagsAPITagDeleteAllowedMethodsReadOnly(t *testing.T) {
-	env := newTestEnv(t)
+	env := newTestEnv(t, withReadOnly)
 	defer env.Shutdown()
-
-	env.app.readOnly = true
 
 	imageName, err := reference.WithName("foo/bar")
 	checkErr(t, err, "building named object")
@@ -2124,22 +2174,26 @@ func TestTagsAPITagDeleteUnknown(t *testing.T) {
 }
 
 func TestTagsAPITagDeleteReadOnly(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility)
-	defer env.Shutdown()
+
+	setupEnv := newTestEnv(t, withSchema1Compatibility, withSharedInMemoryDriver("TestTagsAPITagDeleteReadOnly"))
+	defer setupEnv.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
 	checkErr(t, err, "building named object")
 
 	tag := "latest"
-	createRepository(env, t, imageName.Name(), tag)
+	createRepository(setupEnv, t, imageName.Name(), tag)
+
+	// Reconfigure environment with withReadOnly enabled.
+	setupEnv.Shutdown()
+	env := newTestEnv(t, withSchema1Compatibility, withSharedInMemoryDriver("TestTagsAPITagDeleteReadOnly"), withReadOnly)
+	defer env.Shutdown()
 
 	ref, err := reference.WithTag(imageName, tag)
 	checkErr(t, err, "building tag reference")
 
 	tagURL, err := env.builder.BuildTagURL(ref)
 	checkErr(t, err, "building tag URL")
-
-	env.app.readOnly = true
 
 	resp, err := httpDelete(tagURL)
 	msg := "checking tag delete"
@@ -2213,7 +2267,7 @@ type testEnv struct {
 	pk      libtrust.PrivateKey
 	ctx     context.Context
 	config  configuration.Configuration
-	app     *App
+	app     *registryhandlers.App
 	server  *httptest.Server
 	builder *v2.URLBuilder
 }
@@ -2234,7 +2288,7 @@ func newTestEnv(t *testing.T, opts ...configOpt) *testEnv {
 func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *testEnv {
 	ctx := context.Background()
 
-	app := NewApp(ctx, config)
+	app := registryhandlers.NewApp(ctx, config)
 
 	var out io.Writer
 	if config.Log.AccessLog.Disabled {

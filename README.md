@@ -13,7 +13,8 @@ project with a new API design, focused around security and performance.
 
 <img src="https://www.docker.com/sites/default/files/oyster-registry-3.png" width=200px/>
 
-[![Circle CI](https://circleci.com/gh/docker/distribution/tree/master.svg?style=svg)](https://circleci.com/gh/docker/distribution/tree/master)
+[![pipeline status](https://gitlab.com/gitlab-org/container-registry/badges/release/2.9-gitlab/pipeline.svg)](https://gitlab.com/gitlab-org/container-registry/-/commits/release/2.9-gitlab)
+[![coverage report](https://gitlab.com/gitlab-org/container-registry/badges/release/2.9-gitlab/coverage.svg)](https://gitlab.com/gitlab-org/container-registry/-/commits/release/2.9-gitlab)
 [![GoDoc](https://godoc.org/github.com/docker/distribution?status.svg)](https://godoc.org/github.com/docker/distribution)
 
 This repository contains the following components:
