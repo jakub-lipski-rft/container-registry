@@ -1,1 +1,0 @@
-ALTER TABLE manifests ALTER COLUMN configuration_id DROP NOT NULL;

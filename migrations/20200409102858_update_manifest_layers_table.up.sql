@@ -1,1 +1,0 @@
-ALTER TABLE manifest_layers DROP COLUMN IF EXISTS marked_at CASCADE;

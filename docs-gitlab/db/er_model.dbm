@@ -34,17 +34,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <schema name="public" layer="0" rect-visible="true" fill-color="#e1e1e1" sql-disabled="true">
 </schema>
 
-<sequence name="repositories_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="repositories" layer="0" collapse-mode="1" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="560" y="40"/>
-	<column name="id" not-null="true" sequence="public.repositories_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="name" not-null="true">
 		<type name="text" length="0"/>
@@ -53,7 +49,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		<type name="text" length="0"/>
 	</column>
 	<column name="parent_id">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp" length="0"/>
@@ -69,17 +65,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="manifest_configurations_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="manifest_configurations" layer="0" collapse-mode="1" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="97" y="592"/>
-	<column name="id" not-null="true" sequence="public.manifest_configurations_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
@@ -107,17 +99,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="manifests_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="manifests" layer="0" collapse-mode="1" max-obj-count="10">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="205" y="335"/>
-	<column name="id" not-null="true" sequence="public.manifests_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="schema_version" not-null="true">
 		<type name="integer" length="0"/>
@@ -129,7 +117,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		<type name="bytea" length="0"/>
 	</column>
 	<column name="configuration_id">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="payload" not-null="true">
 		<type name="json" length="0"/>
@@ -151,17 +139,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="layers_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="layers" layer="0" collapse-mode="1" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="598" y="582"/>
-	<column name="id" not-null="true" sequence="public.layers_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
@@ -189,23 +173,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="manifest_layers_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="manifest_layers" layer="0" collapse-mode="1" max-obj-count="6">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="329" y="599"/>
-	<column name="id" not-null="true" sequence="public.manifest_layers_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="layer_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp" length="0"/>
@@ -221,17 +201,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="manifest_lists_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="manifest_lists" layer="0" collapse-mode="1" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="883" y="338"/>
-	<column name="id" not-null="true" sequence="public.manifest_lists_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="schema_version" not-null="true">
 		<type name="integer" length="0"/>
@@ -262,23 +238,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="manifest_list_items_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="manifest_list_items" layer="0" collapse-mode="1" max-obj-count="6">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="552" y="423"/>
-	<column name="id" not-null="true" sequence="public.manifest_list_items_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_list_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp" length="0"/>
@@ -294,29 +266,25 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<sequence name="tags_id_seq" cycle="false" start="1" increment="1" min-value="1" max-value="2147483647" cache="1">
-	<schema name="public"/>
-	<role name="postgres"/>
-</sequence>
-
 <table name="tags" layer="0" collapse-mode="1" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="218" y="75"/>
-	<column name="id" not-null="true" sequence="public.tags_id_seq">
-		<type name="integer" length="0"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="name" not-null="true">
 		<type name="text" length="0"/>
 	</column>
 	<column name="repository_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_id">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_list_id">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp" length="0"/>
@@ -341,17 +309,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="repository_manifests" layer="0" collapse-mode="1" max-obj-count="6">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="552" y="256"/>
-	<column name="id" not-null="true">
-		<type name="serial" length="0"/>
+	<position x="553" y="256"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="repository_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
-	<column name="created_at" not-null="true" default-value="NOW()">
+	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp" length="0"/>
 	</column>
 	<column name="deleted_at">
@@ -368,17 +337,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="repository_manifest_lists" layer="0" collapse-mode="1" max-obj-count="6">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="876" y="118"/>
-	<column name="id" not-null="true">
-		<type name="serial" length="0"/>
+	<position x="876" y="119"/>
+	<column name="id" not-null="true"
+	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="repository_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
 	<column name="manifest_list_id" not-null="true">
-		<type name="integer" length="0"/>
+		<type name="bigint" length="0"/>
 	</column>
-	<column name="created_at" not-null="true" default-value="NOW()">
+	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp" length="0"/>
 	</column>
 	<column name="deleted_at">

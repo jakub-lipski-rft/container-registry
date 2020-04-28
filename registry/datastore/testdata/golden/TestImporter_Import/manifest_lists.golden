@@ -1,4 +1,4 @@
-[{"id":1,"schema_version":2,"media_type":"application/vnd.docker.distribution.manifest.list.v2+json","payload":{
+[{"id":1,"schema_version":2,"media_type":"application/vnd.docker.distribution.manifest.list.v2+json","digest_hex":"\\xf8f5ca4728269ef4eecd49db2345a03f8ab9244e049fc2af96f7b422dd6df009","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
    "manifests": [
@@ -21,4 +21,4 @@
          }
       }
    ]
-},"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"deleted_at":null,"digest_hex":"\\xf8f5ca4728269ef4eecd49db2345a03f8ab9244e049fc2af96f7b422dd6df009"}]
+},"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"deleted_at":null}]
