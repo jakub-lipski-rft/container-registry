@@ -902,6 +902,9 @@ func apiBase(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Length", fmt.Sprint(len(emptyJSON)))
 
+	w.Header().Set("Gitlab-Container-Registry-Version", strings.TrimPrefix(version.Version, "v"))
+	w.Header().Set("Gitlab-Container-Registry-Features", version.ExtFeatures)
+
 	fmt.Fprint(w, emptyJSON)
 }
 
