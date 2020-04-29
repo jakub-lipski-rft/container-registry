@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS manifest_configurations
     media_type text      NOT NULL,
     digest_hex bytea     NOT NULL,
     size       bigint    NOT NULL,
-    payload    json      NOT NULL,
+    payload    bytea     NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     deleted_at timestamp with time zone,
     CONSTRAINT pk_manifest_configs PRIMARY KEY (id),

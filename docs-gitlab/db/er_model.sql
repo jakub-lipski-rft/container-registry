@@ -41,9 +41,9 @@ CREATE TABLE public.manifest_configurations (
 	media_type text NOT NULL,
 	digest_hex bytea NOT NULL,
 	size bigint NOT NULL,
-	payload json NOT NULL,
-    created_at timestamp with time zone NOT NULL DEFAULT now(),
-    deleted_at timestamp with time zone,
+	payload bytea NOT NULL,
+	created_at timestamp with time zone NOT NULL DEFAULT now(),
+	deleted_at timestamp with time zone,
 	CONSTRAINT pk_manifest_configs PRIMARY KEY (id),
 	CONSTRAINT uq_manifest_configurations_digest_hex UNIQUE (digest_hex)
 
@@ -60,7 +60,7 @@ CREATE TABLE public.manifests (
 	media_type text NOT NULL,
 	digest_hex bytea NOT NULL,
 	configuration_id bigint,
-	payload json NOT NULL,
+	payload bytea NOT NULL,
 	created_at timestamp with time zone NOT NULL DEFAULT now(),
 	marked_at timestamp with time zone,
 	deleted_at timestamp with time zone,
@@ -113,10 +113,10 @@ CREATE TABLE public.manifest_lists (
 	schema_version integer NOT NULL,
 	media_type text,
 	digest_hex bytea NOT NULL,
-	payload json NOT NULL,
-    created_at timestamp with time zone NOT NULL DEFAULT now(),
-    marked_at timestamp with time zone,
-    deleted_at timestamp with time zone,
+	payload bytea NOT NULL,
+	created_at timestamp with time zone NOT NULL DEFAULT now(),
+	marked_at timestamp with time zone,
+	deleted_at timestamp with time zone,
 	CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
 	CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex)
 

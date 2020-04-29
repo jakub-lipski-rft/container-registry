@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS manifest_lists
     schema_version integer   NOT NULL,
     media_type     text,
     digest_hex     bytea     NOT NULL,
-    payload        json      NOT NULL,
+    payload        bytea     NOT NULL,
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
     marked_at      timestamp with time zone,
     deleted_at     timestamp with time zone,
