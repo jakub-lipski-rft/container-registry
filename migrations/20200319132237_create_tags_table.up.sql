@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS tags
     repository_id    bigint    NOT NULL,
     manifest_id      bigint,
     manifest_list_id bigint,
-    created_at       timestamp NOT NULL DEFAULT now(),
-    updated_at       timestamp,
-    deleted_at       timestamp,
+    created_at       timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at       timestamp with time zone,
+    deleted_at       timestamp with time zone,
     CONSTRAINT pk_tags PRIMARY KEY (id),
     CONSTRAINT fk_tags_repository_id FOREIGN KEY (repository_id)
         REFERENCES repositories (id) ON DELETE CASCADE,

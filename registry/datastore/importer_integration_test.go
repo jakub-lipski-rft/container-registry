@@ -60,7 +60,7 @@ func overrideDynamicData(tb testing.TB, actual []byte) []byte {
 	tb.Helper()
 
 	// the created_at timestamps for all entities change with every test run
-	re := regexp.MustCompile(`"created_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d*"`)
+	re := regexp.MustCompile(`"created_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d*\+\d{2}:\d{2}"`)
 	actual = re.ReplaceAllLiteral(actual, []byte(`"created_at":"2020-04-15T12:04:28.95584"`))
 
 	// schema 1 manifests have `signature` and `protected` attributes that changes with every test run

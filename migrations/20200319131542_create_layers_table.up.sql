@@ -4,9 +4,9 @@ CREATE TABLE IF NOT EXISTS layers
     media_type text      NOT NULL,
     digest_hex bytea     NOT NULL,
     size       bigint    NOT NULL,
-    created_at timestamp NOT NULL DEFAULT now(),
-    marked_at  timestamp,
-    deleted_at timestamp,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    marked_at  timestamp with time zone,
+    deleted_at timestamp with time zone,
     CONSTRAINT pk_layers PRIMARY KEY (id),
     CONSTRAINT uq_layers_digest_hex UNIQUE (digest_hex)
 );
