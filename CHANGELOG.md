@@ -1,4 +1,7 @@
 ## [Unreleased]
+## Added
+- registry/api/v2: Show version and supported extra features in custom headers
+
 ### Fixed
 - registry/storage: Fix panic during uploads purge
 
