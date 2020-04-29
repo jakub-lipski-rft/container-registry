@@ -193,6 +193,123 @@ CREATE TABLE public.repository_manifest_lists (
 -- ALTER TABLE public.repository_manifest_lists OWNER TO postgres;
 -- ddl-end --
 
+-- object: tags_repository_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.tags_repository_id_fkey CASCADE;
+CREATE INDEX tags_repository_id_fkey ON public.tags
+	USING btree
+	(
+	  repository_id
+	);
+-- ddl-end --
+
+-- object: tags_manifest_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.tags_manifest_id_fkey CASCADE;
+CREATE INDEX tags_manifest_id_fkey ON public.tags
+	USING btree
+	(
+	  manifest_id
+	);
+-- ddl-end --
+
+-- object: repositories_parent_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.repositories_parent_id_fkey CASCADE;
+CREATE INDEX repositories_parent_id_fkey ON public.repositories
+	USING btree
+	(
+	  parent_id
+	);
+-- ddl-end --
+
+-- object: manifest_layers_manifest_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.manifest_layers_manifest_id_fkey CASCADE;
+CREATE INDEX manifest_layers_manifest_id_fkey ON public.manifest_layers
+	USING btree
+	(
+	  manifest_id
+	);
+-- ddl-end --
+
+-- object: manifest_layers_layer_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.manifest_layers_layer_id_fkey CASCADE;
+CREATE INDEX manifest_layers_layer_id_fkey ON public.manifest_layers
+	USING btree
+	(
+	  layer_id
+	);
+-- ddl-end --
+
+-- object: manifest_list_items_manifest_list_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.manifest_list_items_manifest_list_id_fkey CASCADE;
+CREATE INDEX manifest_list_items_manifest_list_id_fkey ON public.manifest_list_items
+	USING btree
+	(
+	  manifest_list_id
+	);
+-- ddl-end --
+
+-- object: manifest_list_items_manifest_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.manifest_list_items_manifest_id_fkey CASCADE;
+CREATE INDEX manifest_list_items_manifest_id_fkey ON public.manifest_list_items
+	USING btree
+	(
+	  manifest_id
+	);
+-- ddl-end --
+
+-- object: tags_manifest_list_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.tags_manifest_list_id_fkey CASCADE;
+CREATE INDEX tags_manifest_list_id_fkey ON public.tags
+	USING btree
+	(
+	  manifest_list_id
+	);
+-- ddl-end --
+
+-- object: repository_manifests_repository_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.repository_manifests_repository_id_fkey CASCADE;
+CREATE INDEX repository_manifests_repository_id_fkey ON public.repository_manifests
+	USING btree
+	(
+	  repository_id
+	);
+-- ddl-end --
+
+-- object: repository_manifests_manifest_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.repository_manifests_manifest_id_fkey CASCADE;
+CREATE INDEX repository_manifests_manifest_id_fkey ON public.repository_manifests
+	USING btree
+	(
+	  manifest_id
+	);
+-- ddl-end --
+
+-- object: repository_manifest_lists_repository_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.repository_manifest_lists_repository_id_fkey CASCADE;
+CREATE INDEX repository_manifest_lists_repository_id_fkey ON public.repository_manifest_lists
+	USING btree
+	(
+	  repository_id
+	);
+-- ddl-end --
+
+-- object: repository_manifest_lists_manifest_list_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.repository_manifest_lists_manifest_list_id_fkey CASCADE;
+CREATE INDEX repository_manifest_lists_manifest_list_id_fkey ON public.repository_manifest_lists
+	USING btree
+	(
+	  manifest_list_id
+	);
+-- ddl-end --
+
+-- object: manifests_configuration_id_fkey | type: INDEX --
+-- DROP INDEX IF EXISTS public.manifests_configuration_id_fkey CASCADE;
+CREATE INDEX manifests_configuration_id_fkey ON public.manifests
+	USING btree
+	(
+	  configuration_id
+	);
+-- ddl-end --
+
 -- object: fk_repositories_parent_id | type: CONSTRAINT --
 -- ALTER TABLE public.repositories DROP CONSTRAINT IF EXISTS fk_repositories_parent_id CASCADE;
 ALTER TABLE public.repositories ADD CONSTRAINT fk_repositories_parent_id FOREIGN KEY (parent_id)

@@ -1,0 +1,15 @@
+BEGIN;
+DROP INDEX IF EXISTS repositories_parent_id_fkey;
+DROP INDEX IF EXISTS manifests_configuration_id_fkey;
+DROP INDEX IF EXISTS manifest_layers_manifest_id_fkey;
+DROP INDEX IF EXISTS manifest_layers_layer_id_fkey;
+DROP INDEX IF EXISTS manifest_list_items_manifest_list_id_fkey;
+DROP INDEX IF EXISTS manifest_list_items_manifest_id_fkey;
+DROP INDEX IF EXISTS tags_repository_id_fkey;
+DROP INDEX IF EXISTS tags_manifest_id_fkey;
+DROP INDEX IF EXISTS tags_manifest_list_id_fkey;
+DROP INDEX IF EXISTS repository_manifests_repository_id_fkey;
+DROP INDEX IF EXISTS repository_manifests_manifest_id_fkey;
+DROP INDEX IF EXISTS repository_manifest_lists_repository_id_fkey;
+DROP INDEX IF EXISTS repository_manifest_lists_manifest_list_id_fkey;
+COMMIT;
