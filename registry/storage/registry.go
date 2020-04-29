@@ -2,10 +2,12 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/storage/cache"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/libtrust"
@@ -25,6 +27,7 @@ type registry struct {
 	blobDescriptorServiceFactory distribution.BlobDescriptorServiceFactory
 	manifestURLs                 manifestURLs
 	driver                       storagedriver.StorageDriver
+	db                           *datastore.DB
 }
 
 // manifestURLs holds regular expressions for controlling manifest URL whitelisting
@@ -114,6 +117,17 @@ func BlobDescriptorCacheProvider(blobDescriptorCacheProvider cache.BlobDescripto
 			registry.blobServer.statter = statter
 			registry.blobDescriptorCacheProvider = blobDescriptorCacheProvider
 		}
+		return nil
+	}
+}
+
+// Database configures the registry to use the passed database.
+func Database(db *datastore.DB) RegistryOption {
+	return func(registry *registry) error {
+		if db == nil {
+			return fmt.Errorf("Registry.DatabaseEnabled: called with nil database")
+		}
+		registry.db = db
 		return nil
 	}
 }
