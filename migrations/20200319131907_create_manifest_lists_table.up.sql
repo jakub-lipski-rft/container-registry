@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS manifest_lists
     media_type     text,
     digest_hex     bytea     NOT NULL,
     payload        json      NOT NULL,
-    created_at     timestamp NOT NULL DEFAULT now(),
-    marked_at      timestamp,
-    deleted_at     timestamp,
+    created_at     timestamp with time zone NOT NULL DEFAULT now(),
+    marked_at      timestamp with time zone,
+    deleted_at     timestamp with time zone,
     CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
     CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex)
 );

@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS manifest_configurations
     digest_hex bytea     NOT NULL,
     size       bigint    NOT NULL,
     payload    json      NOT NULL,
-    created_at timestamp NOT NULL DEFAULT now(),
-    deleted_at timestamp,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    deleted_at timestamp with time zone,
     CONSTRAINT pk_manifest_configs PRIMARY KEY (id),
     CONSTRAINT uq_manifest_configurations_digest_hex UNIQUE (digest_hex)
 );

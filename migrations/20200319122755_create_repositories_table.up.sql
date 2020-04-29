@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS repositories
     name       text      NOT NULL,
     path       text      NOT NULL,
     parent_id  bigint,
-    created_at timestamp NOT NULL DEFAULT now(),
-    deleted_at timestamp,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    deleted_at timestamp with time zone,
     CONSTRAINT pk_repositories PRIMARY KEY (id),
     CONSTRAINT fk_repositories_parent_id FOREIGN KEY (parent_id)
         REFERENCES repositories (id) ON DELETE CASCADE,

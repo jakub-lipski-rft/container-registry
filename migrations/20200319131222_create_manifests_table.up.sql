@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS manifests
     digest_hex       bytea     NOT NULL,
     configuration_id bigint,
     payload          json      NOT NULL,
-    created_at       timestamp NOT NULL DEFAULT now(),
-    marked_at        timestamp,
-    deleted_at       timestamp,
+    created_at       timestamp with time zone NOT NULL DEFAULT now(),
+    marked_at        timestamp with time zone,
+    deleted_at       timestamp with time zone,
     CONSTRAINT pk_manifests PRIMARY KEY (id),
     CONSTRAINT fk_manifests_configuration_id FOREIGN KEY (configuration_id)
         REFERENCES manifest_configurations (id) ON DELETE CASCADE,
