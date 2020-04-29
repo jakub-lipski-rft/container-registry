@@ -5,7 +5,6 @@ package datastore_test
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"path"
 	"path/filepath"
@@ -90,10 +89,8 @@ func TestImporter_Import(t *testing.T) {
 	// dump each table as JSON and compare the output against reference snapshots (.golden files)
 	for _, tt := range testutil.AllTables {
 		t.Run(string(tt), func(t *testing.T) {
-			var actual []byte
-			q := fmt.Sprintf("SELECT json_agg(%s) FROM %s", tt, tt)
-			row := tx.QueryRowContext(suite.ctx, q)
-			require.NoError(t, row.Scan(&actual))
+			actual, err := tt.DumpAsJSON(suite.ctx, tx)
+			require.NoError(t, err, "error dumping table")
 
 			// see testdata/golden/TestImporter_Import/<table>.golden
 			p := filepath.Join(suite.goldenPath, t.Name()+".golden")

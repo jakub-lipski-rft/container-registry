@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS manifests
     media_type       text      NOT NULL,
     digest_hex       bytea     NOT NULL,
     configuration_id bigint,
-    payload          json      NOT NULL,
+    payload          bytea     NOT NULL,
     created_at       timestamp with time zone NOT NULL DEFAULT now(),
     marked_at        timestamp with time zone,
     deleted_at       timestamp with time zone,

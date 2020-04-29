@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -57,6 +58,72 @@ func (t table) truncate(db *datastore.DB) error {
 // seedFileName generates the expected seed filename based on the convention `<table name>.sql`.
 func (t table) seedFileName() string {
 	return fmt.Sprintf("%s.sql", t)
+}
+
+// DumpAsJSON dumps the table contents in JSON format using the PostgresSQL `json_agg` function. `bytea` columns are
+// automatically decoded for easy visualization/comparision.
+func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, error) {
+	var query string
+	switch t {
+	case ManifestConfigurationsTable:
+		s := `SELECT
+				json_agg(t)
+			FROM (
+				SELECT
+					id,
+					media_type,
+					encode(digest_hex, 'hex') as digest_hex,
+					size,
+					convert_from(payload, 'UTF8')::json AS payload,
+					created_at,
+					deleted_at
+				FROM %s
+			) t;`
+		query = fmt.Sprintf(s, t)
+	case ManifestsTable:
+		s := `SELECT
+				json_agg(t)
+			FROM (
+				SELECT
+					id,
+					schema_version,
+					media_type,
+					encode(digest_hex, 'hex') as digest_hex,
+					configuration_id,
+					convert_from(payload, 'UTF8')::json AS payload,
+					created_at,
+					marked_at,
+					deleted_at
+				FROM %s
+			) t;`
+		query = fmt.Sprintf(s, t)
+	case ManifestListsTable:
+		s := `SELECT
+				json_agg(t)
+			FROM (
+				SELECT
+					id,
+					schema_version,
+					media_type,
+					encode(digest_hex, 'hex') as digest_hex,
+					convert_from(payload, 'UTF8')::json AS payload,
+					created_at,
+					marked_at,
+					deleted_at
+				FROM %s
+			) t;`
+		query = fmt.Sprintf(s, t)
+	default:
+		query = fmt.Sprintf("SELECT json_agg(%s) FROM %s", t, t)
+	}
+
+	var dump []byte
+	row := db.QueryRowContext(ctx, query)
+	if err := row.Scan(&dump); err != nil {
+		return nil, err
+	}
+
+	return dump, nil
 }
 
 // NewDSN generates a new DSN for the test database based on environment variable configurations.
