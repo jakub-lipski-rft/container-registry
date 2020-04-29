@@ -1,3 +1,5 @@
+// +build integration
+
 package handlers_test
 
 import (
@@ -69,6 +71,23 @@ func withReadOnly(config *configuration.Configuration) {
 func withSharedInMemoryDriver(name string) configOpt {
 	return func(config *configuration.Configuration) {
 		config.Storage["sharedinmemorydriver"] = configuration.Parameters{"name": name}
+	}
+}
+
+func withDatabase(config *configuration.Configuration) {
+	port, err := strconv.Atoi(os.Getenv("REGISTRY_DATABASE_PORT"))
+	if err != nil {
+		panic(fmt.Sprintf("error parsing database port: %v", err))
+	}
+
+	config.Database = configuration.Database{
+		Enabled:  true,
+		Host:     os.Getenv("REGISTRY_DATABASE_HOST"),
+		Port:     port,
+		User:     os.Getenv("REGISTRY_DATABASE_USER"),
+		Password: os.Getenv("REGISTRY_DATABASE_PASSWORD"),
+		DBName:   "registry_test",
+		SSLMode:  os.Getenv("REGISTRY_DATABASE_SSLMODE"),
 	}
 }
 
