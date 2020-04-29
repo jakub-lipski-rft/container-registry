@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS manifests
     deleted_at       timestamp,
     CONSTRAINT pk_manifests PRIMARY KEY (id),
     CONSTRAINT fk_manifests_configuration_id FOREIGN KEY (configuration_id)
-        REFERENCES manifest_configurations (id)
-        ON DELETE CASCADE,
+        REFERENCES manifest_configurations (id) ON DELETE CASCADE,
     CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex)
 );
