@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS repositories
     deleted_at timestamp,
     CONSTRAINT pk_repositories PRIMARY KEY (id),
     CONSTRAINT fk_repositories_parent_id FOREIGN KEY (parent_id)
-        REFERENCES repositories (id)
-        ON DELETE CASCADE,
+        REFERENCES repositories (id) ON DELETE CASCADE,
     CONSTRAINT uq_repositories_path UNIQUE (path)
 );
