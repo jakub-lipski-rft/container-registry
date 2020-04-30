@@ -1,11 +1,14 @@
 package storage
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"path"
+	"text/scanner"
 	"time"
 
 	"github.com/docker/distribution"
@@ -406,4 +409,42 @@ func (bw *blobWriter) Reader() (io.ReadCloser, error) {
 	}
 
 	return readCloser, nil
+}
+
+func (bw *blobWriter) uploadIsConfigPayload(ctx context.Context, desc distribution.Descriptor) (bool, error) {
+	fr, err := newFileReader(ctx, bw.driver, bw.path, desc.Size)
+	if err != nil {
+		return false, fmt.Errorf("create file reader: %w", err)
+	}
+	defer fr.Close()
+
+	var isLikelyConfig bool
+	buf := bytes.NewBuffer([]byte{})
+
+	var s scanner.Scanner
+	s.Init(fr)
+	s.Error = func(s *scanner.Scanner, msg string) {} // Silence errors to stdout.
+
+	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+		// Look at the first token, ignoring whitespace and golang-style comments.
+		// If it's a `{`, then we have a might have a config payload.
+		if !isLikelyConfig && s.TokenText() == "{" {
+			isLikelyConfig = true
+		}
+
+		// If it is likely a config payload, it should be reasonably small enough to
+		// load into memory and check that it is valid json.
+		if isLikelyConfig {
+			buf.WriteString(s.TokenText())
+		} else {
+			// Otherwise, no need to scan any further.
+			return false, nil
+		}
+	}
+
+	if isLikelyConfig {
+		return json.Valid(buf.Bytes()), nil
+	}
+
+	return false, nil
 }
