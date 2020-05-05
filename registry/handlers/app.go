@@ -759,7 +759,10 @@ func (app *App) logError(ctx context.Context, errors errcode.Errors) {
 			e, _ := e1.(errcode.Error)
 			c = context.WithValue(ctx, errCodeKey{}, e.Code)
 			c = context.WithValue(c, errMessageKey{}, e.Message)
-			c = context.WithValue(c, errDetailKey{}, e.Detail)
+			// workaround for https://gitlab.com/gitlab-org/container-registry/-/issues/40 until logging can be
+			// refactored in https://gitlab.com/gitlab-org/container-registry/-/issues/31
+			d := map[string]interface{}{"data": e.Detail}
+			c = context.WithValue(c, errDetailKey{}, d)
 		case errcode.ErrorCode:
 			e, _ := e1.(errcode.ErrorCode)
 			c = context.WithValue(ctx, errCodeKey{}, e)
