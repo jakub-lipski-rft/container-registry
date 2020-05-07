@@ -9,5 +9,6 @@ CREATE TABLE IF NOT EXISTS manifests
     marked_at      timestamp with time zone,
     deleted_at     timestamp with time zone,
     CONSTRAINT pk_manifests PRIMARY KEY (id),
-    CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex)
+    CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex),
+    CONSTRAINT chk_manifests_media_type CHECK ((char_length(media_type) <= 255))
 );

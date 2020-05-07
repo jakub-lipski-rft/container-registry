@@ -4,6 +4,31 @@
 -- Project Site: pgmodeler.io
 -- Model Author: ---
 
+-- object: withspace | type: ROLE --
+-- DROP ROLE IF EXISTS withspace;
+CREATE ROLE withspace WITH 
+	INHERIT
+	LOGIN
+	ENCRYPTED PASSWORD '********';
+-- ddl-end --
+
+-- object: withspecial | type: ROLE --
+-- DROP ROLE IF EXISTS withspecial;
+CREATE ROLE withspecial WITH 
+	INHERIT
+	LOGIN
+	ENCRYPTED PASSWORD '********';
+-- ddl-end --
+
+-- object: normal | type: ROLE --
+-- DROP ROLE IF EXISTS normal;
+CREATE ROLE normal WITH 
+	INHERIT
+	LOGIN
+	ENCRYPTED PASSWORD '********';
+-- ddl-end --
+
+
 -- Database creation must be done outside a multicommand file.
 -- These commands were put in this file only as a convenience.
 -- -- object: registry | type: DATABASE --
@@ -27,7 +52,9 @@ CREATE TABLE public.repositories (
 	created_at timestamp with time zone NOT NULL DEFAULT now(),
 	deleted_at timestamp with time zone,
 	CONSTRAINT pk_repositories PRIMARY KEY (id),
-	CONSTRAINT uq_repositories_path UNIQUE (path)
+	CONSTRAINT uq_repositories_path UNIQUE (path),
+	CONSTRAINT chk_repositories_name CHECK ((char_length(name) <= 255)),
+	CONSTRAINT chk_repositories_path CHECK ((char_length(path) <= 255))
 
 );
 -- ddl-end --
@@ -47,7 +74,8 @@ CREATE TABLE public.manifest_configurations (
 	deleted_at timestamp with time zone,
 	CONSTRAINT pk_manifest_configurations PRIMARY KEY (id),
 	CONSTRAINT uq_manifest_configurations_digest_hex UNIQUE (digest_hex),
-	CONSTRAINT uq_manifest_configurations_manifest_id UNIQUE (manifest_id)
+	CONSTRAINT uq_manifest_configurations_manifest_id UNIQUE (manifest_id),
+	CONSTRAINT chk_manifest_configurations_media_type CHECK ((char_length(media_type) <= 255))
 
 );
 -- ddl-end --
@@ -66,7 +94,8 @@ CREATE TABLE public.manifests (
 	marked_at timestamp with time zone,
 	deleted_at timestamp with time zone,
 	CONSTRAINT pk_manifests PRIMARY KEY (id),
-	CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex)
+	CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex),
+	CONSTRAINT chk_manifests_media_type CHECK ((char_length(media_type) <= 255))
 
 );
 -- ddl-end --
@@ -84,7 +113,8 @@ CREATE TABLE public.layers (
 	marked_at timestamp with time zone,
 	deleted_at timestamp with time zone,
 	CONSTRAINT pk_layers PRIMARY KEY (id),
-	CONSTRAINT uq_layers_digest_hex UNIQUE (digest_hex)
+	CONSTRAINT uq_layers_digest_hex UNIQUE (digest_hex),
+	CONSTRAINT chk_layers_media_type CHECK ((char_length(media_type) <= 255))
 
 );
 -- ddl-end --
@@ -119,7 +149,8 @@ CREATE TABLE public.manifest_lists (
 	marked_at timestamp with time zone,
 	deleted_at timestamp with time zone,
 	CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
-	CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex)
+	CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex),
+	CONSTRAINT chk_manifest_lists_media_type CHECK ((char_length(media_type) <= 255))
 
 );
 -- ddl-end --
@@ -155,6 +186,7 @@ CREATE TABLE public.tags (
 	deleted_at timestamp with time zone,
 	CONSTRAINT pk_tags PRIMARY KEY (id),
 	CONSTRAINT uq_tags_name_repository_id UNIQUE (name,repository_id),
+	CONSTRAINT chk_tags_name CHECK ((char_length(name) <= 255)),
 	CONSTRAINT chk_tags_manifest_id_manifest_list_id CHECK (((manifest_id is not null and manifest_list_id is null) or (manifest_id is null and manifest_list_id is not null)))
 
 );
@@ -302,15 +334,6 @@ CREATE INDEX repository_manifest_lists_manifest_list_id_fkey ON public.repositor
 	);
 -- ddl-end --
 
--- object: manifests_configuration_id_fkey | type: INDEX --
--- DROP INDEX IF EXISTS public.manifests_configuration_id_fkey CASCADE;
-CREATE INDEX manifests_configuration_id_fkey ON public.manifests
-	USING btree
-	(
-	  configuration_id
-	);
--- ddl-end --
-
 -- object: fk_repositories_parent_id | type: CONSTRAINT --
 -- ALTER TABLE public.repositories DROP CONSTRAINT IF EXISTS fk_repositories_parent_id CASCADE;
 ALTER TABLE public.repositories ADD CONSTRAINT fk_repositories_parent_id FOREIGN KEY (parent_id)
@@ -401,3 +424,35 @@ ALTER TABLE public.repository_manifest_lists ADD CONSTRAINT fk_repository_manife
 REFERENCES public.manifest_lists (id) MATCH FULL
 ON DELETE CASCADE ON UPDATE NO ACTION;
 -- ddl-end --
+
+-- object: grant_5af05d4d97 | type: PERMISSION --
+GRANT CONNECT,TEMPORARY
+   ON DATABASE registry
+   TO PUBLIC;
+-- ddl-end --
+
+-- object: grant_9b100fd7a2 | type: PERMISSION --
+GRANT CREATE,CONNECT,TEMPORARY
+   ON DATABASE registry
+   TO postgres;
+-- ddl-end --
+
+-- object: grant_d16b413508 | type: PERMISSION --
+GRANT CREATE,CONNECT,TEMPORARY
+   ON DATABASE registry
+   TO withspace;
+-- ddl-end --
+
+-- object: grant_ee32f68f10 | type: PERMISSION --
+GRANT CREATE,CONNECT,TEMPORARY
+   ON DATABASE registry
+   TO withspecial;
+-- ddl-end --
+
+-- object: grant_17a7054e8c | type: PERMISSION --
+GRANT CREATE,CONNECT,TEMPORARY
+   ON DATABASE registry
+   TO normal;
+-- ddl-end --
+
+

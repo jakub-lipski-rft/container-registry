@@ -12,5 +12,6 @@ CREATE TABLE IF NOT EXISTS manifest_configurations
     CONSTRAINT fk_manifest_configurations_manifest_id FOREIGN KEY (manifest_id)
         REFERENCES manifests (id) ON DELETE CASCADE,
     CONSTRAINT uq_manifest_configurations_digest_hex UNIQUE (digest_hex),
-    CONSTRAINT uq_manifest_configurations_manifest_id UNIQUE (manifest_id)
+    CONSTRAINT uq_manifest_configurations_manifest_id UNIQUE (manifest_id),
+    CONSTRAINT chk_manifest_configurations_media_type CHECK ((char_length(media_type) <= 255))
 );
