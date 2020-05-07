@@ -20,7 +20,7 @@ func reloadManifestFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
 		testutil.RepositoryManifestsTable, testutil.LayersTable, testutil.ManifestLayersTable,
 	)
 }
@@ -29,7 +29,7 @@ func unloadManifestFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
 		testutil.RepositoryManifestsTable, testutil.LayersTable, testutil.ManifestLayersTable,
 	))
 }
@@ -44,13 +44,12 @@ func TestManifestStore_FindByID(t *testing.T) {
 
 	// see testdata/fixtures/manifests.sql
 	expected := &models.Manifest{
-		ID:              1,
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
-		ConfigurationID: sql.NullInt64{Int64: 1, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
-		CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
+		ID:            1,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
+		CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
 	}
 	require.Equal(t, expected, m)
 }
@@ -73,13 +72,12 @@ func TestManifestStore_FindByDigest(t *testing.T) {
 
 	// see testdata/fixtures/manifests.sql
 	excepted := &models.Manifest{
-		ID:              2,
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
-		ConfigurationID: sql.NullInt64{Int64: 2, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
-		CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
+		ID:            2,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+		CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
 	}
 	require.Equal(t, excepted, m)
 }
@@ -104,31 +102,28 @@ func TestManifestStore_FindAll(t *testing.T) {
 	local := mm[0].CreatedAt.Location()
 	expected := models.Manifests{
 		{
-			ID:              1,
-			SchemaVersion:   2,
-			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-			Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
-			ConfigurationID: sql.NullInt64{Int64: 1, Valid: true},
-			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
-			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+			ID:            1,
+			SchemaVersion: 2,
+			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:        "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
+			CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
 		},
 		{
-			ID:              2,
-			SchemaVersion:   2,
-			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-			Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
-			ConfigurationID: sql.NullInt64{Int64: 2, Valid: true},
-			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
-			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+			ID:            2,
+			SchemaVersion: 2,
+			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:        "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+			CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
 		},
 		{
-			ID:              3,
-			SchemaVersion:   2,
-			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-			Digest:          "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
-			ConfigurationID: sql.NullInt64{Int64: 3, Valid: true},
-			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":6775,"digest":"sha256:33f3ef3322b28ecfc368872e621ab715a04865471c47ca7426f3e93846157780"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":27091819,"digest":"sha256:68ced04f60ab5c7a5f1d0b0b4e7572c5a4c8cce44866513d30d9df1a15277d6b"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":23882259,"digest":"sha256:c4039fd85dccc8e267c98447f8f1b27a402dbb4259d86586f4097acb5e6634af"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":203,"digest":"sha256:c16ce02d3d6132f7059bf7e9ff6205cbf43e86c538ef981c37598afd27d01efa"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":107,"digest":"sha256:a0696058fc76fe6f456289f5611efe5c3411814e686f59f28b2e2069ed9e7d28"}]}`),
-			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+			ID:            3,
+			SchemaVersion: 2,
+			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:        "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":6775,"digest":"sha256:33f3ef3322b28ecfc368872e621ab715a04865471c47ca7426f3e93846157780"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":27091819,"digest":"sha256:68ced04f60ab5c7a5f1d0b0b4e7572c5a4c8cce44866513d30d9df1a15277d6b"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":23882259,"digest":"sha256:c4039fd85dccc8e267c98447f8f1b27a402dbb4259d86586f4097acb5e6634af"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":203,"digest":"sha256:c16ce02d3d6132f7059bf7e9ff6205cbf43e86c538ef981c37598afd27d01efa"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":107,"digest":"sha256:a0696058fc76fe6f456289f5611efe5c3411814e686f59f28b2e2069ed9e7d28"}]}`),
+			CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
 		},
 		{
 			ID:            4,
@@ -244,16 +239,13 @@ func TestManifestStore_Repositories(t *testing.T) {
 
 func TestManifestStore_Create(t *testing.T) {
 	unloadManifestFixtures(t)
-	reloadRepositoryFixtures(t)
-	reloadManifestConfigurationFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:46b163863b462eadc1b17dca382ccbfb08a853cffc79e2049607f95455cc44fa",
-		ConfigurationID: sql.NullInt64{Int64: 1, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:46b163863b462eadc1b17dca382ccbfb08a853cffc79e2049607f95455cc44fa",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
 	}
 	err := s.Create(suite.ctx, m)
 
@@ -267,11 +259,10 @@ func TestManifestStore_Create_NonUniqueDigestFails(t *testing.T) {
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
-		ConfigurationID: sql.NullInt64{Int64: 3, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
 	}
 	err := s.Create(suite.ctx, m)
 	require.Error(t, err)
@@ -282,12 +273,11 @@ func TestManifestStore_Update(t *testing.T) {
 
 	s := datastore.NewManifestStore(suite.db)
 	update := &models.Manifest{
-		ID:              3,
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
-		ConfigurationID: sql.NullInt64{Int64: 3, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
+		ID:            3,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
 	}
 	err := s.Update(suite.ctx, update)
 	require.NoError(t, err)
@@ -303,12 +293,11 @@ func TestManifestStore_Update_NotFound(t *testing.T) {
 	s := datastore.NewManifestStore(suite.db)
 
 	update := &models.Manifest{
-		ID:              100,
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
-		ConfigurationID: sql.NullInt64{Int64: 3, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
+		ID:            100,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
 	}
 
 	err := s.Update(suite.ctx, update)

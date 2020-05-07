@@ -52,8 +52,8 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 	var digestHex []byte
 	m := new(models.Manifest)
 
-	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.ConfigurationID, &m.Payload,
-		&m.CreatedAt, &m.MarkedAt, &m.DeletedAt)
+	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt,
+		&m.DeletedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest: %w", err)
@@ -73,8 +73,8 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 		var digestHex []byte
 		m := new(models.Manifest)
 
-		err := rows.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.ConfigurationID,
-			&m.Payload, &m.CreatedAt, &m.MarkedAt, &m.DeletedAt)
+		err := rows.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt,
+			&m.DeletedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest: %w", err)
 		}
@@ -90,7 +90,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 
 // FindByID finds a Manifest by ID.
 func (s *manifestStore) FindByID(ctx context.Context, id int) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, configuration_id, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
@@ -100,7 +100,7 @@ func (s *manifestStore) FindByID(ctx context.Context, id int) (*models.Manifest,
 
 // FindByDigest finds a Manifest by the digest.
 func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, configuration_id, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifests WHERE digest_hex = decode($1, 'hex')`
 
 	row := s.db.QueryRowContext(ctx, q, d.Hex())
@@ -110,7 +110,7 @@ func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*mod
 
 // FindAll finds all manifests.
 func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, configuration_id, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifests`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -181,10 +181,10 @@ func (s *manifestStore) Repositories(ctx context.Context, m *models.Manifest) (m
 
 // Create saves a new Manifest.
 func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
-	q := `INSERT INTO manifests (schema_version, media_type, digest_hex, configuration_id, payload)
-		VALUES ($1, $2, decode($3, 'hex'), $4, $5) RETURNING id, created_at`
+	q := `INSERT INTO manifests (schema_version, media_type, digest_hex, payload)
+		VALUES ($1, $2, decode($3, 'hex'), $4) RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest.Hex(), m.ConfigurationID, m.Payload)
+	row := s.db.QueryRowContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest.Hex(), m.Payload)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
 		return fmt.Errorf("error creating manifest: %w", err)
 	}
@@ -195,10 +195,10 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 // Update updates an existing Manifest.
 func (s *manifestStore) Update(ctx context.Context, m *models.Manifest) error {
 	q := `UPDATE manifests
-		SET (schema_version, media_type, digest_hex, configuration_id, payload) = ($1, $2, decode($3, 'hex'), $4, $5)
-		WHERE id = $6`
+		SET (schema_version, media_type, digest_hex, payload) = ($1, $2, decode($3, 'hex'), $4)
+		WHERE id = $5`
 
-	res, err := s.db.ExecContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest.Hex(), m.ConfigurationID, m.Payload, m.ID)
+	res, err := s.db.ExecContext(ctx, q, m.SchemaVersion, m.MediaType, m.Digest.Hex(), m.Payload, m.ID)
 	if err != nil {
 		return fmt.Errorf("error updating manifest: %w", err)
 	}

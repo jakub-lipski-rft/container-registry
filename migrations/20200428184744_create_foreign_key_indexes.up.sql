@@ -1,6 +1,5 @@
 BEGIN;
 CREATE INDEX IF NOT EXISTS repositories_parent_id_fkey ON repositories (parent_id);
-CREATE INDEX IF NOT EXISTS manifests_configuration_id_fkey ON manifests (configuration_id);
 CREATE INDEX IF NOT EXISTS manifest_layers_manifest_id_fkey ON manifest_layers (manifest_id);
 CREATE INDEX IF NOT EXISTS manifest_layers_layer_id_fkey ON manifest_layers (layer_id);
 CREATE INDEX IF NOT EXISTS manifest_list_items_manifest_list_id_fkey ON manifest_list_items (manifest_list_id);
