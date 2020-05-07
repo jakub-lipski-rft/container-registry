@@ -16,6 +16,7 @@ type ManifestReader interface {
 	FindByID(ctx context.Context, id int) (*models.Manifest, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
+	Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error)
 	Layers(ctx context.Context, m *models.Manifest) (models.Layers, error)
 	Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error)
 	Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error)
@@ -131,6 +132,15 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+// Config finds the manifest configuration.
+func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error) {
+	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at
+		FROM manifest_configurations WHERE manifest_id = $1`
+	row := s.db.QueryRowContext(ctx, q, m.ID)
+
+	return scanFullManifestConfiguration(row)
 }
 
 // Layers finds layers associated with a manifest, through the ManifestLayer relationship entity.

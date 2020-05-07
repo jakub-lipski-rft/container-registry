@@ -16,6 +16,7 @@ type ManifestConfigurationReader interface {
 	FindByID(ctx context.Context, id int) (*models.ManifestConfiguration, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestConfiguration, error)
 	Count(ctx context.Context) (int, error)
+	Manifest(ctx context.Context, c *models.ManifestConfiguration) (*models.Manifest, error)
 }
 
 // ManifestConfigurationWriter is the interface that defines write operations for a manifest configuration store.
@@ -117,6 +118,16 @@ func (s *manifestConfigurationStore) Count(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+// Manifest finds the manifest that the configuration belongs to.
+func (s *manifestConfigurationStore) Manifest(ctx context.Context, c *models.ManifestConfiguration) (*models.Manifest, error) {
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+		FROM manifests WHERE id = $1`
+
+	row := s.db.QueryRowContext(ctx, q, c.ManifestID)
+
+	return scanFullManifest(row)
 }
 
 // Create saves a new manifest configuration.
