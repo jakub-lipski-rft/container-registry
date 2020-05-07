@@ -71,6 +71,7 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 			FROM (
 				SELECT
 					id,
+					manifest_id,
 					media_type,
 					encode(digest_hex, 'hex') as digest_hex,
 					size,
@@ -89,7 +90,6 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 					schema_version,
 					media_type,
 					encode(digest_hex, 'hex') as digest_hex,
-					configuration_id,
 					convert_from(payload, 'UTF8')::json AS payload,
 					created_at,
 					marked_at,

@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.2" last-position="0,0" last-zoom="1" max-obj-count="15"
+<dbmodel pgmodeler-ver="0.9.2" last-position="0,420" last-zoom="1" max-obj-count="15"
 	 default-schema="public" default-owner="postgres">
 <role name="withspace"
       inherit="true"
@@ -65,12 +65,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_configurations" layer="0" collapse-mode="2" max-obj-count="8">
+<table name="manifest_configurations" layer="0" collapse-mode="2" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="0" y="884"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="manifest_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="media_type" not-null="true">
@@ -91,15 +94,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="deleted_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<constraint name="pk_manifest_configs" type="pk-constr" table="public.manifest_configurations">
+	<constraint name="pk_manifest_configurations" type="pk-constr" table="public.manifest_configurations">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
 	<constraint name="uq_manifest_configurations_digest_hex" type="uq-constr" table="public.manifest_configurations">
 		<columns names="digest_hex" ref-type="src-columns"/>
 	</constraint>
+	<constraint name="uq_manifest_configurations_manifest_id" type="uq-constr" table="public.manifest_configurations">
+		<columns names="manifest_id" ref-type="src-columns"/>
+	</constraint>
 </table>
 
-<table name="manifests" layer="0" collapse-mode="2" max-obj-count="10">
+<table name="manifests" layer="0" collapse-mode="2" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="197" y="432"/>
@@ -115,9 +121,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
-	</column>
-	<column name="configuration_id">
-		<type name="bigint" length="0"/>
 	</column>
 	<column name="payload" not-null="true">
 		<type name="bytea" length="0"/>
@@ -472,9 +475,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifests_configuration_id" type="fk-constr" comparison-type="MATCH SIMPLE"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_configurations" table="public.manifests">
-	<columns names="configuration_id" ref-type="src-columns"/>
+<constraint name="fk_manifest_configurations_manifest_id" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.manifest_configurations">
+	<columns names="manifest_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -555,11 +558,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</line>
 </relationship>
 
-<relationship name="rel_manifests_manifest_configurations" type="relfk" layer="0"
-	 src-table="public.manifests"
-	 dst-table="public.manifest_configurations" reference-fk="fk_manifests_configuration_id"
-	 src-required="false" dst-required="false"/>
-
 <relationship name="rel_manifest_layers_manifests" type="relfk" layer="0"
 	 src-table="public.manifest_layers"
 	 dst-table="public.manifests" reference-fk="fk_manifest_layers_manifest_id"
@@ -621,6 +619,11 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <relationship name="rel_tags_manifest_lists" type="relfk" layer="0"
 	 src-table="public.tags"
 	 dst-table="public.manifest_lists" reference-fk="fk_tags_manifest_list_id"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_manifest_configurations_manifests" type="relfk" layer="0"
+	 src-table="public.manifest_configurations"
+	 dst-table="public.manifests" reference-fk="fk_manifest_configurations_manifest_id"
 	 src-required="false" dst-required="false"/>
 
 <permission>

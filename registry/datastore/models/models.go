@@ -21,28 +21,28 @@ type Repository struct {
 type Repositories []*Repository
 
 type ManifestConfiguration struct {
-	ID        int
-	MediaType string
-	Digest    digest.Digest
-	Size      int64
-	Payload   json.RawMessage
-	CreatedAt time.Time
-	DeletedAt sql.NullTime
+	ID         int
+	ManifestID int
+	MediaType  string
+	Digest     digest.Digest
+	Size       int64
+	Payload    json.RawMessage
+	CreatedAt  time.Time
+	DeletedAt  sql.NullTime
 }
 
 // ManifestConfigurations is a slice of ManifestConfiguration pointers.
 type ManifestConfigurations []*ManifestConfiguration
 
 type Manifest struct {
-	ID              int
-	SchemaVersion   int
-	MediaType       string
-	Digest          digest.Digest
-	ConfigurationID sql.NullInt64
-	Payload         json.RawMessage
-	CreatedAt       time.Time
-	MarkedAt        sql.NullTime
-	DeletedAt       sql.NullTime
+	ID            int
+	SchemaVersion int
+	MediaType     string
+	Digest        digest.Digest
+	Payload       json.RawMessage
+	CreatedAt     time.Time
+	MarkedAt      sql.NullTime
+	DeletedAt     sql.NullTime
 }
 
 // Manifests is a slice of Manifest pointers.

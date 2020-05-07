@@ -19,7 +19,7 @@ func reloadTagFixtures(tb testing.TB) {
 		tb, suite.db, suite.basePath,
 		// A Tag has a foreign key for a Manifest or a ManifestList, which in turn references
 		// a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
 		testutil.ManifestListsTable, testutil.TagsTable,
 	)
 }
@@ -29,7 +29,7 @@ func unloadTagFixtures(tb testing.TB) {
 		suite.db,
 		// A Tag has a foreign key for a Manifest or a ManifestList, which in turn references
 		// a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestConfigurationsTable, testutil.ManifestsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
 		testutil.ManifestListsTable, testutil.TagsTable,
 	))
 }
@@ -216,13 +216,12 @@ func TestTagStore_Manifest(t *testing.T) {
 
 	// see testdata/fixtures/tags.sql
 	excepted := &models.Manifest{
-		ID:              2,
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
-		ConfigurationID: sql.NullInt64{Int64: 2, Valid: true},
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
-		CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
+		ID:            2,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+		CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
 	}
 	require.Equal(t, excepted, m)
 }

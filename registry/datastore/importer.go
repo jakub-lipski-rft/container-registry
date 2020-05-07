@@ -209,23 +209,6 @@ func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribut
 }
 
 func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *schema2.DeserializedManifest, dgst digest.Digest) (*models.Manifest, error) {
-	blobStore := fsRepo.Blobs(ctx)
-	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
-	if err != nil {
-		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
-	}
-
-	// find or create DB manifest configuration
-	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
-		MediaType: m.Config.MediaType,
-		Digest:    m.Config.Digest,
-		Size:      m.Config.Size,
-		Payload:   configPayload,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	_, payload, err := m.Payload()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
@@ -236,11 +219,25 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 		SchemaVersion: m.SchemaVersion,
 		MediaType:     m.MediaType,
 		Digest:        dgst,
-		ConfigurationID: sql.NullInt64{
-			Int64: int64(dbConfig.ID),
-			Valid: true,
-		},
-		Payload: payload,
+		Payload:       payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// find or create DB manifest configuration
+	blobStore := fsRepo.Blobs(ctx)
+	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
+	}
+
+	_, err = imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
+		ManifestID: dbManifest.ID,
+		MediaType:  m.Config.MediaType,
+		Digest:     m.Config.Digest,
+		Size:       m.Config.Size,
+		Payload:    configPayload,
 	})
 	if err != nil {
 		return nil, err
@@ -260,23 +257,6 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 }
 
 func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *ocischema.DeserializedManifest, dgst digest.Digest) (*models.Manifest, error) {
-	blobStore := fsRepo.Blobs(ctx)
-	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
-	if err != nil {
-		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
-	}
-
-	// find or create DB manifest configuration
-	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
-		MediaType: m.Config.MediaType,
-		Digest:    m.Config.Digest,
-		Size:      m.Config.Size,
-		Payload:   configPayload,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	_, payload, err := m.Payload()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
@@ -287,11 +267,25 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 		SchemaVersion: m.SchemaVersion,
 		MediaType:     v1.MediaTypeImageManifest,
 		Digest:        dgst,
-		ConfigurationID: sql.NullInt64{
-			Int64: int64(dbConfig.ID),
-			Valid: true,
-		},
-		Payload: payload,
+		Payload:       payload,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// find or create DB manifest configuration
+	blobStore := fsRepo.Blobs(ctx)
+	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
+	}
+
+	_, err = imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
+		ManifestID: dbManifest.ID,
+		MediaType:  m.Config.MediaType,
+		Digest:     m.Config.Digest,
+		Size:       m.Config.Size,
+		Payload:    configPayload,
 	})
 	if err != nil {
 		return nil, err
