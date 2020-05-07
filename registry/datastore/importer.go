@@ -478,7 +478,7 @@ func (imp *Importer) importParentRepositories(ctx context.Context, path string) 
 	logrus.WithField("path", path).Info("importing repository parents")
 
 	// create indirect parents
-	var currParentID int
+	var currParentID int64
 	for _, parent := range parents {
 		// check if already exists
 		dbRepo, err := imp.repositoryStore.FindByPath(ctx, parent)

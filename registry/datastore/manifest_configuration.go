@@ -80,7 +80,7 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 }
 
 // FindByID finds a manifest configuration by ID.
-func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int) (*models.ManifestConfiguration, error) {
+func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int64) (*models.ManifestConfiguration, error) {
 	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at
 		FROM manifest_configurations WHERE id = $1`
 	row := s.db.QueryRowContext(ctx, q, id)

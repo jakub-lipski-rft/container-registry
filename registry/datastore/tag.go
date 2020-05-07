@@ -77,7 +77,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 }
 
 // FindByID finds a Tag by ID.
-func (s *tagStore) FindByID(ctx context.Context, id int) (*models.Tag, error) {
+func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) {
 	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at FROM tags WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 

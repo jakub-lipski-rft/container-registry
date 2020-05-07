@@ -90,7 +90,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 }
 
 // FindByID finds a Manifest by ID.
-func (s *manifestStore) FindByID(ctx context.Context, id int) (*models.Manifest, error) {
+func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifest, error) {
 	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifests WHERE id = $1`
 

@@ -9,7 +9,7 @@ import (
 )
 
 type Repository struct {
-	ID        int
+	ID        int64
 	Name      string
 	Path      string
 	ParentID  sql.NullInt64
@@ -21,8 +21,8 @@ type Repository struct {
 type Repositories []*Repository
 
 type ManifestConfiguration struct {
-	ID         int
-	ManifestID int
+	ID         int64
+	ManifestID int64
 	MediaType  string
 	Digest     digest.Digest
 	Size       int64
@@ -35,7 +35,7 @@ type ManifestConfiguration struct {
 type ManifestConfigurations []*ManifestConfiguration
 
 type Manifest struct {
-	ID            int
+	ID            int64
 	SchemaVersion int
 	MediaType     string
 	Digest        digest.Digest
@@ -49,9 +49,9 @@ type Manifest struct {
 type Manifests []*Manifest
 
 type Tag struct {
-	ID           int
+	ID           int64
 	Name         string
-	RepositoryID int
+	RepositoryID int64
 	// a tag can be associated with either a manifest or a manifest list
 	ManifestID     sql.NullInt64
 	ManifestListID sql.NullInt64
@@ -64,7 +64,7 @@ type Tag struct {
 type Tags []*Tag
 
 type Layer struct {
-	ID        int
+	ID        int64
 	MediaType string
 	Digest    digest.Digest
 	Size      int64
@@ -77,7 +77,7 @@ type Layer struct {
 type Layers []*Layer
 
 type ManifestList struct {
-	ID            int
+	ID            int64
 	SchemaVersion int
 	MediaType     sql.NullString
 	Digest        digest.Digest
