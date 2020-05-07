@@ -106,7 +106,7 @@ s3-aws:
     REGISTRY_DATABASE_DBNAME: "registry_test"
     REGISTRY_DATABASE_SSLMODE: "disable"
   services:
-    - name: postgres:12-alpine
+    - name: postgres:11-alpine
       alias: "db"
   script: go test -v -tags=integration github.com/docker/distribution/registry/$CI_JOB_NAME
 
