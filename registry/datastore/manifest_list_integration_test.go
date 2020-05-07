@@ -255,11 +255,11 @@ func TestManifestListStore_AssociateManifest(t *testing.T) {
 	mm, err := s.Manifests(suite.ctx, ml)
 	require.NoError(t, err)
 
-	var assocManifestIDs []int
+	var assocManifestIDs []int64
 	for _, m := range mm {
 		assocManifestIDs = append(assocManifestIDs, m.ID)
 	}
-	require.Contains(t, assocManifestIDs, 3)
+	require.Contains(t, assocManifestIDs, int64(3))
 }
 
 func TestManifestListStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *testing.T) {
@@ -288,7 +288,7 @@ func TestManifestListStore_DissociateManifest(t *testing.T) {
 	require.NoError(t, err)
 
 	// see testdata/fixtures/manifest_list_items.sql
-	var manifestIDs []int
+	var manifestIDs []int64
 	for _, m := range mm {
 		manifestIDs = append(manifestIDs, m.ID)
 	}

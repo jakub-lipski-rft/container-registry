@@ -82,7 +82,7 @@ func scanFullLayers(rows *sql.Rows) (models.Layers, error) {
 }
 
 // FindByID finds a layer by ID.
-func (s *layerStore) FindByID(ctx context.Context, id int) (*models.Layer, error) {
+func (s *layerStore) FindByID(ctx context.Context, id int64) (*models.Layer, error) {
 	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at FROM layers WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 

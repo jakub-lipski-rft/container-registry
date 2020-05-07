@@ -86,7 +86,7 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 }
 
 // FindByID finds a repository by ID.
-func (s *repositoryStore) FindByID(ctx context.Context, id int) (*models.Repository, error) {
+func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repository, error) {
 	q := "SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 

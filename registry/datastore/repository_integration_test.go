@@ -487,11 +487,11 @@ func TestRepositoryStore_AssociateManifest(t *testing.T) {
 	mm, err := s.Manifests(suite.ctx, r)
 	require.NoError(t, err)
 
-	var assocManifestIDs []int
+	var assocManifestIDs []int64
 	for _, m := range mm {
 		assocManifestIDs = append(assocManifestIDs, m.ID)
 	}
-	require.Contains(t, assocManifestIDs, 2)
+	require.Contains(t, assocManifestIDs, int64(2))
 }
 
 func TestRepositoryStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *testing.T) {
@@ -550,11 +550,11 @@ func TestRepositoryStore_AssociateManifestList(t *testing.T) {
 	ll, err := s.ManifestLists(suite.ctx, r)
 	require.NoError(t, err)
 
-	var assocManifestListIDs []int
+	var assocManifestListIDs []int64
 	for _, ml := range ll {
 		assocManifestListIDs = append(assocManifestListIDs, ml.ID)
 	}
-	require.Contains(t, assocManifestListIDs, 2)
+	require.Contains(t, assocManifestListIDs, int64(2))
 }
 
 func TestRepositoryStore_AssociateManifestList_AlreadyAssociatedDoesNotFail(t *testing.T) {

@@ -86,7 +86,7 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 }
 
 // FindByID finds a manifest list by ID.
-func (s *manifestListStore) FindByID(ctx context.Context, id int) (*models.ManifestList, error) {
+func (s *manifestListStore) FindByID(ctx context.Context, id int64) (*models.ManifestList, error) {
 	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists WHERE id = $1`
 
