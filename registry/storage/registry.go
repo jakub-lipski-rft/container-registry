@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"github.com/docker/distribution"
@@ -124,9 +123,6 @@ func BlobDescriptorCacheProvider(blobDescriptorCacheProvider cache.BlobDescripto
 // Database configures the registry to use the passed database.
 func Database(db *datastore.DB) RegistryOption {
 	return func(registry *registry) error {
-		if db == nil {
-			return fmt.Errorf("Registry.DatabaseEnabled: called with nil database")
-		}
 		registry.db = db
 		return nil
 	}

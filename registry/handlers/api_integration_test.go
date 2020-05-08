@@ -31,6 +31,8 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/distribution/registry/datastore"
+	dbtestutil "github.com/docker/distribution/registry/datastore/testutil"
 	registryhandlers "github.com/docker/distribution/registry/handlers"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/factory"
@@ -71,23 +73,6 @@ func withReadOnly(config *configuration.Configuration) {
 func withSharedInMemoryDriver(name string) configOpt {
 	return func(config *configuration.Configuration) {
 		config.Storage["sharedinmemorydriver"] = configuration.Parameters{"name": name}
-	}
-}
-
-func withDatabase(config *configuration.Configuration) {
-	port, err := strconv.Atoi(os.Getenv("REGISTRY_DATABASE_PORT"))
-	if err != nil {
-		panic(fmt.Sprintf("error parsing database port: %v", err))
-	}
-
-	config.Database = configuration.Database{
-		Enabled:  true,
-		Host:     os.Getenv("REGISTRY_DATABASE_HOST"),
-		Port:     port,
-		User:     os.Getenv("REGISTRY_DATABASE_USER"),
-		Password: os.Getenv("REGISTRY_DATABASE_PASSWORD"),
-		DBName:   "registry_test",
-		SSLMode:  os.Getenv("REGISTRY_DATABASE_SSLMODE"),
 	}
 }
 
@@ -292,6 +277,23 @@ func newConfig(opts ...configOpt) configuration.Configuration {
 	}
 	config.HTTP.Headers = headerConfig
 
+	if os.Getenv("REGISTRY_DATABASE_ENABLED") == "true" {
+		dsn, err := dbtestutil.NewDSN()
+		if err != nil {
+			panic(fmt.Sprintf("error creating dsn: %v", err))
+		}
+
+		config.Database = configuration.Database{
+			Enabled:  true,
+			Host:     dsn.Host,
+			Port:     dsn.Port,
+			User:     dsn.User,
+			Password: dsn.Password,
+			DBName:   dsn.DBName,
+			SSLMode:  dsn.SSLMode,
+		}
+	}
+
 	for _, o := range opts {
 		o(config)
 	}
@@ -383,14 +385,14 @@ func makeBlobArgs(t *testing.T) blobArgs {
 // TestBlobAPI conducts a full test of the of the blob api.
 func TestBlobAPI(t *testing.T) {
 	env1 := newTestEnv(t)
-	defer env1.Shutdown()
 	args := makeBlobArgs(t)
 	testBlobAPI(t, env1, args)
+	env1.Shutdown()
 
 	env2 := newTestEnv(t, withDelete)
-	defer env2.Shutdown()
 	args = makeBlobArgs(t)
 	testBlobAPI(t, env2, args)
+	env2.Shutdown()
 }
 
 func TestBlobDelete(t *testing.T) {
@@ -2289,6 +2291,7 @@ type testEnv struct {
 	app     *registryhandlers.App
 	server  *httptest.Server
 	builder *v2.URLBuilder
+	db      *datastore.DB
 }
 
 func newTestEnvMirror(t *testing.T, opts ...configOpt) *testEnv {
@@ -2327,6 +2330,17 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 		t.Fatalf("unexpected error generating private key: %v", err)
 	}
 
+	// The API test needs access to the database only to clean it up during
+	// shutdown so that environments come up with a fresh copy of the database.
+	var db *datastore.DB
+
+	if config.Database.Enabled {
+		db, err = dbtestutil.NewDB()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	return &testEnv{
 		pk:      pk,
 		ctx:     ctx,
@@ -2334,12 +2348,26 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 		app:     app,
 		server:  server,
 		builder: builder,
+		db:      db,
 	}
 }
 
 func (t *testEnv) Shutdown() {
 	t.server.CloseClientConnections()
 	t.server.Close()
+
+	if t.config.Database.Enabled {
+		if err := dbtestutil.TruncateAllTables(t.db); err != nil {
+			panic(err)
+		}
+
+		if err := t.db.Close(); err != nil {
+			panic(err)
+		}
+
+		// Needed for idempotency, so that shutdowns may be defer'd without worry.
+		t.config.Database.Enabled = false
+	}
 }
 
 func putManifest(t *testing.T, msg, url, contentType string, v interface{}) *http.Response {
