@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS manifest_layers
     created_at  timestamp with time zone NOT NULL DEFAULT now(),
     deleted_at  timestamp with time zone,
     CONSTRAINT pk_manifest_layers PRIMARY KEY (id),
-    CONSTRAINT fk_manifest_layers_manifest_id FOREIGN KEY (manifest_id)
+    CONSTRAINT fk_manifest_layers_manifest_id_manifests FOREIGN KEY (manifest_id)
         REFERENCES manifests (id) ON DELETE CASCADE,
-    CONSTRAINT fk_manifest_layers_layer_id FOREIGN KEY (layer_id)
+    CONSTRAINT fk_manifest_layers_layer_id_layers FOREIGN KEY (layer_id)
         REFERENCES layers (id) ON DELETE CASCADE,
     CONSTRAINT uq_manifest_layers_manifest_id_layer_id UNIQUE (manifest_id, layer_id)
 );

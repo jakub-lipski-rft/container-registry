@@ -9,14 +9,15 @@ CREATE TABLE IF NOT EXISTS tags
     updated_at       timestamp with time zone,
     deleted_at       timestamp with time zone,
     CONSTRAINT pk_tags PRIMARY KEY (id),
-    CONSTRAINT fk_tags_repository_id FOREIGN KEY (repository_id)
+    CONSTRAINT fk_tags_repository_id_repositories FOREIGN KEY (repository_id)
         REFERENCES repositories (id) ON DELETE CASCADE,
-    CONSTRAINT fk_tags_manifest_id FOREIGN KEY (manifest_id)
+    CONSTRAINT fk_tags_manifest_id_manifests FOREIGN KEY (manifest_id)
         REFERENCES manifests (id) ON DELETE CASCADE,
-    CONSTRAINT fk_tags_manifest_list_id FOREIGN KEY (manifest_list_id)
+    CONSTRAINT fk_tags_manifest_list_id_manifest_lists FOREIGN KEY (manifest_list_id)
         REFERENCES manifest_lists (id) ON DELETE CASCADE,
     CONSTRAINT uq_tags_name_repository_id UNIQUE (name, repository_id),
-    CONSTRAINT chk_tags_name CHECK ((char_length(name) <= 255)),
-    CONSTRAINT chk_tags_manifest_id_manifest_list_id CHECK (((manifest_id IS NOT NULL AND manifest_list_id IS NULL) OR
-                                                             (manifest_id IS NULL AND manifest_list_id IS NOT NULL)))
+    CONSTRAINT ck_tags_name_length CHECK ((char_length(name) <= 255)),
+    CONSTRAINT ck_tags_manifest_id_manifest_list_id_one_of CHECK ((
+            (manifest_id IS NOT NULL AND manifest_list_id IS NULL) OR
+            (manifest_id IS NULL AND manifest_list_id IS NOT NULL)))
 );
