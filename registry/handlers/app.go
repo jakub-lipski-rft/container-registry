@@ -281,6 +281,28 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		}
 	}
 
+	// Connect to the metadata database, if enabled.
+	if config.Database.Enabled {
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("failed to construct database connection: %v", err))
+		}
+
+		if err := db.MigrateUp(); err != nil {
+			panic(fmt.Sprintf("failed to run database migrations: %v", err))
+		}
+
+		app.db = db
+		options = append(options, storage.Database(app.db))
+	}
+
 	// configure storage caches
 	if cc, ok := config.Storage["cache"]; ok {
 		v, ok := cc["blobdescriptor"]

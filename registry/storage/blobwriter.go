@@ -1,19 +1,18 @@
 package storage
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"path"
-	"text/scanner"
 	"time"
 
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/models"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
@@ -46,7 +45,6 @@ type blobWriter struct {
 
 	resumableDigestEnabled bool
 	committed              bool
-	databaseEnabled        bool
 }
 
 var _ distribution.BlobWriter = &blobWriter{}
@@ -77,6 +75,39 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 		return distribution.Descriptor{}, err
 	}
 
+	// TODO: It's stil possible to operate the registry with no database, so we
+	// must keep track of the nil-ness of these varibles for now.
+	var tx *sql.Tx
+	var ls datastore.LayerStore
+
+	if bw.db != nil {
+
+		tx, err = bw.db.Begin()
+		if err != nil {
+			return distribution.Descriptor{}, fmt.Errorf("beginning database transaction: %w", err)
+		}
+		defer tx.Rollback()
+
+		ls = datastore.NewLayerStore(tx)
+
+		// We need to ensure the layer is not already present before trying to
+		// create it on the database.
+		dbLayer, err := ls.FindByDigest(ctx, canonical.Digest)
+		if err != nil {
+			return distribution.Descriptor{}, fmt.Errorf("testing for presence of layer in database: %w", err)
+		}
+
+		if dbLayer == nil {
+			if err := ls.Create(ctx, &models.Layer{
+				MediaType: canonical.MediaType,
+				Digest:    canonical.Digest,
+				Size:      canonical.Size,
+			}); err != nil {
+				return distribution.Descriptor{}, fmt.Errorf("creating layer metadata in database: %w", err)
+			}
+		}
+	}
+
 	if err := bw.moveBlob(ctx, canonical); err != nil {
 		return distribution.Descriptor{}, err
 	}
@@ -92,6 +123,12 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 	err = bw.blobStore.blobAccessController.SetDescriptor(ctx, canonical.Digest, canonical)
 	if err != nil {
 		return distribution.Descriptor{}, err
+	}
+
+	if bw.db != nil {
+		if err := tx.Commit(); err != nil {
+			return distribution.Descriptor{}, fmt.Errorf("commiting database transaction: %w", err)
+		}
 	}
 
 	bw.committed = true
@@ -409,42 +446,4 @@ func (bw *blobWriter) Reader() (io.ReadCloser, error) {
 	}
 
 	return readCloser, nil
-}
-
-func (bw *blobWriter) uploadIsConfigPayload(ctx context.Context, desc distribution.Descriptor) (bool, error) {
-	fr, err := newFileReader(ctx, bw.driver, bw.path, desc.Size)
-	if err != nil {
-		return false, fmt.Errorf("create file reader: %w", err)
-	}
-	defer fr.Close()
-
-	var isLikelyConfig bool
-	buf := bytes.NewBuffer([]byte{})
-
-	var s scanner.Scanner
-	s.Init(fr)
-	s.Error = func(s *scanner.Scanner, msg string) {} // Silence errors to stdout.
-
-	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
-		// Look at the first token, ignoring whitespace and golang-style comments.
-		// If it's a `{`, then we have a might have a config payload.
-		if !isLikelyConfig && s.TokenText() == "{" {
-			isLikelyConfig = true
-		}
-
-		// If it is likely a config payload, it should be reasonably small enough to
-		// load into memory and check that it is valid json.
-		if isLikelyConfig {
-			buf.WriteString(s.TokenText())
-		} else {
-			// Otherwise, no need to scan any further.
-			return false, nil
-		}
-	}
-
-	if isLikelyConfig {
-		return json.Valid(buf.Bytes()), nil
-	}
-
-	return false, nil
 }
