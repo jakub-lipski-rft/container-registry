@@ -12,7 +12,7 @@ import (
 // TagReader is the interface that defines read operations for a tag store.
 type TagReader interface {
 	FindAll(ctx context.Context) (models.Tags, error)
-	FindByID(ctx context.Context, id int) (*models.Tag, error)
+	FindByID(ctx context.Context, id int64) (*models.Tag, error)
 	FindByNameAndRepositoryID(ctx context.Context, name string, repositoryID int) (*models.Tag, error)
 	Count(ctx context.Context) (int, error)
 	Repository(ctx context.Context, t *models.Tag) (*models.Repository, error)
@@ -24,9 +24,8 @@ type TagReader interface {
 type TagWriter interface {
 	Create(ctx context.Context, t *models.Tag) error
 	Update(ctx context.Context, t *models.Tag) error
-	Mark(ctx context.Context, t *models.Tag) error
 	SoftDelete(ctx context.Context, t *models.Tag) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 }
 
 // TagStore is the interface that a tag store should conform to.
@@ -192,7 +191,7 @@ func (s *tagStore) SoftDelete(ctx context.Context, t *models.Tag) error {
 }
 
 // Delete deletes a Tag.
-func (s *tagStore) Delete(ctx context.Context, id int) error {
+func (s *tagStore) Delete(ctx context.Context, id int64) error {
 	q := "DELETE FROM tags WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)

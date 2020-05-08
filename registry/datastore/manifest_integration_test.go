@@ -34,6 +34,10 @@ func unloadManifestFixtures(tb testing.TB) {
 	))
 }
 
+func TestManifestStore_ImplementsReaderAndWriter(t *testing.T) {
+	require.Implements(t, (*datastore.ManifestStore)(nil), datastore.NewManifestStore(suite.db))
+}
+
 func TestManifestStore_FindByID(t *testing.T) {
 	reloadManifestFixtures(t)
 

@@ -13,7 +13,7 @@ import (
 // ManifestReader is the interface that defines read operations for a Manifest store.
 type ManifestReader interface {
 	FindAll(ctx context.Context) (models.Manifests, error)
-	FindByID(ctx context.Context, id int) (*models.Manifest, error)
+	FindByID(ctx context.Context, id int64) (*models.Manifest, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
 	Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error)
@@ -30,7 +30,7 @@ type ManifestWriter interface {
 	AssociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error
 	DissociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error
 	SoftDelete(ctx context.Context, m *models.Manifest) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 }
 
 // ManifestStore is the interface that a Manifest store should conform to.
@@ -281,7 +281,7 @@ func (s *manifestStore) SoftDelete(ctx context.Context, m *models.Manifest) erro
 }
 
 // Delete deletes a Manifest.
-func (s *manifestStore) Delete(ctx context.Context, id int) error {
+func (s *manifestStore) Delete(ctx context.Context, id int64) error {
 	q := "DELETE FROM manifests WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)

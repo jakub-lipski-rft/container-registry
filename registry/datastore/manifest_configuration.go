@@ -13,7 +13,7 @@ import (
 // ManifestConfigurationReader is the interface that defines read operations for a manifest configuration store.
 type ManifestConfigurationReader interface {
 	FindAll(ctx context.Context) (models.ManifestConfigurations, error)
-	FindByID(ctx context.Context, id int) (*models.ManifestConfiguration, error)
+	FindByID(ctx context.Context, id int64) (*models.ManifestConfiguration, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestConfiguration, error)
 	Count(ctx context.Context) (int, error)
 	Manifest(ctx context.Context, c *models.ManifestConfiguration) (*models.Manifest, error)
@@ -24,7 +24,7 @@ type ManifestConfigurationWriter interface {
 	Create(ctx context.Context, c *models.ManifestConfiguration) error
 	Update(ctx context.Context, c *models.ManifestConfiguration) error
 	SoftDelete(ctx context.Context, c *models.ManifestConfiguration) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 }
 
 // ManifestConfigurationStore is the interface that a manifest configuration store should conform to.
@@ -98,7 +98,7 @@ func (s *manifestConfigurationStore) FindByDigest(ctx context.Context, d digest.
 }
 
 // FindAll finds all manifest configurations.
-func (s *manifestConfigurationStore) FindAll(ctx context.Context) ([]*models.ManifestConfiguration, error) {
+func (s *manifestConfigurationStore) FindAll(ctx context.Context) (models.ManifestConfigurations, error) {
 	q := "SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at FROM manifest_configurations"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
@@ -179,7 +179,7 @@ func (s *manifestConfigurationStore) SoftDelete(ctx context.Context, c *models.M
 }
 
 // Delete deletes a manifest configuration.
-func (s *manifestConfigurationStore) Delete(ctx context.Context, id int) error {
+func (s *manifestConfigurationStore) Delete(ctx context.Context, id int64) error {
 	q := "DELETE FROM manifest_configurations WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)

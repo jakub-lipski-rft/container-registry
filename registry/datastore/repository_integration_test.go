@@ -23,6 +23,10 @@ func unloadRepositoryFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.RepositoriesTable))
 }
 
+func TestRepositoryStore_ImplementsReaderAndWriter(t *testing.T) {
+	require.Implements(t, (*datastore.RepositoryStore)(nil), datastore.NewRepositoryStore(suite.db))
+}
+
 func TestRepositoryStore_FindByID(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
