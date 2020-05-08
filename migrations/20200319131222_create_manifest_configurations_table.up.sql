@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS manifest_configurations
     created_at  timestamp with time zone NOT NULL DEFAULT now(),
     deleted_at  timestamp with time zone,
     CONSTRAINT pk_manifest_configurations PRIMARY KEY (id),
-    CONSTRAINT fk_manifest_configurations_manifest_id FOREIGN KEY (manifest_id)
+    CONSTRAINT fk_manifest_configurations_manifest_id_manifests FOREIGN KEY (manifest_id)
         REFERENCES manifests (id) ON DELETE CASCADE,
     CONSTRAINT uq_manifest_configurations_digest_hex UNIQUE (digest_hex),
     CONSTRAINT uq_manifest_configurations_manifest_id UNIQUE (manifest_id),
-    CONSTRAINT chk_manifest_configurations_media_type CHECK ((char_length(media_type) <= 255))
+    CONSTRAINT ck_manifest_configurations_media_type_length CHECK ((char_length(media_type) <= 255))
 );

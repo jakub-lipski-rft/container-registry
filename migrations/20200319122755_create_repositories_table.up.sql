@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS repositories
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     deleted_at timestamp with time zone,
     CONSTRAINT pk_repositories PRIMARY KEY (id),
-    CONSTRAINT fk_repositories_parent_id FOREIGN KEY (parent_id)
+    CONSTRAINT fk_repositories_parent_id_repositories FOREIGN KEY (parent_id)
         REFERENCES repositories (id) ON DELETE CASCADE,
     CONSTRAINT uq_repositories_path UNIQUE (path),
-    CONSTRAINT chk_repositories_name CHECK ((char_length(name) <= 255)),
-    CONSTRAINT chk_repositories_path CHECK ((char_length(path) <= 255))
+    CONSTRAINT ck_repositories_name_length CHECK ((char_length(name) <= 255)),
+    CONSTRAINT ck_repositories_path_length CHECK ((char_length(path) <= 255))
 );

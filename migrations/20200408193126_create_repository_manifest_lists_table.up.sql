@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS repository_manifest_lists
     created_at       timestamp with time zone NOT NULL DEFAULT NOW(),
     deleted_at       timestamp with time zone,
     CONSTRAINT pk_repository_manifest_lists PRIMARY KEY (id),
-    CONSTRAINT fk_repository_manifest_lists_repository_id FOREIGN KEY (repository_id)
+    CONSTRAINT fk_repository_manifest_lists_repository_id_repositories FOREIGN KEY (repository_id)
         REFERENCES repositories (id) ON DELETE CASCADE,
-    CONSTRAINT fk_repository_manifest_lists_manifest_list_id FOREIGN KEY (manifest_list_id)
+    CONSTRAINT fk_repository_manifest_lists_manifest_list_id_manifest_lists FOREIGN KEY (manifest_list_id)
         REFERENCES manifest_lists (id) ON DELETE CASCADE,
     CONSTRAINT uq_repository_manifests_repository_id_manifest_list_id UNIQUE (repository_id, manifest_list_id)
 );

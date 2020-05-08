@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS manifest_lists
     deleted_at     timestamp with time zone,
     CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
     CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex),
-    CONSTRAINT chk_manifest_lists_media_type CHECK ((char_length(media_type) <= 255))
+    CONSTRAINT ck_manifest_lists_media_type_length CHECK ((char_length(media_type) <= 255))
 );

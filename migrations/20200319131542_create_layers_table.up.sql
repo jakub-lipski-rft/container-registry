@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS layers
     deleted_at timestamp with time zone,
     CONSTRAINT pk_layers PRIMARY KEY (id),
     CONSTRAINT uq_layers_digest_hex UNIQUE (digest_hex),
-    CONSTRAINT chk_layers_media_type CHECK ((char_length(media_type) <= 255))
+    CONSTRAINT ck_layers_media_type_length CHECK ((char_length(media_type) <= 255))
 );
