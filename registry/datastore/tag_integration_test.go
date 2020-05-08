@@ -34,6 +34,10 @@ func unloadTagFixtures(tb testing.TB) {
 	))
 }
 
+func TestTagStore_ImplementsReaderAndWriter(t *testing.T) {
+	require.Implements(t, (*datastore.TagStore)(nil), datastore.NewTagStore(suite.db))
+}
+
 func TestTagStore_FindByID(t *testing.T) {
 	reloadTagFixtures(t)
 

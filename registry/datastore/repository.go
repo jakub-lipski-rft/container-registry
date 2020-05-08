@@ -12,11 +12,11 @@ import (
 // RepositoryReader is the interface that defines read operations for a repository store.
 type RepositoryReader interface {
 	FindAll(ctx context.Context) (models.Repositories, error)
-	FindByID(ctx context.Context, id int) (*models.Repository, error)
+	FindByID(ctx context.Context, id int64) (*models.Repository, error)
 	FindByPath(ctx context.Context, path string) (*models.Repository, error)
-	FindDescendantsOf(ctx context.Context, id int) (models.Repositories, error)
-	FindAncestorsOf(ctx context.Context, id int) (models.Repositories, error)
-	FindSiblingsOf(ctx context.Context, id int) (models.Repositories, error)
+	FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error)
+	FindAncestorsOf(ctx context.Context, id int64) (models.Repositories, error)
+	FindSiblingsOf(ctx context.Context, id int64) (models.Repositories, error)
 	Count(ctx context.Context) (int, error)
 	Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error)
 	ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error)
@@ -34,7 +34,7 @@ type RepositoryWriter interface {
 	AssociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	SoftDelete(ctx context.Context, r *models.Repository) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 }
 
 // RepositoryStore is the interface that a repository store should conform to.
@@ -113,7 +113,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 }
 
 // FindDescendantsOf finds all descendants of a given repository.
-func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int) (models.Repositories, error) {
+func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE descendants AS (
 		SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories WHERE id = $1
 		UNION ALL
@@ -130,7 +130,7 @@ func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int) (models
 }
 
 // FindAncestorsOf finds all ancestors of a given repository.
-func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int) (models.Repositories, error) {
+func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE ancestors AS (
 		SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories  WHERE id = $1
 		UNION ALL
@@ -147,7 +147,7 @@ func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int) (models.R
 }
 
 // FindSiblingsOf finds all siblings of a given repository.
-func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int) (models.Repositories, error) {
+func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `SELECT siblings.id, siblings.name, siblings.path, siblings.parent_id, siblings.created_at, siblings.deleted_at
 		FROM repositories siblings
 		LEFT JOIN repositories anchor ON siblings.parent_id = anchor.parent_id
@@ -347,7 +347,7 @@ func (s *repositoryStore) SoftDelete(ctx context.Context, r *models.Repository) 
 }
 
 // Delete deletes a repository.
-func (s *repositoryStore) Delete(ctx context.Context, id int) error {
+func (s *repositoryStore) Delete(ctx context.Context, id int64) error {
 	q := "DELETE FROM repositories WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)

@@ -21,6 +21,10 @@ func unloadManifestConfigurationFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.ManifestsTable, testutil.ManifestConfigurationsTable))
 }
 
+func TestManifestConfigurationStore_ImplementsReaderAndWriter(t *testing.T) {
+	require.Implements(t, (*datastore.ManifestConfigurationStore)(nil), datastore.NewManifestConfigurationStore(suite.db))
+}
+
 func TestManifestConfigurationStore_FindByID(t *testing.T) {
 	reloadManifestConfigurationFixtures(t)
 
@@ -89,7 +93,7 @@ func TestManifestConfigurationStore_FindAll(t *testing.T) {
 
 	// see testdata/fixtures/manifest_configurations.sql
 	local := cc[0].CreatedAt.Location()
-	expected := []*models.ManifestConfiguration{
+	expected := models.ManifestConfigurations{
 		{
 			ID:         1,
 			ManifestID: 1,

@@ -13,11 +13,11 @@ import (
 // ManifestListReader is the interface that defines read operations for a manifest list store.
 type ManifestListReader interface {
 	FindAll(ctx context.Context) (models.ManifestLists, error)
-	FindByID(ctx context.Context, id int) (*models.ManifestList, error)
+	FindByID(ctx context.Context, id int64) (*models.ManifestList, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestList, error)
 	Count(ctx context.Context) (int, error)
 	Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error)
-	Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error)
+	Repositories(ctx context.Context, m *models.ManifestList) (models.Repositories, error)
 }
 
 // ManifestListWriter is the interface that defines write operations for a manifest list store.
@@ -28,7 +28,7 @@ type ManifestListWriter interface {
 	AssociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error
 	DissociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error
 	SoftDelete(ctx context.Context, ml *models.ManifestList) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 }
 
 // ManifestListStore is the interface that a manifest list store should conform to.
@@ -252,7 +252,7 @@ func (s *manifestListStore) SoftDelete(ctx context.Context, ml *models.ManifestL
 }
 
 // Delete deletes a manifest list.
-func (s *manifestListStore) Delete(ctx context.Context, id int) error {
+func (s *manifestListStore) Delete(ctx context.Context, id int64) error {
 	q := "DELETE FROM manifest_lists WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)

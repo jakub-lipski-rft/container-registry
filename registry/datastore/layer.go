@@ -13,7 +13,7 @@ import (
 // LayerReader is the interface that defines read operations for a layer store.
 type LayerReader interface {
 	FindAll(ctx context.Context) (models.Layers, error)
-	FindByID(ctx context.Context, id int) (*models.Layer, error)
+	FindByID(ctx context.Context, id int64) (*models.Layer, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.Layer, error)
 	Count(ctx context.Context) (int, error)
 	Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error)
@@ -25,7 +25,7 @@ type LayerWriter interface {
 	Update(ctx context.Context, l *models.Layer) error
 	Mark(ctx context.Context, l *models.Layer) error
 	SoftDelete(ctx context.Context, l *models.Layer) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id int64) error
 }
 
 // LayerStore is the interface that a layer store should conform to.
@@ -199,7 +199,7 @@ func (s *layerStore) SoftDelete(ctx context.Context, l *models.Layer) error {
 }
 
 // Delete deletes a layer.
-func (s *layerStore) Delete(ctx context.Context, id int) error {
+func (s *layerStore) Delete(ctx context.Context, id int64) error {
 	q := "DELETE FROM layers WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)

@@ -20,6 +20,10 @@ func unloadLayerFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.LayersTable))
 }
 
+func TestLayerStore_ImplementsReaderAndWriter(t *testing.T) {
+	require.Implements(t, (*datastore.LayerStore)(nil), datastore.NewLayerStore(suite.db))
+}
+
 func TestLayerStore_FindByID(t *testing.T) {
 	reloadLayerFixtures(t)
 
