@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/docker/distribution"
@@ -49,16 +47,6 @@ func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distri
 		repositoryStore:            NewRepositoryStore(db),
 		tagStore:                   NewTagStore(db),
 	}
-}
-
-// parseRepositoryPath parses a repository path and returns the corresponding repository name and its ancestors by
-// splitting the path on forward slashes.
-func parseRepositoryPath(path string) (string, []string) {
-	segments := strings.Split(filepath.Clean(path), "/")
-	name := segments[len(segments)-1]
-	ancestors := segments[:len(segments)-1]
-
-	return name, ancestors
 }
 
 func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manifest) (*models.Manifest, error) {
@@ -470,56 +458,6 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 	return nil
 }
 
-// importParentRepositories creates parent repositories recursively, preserving their hierarchical relationship.
-// Returns the direct parent repository.
-func (imp *Importer) importParentRepositories(ctx context.Context, path string) (*models.Repository, error) {
-	name, parents := parseRepositoryPath(path)
-
-	logrus.WithField("path", path).Info("importing repository parents")
-
-	// create indirect parents
-	var currParentID int64
-	for _, parent := range parents {
-		// check if already exists
-		dbRepo, err := imp.repositoryStore.FindByPath(ctx, parent)
-		if err != nil {
-			return nil, fmt.Errorf("error finding parent repository: %w", err)
-		}
-		if dbRepo == nil {
-			logrus.WithField("path", parent).Info("creating indirect parent")
-			name, _ := parseRepositoryPath(parent)
-			dbRepo = &models.Repository{
-				Name: name,
-				Path: parent,
-				ParentID: sql.NullInt64{
-					Int64: int64(currParentID),
-					Valid: currParentID > 0,
-				},
-			}
-			if err := imp.repositoryStore.Create(ctx, dbRepo); err != nil {
-				return nil, fmt.Errorf("error creating parent repository: %w", err)
-			}
-		}
-
-		currParentID = dbRepo.ID
-	}
-
-	// create direct parent
-	dbParent := &models.Repository{
-		Name: name,
-		Path: path,
-		ParentID: sql.NullInt64{
-			Int64: int64(currParentID),
-			Valid: currParentID > 0,
-		},
-	}
-	if err := imp.repositoryStore.Create(ctx, dbParent); err != nil {
-		return nil, fmt.Errorf("error creating parent repository: %w", err)
-	}
-
-	return dbParent, nil
-}
-
 func (imp *Importer) importRepository(ctx context.Context, path string) error {
 	named, err := reference.WithName(path)
 	if err != nil {
@@ -530,30 +468,9 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 		return fmt.Errorf("error constructing repository: %w", err)
 	}
 
-	// break repository path in name and parents
-	name, parents := parseRepositoryPath(path)
-	parentPath := filepath.Join(parents...)
-
-	// find parent repository (if applicable)
-	parentID := sql.NullInt64{}
-	if parentPath != "" {
-		parent, err := imp.repositoryStore.FindByPath(ctx, parentPath)
-		if err != nil {
-			return fmt.Errorf("error finding parent repository: %w", err)
-		}
-		if parent == nil {
-			parent, err = imp.importParentRepositories(ctx, parentPath)
-			if err != nil {
-				return fmt.Errorf("error importing parent repositories: %w", err)
-			}
-		}
-		parentID.Int64 = int64(parent.ID)
-		parentID.Valid = true
-	}
-
 	// create repository
-	dbRepo := &models.Repository{Name: name, Path: path, ParentID: parentID}
-	if err := imp.repositoryStore.Create(ctx, dbRepo); err != nil {
+	dbRepo, err := imp.repositoryStore.CreateByPath(ctx, path)
+	if err != nil {
 		return fmt.Errorf("error creating repository: %w", err)
 	}
 

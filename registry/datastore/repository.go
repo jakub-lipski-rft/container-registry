@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/docker/distribution/registry/datastore/models"
 )
@@ -28,6 +30,7 @@ type RepositoryReader interface {
 // RepositoryWriter is the interface that defines write operations for a repository store.
 type RepositoryWriter interface {
 	Create(ctx context.Context, r *models.Repository) error
+	CreateByPath(ctx context.Context, path string) (*models.Repository, error)
 	Update(ctx context.Context, r *models.Repository) error
 	AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
@@ -254,6 +257,79 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 	}
 
 	return nil
+}
+
+func splitRepositoryPath(path string) []string {
+	return strings.Split(filepath.Clean(path), "/")
+}
+
+// repositoryParentPaths parses a repository path (e.g. `"a/b/c"`) and returns its parents path(s) (e.g.
+// `["a", "a/b", "a/b/c"]`) starting from the root repository.
+func repositoryParentPaths(path string) []string {
+	segments := splitRepositoryPath(path)
+	names := segments[:len(segments)-1]
+
+	paths := make([]string, 0, len(names))
+	for i := 0; i < len(names); i++ {
+		paths = append(paths, strings.Join(names[:i+1], "/"))
+	}
+
+	return paths
+}
+
+// repositoryName parses a repository path (e.g. `"a/b/c"`) and returns its name (e.g. `"c"`).
+func repositoryName(path string) string {
+	segments := splitRepositoryPath(path)
+	return segments[len(segments)-1]
+}
+
+// CreateByPath recursively creates the repositories for a given path (e.g. `"a/b/c"`), preserving their hierarchical
+// relationship. Returns the leaf repository (e.g. `c`). No error is raised if a repository already exist. This function
+// should be called within a transaction to account for partial failures.
+func (s *repositoryStore) CreateByPath(ctx context.Context, path string) (*models.Repository, error) {
+	parentsPath := repositoryParentPaths(path)
+
+	// find or create parent repositories
+	var currParentID int64
+	for _, parentPath := range parentsPath {
+		// check if already exists
+		r, err := s.FindByPath(ctx, parentPath)
+		if err != nil {
+			return nil, fmt.Errorf("finding parent repository: %w", err)
+		}
+		if r == nil {
+			// if not create
+			r = &models.Repository{
+				Name: repositoryName(parentPath),
+				Path: parentPath,
+				ParentID: sql.NullInt64{
+					Int64: currParentID,
+					Valid: currParentID > 0,
+				},
+			}
+			if err := s.Create(ctx, r); err != nil {
+				return nil, fmt.Errorf("creating parent repository: %w", err)
+			}
+		}
+
+		// track ID to continue linking the chain of repositories
+		currParentID = r.ID
+	}
+
+	// create leaf repository
+	r := &models.Repository{
+		Name: repositoryName(path),
+		Path: path,
+		ParentID: sql.NullInt64{
+			Int64: currParentID,
+			Valid: currParentID > 0,
+		},
+	}
+	if err := s.Create(ctx, r); err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 // Update updates an existing repository.
