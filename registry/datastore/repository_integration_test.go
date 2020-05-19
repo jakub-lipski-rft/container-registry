@@ -445,6 +445,85 @@ func TestRepositoryStore_Create_NonUniquePathFails(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRepositoryStore_CreatePath(t *testing.T) {
+	unloadRepositoryFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	tt := []struct {
+		name            string
+		RepoPath        string
+		truncateBefore  bool
+		dbExpectedRepos []models.Repository
+	}{{
+		name:     "single",
+		RepoPath: "a",
+		dbExpectedRepos: []models.Repository{{
+			ID:       int64(1),
+			Name:     "a",
+			Path:     "a",
+			ParentID: sql.NullInt64{},
+		}},
+	}, {
+		name:     "multiple",
+		RepoPath: "a/b/c/c",
+		dbExpectedRepos: []models.Repository{
+			// reused from the `single` test
+			{
+				ID:       int64(1),
+				Name:     "a",
+				Path:     "a",
+				ParentID: sql.NullInt64{},
+			},
+			// new
+			{
+				ID:       int64(2),
+				Name:     "b",
+				Path:     "a/b",
+				ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+			},
+			{
+				ID:       int64(3),
+				Name:     "c",
+				Path:     "a/b/c",
+				ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+			},
+			{
+				ID:       int64(4),
+				Name:     "c",
+				Path:     "a/b/c/c",
+				ParentID: sql.NullInt64{Int64: int64(3), Valid: true},
+			},
+		},
+	}}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			if test.truncateBefore {
+				unloadRepositoryFixtures(t)
+			}
+
+			r, err := s.CreateByPath(suite.ctx, test.RepoPath)
+			require.NoError(t, err)
+
+			actual, err := s.FindAll(suite.ctx)
+			require.NoError(t, err)
+
+			require.Equal(t, len(test.dbExpectedRepos), len(actual))
+			require.Equal(t, r, actual[len(actual)-1])
+
+			for i, r := range actual {
+				require.Equal(t, test.dbExpectedRepos[i].ID, r.ID)
+				require.Equal(t, test.dbExpectedRepos[i].Name, r.Name)
+				require.Equal(t, test.dbExpectedRepos[i].Path, r.Path)
+				require.Equal(t, test.dbExpectedRepos[i].ParentID, r.ParentID)
+				require.NotEmpty(t, r.CreatedAt)
+				require.Empty(t, r.DeletedAt)
+			}
+		})
+	}
+}
+
 func TestRepositoryStore_Update(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
