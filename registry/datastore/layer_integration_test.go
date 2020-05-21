@@ -207,6 +207,41 @@ func TestLayerStore_Create(t *testing.T) {
 	require.NotEmpty(t, l.CreatedAt)
 }
 
+func TestLayerStore_CreateOrFind(t *testing.T) {
+	unloadLayerFixtures(t)
+
+	s := datastore.NewLayerStore(suite.db)
+	tmp := &models.Layer{
+		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		Digest:    "sha256:1d9136cd62c9b60083de7763cfac547b1e571d10648393ade10325055a810556",
+		Size:      203,
+	}
+
+	// create non existing layer
+	l := &models.Layer{
+		MediaType: tmp.MediaType,
+		Digest:    tmp.Digest,
+		Size:      tmp.Size,
+	}
+	err := s.CreateOrFind(suite.ctx, l)
+	require.NoError(t, err)
+	require.NotEmpty(t, l.ID)
+	require.Equal(t, tmp.MediaType, l.MediaType)
+	require.Equal(t, tmp.Digest, l.Digest)
+	require.Equal(t, tmp.Size, l.Size)
+	require.NotEmpty(t, l.CreatedAt)
+
+	// attempt to create existing layer
+	l2 := &models.Layer{
+		MediaType: tmp.MediaType,
+		Digest:    tmp.Digest,
+		Size:      tmp.Size,
+	}
+	err = s.CreateOrFind(suite.ctx, l2)
+	require.NoError(t, err)
+	require.Equal(t, l, l2)
+}
+
 func TestLayerStore_Create_NonUniqueDigestFails(t *testing.T) {
 	reloadLayerFixtures(t)
 

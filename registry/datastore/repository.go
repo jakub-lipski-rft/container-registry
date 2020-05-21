@@ -261,6 +261,10 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 	return nil
 }
 
+// CreateOrFind attempts to create a repository. If the repository already exists (same path) that record is loaded from
+// the database into r. This is similar to a FindByPath followed by a Create, but without being prone to race conditions
+// on write operations between the corresponding read (FindByPath) and write (Create) operations. Separate Find* and
+// Create method calls should be preferred to this when race conditions are not a concern.
 func (s *repositoryStore) CreateOrFind(ctx context.Context, r *models.Repository) error {
 	q := `INSERT INTO repositories (name, path, parent_id)
 		VALUES ($1, $2, $3)
