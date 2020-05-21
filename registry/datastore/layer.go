@@ -22,6 +22,7 @@ type LayerReader interface {
 // LayerWriter is the interface that defines write operations for a layer store.
 type LayerWriter interface {
 	Create(ctx context.Context, l *models.Layer) error
+	CreateOrFind(ctx context.Context, l *models.Layer) error
 	Update(ctx context.Context, l *models.Layer) error
 	Mark(ctx context.Context, l *models.Layer) error
 	SoftDelete(ctx context.Context, l *models.Layer) error
@@ -145,6 +146,32 @@ func (s *layerStore) Create(ctx context.Context, l *models.Layer) error {
 	row := s.db.QueryRowContext(ctx, q, l.MediaType, l.Digest.Hex(), l.Size)
 	if err := row.Scan(&l.ID, &l.CreatedAt); err != nil {
 		return fmt.Errorf("error creating layer: %w", err)
+	}
+
+	return nil
+}
+
+// CreateOrFind attempts to create a layer. If the layer already exists (same digest_hex) that record is loaded from the
+// database into l. This is similar to a FindByDigest followed by a Create, but without being prone to race conditions
+// on write operations between the corresponding read (FindByDigest) and write (Create) operations. Separate Find* and
+// Create method calls should be preferred to this when race conditions are not a concern.
+func (s *layerStore) CreateOrFind(ctx context.Context, l *models.Layer) error {
+	q := `INSERT INTO layers (media_type, digest_hex, size)
+		VALUES ($1, decode($2, 'hex'), $3)
+		ON CONFLICT (digest_hex) DO NOTHING
+		RETURNING id, created_at`
+
+	row := s.db.QueryRowContext(ctx, q, l.MediaType, l.Digest.Hex(), l.Size)
+	if err := row.Scan(&l.ID, &l.CreatedAt); err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("creating layer: %w", err)
+		}
+		// if the result set has no rows, then the layer already exists
+		tmp, err := s.FindByDigest(ctx, l.Digest)
+		if err != nil {
+			return err
+		}
+		*l = *tmp
 	}
 
 	return nil
