@@ -445,83 +445,348 @@ func TestRepositoryStore_Create_NonUniquePathFails(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestRepositoryStore_CreatePath(t *testing.T) {
+func TestRepositoryStore_CreateByPath_NewLeaf(t *testing.T) {
 	unloadRepositoryFixtures(t)
-
 	s := datastore.NewRepositoryStore(suite.db)
 
-	tt := []struct {
-		name            string
-		RepoPath        string
-		truncateBefore  bool
-		dbExpectedRepos []models.Repository
-	}{{
-		name:     "single",
-		RepoPath: "a",
-		dbExpectedRepos: []models.Repository{{
+	// validate return
+	r, err := s.CreateByPath(suite.ctx, "a")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "a", r.Name)
+	require.Equal(t, "a", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+	require.Empty(t, r.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 1)
+	require.Equal(t, r, actual[0])
+}
+
+func TestRepositoryStore_CreateByPath_ExistingLeafFails(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	r := &models.Repository{Name: "a", Path: "a"}
+	err := s.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// validate return
+	r2, err := s.CreateByPath(suite.ctx, "a")
+	require.Error(t, err)
+	require.Nil(t, r2)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 1)
+	require.Equal(t, r, actual[0])
+}
+
+func TestRepositoryStore_CreateByPath_NewNestedParents(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// validate return
+	r, err := s.CreateByPath(suite.ctx, "a/b/c/c")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "c", r.Name)
+	require.Equal(t, "a/b/c/c", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+	require.Empty(t, r.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 4)
+
+	expected := []models.Repository{
+		{
 			ID:       int64(1),
 			Name:     "a",
 			Path:     "a",
 			ParentID: sql.NullInt64{},
-		}},
-	}, {
-		name:     "multiple",
-		RepoPath: "a/b/c/c",
-		dbExpectedRepos: []models.Repository{
-			// reused from the `single` test
-			{
-				ID:       int64(1),
-				Name:     "a",
-				Path:     "a",
-				ParentID: sql.NullInt64{},
-			},
-			// new
-			{
-				ID:       int64(2),
-				Name:     "b",
-				Path:     "a/b",
-				ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
-			},
-			{
-				ID:       int64(3),
-				Name:     "c",
-				Path:     "a/b/c",
-				ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
-			},
-			{
-				ID:       int64(4),
-				Name:     "c",
-				Path:     "a/b/c/c",
-				ParentID: sql.NullInt64{Int64: int64(3), Valid: true},
-			},
 		},
-	}}
-
-	for _, test := range tt {
-		t.Run(test.name, func(t *testing.T) {
-			if test.truncateBefore {
-				unloadRepositoryFixtures(t)
-			}
-
-			r, err := s.CreateByPath(suite.ctx, test.RepoPath)
-			require.NoError(t, err)
-
-			actual, err := s.FindAll(suite.ctx)
-			require.NoError(t, err)
-
-			require.Equal(t, len(test.dbExpectedRepos), len(actual))
-			require.Equal(t, r, actual[len(actual)-1])
-
-			for i, r := range actual {
-				require.Equal(t, test.dbExpectedRepos[i].ID, r.ID)
-				require.Equal(t, test.dbExpectedRepos[i].Name, r.Name)
-				require.Equal(t, test.dbExpectedRepos[i].Path, r.Path)
-				require.Equal(t, test.dbExpectedRepos[i].ParentID, r.ParentID)
-				require.NotEmpty(t, r.CreatedAt)
-				require.Empty(t, r.DeletedAt)
-			}
-		})
+		{
+			ID:       int64(2),
+			Name:     "b",
+			Path:     "a/b",
+			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+		},
+		{
+			ID:       int64(3),
+			Name:     "c",
+			Path:     "a/b/c",
+			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+		},
+		{
+			ID:       int64(4),
+			Name:     "c",
+			Path:     "a/b/c/c",
+			ParentID: sql.NullInt64{Int64: int64(3), Valid: true},
+		},
 	}
+
+	for i, r := range actual {
+		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].Name, r.Name)
+		require.Equal(t, expected[i].Path, r.Path)
+		require.Equal(t, expected[i].ParentID, r.ParentID)
+		require.NotEmpty(t, r.CreatedAt)
+		require.Empty(t, r.DeletedAt)
+	}
+}
+
+func TestRepositoryStore_CreateByPath_ExistingNestedParents(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	r1 := &models.Repository{Name: "a", Path: "a"}
+	err := s.Create(suite.ctx, r1)
+
+	r2 := &models.Repository{Name: "b", Path: "a/b", ParentID: sql.NullInt64{Int64: r1.ID, Valid: true}}
+	err = s.Create(suite.ctx, r2)
+	require.NoError(t, err)
+
+	// validate return
+	r, err := s.CreateByPath(suite.ctx, "a/b/c")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "c", r.Name)
+	require.Equal(t, "a/b/c", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+	require.Empty(t, r.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 3)
+
+	expected := []models.Repository{
+		{
+			ID:       int64(1),
+			Name:     "a",
+			Path:     "a",
+			ParentID: sql.NullInt64{},
+		},
+		{
+			ID:       int64(2),
+			Name:     "b",
+			Path:     "a/b",
+			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+		},
+		{
+			// Attempts to insert already existing repositories (we attempted to recreate `a` and `a/b`) increments the
+			// ID sequence by 1. Therefore the next success write has ID 5 instead of 3.
+			ID:       int64(5),
+			Name:     "c",
+			Path:     "a/b/c",
+			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+		},
+	}
+
+	for i, r := range actual {
+		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].Name, r.Name)
+		require.Equal(t, expected[i].Path, r.Path)
+		require.Equal(t, expected[i].ParentID, r.ParentID)
+		require.NotEmpty(t, r.CreatedAt)
+		require.Empty(t, r.DeletedAt)
+	}
+}
+
+func TestRepositoryStore_CreateOrFindByPath_NewLeaf(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// validate return
+	r, err := s.CreateOrFindByPath(suite.ctx, "a")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "a", r.Name)
+	require.Equal(t, "a", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+	require.Empty(t, r.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 1)
+	require.Equal(t, r, actual[0])
+}
+
+func TestRepositoryStore_CreateByPath_ExistingLeafDoesNotFail(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	r := &models.Repository{Name: "a", Path: "a"}
+	err := s.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// validate return
+	r2, err := s.CreateOrFindByPath(suite.ctx, "a")
+	require.NoError(t, err)
+	require.NotNil(t, r2)
+	require.NotEmpty(t, r2.ID)
+	require.Equal(t, "a", r2.Name)
+	require.Equal(t, "a", r2.Path)
+	require.NotEmpty(t, r2.CreatedAt)
+	require.Empty(t, r2.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 1)
+	require.Equal(t, r, actual[0])
+}
+
+func TestRepositoryStore_CreateOrFindByPath_NewNestedParents(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// validate return
+	r, err := s.CreateOrFindByPath(suite.ctx, "a/b/c/c")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "c", r.Name)
+	require.Equal(t, "a/b/c/c", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+	require.Empty(t, r.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 4)
+
+	expected := []models.Repository{
+		{
+			ID:       int64(1),
+			Name:     "a",
+			Path:     "a",
+			ParentID: sql.NullInt64{},
+		},
+		{
+			ID:       int64(2),
+			Name:     "b",
+			Path:     "a/b",
+			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+		},
+		{
+			ID:       int64(3),
+			Name:     "c",
+			Path:     "a/b/c",
+			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+		},
+		{
+			ID:       int64(4),
+			Name:     "c",
+			Path:     "a/b/c/c",
+			ParentID: sql.NullInt64{Int64: int64(3), Valid: true},
+		},
+	}
+
+	for i, r := range actual {
+		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].Name, r.Name)
+		require.Equal(t, expected[i].Path, r.Path)
+		require.Equal(t, expected[i].ParentID, r.ParentID)
+		require.NotEmpty(t, r.CreatedAt)
+		require.Empty(t, r.DeletedAt)
+	}
+}
+
+func TestRepositoryStore_CreateOrFindByPath_ExistingNestedParents(t *testing.T) {
+	unloadRepositoryFixtures(t)
+	s := datastore.NewRepositoryStore(suite.db)
+
+	r1 := &models.Repository{Name: "a", Path: "a"}
+	err := s.Create(suite.ctx, r1)
+
+	r2 := &models.Repository{Name: "b", Path: "a/b", ParentID: sql.NullInt64{Int64: r1.ID, Valid: true}}
+	err = s.Create(suite.ctx, r2)
+	require.NoError(t, err)
+
+	// validate return
+	r, err := s.CreateOrFindByPath(suite.ctx, "a/b/c")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "c", r.Name)
+	require.Equal(t, "a/b/c", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+	require.Empty(t, r.DeletedAt)
+
+	// validate database state
+	actual, err := s.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Len(t, actual, 3)
+
+	expected := []models.Repository{
+		{
+			ID:       int64(1),
+			Name:     "a",
+			Path:     "a",
+			ParentID: sql.NullInt64{},
+		},
+		{
+			ID:       int64(2),
+			Name:     "b",
+			Path:     "a/b",
+			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+		},
+		{
+			// Attempts to insert already existing repositories (we attempted to recreate `a` and `a/b`) increments the
+			// ID sequence by 1. Therefore the next success write has ID 5 instead of 3.
+			ID:       int64(5),
+			Name:     "c",
+			Path:     "a/b/c",
+			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+		},
+	}
+
+	for i, r := range actual {
+		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].Name, r.Name)
+		require.Equal(t, expected[i].Path, r.Path)
+		require.Equal(t, expected[i].ParentID, r.ParentID)
+		require.NotEmpty(t, r.CreatedAt)
+		require.Empty(t, r.DeletedAt)
+	}
+}
+
+func TestRepositoryStore_CreateOrFind(t *testing.T) {
+	unloadRepositoryFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// create non existing `foo/bar`
+	r := &models.Repository{
+		Name: "bar",
+		Path: "foo/bar",
+	}
+	err := s.CreateOrFind(suite.ctx, r)
+	require.NoError(t, err)
+	require.NotEmpty(t, r.ID)
+	require.Equal(t, "bar", r.Name)
+	require.Equal(t, "foo/bar", r.Path)
+	require.NotEmpty(t, r.CreatedAt)
+
+	// attempt to create existing `foo/bar`
+	r2 := &models.Repository{
+		Name: "bar",
+		Path: "foo/bar",
+	}
+	err = s.CreateOrFind(suite.ctx, r2)
+	require.NoError(t, err)
+	require.Equal(t, r, r2)
 }
 
 func TestRepositoryStore_Update(t *testing.T) {

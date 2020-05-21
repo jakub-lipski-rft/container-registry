@@ -31,6 +31,8 @@ type RepositoryReader interface {
 type RepositoryWriter interface {
 	Create(ctx context.Context, r *models.Repository) error
 	CreateByPath(ctx context.Context, path string) (*models.Repository, error)
+	CreateOrFind(ctx context.Context, r *models.Repository) error
+	CreateOrFindByPath(ctx context.Context, path string) (*models.Repository, error)
 	Update(ctx context.Context, r *models.Repository) error
 	AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
@@ -259,6 +261,28 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 	return nil
 }
 
+func (s *repositoryStore) CreateOrFind(ctx context.Context, r *models.Repository) error {
+	q := `INSERT INTO repositories (name, path, parent_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (path) DO NOTHING
+		RETURNING id, created_at`
+
+	row := s.db.QueryRowContext(ctx, q, r.Name, r.Path, r.ParentID)
+	if err := row.Scan(&r.ID, &r.CreatedAt); err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("creating repository: %w", err)
+		}
+		// if the result set has no rows, then the repository already exists
+		tmp, err := s.FindByPath(ctx, r.Path)
+		if err != nil {
+			return err
+		}
+		*r = *tmp
+	}
+
+	return nil
+}
+
 func splitRepositoryPath(path string) []string {
 	return strings.Split(filepath.Clean(path), "/")
 }
@@ -283,49 +307,72 @@ func repositoryName(path string) string {
 	return segments[len(segments)-1]
 }
 
-// CreateByPath recursively creates the repositories for a given path (e.g. `"a/b/c"`), preserving their hierarchical
-// relationship. Returns the leaf repository (e.g. `c`). No error is raised if a repository already exist. This function
-// should be called within a transaction to account for partial failures.
-func (s *repositoryStore) CreateByPath(ctx context.Context, path string) (*models.Repository, error) {
+// createOrFindParentByPath creates parent repositories for a given path, if any (e.g. `a` and `b` for path `"a/b/c"`),
+// preserving their hierarchical relationship. Returns the immediate parent repository, if any (e.g. `b`). No error is
+// raised if a repository already exists.
+func (s *repositoryStore) createOrFindParentByPath(ctx context.Context, path string) (*models.Repository, error) {
 	parentsPath := repositoryParentPaths(path)
+	if len(parentsPath) == 0 {
+		return nil, nil
+	}
 
-	// find or create parent repositories
 	var currParentID int64
+	var r *models.Repository
+
 	for _, parentPath := range parentsPath {
-		// check if already exists
-		r, err := s.FindByPath(ctx, parentPath)
+		r = &models.Repository{
+			Name: repositoryName(parentPath),
+			Path: parentPath,
+			ParentID: sql.NullInt64{
+				Int64: currParentID,
+				Valid: currParentID > 0,
+			},
+		}
+		err := s.CreateOrFind(ctx, r)
 		if err != nil {
 			return nil, fmt.Errorf("finding parent repository: %w", err)
-		}
-		if r == nil {
-			// if not create
-			r = &models.Repository{
-				Name: repositoryName(parentPath),
-				Path: parentPath,
-				ParentID: sql.NullInt64{
-					Int64: currParentID,
-					Valid: currParentID > 0,
-				},
-			}
-			if err := s.Create(ctx, r); err != nil {
-				return nil, fmt.Errorf("creating parent repository: %w", err)
-			}
 		}
 
 		// track ID to continue linking the chain of repositories
 		currParentID = r.ID
 	}
 
-	// create leaf repository
-	r := &models.Repository{
-		Name: repositoryName(path),
-		Path: path,
-		ParentID: sql.NullInt64{
-			Int64: currParentID,
-			Valid: currParentID > 0,
-		},
+	return r, nil
+}
+
+// CreateByPath creates the repositories for a given path (e.g. `"a/b/c"`), preserving their hierarchical relationship.
+// Returns the leaf repository (e.g. `c`). No error is raised if a parent repository already exists, only if the leaf
+// repository does.
+func (s *repositoryStore) CreateByPath(ctx context.Context, path string) (*models.Repository, error) {
+	p, err := s.createOrFindParentByPath(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("creating or finding parent repository: %w", err)
+	}
+
+	r := &models.Repository{Name: repositoryName(path), Path: path}
+	if p != nil {
+		r.ParentID = sql.NullInt64{Int64: p.ID, Valid: true}
 	}
 	if err := s.Create(ctx, r); err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
+
+// CreateOrFindByPath is the fully idempotent version of CreateByPath, where no error is returned if the leaf repository
+// already exists.
+func (s *repositoryStore) CreateOrFindByPath(ctx context.Context, path string) (*models.Repository, error) {
+	p, err := s.createOrFindParentByPath(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("creating or finding parent repository: %w", err)
+	}
+
+	r := &models.Repository{Name: repositoryName(path), Path: path}
+	if p != nil {
+		r.ParentID = sql.NullInt64{Int64: p.ID, Valid: true}
+	}
+	if err := s.CreateOrFind(ctx, r); err != nil {
 		return nil, err
 	}
 
