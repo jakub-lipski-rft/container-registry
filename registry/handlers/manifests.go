@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"mime"
 	"net/http"
@@ -17,6 +18,8 @@ import (
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/auth"
+	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -378,6 +381,46 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// We're using the database and mirroring writes to the filesystem. We'll run
+	// a transaction so we can revert any changes to the database in case that
+	// any part of this multi-phase database operation fails.
+	if imh.Config.Database.Enabled {
+		switch reqManifest := manifest.(type) {
+		case *schema2.DeserializedManifest:
+			// The config payload should already be pushed up and stored as a blob.
+			// We're running this outside the transaction to limit the manifest
+			// database writing logic's dependence on other parts of the system until
+			// we've settled on a final design and to reduce the overall transaction time.
+			cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, reqManifest.Config.Digest)
+			if err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to obtain manifest configuration payload: %v", err)))
+				return
+			}
+
+			tx, err := imh.App.db.Begin()
+			if err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to create database transaction: %v", err)))
+				return
+			}
+			defer tx.Rollback()
+
+			if err = dbPutManifestSchema2(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), cfgPayload, imh.Repository.Named()); err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
+				return
+			}
+			if err := tx.Commit(); err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to commit manifest manifest to database: %v", err)))
+				return
+			}
+		default:
+			dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
+		}
+	}
+
 	// Tag this manifest
 	if imh.Tag != "" {
 		tags := imh.Repository.Tags(imh)
@@ -408,6 +451,78 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusCreated)
 
 	dcontext.GetLogger(imh).Debug("Succeeded in putting manifest!")
+}
+
+func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
+	mStore := datastore.NewManifestStore(db)
+	dbManifest, err := mStore.FindByDigest(ctx, canonical)
+	if err != nil {
+		return err
+	}
+	if dbManifest == nil {
+		m := &models.Manifest{
+			SchemaVersion: manifest.SchemaVersion,
+			MediaType:     manifest.MediaType,
+			Digest:        canonical,
+			Payload:       payload,
+		}
+
+		if err := mStore.Create(ctx, m); err != nil {
+			return err
+		}
+
+		dbManifest = m
+
+		// find and associate manifest layers
+		layerStore := datastore.NewLayerStore(db)
+		for _, reqLayer := range manifest.Layers {
+			dbLayer, err := layerStore.FindByDigest(ctx, reqLayer.Digest)
+			if err != nil {
+				return err
+			}
+
+			if dbLayer == nil {
+				return fmt.Errorf("layer %s not found in database", reqLayer.Digest)
+			}
+
+			if err := mStore.AssociateLayer(ctx, dbManifest, dbLayer); err != nil {
+				return err
+			}
+		}
+
+		// Find or create the manifest configuration.
+		mCfgStore := datastore.NewManifestConfigurationStore(db)
+
+		dbCfg, err := mCfgStore.FindByDigest(ctx, manifest.Config.Digest)
+		if err != nil {
+			return err
+		}
+
+		if dbCfg == nil {
+			if err := mCfgStore.Create(ctx, &models.ManifestConfiguration{
+				ManifestID: dbManifest.ID,
+				MediaType:  manifest.Config.MediaType,
+				Digest:     manifest.Config.Digest,
+				Size:       manifest.Config.Size,
+				Payload:    cfgPayload,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Associate manifest and repository.
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path.Name())
+	if err != nil {
+		return err
+	}
+
+	if err := repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // applyResourcePolicy checks whether the resource class matches what has

@@ -81,7 +81,6 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 	var ls datastore.LayerStore
 
 	if bw.db != nil {
-
 		tx, err = bw.db.Begin()
 		if err != nil {
 			return distribution.Descriptor{}, fmt.Errorf("beginning database transaction: %w", err)
@@ -127,7 +126,7 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 
 	if bw.db != nil {
 		if err := tx.Commit(); err != nil {
-			return distribution.Descriptor{}, fmt.Errorf("commiting database transaction: %w", err)
+			return distribution.Descriptor{}, fmt.Errorf("committing database transaction: %w", err)
 		}
 	}
 

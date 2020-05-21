@@ -906,16 +906,16 @@ func TestManifestAPI(t *testing.T) {
 	schema2Repo, _ := reference.WithName("foo/schema2")
 
 	env1 := newTestEnv(t, withSchema1Compatibility)
-	defer env1.Shutdown()
 	testManifestAPISchema1(t, env1, schema1Repo)
 	schema2Args := testManifestAPISchema2(t, env1, schema2Repo)
 	testManifestAPIManifestList(t, env1, schema2Args)
+	env1.Shutdown()
 
 	env2 := newTestEnv(t, withDelete, withSchema1Compatibility)
-	defer env2.Shutdown()
 	testManifestAPISchema1(t, env2, schema1Repo)
 	schema2Args = testManifestAPISchema2(t, env2, schema2Repo)
 	testManifestAPIManifestList(t, env2, schema2Args)
+	env2.Shutdown()
 }
 
 // storageManifestErrDriverFactory implements the factory.StorageDriverFactory interface.
