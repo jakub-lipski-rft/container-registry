@@ -102,6 +102,7 @@ func TestLayerUpload(t *testing.T) {
 	defer env.Shutdown(t)
 
 	testFilesystemLayerUpload(t, env)
+	testIdempotentUpload(t, env)
 	testDockerConfigurationPaylodUpload(t, env)
 	testHelmConfigurationPaylodUpload(t, env)
 	testMalformedPayloadUpload(t, env)
@@ -116,9 +117,26 @@ func testFilesystemLayerUpload(t *testing.T, env *env) {
 	testLayerUpload(t, env, layer, dgst)
 }
 
+func testIdempotentUpload(t *testing.T, env *env) {
+	basePath, err := os.Getwd()
+	require.NoError(t, err)
+
+	path := filepath.Join(basePath, "testdata", "fixtures", "blobwriter", "docker_configuration.json")
+
+	dockerPayload, err := ioutil.ReadFile(path)
+	require.NoErrorf(t, err, "error reading fixture")
+
+	for i := 0; i < 100; i++ {
+		go func() {
+			testLayerUpload(t, env, bytes.NewReader(dockerPayload), digest.FromBytes(dockerPayload))
+		}()
+	}
+}
+
 func testEmptyLayerUpload(t *testing.T, env *env) {
 	testLayerUpload(t, env, bytes.NewReader([]byte{}), digest.FromBytes([]byte{}))
 }
+
 func testDockerConfigurationPaylodUpload(t *testing.T, env *env) {
 	basePath, err := os.Getwd()
 	require.NoError(t, err)
@@ -141,6 +159,7 @@ func testMalformedPayloadUpload(t *testing.T, env *env) {
 	malformedPayload := `{"invalid":"json",`
 	testLayerUpload(t, env, strings.NewReader(malformedPayload), digest.FromString(malformedPayload))
 }
+
 func testUnformattedPayloadUpload(t *testing.T, env *env) {
 	unformattedPayload := "unformatted string"
 	testLayerUpload(t, env, strings.NewReader(unformattedPayload), digest.FromString(unformattedPayload))
