@@ -15,11 +15,13 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest"
+	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
 	dbtestutil "github.com/docker/distribution/registry/datastore/testutil"
+	"github.com/docker/libtrust"
 )
 
 type env struct {
@@ -73,6 +75,28 @@ func (e *env) uploadSchema2ManifestToDB(t *testing.T, manifest schema2.Manifest,
 	return dManifest.Target().Digest
 }
 
+func (e *env) uploadSchema1ManifestToDB(t *testing.T, manifest schema1.Manifest, repoName string) digest.Digest {
+	t.Helper()
+
+	path, err := reference.WithName(repoName)
+	require.NoError(t, err)
+
+	pk, err := libtrust.GenerateECP256PrivateKey()
+	require.NoError(t, err)
+	sm, err := schema1.Sign(&manifest, pk)
+	require.NoError(t, err)
+
+	_, payload, err := sm.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	err = dbPutManifestSchema1(e.ctx, e.db, dgst, sm, payload, path)
+	require.NoError(t, err)
+
+	return dgst
+}
+
 func (e *env) shutdown(t *testing.T) {
 	t.Helper()
 
@@ -115,7 +139,18 @@ func newEnv(t *testing.T) *env {
 	return env
 }
 
-func TestPutManifestDB(t *testing.T) {
+func TestPutManifestSchema1DB(t *testing.T) {
+	env1 := newEnv(t)
+	defer env1.shutdown(t)
+
+	testPutManifestSchmea1DB(t, env1)
+	testPutManifestSchmea1DBIsIdempotent(t, env1)
+	testPutManifestSchmea1DBMultipleRepositories(t, env1)
+	testPutManifestSchmea1DBMultipleManifests(t, env1)
+	testPutManifestSchmea1DBMissingLayer(t, env1)
+}
+
+func TestPutManifestSchema2DB(t *testing.T) {
 	env1 := newEnv(t)
 	defer env1.shutdown(t)
 
@@ -132,7 +167,7 @@ func testPutManifestSchmea2DB(t *testing.T, env *env) {
 	repoPath := "manifestdb/happypath"
 	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
 
-	verifyManifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
+	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 }
 
 func testPutManifestSchmea2DBIsIdempotent(t *testing.T, env *env) {
@@ -140,10 +175,10 @@ func testPutManifestSchmea2DBIsIdempotent(t *testing.T, env *env) {
 	repoPath := "manifestdb/idempotent"
 
 	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-	verifyManifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
+	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 
 	manifestDigest = env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-	verifyManifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
+	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 }
 
 func testPutManifestSchmea2DBMultipleRepositories(t *testing.T, env *env) {
@@ -155,7 +190,7 @@ func testPutManifestSchmea2DBMultipleRepositories(t *testing.T, env *env) {
 		repoPath := fmt.Sprintf("%s%d", repoBasePath, i)
 		manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
 
-		verifyManifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
+		verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 	}
 }
 
@@ -166,7 +201,7 @@ func testPutManifestSchmea2DBMultipleManifests(t *testing.T, env *env) {
 		manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
 		manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
 
-		verifyManifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
+		verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 	}
 }
 
@@ -196,7 +231,123 @@ func testPutManifestSchmea2DBMissingLayer(t *testing.T, env *env) {
 	assert.Error(t, err)
 }
 
-func verifyManifest(t *testing.T, env *env, dgst digest.Digest, manifest schema2.Manifest, cfgPayload []byte, repoPath string) {
+func testPutManifestSchmea1DB(t *testing.T, env *env) {
+	manifest := seedRandomSchema1Manifest(t, env)
+
+	repoPath := "manifestdb/happypathschema1"
+	manifestDigest := env.uploadSchema1ManifestToDB(t, manifest, repoPath)
+
+	verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
+}
+
+func testPutManifestSchmea1DBIsIdempotent(t *testing.T, env *env) {
+	manifest := seedRandomSchema1Manifest(t, env)
+	repoPath := "manifestdb/idempotentschema1"
+
+	manifestDigest := env.uploadSchema1ManifestToDB(t, manifest, repoPath)
+	verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
+
+	manifestDigest = env.uploadSchema1ManifestToDB(t, manifest, repoPath)
+	verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
+}
+
+func testPutManifestSchmea1DBMultipleRepositories(t *testing.T, env *env) {
+	manifest := seedRandomSchema1Manifest(t, env)
+
+	repoBasePath := "manifestdb/multireposchema1"
+
+	for i := 0; i < 10; i++ {
+		repoPath := fmt.Sprintf("%s%d", repoBasePath, i)
+		manifestDigest := env.uploadSchema1ManifestToDB(t, manifest, repoPath)
+
+		verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
+	}
+}
+
+func testPutManifestSchmea1DBMultipleManifests(t *testing.T, env *env) {
+	repoPath := "manifestdb/multimanifestschema1"
+
+	for i := 0; i < 10; i++ {
+		manifest := seedRandomSchema1Manifest(t, env)
+		manifestDigest := env.uploadSchema1ManifestToDB(t, manifest, repoPath)
+
+		verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
+	}
+}
+
+func testPutManifestSchmea1DBMissingLayer(t *testing.T, env *env) {
+	manifest := seedRandomSchema1Manifest(t, env)
+
+	layerStore := datastore.NewLayerStore(env.db)
+
+	// Remove layer from database before uploading manifest
+	dbLayer, err := layerStore.FindByDigest(env.ctx, manifest.FSLayers[0].BlobSum)
+	require.NoError(t, err)
+	require.NotNil(t, dbLayer)
+
+	layerStore.Delete(env.ctx, dbLayer.ID)
+	require.NoError(t, err)
+
+	// Try to put manifest with missing layer.
+	pk, err := libtrust.GenerateECP256PrivateKey()
+	require.NoError(t, err)
+	sm, err := schema1.Sign(&manifest, pk)
+	require.NoError(t, err)
+
+	_, payload, err := sm.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+	path, err := reference.WithName("manifestdb/missinglayerschema1")
+
+	err = dbPutManifestSchema1(env.ctx, env.db, dgst, sm, payload, path)
+	assert.Error(t, err)
+}
+
+func verifySchema1Manifest(t *testing.T, env *env, dgst digest.Digest, manifest schema1.Manifest, repoPath string) {
+	t.Helper()
+
+	mStore := datastore.NewManifestStore(env.db)
+
+	// Ensure presence of manifest.
+	dbManifest, err := mStore.FindByDigest(env.ctx, dgst)
+	require.NoError(t, err)
+	assert.NotNil(t, dbManifest)
+
+	// Ensure repository is associated with manifest.
+	dbRepos, err := mStore.Repositories(env.ctx, dbManifest)
+	require.NoError(t, err)
+	assert.NotEmpty(t, dbRepos)
+
+	var foundRepo bool
+	for _, repo := range dbRepos {
+		if repo.Path == repoPath {
+			foundRepo = true
+			break
+		}
+	}
+	assert.True(t, foundRepo)
+
+	// Ensure presence of each layer.
+	dbLayers, err := mStore.Layers(env.ctx, dbManifest)
+	require.NoError(t, err)
+	assert.NotEmpty(t, dbLayers)
+
+	for _, fsLayer := range manifest.FSLayers {
+		var foundLayer bool
+		for _, layer := range dbLayers {
+			if layer.Digest == fsLayer.BlobSum {
+				foundLayer = true
+				break
+			}
+		}
+		assert.True(t, foundLayer)
+	}
+}
+
+func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest schema2.Manifest, cfgPayload []byte, repoPath string) {
+	t.Helper()
+
 	mStore := datastore.NewManifestStore(env.db)
 
 	// Ensure pressence of manifest.
@@ -243,9 +394,33 @@ func verifyManifest(t *testing.T, env *env, dgst digest.Digest, manifest schema2
 	}
 }
 
+// seedRandomSchema1Manifest generates a random schema1 manifest and ensures
+// that its layers are present in the database.
+func seedRandomSchema1Manifest(t *testing.T, env *env) schema1.Manifest {
+	t.Helper()
+
+	manifest := schema1.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 1,
+			MediaType:     schema1.MediaTypeManifest,
+		},
+		FSLayers: make([]schema1.FSLayer, 4),
+	}
+
+	for i := range manifest.FSLayers {
+		_, desc := generateRandomLayer()
+		env.uploadLayerToDB(t, desc)
+		manifest.FSLayers[i].BlobSum = desc.Digest
+	}
+
+	return manifest
+}
+
 // seedRandomSchema2Manifest generates a random schema2 manifest and ensures
 // that its config payload blob and layers are present in the database.
 func seedRandomSchema2Manifest(t *testing.T, env *env) (schema2.Manifest, []byte) {
+	t.Helper()
+
 	manifest := schema2.Manifest{
 		Versioned: manifest.Versioned{
 			SchemaVersion: 2,
