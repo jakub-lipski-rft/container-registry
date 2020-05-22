@@ -385,10 +385,24 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	// a transaction so we can revert any changes to the database in case that
 	// any part of this multi-phase database operation fails.
 	if imh.Config.Database.Enabled {
+		tx, err := imh.App.db.Begin()
+		if err != nil {
+			imh.Errors = append(imh.Errors,
+				errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to create database transaction: %v", err)))
+			return
+		}
+		defer tx.Rollback()
+
 		switch reqManifest := manifest.(type) {
+		case *schema1.SignedManifest:
+			if err = dbPutManifestSchema1(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), imh.Repository.Named()); err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
+				return
+			}
 		case *schema2.DeserializedManifest:
 			// The config payload should already be pushed up and stored as a blob.
-			// We're running this outside the transaction to limit the manifest
+			// We're running this outside dbPutManifestSchema2 to limit the manifest
 			// database writing logic's dependence on other parts of the system until
 			// we've settled on a final design and to reduce the overall transaction time.
 			cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, reqManifest.Config.Digest)
@@ -398,26 +412,18 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 
-			tx, err := imh.App.db.Begin()
-			if err != nil {
-				imh.Errors = append(imh.Errors,
-					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to create database transaction: %v", err)))
-				return
-			}
-			defer tx.Rollback()
-
 			if err = dbPutManifestSchema2(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), cfgPayload, imh.Repository.Named()); err != nil {
 				imh.Errors = append(imh.Errors,
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
 			}
-			if err := tx.Commit(); err != nil {
-				imh.Errors = append(imh.Errors,
-					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to commit manifest manifest to database: %v", err)))
-				return
-			}
 		default:
 			dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
+		}
+		if err := tx.Commit(); err != nil {
+			imh.Errors = append(imh.Errors,
+				errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to commit manifest to database: %v", err)))
+			return
 		}
 	}
 
@@ -521,7 +527,57 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical d
 	if err := repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
 		return err
 	}
+	return nil
+}
 
+func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema1.SignedManifest, payload []byte, path reference.Named) error {
+	mStore := datastore.NewManifestStore(db)
+	dbManifest, err := mStore.FindByDigest(ctx, canonical)
+	if err != nil {
+		return err
+	}
+	if dbManifest == nil {
+		m := &models.Manifest{
+			SchemaVersion: manifest.SchemaVersion,
+			MediaType:     manifest.MediaType,
+			Digest:        canonical,
+			Payload:       payload,
+		}
+
+		if err := mStore.Create(ctx, m); err != nil {
+			return err
+		}
+
+		dbManifest = m
+
+		// find and associate manifest layers
+		layerStore := datastore.NewLayerStore(db)
+		for _, layer := range manifest.FSLayers {
+			dbLayer, err := layerStore.FindByDigest(ctx, layer.BlobSum)
+			if err != nil {
+				return err
+			}
+
+			if dbLayer == nil {
+				return fmt.Errorf("layer %s not found in database", layer.BlobSum)
+			}
+
+			if err := mStore.AssociateLayer(ctx, dbManifest, dbLayer); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Associate manifest and repository.
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path.Name())
+	if err != nil {
+		return err
+	}
+
+	if err := repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
+		return err
+	}
 	return nil
 }
 
