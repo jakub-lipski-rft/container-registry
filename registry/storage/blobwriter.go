@@ -87,23 +87,15 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 		}
 		defer tx.Rollback()
 
+		// Even though we don't need to interact with database layer after this
+		// point, we'll use CreateOrFind to avoid race conditions.
 		ls = datastore.NewLayerStore(tx)
-
-		// We need to ensure the layer is not already present before trying to
-		// create it on the database.
-		dbLayer, err := ls.FindByDigest(ctx, canonical.Digest)
-		if err != nil {
-			return distribution.Descriptor{}, fmt.Errorf("testing for presence of layer in database: %w", err)
-		}
-
-		if dbLayer == nil {
-			if err := ls.Create(ctx, &models.Layer{
-				MediaType: canonical.MediaType,
-				Digest:    canonical.Digest,
-				Size:      canonical.Size,
-			}); err != nil {
-				return distribution.Descriptor{}, fmt.Errorf("creating layer metadata in database: %w", err)
-			}
+		if err := ls.CreateOrFind(ctx, &models.Layer{
+			MediaType: canonical.MediaType,
+			Digest:    canonical.Digest,
+			Size:      canonical.Size,
+		}); err != nil {
+			return distribution.Descriptor{}, fmt.Errorf("creating layer in database: %w", err)
 		}
 	}
 
