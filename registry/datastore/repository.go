@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/opencontainers/go-digest"
+
 	"github.com/docker/distribution/registry/datastore/models"
 )
 
@@ -25,6 +27,8 @@ type RepositoryReader interface {
 	Tags(ctx context.Context, r *models.Repository) (models.Tags, error)
 	ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error)
 	ManifestListTags(ctx context.Context, r *models.Repository, m *models.ManifestList) (models.Tags, error)
+	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
+	FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error)
 }
 
 // RepositoryWriter is the interface that defines write operations for a repository store.
@@ -247,6 +251,30 @@ func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repositor
 	}
 
 	return scanFullManifestLists(rows)
+}
+
+// FindManifestByDigest finds a manifest by digest within a repository.
+func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at, m.deleted_at
+		FROM manifests as m
+		JOIN repository_manifests as rm ON rm.manifest_id = m.id
+		JOIN repositories as r ON r.id = rm.repository_id
+		WHERE r.id = $1 AND m.digest_hex = decode($2, 'hex')`
+
+	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
+	return scanFullManifest(row)
+}
+
+// FindManifestListByDigest finds a manifest list by digest within a repository.
+func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error) {
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at,
+		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
+		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
+		JOIN repositories as r ON r.id = rml.repository_id
+		WHERE r.id = $1 AND ml.digest_hex = decode($2, 'hex')`
+
+	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
+	return scanFullManifestList(row)
 }
 
 // Create saves a new repository.
