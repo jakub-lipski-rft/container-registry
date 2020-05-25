@@ -990,6 +990,48 @@ func TestRepositoryStore_DissociateManifestList_NotAssociatedDoesNotFail(t *test
 	require.NoError(t, err)
 }
 
+func TestRepositoryStore_UntagManifest(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/tags.sql
+	r := &models.Repository{ID: 3}
+	m := &models.Manifest{ID: 1}
+
+	tt, err := s.ManifestTags(suite.ctx, r, m)
+	require.NoError(t, err)
+	require.NotEmpty(t, tt)
+
+	err = s.UntagManifest(suite.ctx, r, m)
+	require.NoError(t, err)
+
+	tt, err = s.ManifestTags(suite.ctx, r, m)
+	require.NoError(t, err)
+	require.Empty(t, tt)
+}
+
+func TestRepositoryStore_UntagManifestList(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/tags.sql
+	r := &models.Repository{ID: 3}
+	ml := &models.ManifestList{ID: 1}
+
+	tt, err := s.ManifestListTags(suite.ctx, r, ml)
+	require.NoError(t, err)
+	require.NotEmpty(t, tt)
+
+	err = s.UntagManifestList(suite.ctx, r, ml)
+	require.NoError(t, err)
+
+	tt, err = s.ManifestListTags(suite.ctx, r, ml)
+	require.NoError(t, err)
+	require.Empty(t, tt)
+}
+
 func TestRepositoryStore_SoftDelete(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
