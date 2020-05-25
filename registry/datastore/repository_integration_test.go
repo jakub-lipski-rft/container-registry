@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/opencontainers/go-digest"
+
 	"github.com/docker/distribution/manifest/manifestlist"
 
 	"github.com/docker/distribution/registry/datastore"
@@ -415,6 +417,48 @@ func TestRepositoryStore_Count(t *testing.T) {
 
 	// see testdata/fixtures/repositories.sql
 	require.Equal(t, 4, count)
+}
+
+func TestRepositoryStore_FindManifestByDigest(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	d := digest.Digest("sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f")
+	s := datastore.NewRepositoryStore(suite.db)
+
+	m, err := s.FindManifestByDigest(suite.ctx, &models.Repository{ID: 3}, d)
+	require.NoError(t, err)
+	require.NotNil(t, m)
+	// see testdata/fixtures/repository_manifests.sql
+	expected := &models.Manifest{
+		ID:            2,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        d,
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+		CreatedAt:     testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
+	}
+	require.Equal(t, expected, m)
+}
+
+func TestRepositoryStore_FindManifestListByDigest(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	d := digest.Digest("sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0")
+	s := datastore.NewRepositoryStore(suite.db)
+
+	ml, err := s.FindManifestListByDigest(suite.ctx, &models.Repository{ID: 3}, d)
+	require.NoError(t, err)
+
+	// see testdata/fixtures/repository_manifest_lists.sql
+	expected := &models.ManifestList{
+		ID:            1,
+		SchemaVersion: 2,
+		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+		Digest:        d,
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
+		CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:03.470711", ml.CreatedAt.Location()),
+	}
+	require.Equal(t, expected, ml)
 }
 
 func TestRepositoryStore_Create(t *testing.T) {
