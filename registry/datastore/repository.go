@@ -42,6 +42,8 @@ type RepositoryWriter interface {
 	DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	AssociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
+	UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
+	UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	SoftDelete(ctx context.Context, r *models.Repository) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -482,6 +484,30 @@ func (s *repositoryStore) DissociateManifestList(ctx context.Context, r *models.
 
 	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating manifest list: %w", err)
+	}
+
+	return nil
+}
+
+// UntagManifest deletes all tags of a manifest in a repository.
+func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
+	q := "DELETE FROM tags WHERE repository_id = $1 AND manifest_id = $2"
+
+	_, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
+	if err != nil {
+		return fmt.Errorf("error untagging manifest: %w", err)
+	}
+
+	return nil
+}
+
+// UntagManifest deletes all tags of a manifest list in a repository.
+func (s *repositoryStore) UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error {
+	q := "DELETE FROM tags WHERE repository_id = $1 AND manifest_list_id = $2"
+
+	_, err := s.db.ExecContext(ctx, q, r.ID, ml.ID)
+	if err != nil {
+		return fmt.Errorf("error untagging manifest list: %w", err)
 	}
 
 	return nil
