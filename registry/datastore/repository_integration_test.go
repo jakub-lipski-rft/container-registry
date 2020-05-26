@@ -461,6 +461,24 @@ func TestRepositoryStore_FindManifestListByDigest(t *testing.T) {
 	require.Equal(t, expected, ml)
 }
 
+func TestRepositoryStore_FindTagByName(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	tag, err := s.FindTagByName(suite.ctx, &models.Repository{ID: 4}, "1.0.0")
+	require.NoError(t, err)
+
+	// see testdata/fixtures/tags.sql
+	expected := &models.Tag{
+		ID:           4,
+		Name:         "1.0.0",
+		RepositoryID: 4,
+		ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+		CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:46.283783", tag.CreatedAt.Location()),
+	}
+	require.Equal(t, expected, tag)
+}
+
 func TestRepositoryStore_Create(t *testing.T) {
 	unloadRepositoryFixtures(t)
 

@@ -29,6 +29,7 @@ type RepositoryReader interface {
 	ManifestListTags(ctx context.Context, r *models.Repository, m *models.ManifestList) (models.Tags, error)
 	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
 	FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error)
+	FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error)
 }
 
 // RepositoryWriter is the interface that defines write operations for a repository store.
@@ -289,6 +290,15 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 	}
 
 	return nil
+}
+
+// FindTagByName finds a tag by name within a repository.
+func (s *repositoryStore) FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error) {
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+		FROM tags WHERE repository_id = $1 AND name = $2`
+	row := s.db.QueryRowContext(ctx, q, r.ID, name)
+
+	return scanFullTag(row)
 }
 
 // CreateOrFind attempts to create a repository. If the repository already exists (same path) that record is loaded from
