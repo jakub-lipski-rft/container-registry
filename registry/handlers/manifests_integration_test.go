@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest"
+	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/reference"
@@ -97,6 +98,26 @@ func (e *env) uploadSchema1ManifestToDB(t *testing.T, manifest schema1.Manifest,
 	return dgst
 }
 
+func (e *env) uploadManifestListToDB(t *testing.T, manifestList manifestlist.ManifestList, repoName string) digest.Digest {
+	t.Helper()
+
+	path, err := reference.WithName(repoName)
+	require.NoError(t, err)
+
+	deserializedManifestList, err := manifestlist.FromDescriptors(manifestList.Manifests)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifestList.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	err = dbPutManifestList(e.ctx, e.db, dgst, deserializedManifestList, payload, path)
+	require.NoError(t, err)
+
+	return dgst
+}
+
 func (e *env) shutdown(t *testing.T) {
 	t.Helper()
 
@@ -159,6 +180,17 @@ func TestPutManifestSchema2DB(t *testing.T) {
 	testPutManifestSchmea2DBMultipleRepositories(t, env1)
 	testPutManifestSchmea2DBMultipleManifests(t, env1)
 	testPutManifestSchmea2DBMissingLayer(t, env1)
+}
+
+func TestPutManifestList(t *testing.T) {
+	env1 := newEnv(t)
+	defer env1.shutdown(t)
+
+	testPutManifestList(t, env1)
+	testPutManifestListIsIdempotent(t, env1)
+	testPutManifestListMultipleRepositories(t, env1)
+	testPutManifestListMultipleManifests(t, env1)
+	testPutManifestListMissingManifest(t, env1)
 }
 
 func testPutManifestSchmea2DB(t *testing.T, env *env) {
@@ -304,6 +336,79 @@ func testPutManifestSchmea1DBMissingLayer(t *testing.T, env *env) {
 	assert.Error(t, err)
 }
 
+func testPutManifestList(t *testing.T, env *env) {
+	manifestList := seedRandomManifestList(t, env)
+
+	repoPath := "manifestdb/happypathmanifestlist"
+	manifestDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+	verifyManifestList(t, env, manifestDigest, manifestList, repoPath)
+}
+
+func testPutManifestListIsIdempotent(t *testing.T, env *env) {
+	manifestList := seedRandomManifestList(t, env)
+	repoPath := "manifestdb/idempotentmanifestlist"
+
+	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+	verifyManifestList(t, env, manifestListDigest, manifestList, repoPath)
+
+	manifestListDigest = env.uploadManifestListToDB(t, manifestList, repoPath)
+	verifyManifestList(t, env, manifestListDigest, manifestList, repoPath)
+}
+
+func testPutManifestListMultipleRepositories(t *testing.T, env *env) {
+	manifestList := seedRandomManifestList(t, env)
+
+	repoBasePath := "manifestdb/multirepomanifestlist"
+
+	for i := 0; i < 10; i++ {
+		repoPath := fmt.Sprintf("%s%d", repoBasePath, i)
+		manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+		verifyManifestList(t, env, manifestListDigest, manifestList, repoPath)
+	}
+}
+
+func testPutManifestListMultipleManifests(t *testing.T, env *env) {
+	repoPath := "manifestdb/multimanifestlist"
+
+	for i := 0; i < 10; i++ {
+		manifestList := seedRandomManifestList(t, env)
+		manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+		verifyManifestList(t, env, manifestListDigest, manifestList, repoPath)
+	}
+}
+
+func testPutManifestListMissingManifest(t *testing.T, env *env) {
+	manifestList := seedRandomManifestList(t, env)
+
+	mStore := datastore.NewManifestStore(env.db)
+
+	// Remove manifest from database before uploading manifest list
+	dbManifest, err := mStore.FindByDigest(env.ctx, manifestList.Manifests[0].Descriptor.Digest)
+	require.NoError(t, err)
+	require.NotNil(t, dbManifest)
+
+	err = mStore.Delete(env.ctx, dbManifest.ID)
+	require.NoError(t, err)
+
+	// Try to put manifest list with missing manifest.
+	deserializedManifestList, err := manifestlist.FromDescriptors(manifestList.Manifests)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifestList.Payload()
+	require.NoError(t, err)
+
+	path, err := reference.WithName("manifestdb/missinglayer")
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	err = dbPutManifestList(env.ctx, env.db, dgst, deserializedManifestList, payload, path)
+	assert.Error(t, err)
+}
+
 func verifySchema1Manifest(t *testing.T, env *env, dgst digest.Digest, manifest schema1.Manifest, repoPath string) {
 	t.Helper()
 
@@ -317,7 +422,7 @@ func verifySchema1Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	// Ensure repository is associated with manifest.
 	dbRepos, err := mStore.Repositories(env.ctx, dbManifest)
 	require.NoError(t, err)
-	assert.NotEmpty(t, dbRepos)
+	require.NotEmpty(t, dbRepos)
 
 	var foundRepo bool
 	for _, repo := range dbRepos {
@@ -331,7 +436,7 @@ func verifySchema1Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	// Ensure presence of each layer.
 	dbLayers, err := mStore.Layers(env.ctx, dbManifest)
 	require.NoError(t, err)
-	assert.NotEmpty(t, dbLayers)
+	require.NotEmpty(t, dbLayers)
 
 	for _, fsLayer := range manifest.FSLayers {
 		var foundLayer bool
@@ -358,7 +463,7 @@ func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	// Ensure repositry is associated with manifest.
 	dbRepos, err := mStore.Repositories(env.ctx, dbManifest)
 	require.NoError(t, err)
-	assert.NotEmpty(t, dbRepos)
+	require.NotEmpty(t, dbRepos)
 
 	var foundRepo bool
 	for _, repo := range dbRepos {
@@ -379,7 +484,7 @@ func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	// Ensure presence of each layer.
 	dbLayers, err := mStore.Layers(env.ctx, dbManifest)
 	require.NoError(t, err)
-	assert.NotEmpty(t, dbLayers)
+	require.NotEmpty(t, dbLayers)
 
 	for _, desc := range manifest.Layers {
 		var foundLayer bool
@@ -392,6 +497,46 @@ func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 		}
 		assert.True(t, foundLayer)
 	}
+}
+
+func verifyManifestList(t *testing.T, env *env, dgst digest.Digest, manifestList manifestlist.ManifestList, repoPath string) {
+	t.Helper()
+
+	mListStore := datastore.NewManifestListStore(env.db)
+
+	// Ensure presence of manifest list.
+	dbManifestList, err := mListStore.FindByDigest(env.ctx, dgst)
+	require.NoError(t, err)
+	require.NotNil(t, dbManifestList)
+
+	// Ensure manifests are associated with manifest list.
+	dbManifests, err := mListStore.Manifests(env.ctx, dbManifestList)
+	require.NoError(t, err)
+	require.NotEmpty(t, dbManifests)
+
+	for _, dbManifest := range dbManifests {
+		var foundManifest bool
+		for _, manifestDesc := range manifestList.Manifests {
+			if manifestDesc.Digest == dbManifest.Digest {
+				foundManifest = true
+			}
+		}
+		assert.True(t, foundManifest)
+	}
+
+	// Ensure manifest list is associated with repository.
+	dbRepos, err := mListStore.Repositories(env.ctx, dbManifestList)
+	require.NoError(t, err)
+	require.NotEmpty(t, dbRepos)
+
+	var foundRepo bool
+	for _, repo := range dbRepos {
+		if repo.Path == repoPath {
+			foundRepo = true
+			break
+		}
+	}
+	assert.True(t, foundRepo)
 }
 
 // seedRandomSchema1Manifest generates a random schema1 manifest and ensures
@@ -440,6 +585,37 @@ func seedRandomSchema2Manifest(t *testing.T, env *env) (schema2.Manifest, []byte
 	}
 
 	return manifest, cfgPayload
+}
+
+// seedRandomManifestList generates a random manifest list and ensures that
+// it and it's manifests are present in the database.
+func seedRandomManifestList(t *testing.T, env *env) manifestlist.ManifestList {
+	manifestList := manifestlist.ManifestList{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     manifestlist.MediaTypeManifestList,
+		},
+		Manifests: make([]manifestlist.ManifestDescriptor, 4),
+	}
+
+	for i := range manifestList.Manifests {
+		manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
+		repoPath := "manifestdb/seed"
+
+		manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
+
+		manifestList.Manifests[i] = manifestlist.ManifestDescriptor{
+			Descriptor: distribution.Descriptor{
+				Digest: manifestDigest,
+			},
+			Platform: manifestlist.PlatformSpec{
+				Architecture: "amd64",
+				OS:           "linux",
+			},
+		}
+	}
+
+	return manifestList
 }
 
 // generateRandomLayer generates a random layer payload and distribution.Descriptor

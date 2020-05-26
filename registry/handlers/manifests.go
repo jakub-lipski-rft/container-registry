@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"mime"
 	"net/http"
@@ -417,6 +418,12 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
 			}
+		case *manifestlist.DeserializedManifestList:
+			if err = dbPutManifestList(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), imh.Repository.Named()); err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest list to database: %v", err)))
+				return
+			}
 		default:
 			dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
 		}
@@ -579,6 +586,54 @@ func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, canonical d
 		return err
 	}
 	return nil
+}
+
+func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifestList *manifestlist.DeserializedManifestList, payload []byte, path reference.Named) error {
+	mListStore := datastore.NewManifestListStore(db)
+	dbManifestList, err := mListStore.FindByDigest(ctx, canonical)
+	if err != nil {
+		return err
+	}
+
+	if dbManifestList == nil {
+		dbManifestList = &models.ManifestList{
+			SchemaVersion: manifestList.SchemaVersion,
+			// Mediatype will be empty for OCI manifests.
+			MediaType: sql.NullString{
+				String: manifestList.MediaType,
+				Valid:  manifestList.MediaType != "",
+			},
+			Digest:  canonical,
+			Payload: payload,
+		}
+		if err := mListStore.Create(ctx, dbManifestList); err != nil {
+			return err
+		}
+
+		// Associate manifests to the manifest list.
+		mStore := datastore.NewManifestStore(db)
+		for _, m := range manifestList.Manifests {
+			dbManifest, err := mStore.FindByDigest(ctx, m.Digest)
+			if err != nil {
+				return err
+			}
+			if dbManifest == nil {
+				return fmt.Errorf("manifest %s not found", m.Digest)
+			}
+			if err := mListStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Associate manifest list and repository.
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path.Name())
+	if err != nil {
+		return err
+	}
+
+	return repositoryStore.AssociateManifestList(ctx, dbRepo, dbManifestList)
 }
 
 // applyResourcePolicy checks whether the resource class matches what has
