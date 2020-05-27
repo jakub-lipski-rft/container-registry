@@ -13,7 +13,6 @@ import (
 type TagReader interface {
 	FindAll(ctx context.Context) (models.Tags, error)
 	FindByID(ctx context.Context, id int64) (*models.Tag, error)
-	FindByNameAndRepositoryID(ctx context.Context, name string, repositoryID int) (*models.Tag, error)
 	Count(ctx context.Context) (int, error)
 	Repository(ctx context.Context, t *models.Tag) (*models.Repository, error)
 	Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error)
@@ -79,15 +78,6 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) {
 	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at FROM tags WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
-
-	return scanFullTag(row)
-}
-
-// FindByNameAndRepositoryID finds a Tag by name and repository ID.
-func (s *tagStore) FindByNameAndRepositoryID(ctx context.Context, name string, repositoryID int) (*models.Tag, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
-		FROM tags WHERE name = $1 AND repository_id = $2`
-	row := s.db.QueryRowContext(ctx, q, name, repositoryID)
 
 	return scanFullTag(row)
 }

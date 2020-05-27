@@ -65,33 +65,6 @@ func TestTagStore_FindByID_NotFound(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestTagStore_FindByNameAndRepositoryID(t *testing.T) {
-	reloadTagFixtures(t)
-
-	s := datastore.NewTagStore(suite.db)
-
-	tag, err := s.FindByNameAndRepositoryID(suite.ctx, "2.0.0", 3)
-	require.NoError(t, err)
-
-	// see testdata/fixtures/tags.sql
-	excepted := &models.Tag{
-		ID:           2,
-		Name:         "2.0.0",
-		RepositoryID: 3,
-		ManifestID:   sql.NullInt64{Int64: 2, Valid: true},
-		CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:44.283783", tag.CreatedAt.Location()),
-	}
-	require.Equal(t, excepted, tag)
-}
-
-func TestTagStore_FindByNameAndRepositoryID_NotFound(t *testing.T) {
-	s := datastore.NewTagStore(suite.db)
-
-	tag, err := s.FindByNameAndRepositoryID(suite.ctx, "3.0.0", 3)
-	require.Nil(t, tag)
-	require.NoError(t, err)
-}
-
 func TestTagStore_FindAll(t *testing.T) {
 	reloadTagFixtures(t)
 
