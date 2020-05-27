@@ -288,20 +288,22 @@ func TestTagStore_Update(t *testing.T) {
 	reloadTagFixtures(t)
 
 	s := datastore.NewTagStore(suite.db)
+	// see testdata/fixtures/tags.sql
 	update := &models.Tag{
-		ID:           5,
-		Name:         "2.0.0",
-		RepositoryID: 4,
-		ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
+		ID:             5,
+		Name:           "2.0.0",
+		RepositoryID:   4,
+		ManifestID:     sql.NullInt64{},
+		ManifestListID: sql.NullInt64{Int64: 1, Valid: true},
 	}
 	err := s.Update(suite.ctx, update)
 	require.NoError(t, err)
 
-	r, err := s.FindByID(suite.ctx, update.ID)
+	tag, err := s.FindByID(suite.ctx, update.ID)
 	require.NoError(t, err)
 
-	update.CreatedAt = r.CreatedAt
-	require.Equal(t, update, r)
+	update.CreatedAt = tag.CreatedAt
+	require.Equal(t, update, tag)
 }
 
 func TestTagStore_Update_NotFound(t *testing.T) {
