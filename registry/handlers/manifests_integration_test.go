@@ -4,6 +4,8 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -628,4 +630,210 @@ func generateRandomLayer() ([]byte, distribution.Descriptor) {
 		MediaType: "application/octet-stream",
 		Digest:    digest.FromBytes(content),
 	}
+}
+
+func TestDeleteManifestDB_Manifest(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	// Setup
+
+	// build test repository
+	rStore := datastore.NewRepositoryStore(env.db)
+	r, err := rStore.CreateByPath(env.ctx, "foo")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// add a manifest
+	mStore := datastore.NewManifestStore(env.db)
+	m := &models.Manifest{
+		SchemaVersion: 2,
+		MediaType:     schema2.MediaTypeManifest,
+		Digest:        "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
+		Payload:       json.RawMessage{},
+	}
+	err = mStore.Create(env.ctx, m)
+	require.NoError(t, err)
+
+	// associate manifest with repository
+	err = rStore.AssociateManifest(env.ctx, r, m)
+	require.NoError(t, err)
+
+	// tag manifest
+	tStore := datastore.NewTagStore(env.db)
+	tags := []*models.Tag{
+		{
+			Name:         "1.0.0",
+			RepositoryID: r.ID,
+			ManifestID:   sql.NullInt64{Int64: m.ID, Valid: true},
+		},
+		{
+			Name:         "latest",
+			RepositoryID: r.ID,
+			ManifestID:   sql.NullInt64{Int64: m.ID, Valid: true},
+		},
+	}
+	for _, tag := range tags {
+		err = tStore.Create(env.ctx, tag)
+		require.NoError(t, err)
+	}
+
+	// Test
+
+	err = dbDeleteManifest(env.ctx, env.db, r.Path, m.Digest)
+	require.NoError(t, err)
+
+	// the manifest should still be there (deleting it is GC's responsibility, if no other repo uses it)
+	m2, err := mStore.FindByID(env.ctx, m.ID)
+	require.NoError(t, err)
+	require.Equal(t, m, m2)
+
+	// but the manifest and repository association should not
+	mm, err := rStore.Manifests(env.ctx, r)
+	require.NoError(t, err)
+	require.Empty(t, mm)
+
+	// neither the tags
+	for _, tag := range tags {
+		tag, err = tStore.FindByID(env.ctx, tag.ID)
+		require.NoError(t, err)
+		require.Nil(t, tag)
+	}
+}
+
+func TestDeleteManifestDB_ManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	// Setup
+
+	// build test repository
+	rStore := datastore.NewRepositoryStore(env.db)
+	r, err := rStore.CreateByPath(env.ctx, "foo")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// add a manifest list
+	mlStore := datastore.NewManifestListStore(env.db)
+	ml := &models.ManifestList{
+		SchemaVersion: 2,
+		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+		Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
+		Payload:       json.RawMessage(`{"schemaVersion":2}`),
+	}
+	err = mlStore.Create(env.ctx, ml)
+	require.NoError(t, err)
+
+	// associate manifest list with repository
+	err = rStore.AssociateManifestList(env.ctx, r, ml)
+	require.NoError(t, err)
+
+	// tag manifest list
+	tStore := datastore.NewTagStore(env.db)
+	tags := []*models.Tag{
+		{
+			Name:           "1.0.0",
+			RepositoryID:   r.ID,
+			ManifestListID: sql.NullInt64{Int64: ml.ID, Valid: true},
+		},
+		{
+			Name:           "latest",
+			RepositoryID:   r.ID,
+			ManifestListID: sql.NullInt64{Int64: ml.ID, Valid: true},
+		},
+	}
+	for _, tag := range tags {
+		err = tStore.Create(env.ctx, tag)
+		require.NoError(t, err)
+	}
+
+	// Test
+
+	err = dbDeleteManifest(env.ctx, env.db, r.Path, ml.Digest)
+	require.NoError(t, err)
+
+	// the manifest list should still be there (deleting it is GC's responsibility, if no other repo uses it)
+	ml2, err := mlStore.FindByID(env.ctx, ml.ID)
+	require.NoError(t, err)
+	require.Equal(t, ml, ml2)
+
+	// but the manifest list and repository association should not
+	mm, err := rStore.ManifestLists(env.ctx, r)
+	require.NoError(t, err)
+	require.Empty(t, mm)
+
+	// neither the tags
+	for _, tag := range tags {
+		tag, err = tStore.FindByID(env.ctx, tag.ID)
+		require.NoError(t, err)
+		require.Nil(t, tag)
+	}
+}
+
+func TestDeleteManifestDB_DissociatedManifest(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	// Setup
+
+	// build test repository
+	rStore := datastore.NewRepositoryStore(env.db)
+	r, err := rStore.CreateByPath(env.ctx, "foo")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// add a manifest
+	mStore := datastore.NewManifestStore(env.db)
+	m := &models.Manifest{
+		SchemaVersion: 2,
+		MediaType:     schema2.MediaTypeManifest,
+		Digest:        "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
+		Payload:       json.RawMessage{},
+	}
+	err = mStore.Create(env.ctx, m)
+	require.NoError(t, err)
+
+	// Test
+
+	err = dbDeleteManifest(env.ctx, env.db, r.Path, m.Digest)
+	require.Error(t, err, "no manifest or manifest list found in database")
+
+	// the manifest should still be there (it was not associated with the repository)
+	m2, err := mStore.FindByID(env.ctx, m.ID)
+	require.NoError(t, err)
+	require.Equal(t, m, m2)
+}
+
+func TestDeleteManifestDB_DissociatedManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	// Setup
+
+	// build test repository
+	rStore := datastore.NewRepositoryStore(env.db)
+	r, err := rStore.CreateByPath(env.ctx, "foo")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// add a manifest list
+	mlStore := datastore.NewManifestListStore(env.db)
+	ml := &models.ManifestList{
+		SchemaVersion: 2,
+		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+		Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
+		Payload:       json.RawMessage(`{"schemaVersion":2}`),
+	}
+	err = mlStore.Create(env.ctx, ml)
+	require.NoError(t, err)
+
+	// Test
+
+	err = dbDeleteManifest(env.ctx, env.db, r.Path, ml.Digest)
+	require.Error(t, err, "no manifest or manifest list found in database")
+
+	// the manifest list should still be there (it was not associated with the repository)
+	ml2, err := mlStore.FindByID(env.ctx, ml.ID)
+	require.NoError(t, err)
+	require.Equal(t, ml, ml2)
 }

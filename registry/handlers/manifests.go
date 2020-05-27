@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"mime"
 	"net/http"
@@ -706,6 +707,53 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 	return nil
 }
 
+// dbDeleteManifest replicates the DeleteManifest action in the metadata database. This method doesn't actually delete
+// a manifest from the database (that's a task for GC, if a manifest is unreferenced), it only deletes the record that
+// associates the manifest with a digest d with the repository with path repoPath. Any tags that reference the manifest
+// within the repository are also deleted.
+func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
+
+	rStore := datastore.NewRepositoryStore(db)
+	r, err := rStore.FindByPath(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+	if r == nil {
+		return fmt.Errorf("repository not found in database: %w", err)
+	}
+
+	// the target digest may reference a manifest or manifest list, start by searching for a manifest
+	m, err := rStore.FindManifestByDigest(ctx, r, d)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		// search for manifest lists if a manifest does not exist
+		ml, err := rStore.FindManifestListByDigest(ctx, r, d)
+		if err != nil {
+			return err
+		}
+		if ml == nil {
+			return errors.New("no manifest or manifest list found in database")
+		}
+
+		log.Debug("manifest list found in database")
+		if err := rStore.DissociateManifestList(ctx, r, ml); err != nil {
+			return err
+		}
+
+		return rStore.UntagManifestList(ctx, r, ml)
+	}
+
+	log.Debug("manifest found in database")
+	if err := rStore.DissociateManifest(ctx, r, m); err != nil {
+		return err
+	}
+
+	return rStore.UntagManifest(ctx, r, m)
+}
+
 // DeleteManifest removes the manifest with the given digest from the registry.
 func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Request) {
 	dcontext.GetLogger(imh).Debug("DeleteImageManifest")
@@ -745,6 +793,28 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 	for _, tag := range referencedTags {
 		if err := tagService.Untag(imh, tag); err != nil {
 			imh.Errors = append(imh.Errors, err)
+			return
+		}
+	}
+
+	if imh.App.Config.Database.Enabled {
+		tx, err := imh.db.BeginTx(r.Context(), nil)
+		if err != nil {
+			e := fmt.Errorf("failed to create database transaction: %v", err)
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			return
+		}
+		defer tx.Rollback()
+
+		if err = dbDeleteManifest(imh, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
+			e := fmt.Errorf("failed to delete manifest in database: %v", err)
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			e := fmt.Errorf("failed to commit database transaction: %v", err)
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return
 		}
 	}
