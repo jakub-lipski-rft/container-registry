@@ -1,8 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/docker/distribution/registry/datastore"
 
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
@@ -85,6 +90,29 @@ type tagHandler struct {
 	Tag string
 }
 
+func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tagName string) error {
+	rStore := datastore.NewRepositoryStore(db)
+	r, err := rStore.FindByPath(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+	if r == nil {
+		return errors.New("repository not found in database")
+	}
+
+	t, err := rStore.FindTagByName(ctx, r, tagName)
+	if err != nil {
+		return err
+	}
+	if t == nil {
+		// TODO: raise error once we have mirrored the tag write
+		return nil // errors.New("tag not found in database")
+	}
+
+	tStore := datastore.NewTagStore(db)
+	return tStore.Delete(ctx, t.ID)
+}
+
 // DeleteTag deletes a tag for a specific image name.
 func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	dcontext.GetLogger(th).Debug("DeleteTag")
@@ -104,6 +132,14 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown)
 		}
 		return
+	}
+
+	if th.App.Config.Database.Enabled {
+		if err := dbDeleteTag(th, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
+			e := fmt.Errorf("failed to delete tag in database: %v", err)
+			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusAccepted)
