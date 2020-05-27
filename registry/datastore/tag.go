@@ -125,7 +125,7 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 
 // ManifestList finds a tag manifest list. A tag can be associated with either a manifest or a manifest list.
 func (s *tagStore) ManifestList(ctx context.Context, t *models.Tag) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
 		FROM manifest_lists WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, t.ManifestListID)
