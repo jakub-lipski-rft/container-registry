@@ -148,9 +148,9 @@ func (s *tagStore) Create(ctx context.Context, t *models.Tag) error {
 
 // Update updates an existing Tag.
 func (s *tagStore) Update(ctx context.Context, t *models.Tag) error {
-	q := "UPDATE tags SET (name, repository_id, manifest_id) = ($1, $2, $3) WHERE id = $4"
+	q := "UPDATE tags SET (name, repository_id, manifest_id, manifest_list_id) = ($1, $2, $3, $4) WHERE id = $5"
 
-	res, err := s.db.ExecContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ID)
+	res, err := s.db.ExecContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ManifestListID, t.ID)
 	if err != nil {
 		return fmt.Errorf("error updating tag: %w", err)
 	}
