@@ -30,6 +30,7 @@ type RepositoryReader interface {
 	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
 	FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error)
 	FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error)
+	Layers(ctx context.Context, r *models.Repository) (models.Layers, error)
 }
 
 // RepositoryWriter is the interface that defines write operations for a repository store.
@@ -45,6 +46,8 @@ type RepositoryWriter interface {
 	DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
+	LinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error
+	UnlinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error
 	SoftDelete(ctx context.Context, r *models.Repository) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -278,6 +281,22 @@ func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *model
 
 	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
 	return scanFullManifestList(row)
+}
+
+// Layers finds all layers associated with the repository.
+func (s *repositoryStore) Layers(ctx context.Context, r *models.Repository) (models.Layers, error) {
+	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at, l.deleted_at 
+		FROM layers as l
+		JOIN repository_layers as rl ON rl.layer_id = l.id
+		JOIN repositories as r ON r.id = rl.repository_id
+		WHERE r.id = $1`
+
+	rows, err := s.db.QueryContext(ctx, q, r.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding layers: %w", err)
+	}
+
+	return scanFullLayers(rows)
 }
 
 // Create saves a new repository.
@@ -518,6 +537,34 @@ func (s *repositoryStore) UntagManifestList(ctx context.Context, r *models.Repos
 	_, err := s.db.ExecContext(ctx, q, r.ID, ml.ID)
 	if err != nil {
 		return fmt.Errorf("error untagging manifest list: %w", err)
+	}
+
+	return nil
+}
+
+// LinkLayer links a layer to a repository. It does nothing if already linked.
+func (s *repositoryStore) LinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error {
+	q := `INSERT INTO repository_layers (repository_id, layer_id) VALUES ($1, $2)
+		ON CONFLICT (repository_id, layer_id) DO NOTHING`
+
+	if _, err := s.db.ExecContext(ctx, q, r.ID, l.ID); err != nil {
+		return fmt.Errorf("error linking layer: %w", err)
+	}
+
+	return nil
+}
+
+// UnlinkLayer unlinks a layer from a repository. It does nothing if not linked.
+func (s *repositoryStore) UnlinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error {
+	q := "DELETE FROM repository_layers WHERE repository_id = $1 AND layer_id = $2"
+
+	res, err := s.db.ExecContext(ctx, q, r.ID, l.ID)
+	if err != nil {
+		return fmt.Errorf("error linking layer: %w", err)
+	}
+
+	if _, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("error linking layer: %w", err)
 	}
 
 	return nil

@@ -479,6 +479,60 @@ func TestRepositoryStore_FindTagByName(t *testing.T) {
 	require.Equal(t, expected, tag)
 }
 
+func TestRepositoryStore_Layers(t *testing.T) {
+	reloadLayerFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByID(suite.ctx, 3)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	ll, err := s.Layers(suite.ctx, r)
+	require.NoError(t, err)
+	require.NotEmpty(t, ll)
+
+	// see testdata/fixtures/repository_layers.sql
+	local := ll[0].CreatedAt.Location()
+	expected := models.Layers{
+		{
+			ID:        1,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+			Digest:    "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9",
+			Size:      2802957,
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
+		},
+		{
+			ID:        2,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+			Digest:    "sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21",
+			Size:      108,
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
+		},
+		{
+			ID:        3,
+			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+			Digest:    "sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1",
+			Size:      109,
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:06:32.856423", local),
+		},
+	}
+	require.Equal(t, expected, ll)
+}
+
+func TestRepositoryStore_LayersNone(t *testing.T) {
+	reloadLayerFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByID(suite.ctx, 1)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// see testdata/fixtures/repository_layers.sql
+	ll, err := s.Layers(suite.ctx, r)
+	require.NoError(t, err)
+	require.Empty(t, ll)
+}
+
 func TestRepositoryStore_Create(t *testing.T) {
 	unloadRepositoryFixtures(t)
 
@@ -1048,6 +1102,81 @@ func TestRepositoryStore_UntagManifestList(t *testing.T) {
 	tt, err = s.ManifestListTags(suite.ctx, r, ml)
 	require.NoError(t, err)
 	require.Empty(t, tt)
+}
+
+func isLayerLinked(t *testing.T, r *models.Repository, l *models.Layer) bool {
+	t.Helper()
+
+	s := datastore.NewRepositoryStore(suite.db)
+	ll, err := s.Layers(suite.ctx, r)
+	require.NoError(t, err)
+
+	for _, layer := range ll {
+		if layer.ID == l.ID {
+			return true
+		}
+	}
+
+	return false
+}
+
+func TestRepositoryStore_LinkLayer(t *testing.T) {
+	reloadLayerFixtures(t)
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.RepositoryLayersTable))
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	r := &models.Repository{ID: 3}
+	l := &models.Layer{ID: 4}
+
+	err := s.LinkLayer(suite.ctx, r, l)
+	require.NoError(t, err)
+
+	require.True(t, isLayerLinked(t, r, l))
+}
+
+func TestRepositoryStore_LinkLayer_AlreadyLinkedDoesNotFail(t *testing.T) {
+	reloadLayerFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/repository_layers.sql
+	r := &models.Repository{ID: 3}
+	l := &models.Layer{ID: 1}
+	require.True(t, isLayerLinked(t, r, l))
+
+	err := s.LinkLayer(suite.ctx, r, l)
+	require.NoError(t, err)
+}
+
+func TestRepositoryStore_UnlinkLayer(t *testing.T) {
+	reloadLayerFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/repository_layers.sql
+	r := &models.Repository{ID: 3}
+	l := &models.Layer{ID: 1}
+	require.True(t, isLayerLinked(t, r, l))
+
+	err := s.UnlinkLayer(suite.ctx, r, l)
+	require.NoError(t, err)
+	require.False(t, isLayerLinked(t, r, l))
+}
+
+func TestRepositoryStore_UnlinkLayer_NotLinkedDoesNotFail(t *testing.T) {
+	reloadLayerFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/repository_layers.sql
+	r := &models.Repository{ID: 3}
+	l := &models.Layer{ID: 4}
+	require.False(t, isLayerLinked(t, r, l))
+
+	err := s.UnlinkLayer(suite.ctx, r, l)
+	require.NoError(t, err)
+	require.False(t, isLayerLinked(t, r, l))
 }
 
 func TestRepositoryStore_SoftDelete(t *testing.T) {

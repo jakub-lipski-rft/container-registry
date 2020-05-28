@@ -13,11 +13,13 @@ import (
 )
 
 func reloadLayerFixtures(tb testing.TB) {
-	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.LayersTable)
+	testutil.ReloadFixtures(tb, suite.db, suite.basePath,
+		testutil.RepositoriesTable, testutil.LayersTable, testutil.RepositoryLayersTable)
 }
 
 func unloadLayerFixtures(tb testing.TB) {
-	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.LayersTable))
+	require.NoError(tb, testutil.TruncateTables(suite.db,
+		testutil.RepositoriesTable, testutil.LayersTable, testutil.RepositoryLayersTable))
 }
 
 func TestLayerStore_ImplementsReaderAndWriter(t *testing.T) {

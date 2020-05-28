@@ -26,6 +26,7 @@ const (
 	ManifestsTable               table = "manifests"
 	RepositoryManifestsTable     table = "repository_manifests"
 	LayersTable                  table = "layers"
+	RepositoryLayersTable        table = "repository_layers"
 	ManifestLayersTable          table = "manifest_layers"
 	ManifestListsTable           table = "manifest_lists"
 	ManifestListItemsTable       table = "manifest_list_items"
@@ -40,6 +41,7 @@ var AllTables = []table{
 	ManifestsTable,
 	RepositoryManifestsTable,
 	LayersTable,
+	RepositoryLayersTable,
 	ManifestLayersTable,
 	ManifestListsTable,
 	ManifestListItemsTable,
