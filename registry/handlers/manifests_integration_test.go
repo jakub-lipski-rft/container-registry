@@ -195,6 +195,255 @@ func TestPutManifestList(t *testing.T) {
 	testPutManifestListMissingManifest(t, env1)
 }
 
+func TestTagManifest_Schema2(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagschema2"
+	tagName := "tagschema2"
+
+	// Upload schema2 manifest and tag it.
+	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
+	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
+
+	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+}
+
+func TestTagManifest_Schema1(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagschema1"
+	tagName := "tagschema1"
+
+	// Upload schema1 manifest and tag it.
+	manifest := seedRandomSchema1Manifest(t, env)
+	manifestDigest := env.uploadSchema1ManifestToDB(t, manifest, repoPath)
+
+	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+}
+
+func TestTagManifest_Idempotent(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagidempotent"
+	tagName := "tagidempotent"
+
+	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
+	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
+
+	// Retag the manifest with the same tag.
+	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+
+	err = dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+}
+
+func TestTagManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagmanifestlist"
+	tagName := "tagmanifestlist"
+
+	// Upload and tag manifest list.
+	manifestList := seedRandomManifestList(t, env)
+	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+}
+
+func TestTagManifestList_Idempotent(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	manifestList := seedRandomManifestList(t, env)
+
+	repoPath := "manifestdb/tagmanifestlistidempotent"
+	tagName := "tagmanifestlist"
+
+	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+	// Tag manifest list twice.
+	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+
+	err = dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+}
+
+func TestTagManifest_TagReplacesPreviousManifest(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	tagName := "tagschema2latest"
+	repoPath := "manifestdb/tagschema2replace"
+
+	// Upload and tag old manifest.
+	oldManifest, oldCfgPayload := seedRandomSchema2Manifest(t, env)
+	oldManifestDigest := env.uploadSchema2ManifestToDB(t, oldManifest, oldCfgPayload, repoPath)
+
+	err := dbTagManifest(env.ctx, env.db, oldManifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	// Ensure tag is initially associated with correct manifest.
+	verifyManifestTag(t, env, oldManifestDigest, tagName, repoPath)
+
+	// Upload a new manifest and tag it with the same tag.
+	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
+	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
+
+	err = dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+}
+
+func TestTagManifest_TagReplacesPreviousManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagmanifestlist"
+	tagName := "tagmanifestreplacemanifestlist"
+
+	// Upload and tag an initial manifest list.
+	manifestList := seedRandomManifestList(t, env)
+	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	// Ensure tag is initially associated with correct manifest list.
+	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+
+	// Upload a schema2 manifest, retagging it with the same tag used for the manifest list.
+	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
+	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
+
+	err = dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	// Ensure tag is now associated with correct manifest.
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+}
+
+func TestTagManifestList_TagReplacesPreviousManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagmanifestlist"
+	tagName := "tagmanifestreplacemanifestlist"
+
+	// Upload and tag an initial manifest list.
+	oldManifestList := seedRandomManifestList(t, env)
+	oldManifestListDigest := env.uploadManifestListToDB(t, oldManifestList, repoPath)
+
+	err := dbTagManifestList(env.ctx, env.db, oldManifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	// Ensure that tag is initially associated with correct manifest list.
+	verifyManifestListTag(t, env, oldManifestListDigest, tagName, repoPath)
+
+	// Upload a new manifest list, retagging it with the same tag used
+	// for the old manifest list.
+	manifestList := seedRandomManifestList(t, env)
+	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+	err = dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+}
+
+func TestTagManifestList_TagReplacesPreviousManifest(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	repoPath := "manifestdb/tagmanifestlist"
+	tagName := "tagmanifestlistlatest"
+
+	// Upload a regular schema2 manifest.
+	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
+	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
+
+	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	// Ensure tag is now associated with correct manifest.
+	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
+
+	// Upload a manifest list, retagging it with the same tag used for the manifest.
+	manifestList := seedRandomManifestList(t, env)
+	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
+
+	err = dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.NoError(t, err)
+
+	// Ensure that tag is associated with correct manifest list.
+	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+}
+
+func TestTagManifest_MissingManifest(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	tagName := "tagmanifestmissing"
+	repoPath := "manifestdb/tagmanifestmissing"
+	manifestDigest := digest.FromString("invalid digest")
+
+	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
+	require.Error(t, err)
+
+	// Ensure tag is not present in database.
+	repoStore := datastore.NewRepositoryStore(env.db)
+	dbRepo, err := repoStore.CreateOrFindByPath(env.ctx, repoPath)
+	require.NoError(t, err)
+
+	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
+	require.NoError(t, err)
+	require.Nil(t, dbTag)
+}
+
+func TestTagManifestList_MissingManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	tagName := "tagmanifestlistmissing"
+	repoPath := "manifestdb/tagmanifestlistmissing"
+	manifestListDigest := digest.FromString("invalid digest")
+
+	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	require.Error(t, err)
+
+	// Ensure tag is not present in database.
+	repoStore := datastore.NewRepositoryStore(env.db)
+	dbRepo, err := repoStore.CreateOrFindByPath(env.ctx, repoPath)
+	require.NoError(t, err)
+
+	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
+	require.NoError(t, err)
+	require.Nil(t, dbTag)
+}
+
 func testPutManifestSchmea2DB(t *testing.T, env *env) {
 	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
 
@@ -539,6 +788,64 @@ func verifyManifestList(t *testing.T, env *env, dgst digest.Digest, manifestList
 		}
 	}
 	assert.True(t, foundRepo)
+}
+
+func verifyManifestTag(t *testing.T, env *env, dgst digest.Digest, tagName, repoPath string) {
+	t.Helper()
+
+	// Ensure tag is present in database.
+	repoStore := datastore.NewRepositoryStore(env.db)
+
+	dbRepo, err := repoStore.FindByPath(env.ctx, repoPath)
+	require.NoError(t, err)
+	require.NotNil(t, dbRepo)
+
+	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
+	require.NoError(t, err)
+	require.NotNil(t, dbTag)
+
+	// Ensure that tag is associated with correct manifest.
+	tagstore := datastore.NewTagStore(env.db)
+	mStore := datastore.NewManifestStore(env.db)
+
+	tagDBManifest, err := tagstore.Manifest(env.ctx, dbTag)
+	require.NoError(t, err)
+	require.NotNil(t, tagDBManifest)
+
+	dbManifest, err := mStore.FindByDigest(env.ctx, dgst)
+	require.NoError(t, err)
+	require.NotNil(t, dbManifest)
+
+	require.Equal(t, dbManifest, tagDBManifest)
+}
+
+func verifyManifestListTag(t *testing.T, env *env, dgst digest.Digest, tagName, repoPath string) {
+	t.Helper()
+
+	// Ensure tag is present in database.
+	repoStore := datastore.NewRepositoryStore(env.db)
+
+	dbRepo, err := repoStore.FindByPath(env.ctx, repoPath)
+	require.NoError(t, err)
+	require.NotNil(t, dbRepo)
+
+	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
+	require.NoError(t, err)
+	require.NotNil(t, dbTag)
+
+	// Ensure that tag is associated with correct manifest list.
+	tagstore := datastore.NewTagStore(env.db)
+	mListStore := datastore.NewManifestListStore(env.db)
+
+	tagDBManifestList, err := tagstore.ManifestList(env.ctx, dbTag)
+	require.NoError(t, err)
+	require.NotNil(t, tagDBManifestList)
+
+	dbManifestList, err := mListStore.FindByDigest(env.ctx, dgst)
+	require.NoError(t, err)
+	require.NotNil(t, dbManifestList)
+
+	require.Equal(t, dbManifestList, tagDBManifestList)
 }
 
 // seedRandomSchema1Manifest generates a random schema1 manifest and ensures

@@ -443,6 +443,40 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 			return
 		}
+
+		// Associate tag with manifest in database.
+		if imh.Config.Database.Enabled {
+			tx, err := imh.App.db.Begin()
+			if err != nil {
+				e := fmt.Errorf("failed to create database transaction: %v", err)
+				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				return
+			}
+			defer tx.Rollback()
+
+			switch reqManifest := manifest.(type) {
+			case *schema2.DeserializedManifest, *schema1.SignedManifest:
+				if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
+					e := fmt.Errorf("failed to create tag in database: %v", err)
+					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+					return
+				}
+			case *manifestlist.DeserializedManifestList:
+				if err := dbTagManifestList(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
+					e := fmt.Errorf("failed to create tag in database: %v", err)
+					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+					return
+				}
+			default:
+				dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).
+					Warn("database does not support manifest class")
+			}
+			if err := tx.Commit(); err != nil {
+				e := fmt.Errorf("failed to commit tag to database: %v", err)
+				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				return
+			}
+		}
 	}
 
 	// Construct a canonical url for the uploaded manifest.
@@ -465,6 +499,117 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusCreated)
 
 	dcontext.GetLogger(imh).Debug("Succeeded in putting manifest!")
+}
+
+func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, tagName, path string) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "manifest_digest": dgst, "tag": tagName})
+	log.Debug("tagging manifest")
+
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.FindByPath(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	// TODO: If we return the manifest ID from the putDatabase methods, we can
+	// avoid looking up the manifest by digest.
+	manifestStore := datastore.NewManifestStore(db)
+	dbManifest, err := manifestStore.FindByDigest(ctx, dgst)
+	if err != nil {
+		return err
+	}
+	if dbManifest == nil {
+		return fmt.Errorf("manifest %s not found in database", dgst)
+	}
+
+	tagStore := datastore.NewTagStore(db)
+
+	dbTag, err := repositoryStore.FindTagByName(ctx, dbRepo, tagName)
+	if err != nil {
+		return err
+	}
+
+	if dbTag != nil {
+		log.Debug("tag already exists in database")
+
+		// Tag exists and already points to the current manifest.
+		if dbTag.ManifestID.Int64 == dbManifest.ID {
+			log.Debug("tag already associated with current manifest")
+			return nil
+		}
+
+		// Tag exists, but refers to another manifest, update the manifest to which
+		// the tag refers. Ensuring that any previous reference to a manifest list ID is cleared.
+		log.Debug("updating tag with manifest ID")
+		dbTag.ManifestID = sql.NullInt64{Int64: dbManifest.ID, Valid: true}
+		dbTag.ManifestListID = sql.NullInt64{}
+
+		return tagStore.Update(ctx, dbTag)
+	}
+
+	// Tag does not exist, create it.
+	log.Debug("creating new tag")
+	return tagStore.Create(ctx, &models.Tag{
+		Name:         tagName,
+		RepositoryID: dbRepo.ID,
+		ManifestID:   sql.NullInt64{Int64: dbManifest.ID, Valid: true},
+	})
+}
+
+func dbTagManifestList(ctx context.Context, db datastore.Queryer, dgst digest.Digest, tagName, path string) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "manifest_list_digest": dgst, "tag": tagName})
+	log.Debug("tagging manifest list")
+
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.FindByPath(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	// TODO: If we return the manifest ID from the putDatabase methods, we can
+	// avoid looking up the manifest by digest.
+	manifestListStore := datastore.NewManifestListStore(db)
+	dbManifestList, err := manifestListStore.FindByDigest(ctx, dgst)
+	if err != nil {
+		return err
+	}
+	if dbManifestList == nil {
+		return fmt.Errorf("manifest list %s not found in database", dgst)
+	}
+
+	tagStore := datastore.NewTagStore(db)
+
+	dbTag, err := repositoryStore.FindTagByName(ctx, dbRepo, tagName)
+	if err != nil {
+		return err
+	}
+
+	if dbTag != nil {
+		log.Debug("tag already exists in database")
+
+		// Tag exists and already points to the current manifest list.
+		if dbTag.ManifestListID.Int64 == dbManifestList.ID {
+			log.Debug("tag already associated with current manifest list")
+			return nil
+		}
+
+		// Tag exists, but refers to another manifest, update the manifest list to
+		// which the tag refers. Ensuring that any previous referece to a manifest
+		// ID is cleared.
+		log.Debug("updating tag with manifest list ID")
+		dbTag.ManifestListID = sql.NullInt64{Int64: dbManifestList.ID, Valid: true}
+		dbTag.ManifestID = sql.NullInt64{}
+
+		return tagStore.Update(ctx, dbTag)
+	}
+
+	// Tag does not exist, create it.
+	log.Debug("creating new tag")
+	return tagStore.Create(ctx, &models.Tag{
+		Name:           tagName,
+		RepositoryID:   dbRepo.ID,
+		ManifestListID: sql.NullInt64{Int64: dbManifestList.ID, Valid: true},
+	})
 }
 
 func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
