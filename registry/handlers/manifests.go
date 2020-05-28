@@ -613,12 +613,17 @@ func dbTagManifestList(ctx context.Context, db datastore.Queryer, dgst digest.Di
 }
 
 func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": canonical, "schema_version": manifest.Versioned.SchemaVersion})
+	log.Debug("putting manifest")
+
 	mStore := datastore.NewManifestStore(db)
 	dbManifest, err := mStore.FindByDigest(ctx, canonical)
 	if err != nil {
 		return err
 	}
 	if dbManifest == nil {
+		log.Debug("manifest not found in database")
+
 		m := &models.Manifest{
 			SchemaVersion: manifest.SchemaVersion,
 			MediaType:     manifest.MediaType,
@@ -658,6 +663,8 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical d
 		}
 
 		if dbCfg == nil {
+			log.Debug("manifest config not found in database")
+
 			if err := mCfgStore.Create(ctx, &models.ManifestConfiguration{
 				ManifestID: dbManifest.ID,
 				MediaType:  manifest.Config.MediaType,
@@ -684,12 +691,17 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical d
 }
 
 func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema1.SignedManifest, payload []byte, path reference.Named) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": canonical, "schema_version": manifest.Versioned.SchemaVersion})
+	log.Debug("putting manifest")
+
 	mStore := datastore.NewManifestStore(db)
 	dbManifest, err := mStore.FindByDigest(ctx, canonical)
 	if err != nil {
 		return err
 	}
 	if dbManifest == nil {
+		log.Debug("manifest not found in database")
+
 		m := &models.Manifest{
 			SchemaVersion: manifest.SchemaVersion,
 			MediaType:     manifest.MediaType,
@@ -735,6 +747,9 @@ func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, canonical d
 }
 
 func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifestList *manifestlist.DeserializedManifestList, payload []byte, path reference.Named) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": canonical})
+	log.Debug("putting manifest list")
+
 	mListStore := datastore.NewManifestListStore(db)
 	dbManifestList, err := mListStore.FindByDigest(ctx, canonical)
 	if err != nil {
@@ -742,6 +757,8 @@ func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical dige
 	}
 
 	if dbManifestList == nil {
+		log.Debug("manifest list not found in database")
+
 		dbManifestList = &models.ManifestList{
 			SchemaVersion: manifestList.SchemaVersion,
 			// Mediatype will be empty for OCI manifests.
