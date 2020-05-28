@@ -105,8 +105,7 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if t == nil {
-		// TODO: raise error once we have mirrored the tag write
-		return nil // errors.New("tag not found in database")
+		return errors.New("tag not found in database")
 	}
 
 	tStore := datastore.NewTagStore(db)

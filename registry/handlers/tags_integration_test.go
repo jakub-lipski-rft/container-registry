@@ -81,7 +81,5 @@ func TestDeleteTagDB_TagNotFound(t *testing.T) {
 	require.NotNil(t, r)
 
 	err = dbDeleteTag(env.ctx, env.db, r.Path, "bar")
-	// TODO: test error once we have mirrored the tag write
-	require.NoError(t, err)
-	//require.Error(t, err, "tag not found in database")
+	require.Error(t, err, "tag not found in database")
 }
