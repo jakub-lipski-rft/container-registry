@@ -108,7 +108,7 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, mc *model
 	return dbConfig, nil
 }
 
-func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Repository, dbManifest *models.Manifest, l *models.Layer) error {
+func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, l *models.Layer) error {
 	dbLayer, err := imp.findOrCreateDBLayer(ctx, fsRepo, l)
 	if err != nil {
 		return err
@@ -117,10 +117,14 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 		return fmt.Errorf("error associating layer with manifest: %w", err)
 	}
 
+	if err := imp.repositoryStore.LinkLayer(ctx, dbRepo, dbLayer); err != nil {
+		return fmt.Errorf("error linking layer to repository: %w", err)
+	}
+
 	return nil
 }
 
-func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distribution.Repository, dbManifest *models.Manifest, fsLayers []schema1.FSLayer) error {
+func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, fsLayers []schema1.FSLayer) error {
 	total := len(fsLayers)
 	for i, fsLayer := range fsLayers {
 		log := logrus.WithFields(logrus.Fields{
@@ -130,7 +134,7 @@ func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distributio
 		})
 		log.Info("importing layer")
 
-		if err := imp.importLayer(ctx, fsRepo, dbManifest, &models.Layer{Digest: fsLayer.BlobSum}); err != nil {
+		if err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Layer{Digest: fsLayer.BlobSum}); err != nil {
 			log.WithError(err).Error("error importing layer")
 			continue
 		}
@@ -139,7 +143,7 @@ func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distributio
 	return nil
 }
 
-func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repository, dbManifest *models.Manifest, fsLayers []distribution.Descriptor) error {
+func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, fsLayers []distribution.Descriptor) error {
 	total := len(fsLayers)
 	for i, fsLayer := range fsLayers {
 		log := logrus.WithFields(logrus.Fields{
@@ -151,7 +155,7 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 		})
 		log.Info("importing layer")
 
-		err := imp.importLayer(ctx, fsRepo, dbManifest, &models.Layer{
+		err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Layer{
 			MediaType: fsLayer.MediaType,
 			Digest:    fsLayer.Digest,
 			Size:      fsLayer.Size,
@@ -184,7 +188,7 @@ func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribut
 	}
 
 	// import manifest layers
-	if err := imp.importSchema1Layers(ctx, fsRepo, dbManifest, m.FSLayers); err != nil {
+	if err := imp.importSchema1Layers(ctx, fsRepo, dbRepo, dbManifest, m.FSLayers); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
 	}
 
@@ -232,7 +236,7 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 	}
 
 	// import manifest layers
-	if err := imp.importLayers(ctx, fsRepo, dbManifest, m.Layers); err != nil {
+	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.Layers); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
 	}
 
@@ -280,7 +284,7 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 	}
 
 	// import manifest layers
-	if err := imp.importLayers(ctx, fsRepo, dbManifest, m.Layers); err != nil {
+	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.Layers); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
 	}
 
