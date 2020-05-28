@@ -223,6 +223,42 @@ func _20200428184744_create_foreign_key_indexes_up_sql() ([]byte, error) {
 	)
 }
 
+var __20200527132906_create_repository_layers_table_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\x28\x4a\x2d\xc8\x2f\xce\x2c\xc9\x2f\xaa\x8c\xcf\x49\xac\x4c\x2d\x2a\xb6\x06\x04\x00\x00\xff\xff\xaa\xec\x88\x39\x27\x00\x00\x00")
+
+func _20200527132906_create_repository_layers_table_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200527132906_create_repository_layers_table_down_sql,
+		"20200527132906_create_repository_layers_table.down.sql",
+	)
+}
+
+var __20200527132906_create_repository_layers_table_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x92\xc1\x6e\xb3\x30\x10\x84\xef\x79\x8a\x39\x06\x29\x6f\xf0\x9f\x1c\x58\x22\xeb\xa7\xa6\x35\x46\x2a\x27\x44\x8b\xdb\x5a\x4d\x42\x0a\xae\xa2\xf4\xe9\xab\x40\x5d\xa0\x44\x82\xbd\xad\xd8\x99\xfd\x98\xb5\x2f\x89\x29\x82\x62\xdb\x88\xc0\x43\x88\x58\x81\x1e\x79\xa2\x12\xd4\xfa\x54\x35\xc6\x56\xf5\x25\xdf\x17\x17\x5d\x37\xab\xf5\x0a\x00\x4c\x89\x41\x3d\x99\x57\x73\xb4\x98\xd6\xd5\x49\xa4\x51\x84\x1d\x09\x92\x4c\x51\x80\x6d\x86\x80\x42\x96\x46\x0a\x2c\x01\x0f\x48\x28\xae\xb2\x4d\xeb\x3a\xd8\x66\xca\x79\xd7\x4e\xd4\x72\xe5\x0e\x68\xa1\xe8\xb9\xd6\x85\xd5\x65\x5e\xb4\xa3\xd6\x1c\x74\x63\x8b\xc3\x09\x67\x63\xdf\xda\x16\x5f\xd5\x51\xf7\xfc\x0e\xf9\x58\x9d\xd7\x5e\x67\x51\xea\xbd\x9e\xb7\xe8\x66\xfd\x58\x24\x4a\x32\x2e\x14\x4e\xef\xf9\x24\x54\xdc\x4b\x7e\xc7\x64\x86\xff\x94\x61\x6d\x4a\x6f\xa2\x7a\xb9\xa1\xca\x47\x71\xf5\x9d\xd1\x0d\xc2\x58\x12\xdf\x89\xce\x70\x34\xe7\xad\x5c\x22\x92\x42\x92\x24\x7c\x1a\x9c\xf9\xaa\xbd\x02\x20\x16\x08\x28\x22\x45\xf0\x59\xe2\xb3\x80\x96\x21\xb9\x63\xb8\x1f\x1b\x71\xb8\x8f\x37\x11\x7e\x04\x0b\x97\x7f\x7e\xcc\xe6\xf1\xfb\x2e\x52\xc1\x1f\x52\xfa\x13\xc3\x06\x3d\x8d\xf7\xef\x3b\x00\x00\xff\xff\x80\xf1\xa4\x3d\x02\x03\x00\x00")
+
+func _20200527132906_create_repository_layers_table_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200527132906_create_repository_layers_table_up_sql,
+		"20200527132906_create_repository_layers_table.up.sql",
+	)
+}
+
+var __20200527133232_create_repository_layers_indexes_down_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x72\x75\xf7\xf4\xb3\xe6\x72\x09\xf2\x0f\x50\xf0\xf4\x73\x71\x8d\x50\xf0\x74\x53\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\xac\x88\x2f\x4a\x2d\xc8\x2f\xce\x2c\xc9\x2f\xaa\x8c\xcf\x49\xac\x4c\x2d\x2a\x46\x16\xc9\x4c\x21\x45\x23\x98\x02\xeb\x71\xf6\xf7\xf5\xf5\x0c\xb1\x06\x04\x00\x00\xff\xff\x71\xb0\x63\x1c\x7b\x00\x00\x00")
+
+func _20200527133232_create_repository_layers_indexes_down_sql() ([]byte, error) {
+	return bindata_read(
+		__20200527133232_create_repository_layers_indexes_down_sql,
+		"20200527133232_create_repository_layers_indexes.down.sql",
+	)
+}
+
+var __20200527133232_create_repository_layers_indexes_up_sql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x72\x75\xf7\xf4\xb3\xe6\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\xf0\x74\x53\xf0\xf3\x0f\x51\x70\x8d\xf0\x0c\x0e\x09\x56\xc8\xac\x88\x2f\x4a\x2d\xc8\x2f\xce\x2c\xc9\x2f\xaa\x8c\xcf\x49\xac\x4c\x2d\x2a\x46\x16\xc9\x4c\x51\xf0\xf7\x53\xc0\x50\xa2\xa0\x81\xa2\x46\x93\x74\x3b\xc0\x14\x6e\xe3\x61\xd2\x20\x93\xfd\x7d\x7d\x3d\x43\xac\x01\x01\x00\x00\xff\xff\xf3\x6c\x4b\xda\xcc\x00\x00\x00")
+
+func _20200527133232_create_repository_layers_indexes_up_sql() ([]byte, error) {
+	return bindata_read(
+		__20200527133232_create_repository_layers_indexes_up_sql,
+		"20200527133232_create_repository_layers_indexes.up.sql",
+	)
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -267,6 +303,10 @@ var _bindata = map[string]func() ([]byte, error){
 	"20200408193126_create_repository_manifest_lists_table.up.sql":   _20200408193126_create_repository_manifest_lists_table_up_sql,
 	"20200428184744_create_foreign_key_indexes.down.sql":             _20200428184744_create_foreign_key_indexes_down_sql,
 	"20200428184744_create_foreign_key_indexes.up.sql":               _20200428184744_create_foreign_key_indexes_up_sql,
+	"20200527132906_create_repository_layers_table.down.sql":         _20200527132906_create_repository_layers_table_down_sql,
+	"20200527132906_create_repository_layers_table.up.sql":           _20200527132906_create_repository_layers_table_up_sql,
+	"20200527133232_create_repository_layers_indexes.down.sql":       _20200527133232_create_repository_layers_indexes_down_sql,
+	"20200527133232_create_repository_layers_indexes.up.sql":         _20200527133232_create_repository_layers_indexes_up_sql,
 }
 
 // AssetDir returns the file names below a certain
@@ -332,4 +372,8 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"20200408193126_create_repository_manifest_lists_table.up.sql":   {_20200408193126_create_repository_manifest_lists_table_up_sql, map[string]*_bintree_t{}},
 	"20200428184744_create_foreign_key_indexes.down.sql":             {_20200428184744_create_foreign_key_indexes_down_sql, map[string]*_bintree_t{}},
 	"20200428184744_create_foreign_key_indexes.up.sql":               {_20200428184744_create_foreign_key_indexes_up_sql, map[string]*_bintree_t{}},
+	"20200527132906_create_repository_layers_table.down.sql":         {_20200527132906_create_repository_layers_table_down_sql, map[string]*_bintree_t{}},
+	"20200527132906_create_repository_layers_table.up.sql":           {_20200527132906_create_repository_layers_table_up_sql, map[string]*_bintree_t{}},
+	"20200527133232_create_repository_layers_indexes.down.sql":       {_20200527133232_create_repository_layers_indexes_down_sql, map[string]*_bintree_t{}},
+	"20200527133232_create_repository_layers_indexes.up.sql":         {_20200527133232_create_repository_layers_indexes_up_sql, map[string]*_bintree_t{}},
 }}
