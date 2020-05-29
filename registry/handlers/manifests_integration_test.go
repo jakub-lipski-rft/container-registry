@@ -162,39 +162,6 @@ func newEnv(t *testing.T) *env {
 	return env
 }
 
-func TestPutManifestSchema1DB(t *testing.T) {
-	env1 := newEnv(t)
-	defer env1.shutdown(t)
-
-	testPutManifestSchmea1DB(t, env1)
-	testPutManifestSchmea1DBIsIdempotent(t, env1)
-	testPutManifestSchmea1DBMultipleRepositories(t, env1)
-	testPutManifestSchmea1DBMultipleManifests(t, env1)
-	testPutManifestSchmea1DBMissingLayer(t, env1)
-}
-
-func TestPutManifestSchema2DB(t *testing.T) {
-	env1 := newEnv(t)
-	defer env1.shutdown(t)
-
-	testPutManifestSchmea2DB(t, env1)
-	testPutManifestSchmea2DBIsIdempotent(t, env1)
-	testPutManifestSchmea2DBMultipleRepositories(t, env1)
-	testPutManifestSchmea2DBMultipleManifests(t, env1)
-	testPutManifestSchmea2DBMissingLayer(t, env1)
-}
-
-func TestPutManifestList(t *testing.T) {
-	env1 := newEnv(t)
-	defer env1.shutdown(t)
-
-	testPutManifestList(t, env1)
-	testPutManifestListIsIdempotent(t, env1)
-	testPutManifestListMultipleRepositories(t, env1)
-	testPutManifestListMultipleManifests(t, env1)
-	testPutManifestListMissingManifest(t, env1)
-}
-
 func TestTagManifest_Schema2(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
@@ -444,7 +411,10 @@ func TestTagManifestList_MissingManifestList(t *testing.T) {
 	require.Nil(t, dbTag)
 }
 
-func testPutManifestSchmea2DB(t *testing.T, env *env) {
+func TestPutManifestSchema2(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
 
 	repoPath := "manifestdb/happypath"
@@ -453,7 +423,10 @@ func testPutManifestSchmea2DB(t *testing.T, env *env) {
 	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 }
 
-func testPutManifestSchmea2DBIsIdempotent(t *testing.T, env *env) {
+func TestPutManifestSchema2_Idempotent(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
 	repoPath := "manifestdb/idempotent"
 
@@ -464,7 +437,10 @@ func testPutManifestSchmea2DBIsIdempotent(t *testing.T, env *env) {
 	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
 }
 
-func testPutManifestSchmea2DBMultipleRepositories(t *testing.T, env *env) {
+func TestPutManifestSchema2_MultipleRepositories(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
 
 	repoBasePath := "manifestdb/multirepo"
@@ -477,7 +453,10 @@ func testPutManifestSchmea2DBMultipleRepositories(t *testing.T, env *env) {
 	}
 }
 
-func testPutManifestSchmea2DBMultipleManifests(t *testing.T, env *env) {
+func TestPutManifestSchema2_MultipleManifests(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	repoPath := "manifestdb/multimanifest"
 
 	for i := 0; i < 10; i++ {
@@ -488,7 +467,10 @@ func testPutManifestSchmea2DBMultipleManifests(t *testing.T, env *env) {
 	}
 }
 
-func testPutManifestSchmea2DBMissingLayer(t *testing.T, env *env) {
+func TestPutManifestSchema2_MissingLayer(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
 
 	layerStore := datastore.NewLayerStore(env.db)
@@ -514,7 +496,10 @@ func testPutManifestSchmea2DBMissingLayer(t *testing.T, env *env) {
 	assert.Error(t, err)
 }
 
-func testPutManifestSchmea1DB(t *testing.T, env *env) {
+func TestPutManifestSchema1(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest := seedRandomSchema1Manifest(t, env)
 
 	repoPath := "manifestdb/happypathschema1"
@@ -523,7 +508,10 @@ func testPutManifestSchmea1DB(t *testing.T, env *env) {
 	verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
 }
 
-func testPutManifestSchmea1DBIsIdempotent(t *testing.T, env *env) {
+func TestPutManifestSchema1_Idempotent(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest := seedRandomSchema1Manifest(t, env)
 	repoPath := "manifestdb/idempotentschema1"
 
@@ -534,7 +522,10 @@ func testPutManifestSchmea1DBIsIdempotent(t *testing.T, env *env) {
 	verifySchema1Manifest(t, env, manifestDigest, manifest, repoPath)
 }
 
-func testPutManifestSchmea1DBMultipleRepositories(t *testing.T, env *env) {
+func TestPutManifestSchema1_MultipleRepositories(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest := seedRandomSchema1Manifest(t, env)
 
 	repoBasePath := "manifestdb/multireposchema1"
@@ -547,7 +538,10 @@ func testPutManifestSchmea1DBMultipleRepositories(t *testing.T, env *env) {
 	}
 }
 
-func testPutManifestSchmea1DBMultipleManifests(t *testing.T, env *env) {
+func TestPutManifestSchema1_MultipleManifests(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	repoPath := "manifestdb/multimanifestschema1"
 
 	for i := 0; i < 10; i++ {
@@ -558,7 +552,10 @@ func testPutManifestSchmea1DBMultipleManifests(t *testing.T, env *env) {
 	}
 }
 
-func testPutManifestSchmea1DBMissingLayer(t *testing.T, env *env) {
+func TestPutManifestSchema1_MissingLayer(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifest := seedRandomSchema1Manifest(t, env)
 
 	layerStore := datastore.NewLayerStore(env.db)
@@ -587,7 +584,10 @@ func testPutManifestSchmea1DBMissingLayer(t *testing.T, env *env) {
 	assert.Error(t, err)
 }
 
-func testPutManifestList(t *testing.T, env *env) {
+func TestPutManifestList(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifestList := seedRandomManifestList(t, env)
 
 	repoPath := "manifestdb/happypathmanifestlist"
@@ -596,7 +596,10 @@ func testPutManifestList(t *testing.T, env *env) {
 	verifyManifestList(t, env, manifestDigest, manifestList, repoPath)
 }
 
-func testPutManifestListIsIdempotent(t *testing.T, env *env) {
+func TestPutManifestList_Idempotent(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifestList := seedRandomManifestList(t, env)
 	repoPath := "manifestdb/idempotentmanifestlist"
 
@@ -607,7 +610,10 @@ func testPutManifestListIsIdempotent(t *testing.T, env *env) {
 	verifyManifestList(t, env, manifestListDigest, manifestList, repoPath)
 }
 
-func testPutManifestListMultipleRepositories(t *testing.T, env *env) {
+func TestPutManifestList_MultipleRepositories(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifestList := seedRandomManifestList(t, env)
 
 	repoBasePath := "manifestdb/multirepomanifestlist"
@@ -620,7 +626,10 @@ func testPutManifestListMultipleRepositories(t *testing.T, env *env) {
 	}
 }
 
-func testPutManifestListMultipleManifests(t *testing.T, env *env) {
+func TestPutManifestList_MultipleManifests(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	repoPath := "manifestdb/multimanifestlist"
 
 	for i := 0; i < 10; i++ {
@@ -631,7 +640,10 @@ func testPutManifestListMultipleManifests(t *testing.T, env *env) {
 	}
 }
 
-func testPutManifestListMissingManifest(t *testing.T, env *env) {
+func TestPutManifestList_MissingManifest(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
 	manifestList := seedRandomManifestList(t, env)
 
 	mStore := datastore.NewManifestStore(env.db)
