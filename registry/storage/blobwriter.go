@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -75,36 +74,49 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 		return distribution.Descriptor{}, err
 	}
 
-	// TODO: It's stil possible to operate the registry with no database, so we
-	// must keep track of the nil-ness of these varibles for now.
-	var tx *sql.Tx
-	var ls datastore.LayerStore
+	if err := bw.moveBlob(ctx, canonical); err != nil {
+		return distribution.Descriptor{}, err
+	}
+
+	var l *models.Layer
+	if bw.db != nil {
+		// Even though we don't need to interact with database layer after this
+		// point, we'll use CreateOrFind to avoid race conditions.
+		ls := datastore.NewLayerStore(bw.db)
+		l = &models.Layer{
+			MediaType: canonical.MediaType,
+			Digest:    canonical.Digest,
+			Size:      canonical.Size,
+		}
+		if err := ls.CreateOrFind(ctx, l); err != nil {
+			return distribution.Descriptor{}, err
+		}
+	}
+
+	if err := bw.blobStore.linkBlob(ctx, canonical, desc.Digest); err != nil {
+		return distribution.Descriptor{}, err
+	}
 
 	if bw.db != nil {
-		tx, err = bw.db.Begin()
+		tx, err := bw.db.Begin()
 		if err != nil {
 			return distribution.Descriptor{}, fmt.Errorf("beginning database transaction: %w", err)
 		}
 		defer tx.Rollback()
 
-		// Even though we don't need to interact with database layer after this
-		// point, we'll use CreateOrFind to avoid race conditions.
-		ls = datastore.NewLayerStore(tx)
-		if err := ls.CreateOrFind(ctx, &models.Layer{
-			MediaType: canonical.MediaType,
-			Digest:    canonical.Digest,
-			Size:      canonical.Size,
-		}); err != nil {
-			return distribution.Descriptor{}, fmt.Errorf("creating layer in database: %w", err)
+		rStore := datastore.NewRepositoryStore(bw.db)
+		r, err := rStore.CreateOrFindByPath(ctx, bw.blobStore.repository.Named().Name())
+		if err != nil {
+			return distribution.Descriptor{}, err
 		}
-	}
 
-	if err := bw.moveBlob(ctx, canonical); err != nil {
-		return distribution.Descriptor{}, err
-	}
+		if err := rStore.LinkLayer(ctx, r, l); err != nil {
+			return distribution.Descriptor{}, err
+		}
 
-	if err := bw.blobStore.linkBlob(ctx, canonical, desc.Digest); err != nil {
-		return distribution.Descriptor{}, err
+		if err := tx.Commit(); err != nil {
+			return distribution.Descriptor{}, fmt.Errorf("committing database transaction: %w", err)
+		}
 	}
 
 	if err := bw.removeResources(ctx); err != nil {
@@ -114,12 +126,6 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 	err = bw.blobStore.blobAccessController.SetDescriptor(ctx, canonical.Digest, canonical)
 	if err != nil {
 		return distribution.Descriptor{}, err
-	}
-
-	if bw.db != nil {
-		if err := tx.Commit(); err != nil {
-			return distribution.Descriptor{}, fmt.Errorf("committing database transaction: %w", err)
-		}
 	}
 
 	bw.committed = true

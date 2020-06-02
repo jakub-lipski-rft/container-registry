@@ -126,7 +126,7 @@ func testIdempotentUpload(t *testing.T, env *env) {
 	dockerPayload, err := ioutil.ReadFile(path)
 	require.NoErrorf(t, err, "error reading fixture")
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 30; i++ {
 		go func() {
 			testLayerUpload(t, env, bytes.NewReader(dockerPayload), digest.FromBytes(dockerPayload))
 		}()
@@ -187,6 +187,17 @@ func testLayerUpload(t *testing.T, env *env, layer io.ReadSeeker, dgst digest.Di
 		assert.Equal(t, layer.Size, wr.Size(), "db layer size and writer size should match")
 
 		assert.Equal(t, layer.MediaType, "application/octet-stream", "db layer mediaType should be application/octet-stream")
+
+		//make sure the repository was created/found
+		rStore := datastore.NewRepositoryStore(env.db)
+		r, err := rStore.FindByPath(env.ctx, env.repo.Named().Name())
+		require.NoError(t, err)
+		require.NotNil(t, r)
+
+		// make sure the layer is linked in the repository
+		ll, err := rStore.Layers(env.ctx, r)
+		require.NoError(t, err)
+		require.Contains(t, ll, layer)
 	}
 
 	desc, err := blobService.Stat(env.ctx, dgst)
