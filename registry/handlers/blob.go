@@ -1,10 +1,18 @@
 package handlers
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"net/http"
 
+	"github.com/docker/distribution/registry/datastore/models"
+
+	dcontext "github.com/docker/distribution/context"
+
+	"github.com/docker/distribution/registry/datastore"
+
 	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/gorilla/handlers"
@@ -53,7 +61,7 @@ type blobHandler struct {
 // GetBlob fetches the binary data from backend storage returns it in the
 // response.
 func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
-	context.GetLogger(bh).Debug("GetBlob")
+	dcontext.GetLogger(bh).Debug("GetBlob")
 	blobs := bh.Repository.Blobs(bh)
 	desc, err := blobs.Stat(bh, bh.Digest)
 	if err != nil {
@@ -66,15 +74,49 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := blobs.ServeBlob(bh, w, r, desc.Digest); err != nil {
-		context.GetLogger(bh).Debugf("unexpected error getting blob HTTP handler: %v", err)
+		dcontext.GetLogger(bh).Debugf("unexpected error getting blob HTTP handler: %v", err)
 		bh.Errors = append(bh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		return
 	}
 }
 
+// dbDeleteBlob does not actually delete a blob from the database (that's GC's responsibility), it only unlinks it from
+// a repository.
+func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
+	log.Debug("deleting blob from repository in database")
+
+	rStore := datastore.NewRepositoryStore(db)
+	r, err := rStore.FindByPath(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+	if r == nil {
+		return errors.New("repository not found in database")
+	}
+
+	ll, err := rStore.Layers(ctx, r)
+	if err != nil {
+		return err
+	}
+
+	var l *models.Layer
+	for _, layer := range ll {
+		if layer.Digest == d {
+			l = layer
+			break
+		}
+	}
+	if l == nil {
+		return errors.New("blob not found in database")
+	}
+
+	return rStore.UnlinkLayer(ctx, r, l)
+}
+
 // DeleteBlob deletes a layer blob
 func (bh *blobHandler) DeleteBlob(w http.ResponseWriter, r *http.Request) {
-	context.GetLogger(bh).Debug("DeleteBlob")
+	dcontext.GetLogger(bh).Debug("DeleteBlob")
 
 	blobs := bh.Repository.Blobs(bh)
 	err := blobs.Delete(bh, bh.Digest)
@@ -88,7 +130,15 @@ func (bh *blobHandler) DeleteBlob(w http.ResponseWriter, r *http.Request) {
 			return
 		default:
 			bh.Errors = append(bh.Errors, err)
-			context.GetLogger(bh).Errorf("Unknown error deleting blob: %s", err.Error())
+			dcontext.GetLogger(bh).Errorf("Unknown error deleting blob: %s", err.Error())
+			return
+		}
+	}
+
+	if bh.App.Config.Database.Enabled {
+		if err := dbDeleteBlob(bh, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
+			e := fmt.Errorf("failed to delete blob in database: %v", err)
+			bh.Errors = append(bh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return
 		}
 	}
