@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,6 +12,8 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
@@ -102,6 +106,50 @@ type blobUploadHandler struct {
 	State blobUploadState
 }
 
+func dbMountBlob(ctx context.Context, db datastore.Queryer, fromRepoPath, toRepoPath string, d digest.Digest) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+		"source":      fromRepoPath,
+		"destination": toRepoPath,
+		"digest":      d,
+	})
+	log.Debug("cross repository blob mounting")
+
+	// find source repository
+	rStore := datastore.NewRepositoryStore(db)
+	srcRepo, err := rStore.FindByPath(ctx, fromRepoPath)
+	if err != nil {
+		return err
+	}
+	if srcRepo == nil {
+		return errors.New("source repository not found in database")
+	}
+
+	// find source layer, which must be linked in the source repository
+	srcLayers, err := rStore.Layers(ctx, srcRepo)
+	if err != nil {
+		return err
+	}
+	var l *models.Layer
+	for _, layer := range srcLayers {
+		if layer.Digest == d {
+			l = layer
+			break
+		}
+	}
+	if l == nil {
+		return errors.New("blob not found in database")
+	}
+
+	// create or find destination repository
+	destRepo, err := rStore.CreateOrFindByPath(ctx, toRepoPath)
+	if err != nil {
+		return err
+	}
+
+	// link layer (does nothing if already linked)
+	return rStore.LinkLayer(ctx, destRepo, l)
+}
+
 // StartBlobUpload begins the blob upload process and allocates a server-side
 // blob writer session, optionally mounting the blob from a separate repository.
 func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +170,12 @@ func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Req
 
 	if err != nil {
 		if ebm, ok := err.(distribution.ErrBlobMounted); ok {
+			if buh.Config.Database.Enabled {
+				if err := dbMountBlob(buh, buh.db, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
+					e := fmt.Errorf("failed to mount blob in database: %v", err)
+					buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				}
+			}
 			if err := buh.writeBlobCreatedHeaders(w, ebm.Descriptor); err != nil {
 				buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 			}
