@@ -124,8 +124,3 @@ database:api:
   <<: *database
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/handlers
-
-database:storage:
-  <<: *database
-  before_script:
-    - export PACKAGE=github.com/docker/distribution/registry/storage

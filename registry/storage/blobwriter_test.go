@@ -1,5 +1,3 @@
-// +build integration
-
 package storage_test
 
 import (
@@ -15,8 +13,6 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/datastore"
-	dbtestutil "github.com/docker/distribution/registry/datastore/testutil"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
@@ -29,46 +25,9 @@ import (
 type env struct {
 	ctx      context.Context
 	driver   driver.StorageDriver
-	db       *datastore.DB
 	registry distribution.Namespace
 	repo     distribution.Repository
 	regOpts  []storage.RegistryOption
-}
-
-func (e *env) isDatabaseEnabled() bool {
-	return os.Getenv("REGISTRY_DATABASE_ENABLED") == "true"
-}
-
-func (e *env) Shutdown(t *testing.T) {
-	t.Helper()
-
-	if !e.isDatabaseEnabled() {
-		return
-	}
-
-	err := dbtestutil.TruncateAllTables(e.db)
-	require.NoError(t, err)
-
-	err = e.db.Close()
-	require.NoError(t, err)
-}
-
-func initDatabase(t *testing.T, env *env) {
-	t.Helper()
-
-	if !env.isDatabaseEnabled() {
-		return
-	}
-
-	db, err := dbtestutil.NewDB()
-	require.NoError(t, err)
-
-	env.db = db
-
-	err = db.MigrateUp()
-	require.NoError(t, err)
-
-	env.regOpts = append(env.regOpts, storage.Database(db))
 }
 
 func newEnv(t *testing.T, repoName string) *env {
@@ -78,8 +37,6 @@ func newEnv(t *testing.T, repoName string) *env {
 		ctx:    context.Background(),
 		driver: inmemory.New(),
 	}
-
-	initDatabase(t, env)
 
 	reg, err := storage.NewRegistry(env.ctx, env.driver, env.regOpts...)
 	require.NoError(t, err)
@@ -99,7 +56,6 @@ func newEnv(t *testing.T, repoName string) *env {
 
 func TestLayerUpload(t *testing.T) {
 	env := newEnv(t, "layer/upload")
-	defer env.Shutdown(t)
 
 	testFilesystemLayerUpload(t, env)
 	testIdempotentUpload(t, env)
@@ -176,30 +132,6 @@ func testLayerUpload(t *testing.T, env *env, layer io.ReadSeeker, dgst digest.Di
 	_, err = wr.Commit(env.ctx, distribution.Descriptor{Digest: dgst})
 	require.NoError(t, err)
 
-	if env.isDatabaseEnabled() {
-		ls := datastore.NewLayerStore(env.db)
-
-		layer, err := ls.FindByDigest(env.ctx, dgst)
-		require.NoError(t, err)
-
-		require.NotNil(t, layer)
-
-		assert.Equal(t, layer.Size, wr.Size(), "db layer size and writer size should match")
-
-		assert.Equal(t, layer.MediaType, "application/octet-stream", "db layer mediaType should be application/octet-stream")
-
-		//make sure the repository was created/found
-		rStore := datastore.NewRepositoryStore(env.db)
-		r, err := rStore.FindByPath(env.ctx, env.repo.Named().Name())
-		require.NoError(t, err)
-		require.NotNil(t, r)
-
-		// make sure the layer is linked in the repository
-		ll, err := rStore.Layers(env.ctx, r)
-		require.NoError(t, err)
-		require.Contains(t, ll, layer)
-	}
-
 	desc, err := blobService.Stat(env.ctx, dgst)
 	require.NoError(t, err)
 
@@ -222,15 +154,6 @@ func testInvalidLayerUpload(t *testing.T, env *env) {
 	_, err = wr.Commit(env.ctx, distribution.Descriptor{Digest: dgst})
 	if assert.Error(t, err) {
 		assert.Equal(t, distribution.ErrBlobInvalidDigest{Digest: dgst, Reason: errors.New("content does not match digest")}, err)
-	}
-
-	if env.isDatabaseEnabled() {
-		ls := datastore.NewLayerStore(env.db)
-
-		layer, err := ls.FindByDigest(env.ctx, dgst)
-		require.NoError(t, err)
-
-		assert.Nil(t, layer, "layer should not present in database")
 	}
 
 	_, err = blobService.Stat(env.ctx, dgst)

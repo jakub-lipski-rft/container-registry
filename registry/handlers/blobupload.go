@@ -246,6 +246,43 @@ func (buh *blobUploadHandler) PatchBlobData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func dbPutBlobUploadComplete(ctx context.Context, db *datastore.DB, repoPath string, desc distribution.Descriptor) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning database transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// create or find layer
+	ls := datastore.NewLayerStore(tx)
+	l := &models.Layer{
+		MediaType: desc.MediaType,
+		Digest:    desc.Digest,
+		Size:      desc.Size,
+	}
+	if err := ls.CreateOrFind(ctx, l); err != nil {
+		return err
+	}
+
+	// create or find repository
+	rStore := datastore.NewRepositoryStore(tx)
+	r, err := rStore.CreateOrFindByPath(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+
+	// link layer to repository
+	if err := rStore.LinkLayer(ctx, r, l); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing database transaction: %w", err)
+	}
+
+	return nil
+}
+
 // PutBlobUploadComplete takes the final request of a blob upload. The
 // request may include all the blob data or no blob data. Any data
 // provided is received and verified. If successful, the blob is linked
@@ -313,6 +350,15 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 
 		return
 	}
+
+	if buh.Config.Database.Enabled {
+		if err := dbPutBlobUploadComplete(buh, buh.db, buh.Repository.Named().Name(), desc); err != nil {
+			e := fmt.Errorf("failed to persist metadata to database: %v", err)
+			buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			return
+		}
+	}
+
 	if err := buh.writeBlobCreatedHeaders(w, desc); err != nil {
 		buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		return
