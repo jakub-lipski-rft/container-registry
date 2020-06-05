@@ -11,7 +11,6 @@ import (
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/datastore"
-	"github.com/docker/distribution/registry/datastore/models"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
@@ -78,45 +77,8 @@ func (bw *blobWriter) Commit(ctx context.Context, desc distribution.Descriptor) 
 		return distribution.Descriptor{}, err
 	}
 
-	var l *models.Layer
-	if bw.db != nil {
-		// Even though we don't need to interact with database layer after this
-		// point, we'll use CreateOrFind to avoid race conditions.
-		ls := datastore.NewLayerStore(bw.db)
-		l = &models.Layer{
-			MediaType: canonical.MediaType,
-			Digest:    canonical.Digest,
-			Size:      canonical.Size,
-		}
-		if err := ls.CreateOrFind(ctx, l); err != nil {
-			return distribution.Descriptor{}, err
-		}
-	}
-
 	if err := bw.blobStore.linkBlob(ctx, canonical, desc.Digest); err != nil {
 		return distribution.Descriptor{}, err
-	}
-
-	if bw.db != nil {
-		tx, err := bw.db.Begin()
-		if err != nil {
-			return distribution.Descriptor{}, fmt.Errorf("beginning database transaction: %w", err)
-		}
-		defer tx.Rollback()
-
-		rStore := datastore.NewRepositoryStore(bw.db)
-		r, err := rStore.CreateOrFindByPath(ctx, bw.blobStore.repository.Named().Name())
-		if err != nil {
-			return distribution.Descriptor{}, err
-		}
-
-		if err := rStore.LinkLayer(ctx, r, l); err != nil {
-			return distribution.Descriptor{}, err
-		}
-
-		if err := tx.Commit(); err != nil {
-			return distribution.Descriptor{}, fmt.Errorf("committing database transaction: %w", err)
-		}
 	}
 
 	if err := bw.removeResources(ctx); err != nil {
