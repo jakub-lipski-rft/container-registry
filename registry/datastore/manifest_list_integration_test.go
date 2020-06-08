@@ -21,7 +21,8 @@ func reloadManifestListFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.ManifestListsTable, testutil.ManifestListItemsTable, testutil.RepositoryManifestListsTable,
+		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+		testutil.RepositoryManifestListsTable,
 	)
 }
 
@@ -30,7 +31,8 @@ func unloadManifestListFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
 		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.ManifestListsTable, testutil.ManifestListItemsTable, testutil.RepositoryManifestListsTable,
+		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+		testutil.RepositoryManifestListsTable,
 	))
 }
 
@@ -164,6 +166,13 @@ func TestManifestListStore_Repositories(t *testing.T) {
 			Path:      "gitlab-org/gitlab-test/backend",
 			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
+		},
+		{
+			ID:        7,
+			Name:      "bar",
+			Path:      "a-test-group/bar",
+			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
 		},
 	}
 	require.Equal(t, expected, rr)

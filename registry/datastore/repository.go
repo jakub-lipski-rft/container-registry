@@ -16,12 +16,14 @@ import (
 // RepositoryReader is the interface that defines read operations for a repository store.
 type RepositoryReader interface {
 	FindAll(ctx context.Context) (models.Repositories, error)
+	FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error)
 	FindByID(ctx context.Context, id int64) (*models.Repository, error)
 	FindByPath(ctx context.Context, path string) (*models.Repository, error)
 	FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error)
 	FindAncestorsOf(ctx context.Context, id int64) (models.Repositories, error)
 	FindSiblingsOf(ctx context.Context, id int64) (models.Repositories, error)
 	Count(ctx context.Context) (int, error)
+	CountAfterPath(ctx context.Context, path string) (int, error)
 	Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error)
 	ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error)
 	Tags(ctx context.Context, r *models.Repository) (models.Tags, error)
@@ -127,6 +129,29 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 	return scanFullRepositories(rows)
 }
 
+// FindAllPaginated finds up to limit repositories with path lexicographically after lastPath. This is used exclusively
+// for the GET /v2/_catalog API route, where pagination is done with a marker (lastPath). Empty repositories (which do
+// not have at least a manifest or a manifest list) are ignored. Also, even if there is no repository with a path
+// of lastPath, the returned repositories will always be those with a path lexicographically after lastPath. Finally,
+// repositories are lexicographically sorted. These constraints exists to preserve the existing API behaviour (when
+// doing a filesystem walk based pagination).
+func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
+	q := `SELECT DISTINCT r.id, r.name, r.path, r.parent_id, r.created_at, r.deleted_at 
+		FROM repositories AS r
+	 	LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
+	 	LEFT JOIN repository_manifest_lists AS rml ON r.id = rml.repository_id
+		WHERE COALESCE(rm.repository_id, rml.repository_id) IS NOT NULL
+		AND r.path > $1
+		ORDER BY r.path
+		LIMIT $2`
+	rows, err := s.db.QueryContext(ctx, q, lastPath, limit)
+	if err != nil {
+		return nil, fmt.Errorf("error finding repositories with pagination: %w", err)
+	}
+
+	return scanFullRepositories(rows)
+}
+
 // FindDescendantsOf finds all descendants of a given repository.
 func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE descendants AS (
@@ -222,6 +247,26 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 
 	if err := s.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
 		return count, fmt.Errorf("error counting repositories: %w", err)
+	}
+
+	return count, nil
+}
+
+// CountAfterPath counts all repositories with path lexicographically after lastPath. This is used exclusively
+// for the GET /v2/_catalog API route, where pagination is done with a marker (lastPath). Empty repositories (which do
+// not have at least a manifest or a manifest list) are ignored. Also, even if there is no repository with a path
+// of lastPath, the counted repositories will always be those with a path lexicographically after lastPath. These
+// constraints exists to preserve the existing API behaviour (when doing a filesystem walk based pagination).
+func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int, error) {
+	q := `SELECT COUNT(DISTINCT(r.id)) FROM repositories AS r
+		LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
+	 	LEFT JOIN repository_manifest_lists AS rml ON r.id = rml.repository_id
+		WHERE COALESCE(rm.repository_id, rml.repository_id) IS NOT NULL
+		AND r.path > $1`
+
+	var count int
+	if err := s.db.QueryRowContext(ctx, q, path).Scan(&count); err != nil {
+		return count, fmt.Errorf("error counting repositories lexicographically after path: %w", err)
 	}
 
 	return count, nil

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/opencontainers/go-digest"
 
@@ -78,7 +79,7 @@ func TestRepositoryStore_FindByPath_NotFound(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRepositoryStore_All(t *testing.T) {
+func TestRepositoryStore_FindAll(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -86,7 +87,7 @@ func TestRepositoryStore_All(t *testing.T) {
 	require.NoError(t, err)
 
 	// see testdata/fixtures/repositories.sql
-	require.Len(t, rr, 4)
+	require.Len(t, rr, 7)
 	local := rr[0].CreatedAt.Location()
 	expected := models.Repositories{
 		{
@@ -116,18 +117,182 @@ func TestRepositoryStore_All(t *testing.T) {
 			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
 		},
+		{
+			ID:        5,
+			Name:      "a-test-group",
+			Path:      "a-test-group",
+			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+		},
+		{
+			ID:        6,
+			Name:      "foo",
+			Path:      "a-test-group/foo",
+			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+		},
+		{
+			ID:        7,
+			Name:      "bar",
+			Path:      "a-test-group/bar",
+			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+		},
 	}
 
 	require.Equal(t, expected, rr)
 }
 
-func TestRepositoryStore_All_NotFound(t *testing.T) {
+func TestRepositoryStore_FindAll_NotFound(t *testing.T) {
 	unloadRepositoryFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 	rr, err := s.FindAll(suite.ctx)
 	require.Empty(t, rr)
 	require.NoError(t, err)
+}
+
+func TestRepositoryStore_FindAllPaginated(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	tt := []struct {
+		name     string
+		limit    int
+		lastPath string
+
+		// see testdata/fixtures/[repositories|repository_manifests|repository_manifest_lists].sql:
+		//
+		// 		gitlab-org 						(0 manifests, 0 manifest lists)
+		// 		gitlab-org/gitlab-test 			(0 manifests, 0 manifest lists)
+		// 		gitlab-org/gitlab-test/backend 	(2 manifests, 1 manifest list)
+		// 		gitlab-org/gitlab-test/frontend (2 manifests, 1 manifest list)
+		// 		a-test-group 					(0 manifests, 0 manifest lists)
+		// 		a-test-group/foo  				(1 manifests, 0 manifest lists)
+		// 		a-test-group/bar 				(0 manifests, 1 manifest list)
+		expectedRepos models.Repositories
+	}{
+		{
+			name:     "no limit and no last path",
+			limit:    100, // there are only 7 repositories in the DB, so this is equivalent to no limit
+			lastPath: "",  // this is the equivalent to no last path, as all repository paths are non-empty
+			expectedRepos: models.Repositories{
+				{
+					ID:       7,
+					Name:     "bar",
+					Path:     "a-test-group/bar",
+					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+				},
+				{
+					ID:       6,
+					Name:     "foo",
+					Path:     "a-test-group/foo",
+					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+				},
+				{
+					ID:       3,
+					Name:     "backend",
+					Path:     "gitlab-org/gitlab-test/backend",
+					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+				{
+					ID:       4,
+					Name:     "frontend",
+					Path:     "gitlab-org/gitlab-test/frontend",
+					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "1st part",
+			limit:    2,
+			lastPath: "",
+			expectedRepos: models.Repositories{
+				{
+					ID:       7,
+					Name:     "bar",
+					Path:     "a-test-group/bar",
+					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+				},
+				{
+					ID:       6,
+					Name:     "foo",
+					Path:     "a-test-group/foo",
+					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "nth part",
+			limit:    1,
+			lastPath: "a-test-group/foo",
+			expectedRepos: models.Repositories{
+				{
+					ID:       3,
+					Name:     "backend",
+					Path:     "gitlab-org/gitlab-test/backend",
+					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "last part",
+			limit:    100,
+			lastPath: "gitlab-org/gitlab-test/backend",
+			expectedRepos: models.Repositories{
+				{
+					ID:       4,
+					Name:     "frontend",
+					Path:     "gitlab-org/gitlab-test/frontend",
+					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "non existent last path",
+			limit:    100,
+			lastPath: "does-not-exist",
+			expectedRepos: models.Repositories{
+				{
+					ID:       3,
+					Name:     "backend",
+					Path:     "gitlab-org/gitlab-test/backend",
+					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+				{
+					ID:       4,
+					Name:     "frontend",
+					Path:     "gitlab-org/gitlab-test/frontend",
+					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+			},
+		},
+	}
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			rr, err := s.FindAllPaginated(suite.ctx, test.limit, test.lastPath)
+
+			// reset created_at attributes for reproducible comparisons
+			for _, r := range rr {
+				require.NotEmpty(t, r.CreatedAt)
+				r.CreatedAt = time.Time{}
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expectedRepos, rr)
+		})
+	}
+}
+
+func TestRepositoryStore_FindAllPaginated_NoRepositories(t *testing.T) {
+	unloadManifestListFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	rr, err := s.FindAllPaginated(suite.ctx, 100, "")
+	require.NoError(t, err)
+	require.Empty(t, rr)
 }
 
 func TestRepositoryStore_DescendantsOf(t *testing.T) {
@@ -416,7 +581,72 @@ func TestRepositoryStore_Count(t *testing.T) {
 	require.NoError(t, err)
 
 	// see testdata/fixtures/repositories.sql
-	require.Equal(t, 4, count)
+	require.Equal(t, 7, count)
+}
+
+func TestRepositoryStore_CountAfterPath(t *testing.T) {
+	reloadManifestListFixtures(t)
+
+	tt := []struct {
+		name string
+		path string
+
+		// see testdata/fixtures/[repositories|repository_manifests|repository_manifest_lists].sql:
+		//
+		// 		gitlab-org 						(0 manifests, 0 manifest lists)
+		// 		gitlab-org/gitlab-test 			(0 manifests, 0 manifest lists)
+		// 		gitlab-org/gitlab-test/backend 	(2 manifests, 1 manifest list)
+		// 		gitlab-org/gitlab-test/frontend (2 manifests, 1 manifest list)
+		// 		a-test-group 					(0 manifests, 0 manifest lists)
+		// 		a-test-group/foo  				(1 manifests, 0 manifest lists)
+		// 		a-test-group/bar 				(0 manifests, 1 manifest list)
+		expectedNumRepos int
+	}{
+		{
+			name: "all",
+			path: "",
+			// all non-empty repositories (4) are lexicographically after ""
+			expectedNumRepos: 4,
+		},
+		{
+			name: "first",
+			path: "a-test-group/bar",
+			// there are 3 non-empty repositories lexicographically after "a-test-group/bar"
+			expectedNumRepos: 3,
+		},
+		{
+			name: "last",
+			path: "gitlab-org/gitlab-test/frontend",
+			// there are 0 repositories lexicographically after "gitlab-org/gitlab-test/frontend"
+			expectedNumRepos: 0,
+		},
+		{
+			name: "non existent",
+			path: "does-not-exist",
+			// there are 2 non-empty repositories lexicographically after "does-not-exist"
+			expectedNumRepos: 2,
+		},
+	}
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			c, err := s.CountAfterPath(suite.ctx, test.path)
+			require.NoError(t, err)
+			require.Equal(t, test.expectedNumRepos, c)
+		})
+	}
+}
+
+func TestRepositoryStore_CountAfterPath_NoRepositories(t *testing.T) {
+	unloadManifestListFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	c, err := s.CountAfterPath(suite.ctx, "")
+	require.NoError(t, err)
+	require.Equal(t, 0, c)
 }
 
 func TestRepositoryStore_FindManifestByDigest(t *testing.T) {
@@ -929,7 +1159,7 @@ func TestRepositoryStore_Update_NotFound(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	update := &models.Repository{
-		ID:   5,
+		ID:   100,
 		Name: "bar",
 	}
 	err := s.Update(suite.ctx, update)
@@ -1198,7 +1428,7 @@ func TestRepositoryStore_SoftDelete(t *testing.T) {
 func TestRepositoryStore_SoftDelete_NotFound(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
-	r := &models.Repository{ID: 5}
+	r := &models.Repository{ID: 100}
 	err := s.SoftDelete(suite.ctx, r)
 	require.EqualError(t, err, "repository not found")
 }
@@ -1216,6 +1446,6 @@ func TestRepositoryStore_Delete(t *testing.T) {
 
 func TestRepositoryStore_Delete_NotFound(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
-	err := s.Delete(suite.ctx, 5)
+	err := s.Delete(suite.ctx, 100)
 	require.EqualError(t, err, "repository not found")
 }
