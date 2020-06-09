@@ -612,12 +612,12 @@ func dbTagManifestList(ctx context.Context, db datastore.Queryer, dgst digest.Di
 	})
 }
 
-func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": canonical, "schema_version": manifest.Versioned.SchemaVersion})
+func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
 	mStore := datastore.NewManifestStore(db)
-	dbManifest, err := mStore.FindByDigest(ctx, canonical)
+	dbManifest, err := mStore.FindByDigest(ctx, dgst)
 	if err != nil {
 		return err
 	}
@@ -627,7 +627,7 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical d
 		m := &models.Manifest{
 			SchemaVersion: manifest.SchemaVersion,
 			MediaType:     manifest.MediaType,
-			Digest:        canonical,
+			Digest:        dgst,
 			Payload:       payload,
 		}
 
@@ -690,12 +690,12 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, canonical d
 	return nil
 }
 
-func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, canonical digest.Digest, manifest *schema1.SignedManifest, payload []byte, path reference.Named) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": canonical, "schema_version": manifest.Versioned.SchemaVersion})
+func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, dgst digest.Digest, manifest *schema1.SignedManifest, payload []byte, path reference.Named) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
 	mStore := datastore.NewManifestStore(db)
-	dbManifest, err := mStore.FindByDigest(ctx, canonical)
+	dbManifest, err := mStore.FindByDigest(ctx, dgst)
 	if err != nil {
 		return err
 	}
@@ -705,8 +705,8 @@ func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, canonical d
 		m := &models.Manifest{
 			SchemaVersion: manifest.SchemaVersion,
 			MediaType:     manifest.MediaType,
-			Digest:        canonical,
-			Payload:       payload,
+			Digest:        dgst,
+			Payload:       manifest.Canonical,
 		}
 
 		if err := mStore.Create(ctx, m); err != nil {
