@@ -30,6 +30,7 @@ import (
 type env struct {
 	ctx context.Context
 	db  *datastore.DB
+	pk  libtrust.PrivateKey
 
 	// isShutdown helps ensure that tests do not try to access the db after the
 	// connection has been closed.
@@ -84,17 +85,12 @@ func (e *env) uploadSchema1ManifestToDB(t *testing.T, manifest schema1.Manifest,
 	path, err := reference.WithName(repoName)
 	require.NoError(t, err)
 
-	pk, err := libtrust.GenerateECP256PrivateKey()
-	require.NoError(t, err)
-	sm, err := schema1.Sign(&manifest, pk)
+	sm, err := schema1.Sign(&manifest, e.pk)
 	require.NoError(t, err)
 
-	_, payload, err := sm.Payload()
-	require.NoError(t, err)
+	dgst := digest.FromBytes(sm.Canonical)
 
-	dgst := digest.FromBytes(payload)
-
-	err = dbPutManifestSchema1(e.ctx, e.db, dgst, sm, payload, path)
+	err = dbPutManifestSchema1(e.ctx, e.db, dgst, sm, sm.Canonical, path)
 	require.NoError(t, err)
 
 	return dgst
@@ -155,7 +151,10 @@ func initDatabase(t *testing.T, env *env) {
 func newEnv(t *testing.T) *env {
 	t.Helper()
 
-	env := &env{ctx: context.Background()}
+	pk, err := libtrust.GenerateECP256PrivateKey()
+	require.NoError(t, err)
+
+	env := &env{ctx: context.Background(), pk: pk}
 
 	initDatabase(t, env)
 
@@ -569,18 +568,13 @@ func TestPutManifestSchema1_MissingLayer(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to put manifest with missing layer.
-	pk, err := libtrust.GenerateECP256PrivateKey()
-	require.NoError(t, err)
-	sm, err := schema1.Sign(&manifest, pk)
+	sm, err := schema1.Sign(&manifest, env.pk)
 	require.NoError(t, err)
 
-	_, payload, err := sm.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
+	dgst := digest.FromBytes(sm.Canonical)
 	path, err := reference.WithName("manifestdb/missinglayerschema1")
 
-	err = dbPutManifestSchema1(env.ctx, env.db, dgst, sm, payload, path)
+	err = dbPutManifestSchema1(env.ctx, env.db, dgst, sm, sm.Canonical, path)
 	assert.Error(t, err)
 }
 
@@ -711,6 +705,12 @@ func verifySchema1Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 		}
 		assert.True(t, foundLayer)
 	}
+
+	// Ensure only the canonical representation (without signatures) is written to the database.
+	sm, err := schema1.Sign(&manifest, env.pk)
+	require.NoError(t, err)
+
+	require.EqualValues(t, sm.Canonical, dbManifest.Payload)
 }
 
 func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest schema2.Manifest, cfgPayload []byte, repoPath string) {
