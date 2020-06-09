@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime"
@@ -22,6 +23,7 @@ import (
 	"github.com/docker/distribution/registry/auth"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/docker/libtrust"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -142,11 +144,16 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var options []distribution.ManifestServiceOption
-	if imh.Tag != "" {
-		options = append(options, distribution.WithTag(imh.Tag))
+	var manifest distribution.Manifest
+	if imh.Config.Database.Enabled {
+		manifest, err = dbGetManifest(imh, imh.App.db, imh.Digest, imh.App.trustKey, imh.Repository.Named().Name())
+	} else {
+		var options []distribution.ManifestServiceOption
+		if imh.Tag != "" {
+			options = append(options, distribution.WithTag(imh.Tag))
+		}
+		manifest, err = manifests.Get(imh, imh.Digest, options...)
 	}
-	manifest, err := manifests.Get(imh, imh.Digest, options...)
 	if err != nil {
 		if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -155,6 +162,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
+
 	// determine the type of the returned manifest
 	manifestType := manifestSchema1
 	schema2Manifest, isSchema2 := manifest.(*schema2.DeserializedManifest)
@@ -209,7 +217,11 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		manifest, err = manifests.Get(imh, manifestDigest)
+		if imh.Config.Database.Enabled {
+			manifest, err = dbGetManifest(imh, imh.App.db, manifestDigest, imh.App.trustKey, imh.Repository.Named().Name())
+		} else {
+			manifest, err = manifests.Get(imh, manifestDigest)
+		}
 		if err != nil {
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -240,6 +252,129 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Docker-Content-Digest", imh.Digest.String())
 	w.Header().Set("Etag", fmt.Sprintf(`"%s"`, imh.Digest))
 	w.Write(p)
+}
+
+func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, schema1SigningKey libtrust.PrivateKey, path string) (distribution.Manifest, error) {
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.FindByPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload []byte
+	var mediaType string
+	var schemaVersion int
+
+	// Find either the manifest or the manifest list by its digest. We can anticipate
+	// that most requests will be for single manifests, so we should try for manifests first.
+	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, dbRepo, dgst)
+	if err != nil {
+		return nil, err
+	}
+	if dbManifest == nil {
+		dbManifestList, err := repositoryStore.FindManifestListByDigest(ctx, dbRepo, dgst)
+		if err != nil {
+			return nil, err
+		}
+		if dbManifestList == nil {
+			return nil, distribution.ErrManifestUnknownRevision{
+				Name:     path,
+				Revision: dgst,
+			}
+		}
+		payload = dbManifestList.Payload
+		mediaType = dbManifestList.MediaType.String
+		schemaVersion = dbManifestList.SchemaVersion
+	} else {
+		payload = dbManifest.Payload
+		mediaType = dbManifest.MediaType
+		schemaVersion = dbManifest.SchemaVersion
+	}
+
+	// TODO: Each case here is taken directly from the respective
+	// registry/storage/*manifesthandler Unmarshal method. These are all relatively
+	// simple with the exception of schema1. We cannot invoke them directly as
+	// they are unexported. We should determine a single place for this logic
+	// during refactoring https://gitlab.com/gitlab-org/container-registry/-/issues/135
+	switch schemaVersion {
+	case 1:
+		var (
+			signatures [][]byte
+			err        error
+		)
+
+		jsig, err := libtrust.NewJSONSignature(payload, signatures...)
+		if err != nil {
+			return nil, err
+		}
+
+		if schema1SigningKey != nil {
+			if err := jsig.Sign(schema1SigningKey); err != nil {
+				return nil, err
+			}
+		}
+
+		// Extract the pretty JWS
+		raw, err := jsig.PrettySignature("signatures")
+		if err != nil {
+			return nil, err
+		}
+
+		var sm schema1.SignedManifest
+		if err := json.Unmarshal(raw, &sm); err != nil {
+			return nil, err
+		}
+
+		return &sm, nil
+	case 2:
+		// This can be an image manifest or a manifest list
+		switch mediaType {
+		case schema2.MediaTypeManifest:
+			m := &schema2.DeserializedManifest{}
+			if err := m.UnmarshalJSON(payload); err != nil {
+				return nil, err
+			}
+
+			return m, nil
+		case v1.MediaTypeImageManifest:
+			m := &ocischema.DeserializedManifest{}
+			if err := m.UnmarshalJSON(payload); err != nil {
+				return nil, err
+			}
+
+			return m, nil
+		case manifestlist.MediaTypeManifestList, v1.MediaTypeImageIndex:
+			m := &manifestlist.DeserializedManifestList{}
+			if err := m.UnmarshalJSON(payload); err != nil {
+				return nil, err
+			}
+
+			return m, nil
+		case "":
+			// OCI image or image index - no media type in the content
+
+			// First see if it looks like an image index
+			resIndex := &manifestlist.DeserializedManifestList{}
+			if err := resIndex.UnmarshalJSON(payload); err != nil {
+				return nil, err
+			}
+			if err == nil && resIndex.Manifests != nil {
+				return resIndex, nil
+			}
+
+			// Otherwise, assume it must be an image manifest
+			m := &ocischema.DeserializedManifest{}
+			if err := m.UnmarshalJSON(payload); err != nil {
+				return nil, err
+			}
+
+			return m, nil
+		default:
+			return nil, distribution.ErrManifestVerification{fmt.Errorf("unrecognized manifest content type %s", mediaType)}
+		}
+	}
+
+	return nil, fmt.Errorf("unrecognized manifest schema version %d", schemaVersion)
 }
 
 func (imh *manifestHandler) convertSchema2Manifest(schema2Manifest *schema2.DeserializedManifest) (distribution.Manifest, error) {
