@@ -27,6 +27,8 @@ type RepositoryReader interface {
 	Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error)
 	ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error)
 	Tags(ctx context.Context, r *models.Repository) (models.Tags, error)
+	TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error)
+	TagsCountAfterName(ctx context.Context, r *models.Repository, lastName string) (int, error)
 	ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error)
 	ManifestListTags(ctx context.Context, r *models.Repository, m *models.ManifestList) (models.Tags, error)
 	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
@@ -212,6 +214,38 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 	}
 
 	return scanFullTags(rows)
+}
+
+// TagsPaginated finds up to limit tags of a given repository with name lexicographically after lastName. This is used
+// exclusively for the GET /v2/<name>/tags/list API route, where pagination is done with a marker (lastName). Even if
+// there is no tag with a name of lastName, the returned tags will always be those with a path lexicographically after
+// lastName. Finally, tags are lexicographically sorted. These constraints exists to preserve the existing API behaviour
+// (when doing a filesystem walk based pagination).
+func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error) {
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+		FROM tags WHERE repository_id = $1 AND name > $2 ORDER BY name LIMIT $3`
+	rows, err := s.db.QueryContext(ctx, q, r.ID, lastName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("error finding tags with pagination: %w", err)
+	}
+
+	return scanFullTags(rows)
+}
+
+// TagsCountAfterName counts all tags of a given repository with name lexicographically after lastName. This is used
+// exclusively for the GET /v2/<name>/tags/list API route, where pagination is done with a marker (lastName). Even if
+// there is no tag with a name of lastName, the counted tags will always be those with a path lexicographically after
+// lastName. This constraint exists to preserve the existing API behaviour (when doing a filesystem walk based
+// pagination).
+func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repository, lastName string) (int, error) {
+	q := "SELECT COUNT(id) FROM tags WHERE repository_id = $1 AND name > $2"
+
+	var count int
+	if err := s.db.QueryRowContext(ctx, q, r.ID, lastName).Scan(&count); err != nil {
+		return count, fmt.Errorf("error counting tags lexicographically after name: %w", err)
+	}
+
+	return count, nil
 }
 
 // ManifestTags finds all tags of a given repository manifest.
