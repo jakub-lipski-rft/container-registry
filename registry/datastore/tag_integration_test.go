@@ -110,14 +110,14 @@ func TestTagStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:           5,
-			Name:         "latest",
+			Name:         "stable-9ede8db0",
 			RepositoryID: 4,
 			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:47.283783", local),
 		},
 		{
 			ID:           6,
-			Name:         "0.0.1",
+			Name:         "stable-91ac07a9",
 			RepositoryID: 4,
 			ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
@@ -131,7 +131,7 @@ func TestTagStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:             8,
-			Name:           "2.1.0",
+			Name:           "rc2",
 			RepositoryID:   4,
 			ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
 			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),

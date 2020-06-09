@@ -508,27 +508,211 @@ func TestRepositoryStore_Tags(t *testing.T) {
 		},
 		{
 			ID:           5,
-			Name:         "latest",
+			Name:         "stable-9ede8db0",
 			RepositoryID: 4,
 			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:47.283783", local),
 		},
 		{
 			ID:           6,
-			Name:         "0.0.1",
+			Name:         "stable-91ac07a9",
 			RepositoryID: 4,
 			ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 		{
 			ID:             8,
-			Name:           "2.1.0",
+			Name:           "rc2",
 			RepositoryID:   4,
 			ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
 			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
 	require.Equal(t, expected, tt)
+}
+
+func TestRepositoryStore_TagsPaginated(t *testing.T) {
+	reloadTagFixtures(t)
+
+	// see testdata/fixtures/tags.sql (sorted):
+	// 1.0.0
+	// rc2
+	// stable-91ac07a9
+	// stable-9ede8db0
+	r := &models.Repository{ID: 4}
+
+	tt := []struct {
+		name         string
+		limit        int
+		lastName     string
+		expectedTags models.Tags
+	}{
+		{
+			name:     "no limit and no last name",
+			limit:    100, // there are only 4 tags in the DB for repository 4, so this is equivalent to no limit
+			lastName: "",  // this is the equivalent to no last name, as all tag names are non-empty
+			expectedTags: models.Tags{
+				{
+					ID:           4,
+					Name:         "1.0.0",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+				},
+				{
+					ID:             8,
+					Name:           "rc2",
+					RepositoryID:   4,
+					ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+				{
+					ID:           6,
+					Name:         "stable-91ac07a9",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+				},
+				{
+					ID:           5,
+					Name:         "stable-9ede8db0",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "1st part",
+			limit:    2,
+			lastName: "",
+			expectedTags: models.Tags{
+				{
+					ID:           4,
+					Name:         "1.0.0",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+				},
+				{
+					ID:             8,
+					Name:           "rc2",
+					RepositoryID:   4,
+					ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "nth part",
+			limit:    1,
+			lastName: "rc2",
+			expectedTags: models.Tags{
+				{
+					ID:           6,
+					Name:         "stable-91ac07a9",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "last part",
+			limit:    100,
+			lastName: "stable-91ac07a9",
+			expectedTags: models.Tags{
+				{
+					ID:           5,
+					Name:         "stable-9ede8db0",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+				},
+			},
+		},
+		{
+			name:     "non existent last name",
+			limit:    100,
+			lastName: "does-not-exist",
+			expectedTags: models.Tags{
+				{
+					ID:             8,
+					Name:           "rc2",
+					RepositoryID:   4,
+					ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+				},
+				{
+					ID:           6,
+					Name:         "stable-91ac07a9",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+				},
+				{
+					ID:           5,
+					Name:         "stable-9ede8db0",
+					RepositoryID: 4,
+					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+				},
+			},
+		},
+	}
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			rr, err := s.TagsPaginated(suite.ctx, r, test.limit, test.lastName)
+			// reset created_at and updated_at attributes for reproducible comparisons
+			for _, r := range rr {
+				r.CreatedAt = time.Time{}
+				r.UpdatedAt = sql.NullTime{}
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expectedTags, rr)
+		})
+	}
+}
+
+func TestRepositoryStore_TagsCountAfterName(t *testing.T) {
+	reloadTagFixtures(t)
+
+	// see testdata/fixtures/tags.sql (sorted):
+	// 1.0.0
+	// rc2
+	// stable-91ac07a9
+	// stable-9ede8db0
+	r := &models.Repository{ID: 4}
+
+	tt := []struct {
+		name          string
+		lastName      string
+		expectedCount int
+	}{
+		{
+			name:          "all",
+			lastName:      "",
+			expectedCount: 4,
+		},
+		{
+			name:          "first",
+			lastName:      "1.0.0",
+			expectedCount: 3,
+		},
+		{
+			name:          "last",
+			lastName:      "stable-9ede8db0",
+			expectedCount: 0,
+		},
+		{
+			name:          "non existent",
+			lastName:      "does-not-exist",
+			expectedCount: 3,
+		},
+	}
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			c, err := s.TagsCountAfterName(suite.ctx, r, test.lastName)
+			require.NoError(t, err)
+			require.Equal(t, test.expectedCount, c)
+		})
+	}
 }
 
 func TestRepositoryStore_ManifestTags(t *testing.T) {
