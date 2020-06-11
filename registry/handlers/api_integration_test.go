@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -17,10 +18,11 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"regexp"
-	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/configuration"
@@ -120,151 +122,176 @@ func TestCheckAPI(t *testing.T) {
 	}
 }
 
+type catalogAPIResponse struct {
+	Repositories []string `json:"repositories"`
+}
+
 // TestCatalogAPI tests the /v2/_catalog endpoint
 func TestCatalogAPI(t *testing.T) {
-	chunkLen := 2
 	env := newTestEnv(t, withSchema1Compatibility)
 	defer env.Shutdown()
 
-	values := url.Values{
-		"last": []string{""},
-		"n":    []string{strconv.Itoa(chunkLen)}}
-
-	catalogURL, err := env.builder.BuildCatalogURL(values)
-	if err != nil {
-		t.Fatalf("unexpected error building catalog url: %v", err)
+	sortedRepos := []string{
+		"2j2ar",
+		"asj9e/ieakg",
+		"dcsl6/xbd1z/9t56s",
+		"hpgkt/bmawb",
+		"jyi7b",
+		"jyi7b/sgv2q/d5a2f",
+		"jyi7b/sgv2q/fxt1v",
+		"kb0j5/pic0i",
+		"n343n",
+		"sb71y",
 	}
 
-	// -----------------------------------
-	// try to get an empty catalog
+	// shuffle repositories to make sure results are consistent regardless of creation order (it matters when running
+	// against the metadata database)
+	shuffledRepos := make([]string, len(sortedRepos))
+	copy(shuffledRepos, sortedRepos)
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(shuffledRepos), func(i, j int) {
+		shuffledRepos[i], shuffledRepos[j] = shuffledRepos[j], shuffledRepos[i]
+	})
+
+	for _, repo := range shuffledRepos {
+		createRepository(env, t, repo, "latest")
+	}
+
+	tt := []struct {
+		name               string
+		queryParams        url.Values
+		expectedBody       catalogAPIResponse
+		expectedLinkHeader string
+	}{
+		{
+			name:         "no query parameters",
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:         "empty last query parameter",
+			queryParams:  url.Values{"last": []string{""}},
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:         "empty n query parameter",
+			queryParams:  url.Values{"n": []string{""}},
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:         "empty last and n query parameters",
+			queryParams:  url.Values{"last": []string{""}, "n": []string{""}},
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:         "non integer n query parameter",
+			queryParams:  url.Values{"n": []string{"foo"}},
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:        "1st page",
+			queryParams: url.Values{"n": []string{"4"}},
+			expectedBody: catalogAPIResponse{Repositories: []string{
+				"2j2ar",
+				"asj9e/ieakg",
+				"dcsl6/xbd1z/9t56s",
+				"hpgkt/bmawb",
+			}},
+			expectedLinkHeader: `</v2/_catalog?last=hpgkt%2Fbmawb&n=4>; rel="next"`,
+		},
+		{
+			name:        "nth page",
+			queryParams: url.Values{"last": []string{"hpgkt/bmawb"}, "n": []string{"4"}},
+			expectedBody: catalogAPIResponse{Repositories: []string{
+				"jyi7b",
+				"jyi7b/sgv2q/d5a2f",
+				"jyi7b/sgv2q/fxt1v",
+				"kb0j5/pic0i",
+			}},
+			expectedLinkHeader: `</v2/_catalog?last=kb0j5%2Fpic0i&n=4>; rel="next"`,
+		},
+		{
+			name:        "last page",
+			queryParams: url.Values{"last": []string{"kb0j5/pic0i"}, "n": []string{"4"}},
+			expectedBody: catalogAPIResponse{Repositories: []string{
+				"n343n",
+				"sb71y",
+			}},
+		},
+		{
+			name:         "zero page size",
+			queryParams:  url.Values{"n": []string{"0"}},
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:         "page size bigger than full list",
+			queryParams:  url.Values{"n": []string{"100"}},
+			expectedBody: catalogAPIResponse{Repositories: sortedRepos},
+		},
+		{
+			name:        "after marker",
+			queryParams: url.Values{"last": []string{"kb0j5/pic0i"}},
+			expectedBody: catalogAPIResponse{Repositories: []string{
+				"n343n",
+				"sb71y",
+			}},
+		},
+		{
+			name:        "after non existent marker",
+			queryParams: url.Values{"last": []string{"does-not-exist"}},
+			expectedBody: catalogAPIResponse{Repositories: []string{
+				"hpgkt/bmawb",
+				"jyi7b",
+				"jyi7b/sgv2q/d5a2f",
+				"jyi7b/sgv2q/fxt1v",
+				"kb0j5/pic0i",
+				"n343n",
+				"sb71y",
+			}},
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			catalogURL, err := env.builder.BuildCatalogURL(test.queryParams)
+			require.NoError(t, err)
+
+			resp, err := http.Get(catalogURL)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var body catalogAPIResponse
+			dec := json.NewDecoder(resp.Body)
+			err = dec.Decode(&body)
+			require.NoError(t, err)
+
+			require.Equal(t, test.expectedBody, body)
+			require.Equal(t, test.expectedLinkHeader, resp.Header.Get("Link"))
+		})
+	}
+}
+
+func TestCatalogAPI_Empty(t *testing.T) {
+	env := newTestEnv(t, withSchema1Compatibility)
+	defer env.Shutdown()
+
+	catalogURL, err := env.builder.BuildCatalogURL()
+	require.NoError(t, err)
+
 	resp, err := http.Get(catalogURL)
-	if err != nil {
-		t.Fatalf("unexpected error issuing request: %v", err)
-	}
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	checkResponse(t, "issuing catalog api check", resp, http.StatusOK)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var ctlg struct {
-		Repositories []string `json:"repositories"`
-	}
-
+	var body catalogAPIResponse
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&ctlg); err != nil {
-		t.Fatalf("error decoding fetched manifest: %v", err)
-	}
+	err = dec.Decode(&body)
+	require.NoError(t, err)
 
-	// we haven't pushed anything to the registry yet
-	if len(ctlg.Repositories) != 0 {
-		t.Fatalf("repositories has unexpected values")
-	}
-
-	if resp.Header.Get("Link") != "" {
-		t.Fatalf("repositories has more data when none expected")
-	}
-
-	// -----------------------------------
-	// push something to the registry and try again
-	images := []string{"foo/aaaa", "foo/bbbb", "foo/cccc"}
-
-	for _, image := range images {
-		createRepository(env, t, image, "sometag")
-	}
-
-	resp, err = http.Get(catalogURL)
-	if err != nil {
-		t.Fatalf("unexpected error issuing request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	checkResponse(t, "issuing catalog api check", resp, http.StatusOK)
-
-	dec = json.NewDecoder(resp.Body)
-	if err = dec.Decode(&ctlg); err != nil {
-		t.Fatalf("error decoding fetched manifest: %v", err)
-	}
-
-	if len(ctlg.Repositories) != chunkLen {
-		t.Fatalf("repositories has unexpected values")
-	}
-
-	for _, image := range images[:chunkLen] {
-		if !contains(ctlg.Repositories, image) {
-			t.Fatalf("didn't find our repository '%s' in the catalog", image)
-		}
-	}
-
-	link := resp.Header.Get("Link")
-	if link == "" {
-		t.Fatalf("repositories has less data than expected")
-	}
-
-	newValues := checkLink(t, link, chunkLen, ctlg.Repositories[len(ctlg.Repositories)-1])
-
-	// -----------------------------------
-	// get the last chunk of data
-
-	catalogURL, err = env.builder.BuildCatalogURL(newValues)
-	if err != nil {
-		t.Fatalf("unexpected error building catalog url: %v", err)
-	}
-
-	resp, err = http.Get(catalogURL)
-	if err != nil {
-		t.Fatalf("unexpected error issuing request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	checkResponse(t, "issuing catalog api check", resp, http.StatusOK)
-
-	dec = json.NewDecoder(resp.Body)
-	if err = dec.Decode(&ctlg); err != nil {
-		t.Fatalf("error decoding fetched manifest: %v", err)
-	}
-
-	if len(ctlg.Repositories) != 1 {
-		t.Fatalf("repositories has unexpected values")
-	}
-
-	lastImage := images[len(images)-1]
-	if !contains(ctlg.Repositories, lastImage) {
-		t.Fatalf("didn't find our repository '%s' in the catalog", lastImage)
-	}
-
-	link = resp.Header.Get("Link")
-	if link != "" {
-		t.Fatalf("catalog has unexpected data")
-	}
-}
-
-func checkLink(t *testing.T, urlStr string, numEntries int, last string) url.Values {
-	re := regexp.MustCompile("<(/v2/_catalog.*)>; rel=\"next\"")
-	matches := re.FindStringSubmatch(urlStr)
-
-	if len(matches) != 2 {
-		t.Fatalf("Catalog link address response was incorrect")
-	}
-	linkURL, _ := url.Parse(matches[1])
-	urlValues := linkURL.Query()
-
-	if urlValues.Get("n") != strconv.Itoa(numEntries) {
-		t.Fatalf("Catalog link entry size is incorrect")
-	}
-
-	if urlValues.Get("last") != last {
-		t.Fatal("Catalog link last entry is incorrect")
-	}
-
-	return urlValues
-}
-
-func contains(elems []string, e string) bool {
-	for _, elem := range elems {
-		if elem == e {
-			return true
-		}
-	}
-	return false
+	require.Len(t, body.Repositories, 0)
+	require.Empty(t, resp.Header.Get("Link"))
 }
 
 func newConfig(opts ...configOpt) configuration.Configuration {
