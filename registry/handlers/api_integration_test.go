@@ -438,7 +438,7 @@ func TestBlobAPI_Get(t *testing.T) {
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(args.layerFile)
 	require.NoError(t, err)
-	
+
 	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
 	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
 	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
@@ -488,6 +488,75 @@ func TestBlobAPI_Get_BlobNotFound(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 	checkBodyHasErrorCodes(t, "blob not found", res, v2.ErrorCodeBlobUnknown)
+}
+
+func TestBlobAPI_Head(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// check if layer exists
+	res, err := http.Head(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	// verify headers
+	_, err = args.layerFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(args.layerFile)
+	require.NoError(t, err)
+
+	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
+	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
+	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
+	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
+	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
+
+	// verify body
+	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_Head_RepositoryNotFound(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	args := makeBlobArgs(t)
+	ref, err := reference.WithDigest(args.imageName, args.layerDigest)
+	require.NoError(t, err)
+
+	blobURL, err := env.builder.BuildBlobURL(ref)
+	require.NoError(t, err)
+
+	res, err := http.Head(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_Head_BlobNotFound(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
 }
 
 func TestBlobDelete(t *testing.T) {
@@ -597,36 +666,18 @@ func testBlobAPI(t *testing.T, env *testEnv, args blobArgs) *testEnv {
 	layerFile := args.layerFile
 	layerDigest := args.layerDigest
 
-	// -----------------------------------
-	// Test fetch for non-existent content
 	ref, _ := reference.WithDigest(imageName, layerDigest)
 	layerURL, err := env.builder.BuildBlobURL(ref)
 	if err != nil {
 		t.Fatalf("error building url: %v", err)
 	}
 
-	resp, err := http.Get(layerURL)
-	if err != nil {
-		t.Fatalf("unexpected error fetching non-existent layer: %v", err)
-	}
-
-	checkResponse(t, "fetching non-existent content", resp, http.StatusNotFound)
-
-	// ------------------------------------------
-	// Test head request for non-existent content
-	resp, err = http.Head(layerURL)
-	if err != nil {
-		t.Fatalf("unexpected error checking head on non-existent layer: %v", err)
-	}
-
-	checkResponse(t, "checking head on non-existent layer", resp, http.StatusNotFound)
-
 	// ------------------------------------------
 	// Start an upload, check the status then cancel
 	uploadURLBase, uploadUUID := startPushLayer(t, env, imageName)
 
 	// A status check should work
-	resp, err = http.Get(uploadURLBase)
+	resp, err := http.Get(uploadURLBase)
 	if err != nil {
 		t.Fatalf("unexpected error getting upload status: %v", err)
 	}
