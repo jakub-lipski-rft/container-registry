@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -420,6 +421,78 @@ func TestBlobAPI(t *testing.T) {
 	args = makeBlobArgs(t)
 	testBlobAPI(t, env2, args)
 	env2.Shutdown()
+}
+
+func TestBlobAPI_Get(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// fetch layer
+	res, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	// verify response headers
+	_, err = args.layerFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(args.layerFile)
+	require.NoError(t, err)
+	
+	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
+	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
+	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
+	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
+	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
+
+	// verify response body
+	v := args.layerDigest.Verifier()
+	_, err = io.Copy(v, res.Body)
+	require.NoError(t, err)
+	require.True(t, v.Verified())
+}
+
+func TestBlobAPI_Get_RepositoryNotFound(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	args := makeBlobArgs(t)
+	ref, err := reference.WithDigest(args.imageName, args.layerDigest)
+	require.NoError(t, err)
+
+	blobURL, err := env.builder.BuildBlobURL(ref)
+	require.NoError(t, err)
+
+	resp, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeBlobUnknown)
+}
+
+func TestBlobAPI_Get_BlobNotFound(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Get(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	checkBodyHasErrorCodes(t, "blob not found", res, v2.ErrorCodeBlobUnknown)
 }
 
 func TestBlobDelete(t *testing.T) {

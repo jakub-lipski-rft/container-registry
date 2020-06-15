@@ -58,6 +58,40 @@ type blobHandler struct {
 	Digest digest.Digest
 }
 
+func dbGetBlob(ctx context.Context, db datastore.Queryer, repoPath string, dgst digest.Digest) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": dgst})
+	log.Debug("finding blob in database")
+
+	rStore := datastore.NewRepositoryStore(db)
+	r, err := rStore.FindByPath(ctx, repoPath)
+	if err != nil {
+		return errcode.ErrorCodeUnknown.WithDetail(err)
+	}
+	if r == nil {
+		log.Warn("repository not found in database")
+		return v2.ErrorCodeBlobUnknown.WithDetail(dgst)
+	}
+
+	ll, err := rStore.Layers(ctx, r)
+	if err != nil {
+		return errcode.ErrorCodeUnknown.WithDetail(err)
+	}
+
+	var found bool
+	for _, l := range ll {
+		if l.Digest == dgst {
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Warn("blob link not found in database")
+		return v2.ErrorCodeBlobUnknown.WithDetail(dgst)
+	}
+
+	return nil
+}
+
 // GetBlob fetches the binary data from backend storage returns it in the
 // response.
 func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +105,13 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 			bh.Errors = append(bh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		}
 		return
+	}
+
+	if bh.Config.Database.Enabled {
+		if err := dbGetBlob(bh.Context, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
+			bh.Errors = append(bh.Errors, err)
+			return
+		}
 	}
 
 	if err := blobs.ServeBlob(bh, w, r, desc.Digest); err != nil {
