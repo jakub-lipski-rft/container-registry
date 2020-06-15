@@ -147,12 +147,7 @@ func TestCatalogAPI(t *testing.T) {
 
 	// shuffle repositories to make sure results are consistent regardless of creation order (it matters when running
 	// against the metadata database)
-	shuffledRepos := make([]string, len(sortedRepos))
-	copy(shuffledRepos, sortedRepos)
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(shuffledRepos), func(i, j int) {
-		shuffledRepos[i], shuffledRepos[j] = shuffledRepos[j], shuffledRepos[i]
-	})
+	shuffledRepos := shuffledCopy(sortedRepos)
 
 	for _, repo := range shuffledRepos {
 		createRepository(env, t, repo, "latest")
@@ -2199,6 +2194,227 @@ func testManifestDelete(t *testing.T, env *testEnv, args manifestArgs) {
 	if len(tagsResponse.Tags) != 0 {
 		t.Fatalf("expected 0 tags in response: %v", tagsResponse.Tags)
 	}
+}
+
+func shuffledCopy(s []string) []string {
+	shuffled := make([]string, len(s))
+	copy(shuffled, s)
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+
+	return shuffled
+}
+
+func TestTagsAPI_Get(t *testing.T) {
+	env := newTestEnv(t, withSchema1Compatibility)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	require.NoError(t, err)
+
+	sortedTags := []string{
+		"2j2ar",
+		"asj9e",
+		"dcsl6",
+		"hpgkt",
+		"jyi7b",
+		"jyi7b-fxt1v",
+		"jyi7b-sgv2q",
+		"kb0j5",
+		"n343n",
+		"sb71y",
+	}
+
+	// shuffle tags to make sure results are consistent regardless of creation order (it matters when running
+	// against the metadata database)
+	shuffledTags := shuffledCopy(sortedTags)
+
+	createRepositoryWithMultipleIdenticalTags(env, t, imageName.Name(), shuffledTags)
+
+	tt := []struct {
+		name                string
+		runWithoutDBEnabled bool
+		queryParams         url.Values
+		expectedBody        tagsAPIResponse
+		expectedLinkHeader  string
+	}{
+		{
+			name:                "no query parameters",
+			expectedBody:        tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+			runWithoutDBEnabled: true,
+		},
+		{
+			name:         "empty last query parameter",
+			queryParams:  url.Values{"last": []string{""}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+		},
+		{
+			name:         "empty n query parameter",
+			queryParams:  url.Values{"n": []string{""}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+		},
+		{
+			name:         "empty last and n query parameters",
+			queryParams:  url.Values{"last": []string{""}, "n": []string{""}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+		},
+		{
+			name:         "non integer n query parameter",
+			queryParams:  url.Values{"n": []string{"foo"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+		},
+		{
+			name:        "1st page",
+			queryParams: url.Values{"n": []string{"4"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: []string{
+				"2j2ar",
+				"asj9e",
+				"dcsl6",
+				"hpgkt",
+			}},
+			expectedLinkHeader: `</v2/foo/bar/tags/list?last=hpgkt&n=4>; rel="next"`,
+		},
+		{
+			name:        "nth page",
+			queryParams: url.Values{"last": []string{"hpgkt"}, "n": []string{"4"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: []string{
+				"jyi7b",
+				"jyi7b-fxt1v",
+				"jyi7b-sgv2q",
+				"kb0j5",
+			}},
+			expectedLinkHeader: `</v2/foo/bar/tags/list?last=kb0j5&n=4>; rel="next"`,
+		},
+		{
+			name:        "last page",
+			queryParams: url.Values{"last": []string{"kb0j5"}, "n": []string{"4"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: []string{
+				"n343n",
+				"sb71y",
+			}},
+		},
+		{
+			name:         "zero page size",
+			queryParams:  url.Values{"n": []string{"0"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+		},
+		{
+			name:         "page size bigger than full list",
+			queryParams:  url.Values{"n": []string{"100"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags},
+		},
+		{
+			name:        "after marker",
+			queryParams: url.Values{"last": []string{"kb0j5/pic0i"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: []string{
+				"n343n",
+				"sb71y",
+			}},
+		},
+		{
+			name:        "after non existent marker",
+			queryParams: url.Values{"last": []string{"does-not-exist"}},
+			expectedBody: tagsAPIResponse{Name: imageName.Name(), Tags: []string{
+				"hpgkt",
+				"jyi7b",
+				"jyi7b-fxt1v",
+				"jyi7b-sgv2q",
+				"kb0j5",
+				"n343n",
+				"sb71y",
+			}},
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			if !test.runWithoutDBEnabled && !env.config.Database.Enabled {
+				t.Skip("skipping test because the metadata database is not enabled")
+			}
+
+			tagsURL, err := env.builder.BuildTagsURL(imageName, test.queryParams)
+			require.NoError(t, err)
+
+			resp, err := http.Get(tagsURL)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var body tagsAPIResponse
+			dec := json.NewDecoder(resp.Body)
+			err = dec.Decode(&body)
+			require.NoError(t, err)
+
+			require.Equal(t, test.expectedBody, body)
+			require.Equal(t, test.expectedLinkHeader, resp.Header.Get("Link"))
+		})
+	}
+}
+
+func TestTagsAPI_Get_RepositoryNotFound(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	require.NoError(t, err)
+
+	tagsURL, err := env.builder.BuildTagsURL(imageName)
+	require.NoError(t, err)
+
+	resp, err := http.Get(tagsURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	require.Empty(t, resp.Header.Get("Link"))
+	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeNameUnknown)
+}
+
+func TestTagsAPI_Get_EmptyRepository(t *testing.T) {
+	env := newTestEnv(t, withSchema1Compatibility)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	require.NoError(t, err)
+
+	// SETUP
+
+	// create repository and then delete its only tag
+	tag := "latest"
+	createRepository(env, t, imageName.Name(), tag)
+
+	ref, err := reference.WithTag(imageName, tag)
+	require.NoError(t, err)
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	require.NoError(t, err)
+
+	res, err := httpDelete(tagURL)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// TEST
+
+	tagsURL, err := env.builder.BuildTagsURL(imageName)
+	require.NoError(t, err)
+
+	resp, err := http.Get(tagsURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var body tagsAPIResponse
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&body)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Empty(t, resp.Header.Get("Link"))
+	require.Equal(t, tagsAPIResponse{Name: imageName.Name()}, body)
 }
 
 func TestTagsAPITagDeleteAllowedMethods(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/docker/distribution/registry/datastore"
 
@@ -38,25 +39,96 @@ type tagsAPIResponse struct {
 	Tags []string `json:"tags"`
 }
 
+func dbGetTags(ctx context.Context, db datastore.Queryer, repoPath string, n int, last string) ([]string, bool, error) {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "limit": n, "marker": last})
+	log.Debug("finding tags in database")
+	
+	rStore := datastore.NewRepositoryStore(db)
+	r, err := rStore.FindByPath(ctx, repoPath)
+	if err != nil {
+		return nil, false, errcode.ErrorCodeUnknown.WithDetail(err)
+	}
+	if r == nil {
+		log.Warn("repository not found in database")
+		return nil, false, v2.ErrorCodeNameUnknown.WithDetail(map[string]string{"name": repoPath})
+	}
+
+	tt, err := rStore.TagsPaginated(ctx, r, n, last)
+	if err != nil {
+		return nil, false, errcode.ErrorCodeUnknown.WithDetail(err)
+	}
+
+	tags := make([]string, 0, len(tt))
+	for _, t := range tt {
+		tags = append(tags, t.Name)
+	}
+
+	var moreEntries bool
+	if len(tt) > 0 {
+		n, err := rStore.TagsCountAfterName(ctx, r, tt[len(tt)-1].Name)
+		if err != nil {
+			return nil, false, errcode.ErrorCodeUnknown.WithDetail(err)
+		}
+		moreEntries = n > 0
+	}
+
+	return tags, moreEntries, nil
+}
+
 // GetTags returns a json list of tags for a specific image name.
 func (th *tagsHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	tagService := th.Repository.Tags(th)
-	tags, err := tagService.All(th)
-	if err != nil {
-		switch err := err.(type) {
-		case distribution.ErrRepositoryUnknown:
-			th.Errors = append(th.Errors, v2.ErrorCodeNameUnknown.WithDetail(map[string]string{"name": th.Repository.Named().Name()}))
-		case errcode.Error:
+	// Pagination headers are currently only supported by the metadata database backend
+	q := r.URL.Query()
+	lastEntry := q.Get("last")
+	maxEntries, err := strconv.Atoi(q.Get("n"))
+	if err != nil || maxEntries <= 0 {
+		maxEntries = maximumReturnedEntries
+	}
+
+	var tags []string
+	var moreEntries bool
+
+	if th.Config.Database.Enabled {
+		tags, moreEntries, err = dbGetTags(th.Context, th.db, th.Repository.Named().Name(), maxEntries, lastEntry)
+		if err != nil {
 			th.Errors = append(th.Errors, err)
-		default:
-			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			return
 		}
-		return
+		if len(tags) == 0 {
+			// If no tags are found, the current implementation (`else`) returns a nil slice instead of an empty one,
+			// so we have to enforce the same behavior here, for consistency.
+			tags = nil
+		}
+	} else {
+		tagService := th.Repository.Tags(th)
+		tags, err = tagService.All(th)
+		if err != nil {
+			switch err := err.(type) {
+			case distribution.ErrRepositoryUnknown:
+				th.Errors = append(th.Errors, v2.ErrorCodeNameUnknown.WithDetail(map[string]string{"name": th.Repository.Named().Name()}))
+			case errcode.Error:
+				th.Errors = append(th.Errors, err)
+			default:
+				th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			}
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	// Add a link header if there are more entries to retrieve (only supported by the metadata database backend)
+	if moreEntries {
+		lastEntry = tags[len(tags)-1]
+		urlStr, err := createLinkEntry(r.URL.String(), maxEntries, lastEntry)
+		if err != nil {
+			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			return
+		}
+		w.Header().Set("Link", urlStr)
+	}
 
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(tagsAPIResponse{
