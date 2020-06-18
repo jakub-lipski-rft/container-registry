@@ -255,10 +255,20 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 }
 
 func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, schema1SigningKey libtrust.PrivateKey, path string) (distribution.Manifest, error) {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "digest": dgst})
+	log.Debug("getting manifest by digest from database")
+
 	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.FindByPath(ctx, path)
+	r, err := repositoryStore.FindByPath(ctx, path)
 	if err != nil {
 		return nil, err
+	}
+	if r == nil {
+		log.Warn("repository not found in database")
+		return nil, distribution.ErrManifestUnknownRevision{
+			Name:     path,
+			Revision: dgst,
+		}
 	}
 
 	var payload []byte
@@ -267,12 +277,12 @@ func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 
 	// Find either the manifest or the manifest list by its digest. We can anticipate
 	// that most requests will be for single manifests, so we should try for manifests first.
-	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, dbRepo, dgst)
+	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, r, dgst)
 	if err != nil {
 		return nil, err
 	}
 	if dbManifest == nil {
-		dbManifestList, err := repositoryStore.FindManifestListByDigest(ctx, dbRepo, dgst)
+		dbManifestList, err := repositoryStore.FindManifestListByDigest(ctx, r, dgst)
 		if err != nil {
 			return nil, err
 		}
