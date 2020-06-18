@@ -1524,6 +1524,452 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 	return args
 }
 
+func TestManifestAPI_Put_ByTagIsIdempotent(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "idempotentag"
+	repoPath := "schema2/idempotent"
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
+
+	// Build URLs and headers.
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	// Put the same manifest twice to test idempotentcy.
+	resp := putManifest(t, "putting manifest by tag no error", manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+
+	resp = putManifest(t, "putting manifest by tag no error", manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
+func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "replacesmanifesttag"
+	repoPath := "schema2/replacesmanifest"
+
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	// Fetch original manifest by tag name
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", manifestURL, nil)
+	require.NoError(t, err)
+
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "fetching uploaded manifest", resp, http.StatusOK)
+
+	var fetchedOriginalManifest schema2.DeserializedManifest
+	dec := json.NewDecoder(resp.Body)
+
+	err = dec.Decode(&fetchedOriginalManifest)
+	require.NoError(t, err)
+
+	_, originalPayload, err := fetchedOriginalManifest.Payload()
+	require.NoError(t, err)
+
+	// Create a new manifest and push it up with the same tag.
+	newManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	// Fetch new manifest by tag name
+	req, err = http.NewRequest("GET", manifestURL, nil)
+	require.NoError(t, err)
+
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "fetching uploaded manifest", resp, http.StatusOK)
+
+	var fetchedNewManifest schema2.DeserializedManifest
+	dec = json.NewDecoder(resp.Body)
+
+	err = dec.Decode(&fetchedNewManifest)
+	require.NoError(t, err)
+
+	// Ensure that we pulled down the new manifest by the same tag.
+	require.Equal(t, *newManifest, fetchedNewManifest)
+
+	// Ensure that the tag refered to different manifests over time.
+	require.NotEqual(t, fetchedOriginalManifest, fetchedNewManifest)
+
+	_, newPayload, err := fetchedNewManifest.Payload()
+	require.NoError(t, err)
+
+	require.NotEqual(t, originalPayload, newPayload)
+}
+
+func TestManifestAPI_Get_Schema2MissingManifest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	// Push up a manifest so that the repository is created. This way we can
+	// test the case were a manifest is not present in a repository, as opposed
+	// to the case where an entire repository does not exist.
+	tagName := "missingmanifesttag"
+	repoPath := "schema2/missingmanifest"
+
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	dgst := digest.FromString("bogus digest")
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	bogusManifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", bogusManifestDigestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestManifestAPI_Get_Schema2ByDigestMissingRepository(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "missingrepositorytag"
+	repoPath := "schema2/missingrepository"
+
+	// Push up a manifest so that it exists within the registry. We'll attempt to
+	// get the manifest by digest from a non-existant repository, which should fail.
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	repoRef, err := reference.WithName("fake/repo")
+	require.NoError(t, err)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", manifestDigestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestManifestAPI_Get_Schema2ByTagMissingRepository(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "missingrepositorytag"
+	repoPath := "schema2/missingrepository"
+
+	// Push up a manifest so that it exists within the registry. We'll attempt to
+	// get the manifest by tag from a non-existant repository, which should fail.
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	repoRef, err := reference.WithName("fake/repo")
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", manifestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestManifestAPI_Get_Schema2ManifestByDigestNotAssociatedWithRepository(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName1 := "missingrepository1tag"
+	repoPath1 := "schema2/missingrepository1"
+
+	tagName2 := "missingrepository2tag"
+	repoPath2 := "schema2/missingrepository2"
+
+	// Push up two manifests in different repositories so that they both exist
+	// within the registry. We'll attempt to get a manifest by digest from the
+	// repository to which it does not belong, which should fail.
+	putRandomSchema2ManifestByTag(t, env, repoPath1, tagName1)
+	deserializedManifest2 := putRandomSchema2ManifestByTag(t, env, repoPath2, tagName2)
+
+	_, payload, err := deserializedManifest2.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	repoRef1, err := reference.WithName(repoPath1)
+	require.NoError(t, err)
+
+	mismatcheDigestRef, err := reference.WithDigest(repoRef1, dgst)
+	require.NoError(t, err)
+
+	mismatchedManifestURL, err := env.builder.BuildManifestURL(mismatcheDigestRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", mismatchedManifestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestManifestAPI_Get_Schema2ManifestByTagNotAssociatedWithRepository(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName1 := "missingrepository1tag"
+	repoPath1 := "schema2/missingrepository1"
+
+	tagName2 := "missingrepository2tag"
+	repoPath2 := "schema2/missingrepository2"
+
+	// Push up two manifests in different repositories so that they both exist
+	// within the registry. We'll attempt to get a manifest by tag from the
+	// repository to which it does not belong, which should fail.
+	putRandomSchema2ManifestByTag(t, env, repoPath1, tagName1)
+	putRandomSchema2ManifestByTag(t, env, repoPath2, tagName2)
+
+	repoRef1, err := reference.WithName(repoPath1)
+	require.NoError(t, err)
+
+	mismatchedTagRef, err := reference.WithTag(repoRef1, tagName2)
+	require.NoError(t, err)
+
+	mismatchedManifestURL, err := env.builder.BuildManifestURL(mismatchedTagRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", mismatchedManifestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+// TODO: Misc testing that's not currently covered by TestManifestAPI
+// https://gitlab.com/gitlab-org/container-registry/-/issues/143
+func TestManifestAPI_Get_UnknownSchema(t *testing.T) {}
+func TestManifestAPI_Put_UnknownSchema(t *testing.T) {}
+
+func TestManifestAPI_Get_UnknownMediaType(t *testing.T) {}
+func TestManifestAPI_Put_UnknownMediaType(t *testing.T) {}
+
+func TestManifestAPI_Put_ReuseTagManifestToManifestList(t *testing.T)     {}
+func TestManifestAPI_Put_ReuseTagManifestListToManifest(t *testing.T)     {}
+func TestManifestAPI_Put_ReuseTagManifestListToManifestList(t *testing.T) {}
+
+func TestManifestAPI_Put_DigestReadOnly(t *testing.T) {}
+func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
+
+// TODO: Break out logic from testManifestAPISchema2 into these tests.
+// https://gitlab.com/gitlab-org/container-registry/-/issues/140
+func TestManifestAPI_Put_Schema2WithDigest(t *testing.T)        {}
+func TestManifestAPI_Put_Schema2WithTag(t *testing.T)           {}
+func TestManifestAPI_Put_Schema2MissingRepository(t *testing.T) {}
+func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T)     {}
+func TestManifestAPI_Put_Schema2MissingLayer(t *testing.T)      {}
+
+func TestManifestAPI_Get_Schema2ByDigest(t *testing.T)            {}
+func TestManifestAPI_Get_Schema2ByTag(t *testing.T)               {}
+func TestManifestAPI_Get_Schema2ByDigestEtagMatches(t *testing.T) {}
+func TestManifestAPI_Get_Schema2ByTagEtagMatches(t *testing.T)    {}
+func TestManifestAPI_Get_Schema2MissingTag(t *testing.T)          {}
+func TestManifestAPI_Get_Schema2AsSchema1(t *testing.T)           {}
+
+// TODO: Break out logic from testManifestDelete into these tests.
+// https://gitlab.com/gitlab-org/container-registry/-/issues/144
+func TestManifestAPI_Delete_Schema2(t *testing.T)                  {}
+func TestManifestAPI_Delete_Schema2PreviouslyDeleted(t *testing.T) {}
+func TestManifestAPI_Delete_Schema2UnknownManifest(t *testing.T)   {}
+func TestManifestAPI_Delete_Schema2Reupload(t *testing.T)          {}
+func TestManifestAPI_Delete_Schema2ClearsTags(t *testing.T)        {}
+
+func schema2Config() ([]byte, distribution.Descriptor) {
+	payload := []byte(`{
+		"architecture": "amd64",
+		"history": [
+			{
+				"created": "2015-10-31T22:22:54.690851953Z",
+				"created_by": "/bin/sh -c #(nop) ADD file:a3bc1e842b69636f9df5256c49c5374fb4eef1e281fe3f282c65fb853ee171c5 in /"
+			},
+			{
+				"created": "2015-10-31T22:22:55.613815829Z",
+				"created_by": "/bin/sh -c #(nop) CMD [\"sh\"]"
+			}
+		],
+		"rootfs": {
+			"diff_ids": [
+				"sha256:c6f988f4874bb0add23a778f753c65efe992244e148a1d2ec2a8b664fb66bbd1",
+				"sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+			],
+			"type": "layers"
+		}
+	}`)
+
+	return payload, distribution.Descriptor{
+		Size:      int64(len(payload)),
+		MediaType: schema2.MediaTypeImageConfig,
+		Digest:    digest.FromBytes(payload),
+	}
+}
+
+// seedRandomSchema2Manifest generates a random schema2 manifest and puts its config and layers.
+func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoName string) *schema2.DeserializedManifest {
+	repoPath, err := reference.WithName(repoName)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoPath)
+	pushLayer(t, env.builder, repoPath, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, repoPath)
+		pushLayer(t, env.builder, repoPath, dgst, uploadURLBase, rs)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	return deserializedManifest
+}
+
+// putRandomSchema2ManifestByTag creates a random valid schema2 manifest, its
+// config, its layers, and puts them. It returns a the tag referenced url at
+// which the manifest is accessible and the serialized form of the manifest.
+func putRandomSchema2ManifestByTag(t *testing.T, env *testEnv, repoName, tagName string) *schema2.DeserializedManifest {
+	repoPath, err := reference.WithName(repoName)
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoPath, tagName)
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	// Push up a random manifest by tag.
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoName)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoPath, dgst)
+	require.NoError(t, err)
+
+	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	resp := putManifest(t, "putting manifest by tag no error", manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+
+	return deserializedManifest
+}
+
 func testManifestAPISchema2(t *testing.T, env *testEnv, imageName reference.Named) manifestArgs {
 	tag := "schema2tag"
 	args := manifestArgs{
@@ -2724,6 +3170,10 @@ func (t *testEnv) Shutdown() {
 	t.server.Close()
 
 	if t.config.Database.Enabled {
+		if err := t.app.GracefulShutdown(t.ctx); err != nil {
+			panic(err)
+		}
+
 		if err := dbtestutil.TruncateAllTables(t.db); err != nil {
 			panic(err)
 		}

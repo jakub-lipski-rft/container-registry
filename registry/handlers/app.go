@@ -1119,3 +1119,8 @@ func startUploadPurger(ctx context.Context, storageDriver storagedriver.StorageD
 		}
 	}()
 }
+
+// GracefulShutdown allows the app to free any resources befefore shutdown.
+func (app *App) GracefulShutdown(ctx context.Context) error {
+	return app.db.Close()
+}

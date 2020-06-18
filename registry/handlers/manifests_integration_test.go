@@ -195,28 +195,6 @@ func TestTagManifest_Schema1(t *testing.T) {
 	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
 }
 
-func TestTagManifest_Idempotent(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	repoPath := "manifestdb/tagidempotent"
-	tagName := "tagidempotent"
-
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-
-	// Retag the manifest with the same tag.
-	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
-	require.NoError(t, err)
-
-	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
-
-	err = dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
-	require.NoError(t, err)
-
-	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
-}
-
 func TestTagManifestList(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
@@ -255,33 +233,6 @@ func TestTagManifestList_Idempotent(t *testing.T) {
 	require.NoError(t, err)
 
 	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
-}
-
-func TestTagManifest_TagReplacesPreviousManifest(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	tagName := "tagschema2latest"
-	repoPath := "manifestdb/tagschema2replace"
-
-	// Upload and tag old manifest.
-	oldManifest, oldCfgPayload := seedRandomSchema2Manifest(t, env)
-	oldManifestDigest := env.uploadSchema2ManifestToDB(t, oldManifest, oldCfgPayload, repoPath)
-
-	err := dbTagManifest(env.ctx, env.db, oldManifestDigest, tagName, repoPath)
-	require.NoError(t, err)
-
-	// Ensure tag is initially associated with correct manifest.
-	verifyManifestTag(t, env, oldManifestDigest, tagName, repoPath)
-
-	// Upload a new manifest and tag it with the same tag.
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-
-	err = dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
-	require.NoError(t, err)
-
-	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
 }
 
 func TestTagManifest_TagReplacesPreviousManifestList(t *testing.T) {
