@@ -1744,6 +1744,38 @@ func TestManifestAPI_Get_Schema2ByTagMissingRepository(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
+func TestManifestAPI_Get_Schema2ByTagMissingTag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "missingtagtag"
+	repoPath := "schema2/missingtag"
+
+	// Push up a manifest so that it exists within the registry. We'll attempt to
+	// get the manifest by a non-existant tag, which should fail.
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoRef, "faketag")
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", manifestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
+	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
 func TestManifestAPI_Get_Schema2ManifestByDigestNotAssociatedWithRepository(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -1850,7 +1882,6 @@ func TestManifestAPI_Get_Schema2ByDigest(t *testing.T)            {}
 func TestManifestAPI_Get_Schema2ByTag(t *testing.T)               {}
 func TestManifestAPI_Get_Schema2ByDigestEtagMatches(t *testing.T) {}
 func TestManifestAPI_Get_Schema2ByTagEtagMatches(t *testing.T)    {}
-func TestManifestAPI_Get_Schema2MissingTag(t *testing.T)          {}
 func TestManifestAPI_Get_Schema2AsSchema1(t *testing.T)           {}
 
 // TODO: Break out logic from testManifestDelete into these tests.

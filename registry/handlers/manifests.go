@@ -124,11 +124,24 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	var manifest distribution.Manifest
+
 	if imh.Tag != "" {
-		tags := imh.Repository.Tags(imh)
-		desc, err := tags.Get(imh, imh.Tag)
+		var dgst digest.Digest
+
+		if imh.Config.Database.Enabled {
+			manifest, dgst, err = dbGetManifestByTag(imh, imh.App.db, imh.Tag, imh.App.trustKey, imh.Repository.Named().Name())
+		} else {
+			var desc distribution.Descriptor
+
+			tags := imh.Repository.Tags(imh)
+			desc, err = tags.Get(imh, imh.Tag)
+			dgst = desc.Digest
+		}
 		if err != nil {
-			if _, ok := err.(distribution.ErrTagUnknown); ok || err == digest.ErrDigestInvalidFormat {
+			if errors.As(err, &distribution.ErrTagUnknown{}) ||
+				errors.Is(err, digest.ErrDigestInvalidFormat) ||
+				errors.As(err, &distribution.ErrManifestUnknown{}) {
 				// not found or with broken current/link (invalid digest)
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
 			} else {
@@ -136,7 +149,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			}
 			return
 		}
-		imh.Digest = desc.Digest
+		imh.Digest = dgst
 	}
 
 	if etagMatch(r, imh.Digest.String()) {
@@ -144,8 +157,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var manifest distribution.Manifest
-	if imh.Config.Database.Enabled {
+	if imh.Config.Database.Enabled && imh.Tag == "" {
 		manifest, err = dbGetManifest(imh, imh.App.db, imh.Digest, imh.App.trustKey, imh.Repository.Named().Name())
 	} else {
 		var options []distribution.ManifestServiceOption
@@ -301,6 +313,76 @@ func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 		schemaVersion = dbManifest.SchemaVersion
 	}
 
+	return dbPayloadToManifest(payload, mediaType, schemaVersion, schema1SigningKey)
+}
+
+func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName string, schema1SigningKey libtrust.PrivateKey, path string) (distribution.Manifest, digest.Digest, error) {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "tag": tagName})
+	log.Debug("getting manifest by tag from database")
+
+	repositoryStore := datastore.NewRepositoryStore(db)
+	r, err := repositoryStore.FindByPath(ctx, path)
+	if err != nil {
+		return nil, "", err
+	}
+	if r == nil {
+		log.Warn("repository not found in database")
+		return nil, "", distribution.ErrTagUnknown{Tag: tagName}
+	}
+
+	dbTag, err := repositoryStore.FindTagByName(ctx, r, tagName)
+	if err != nil {
+		return nil, "", err
+	}
+	if dbTag == nil {
+		log.Warn("tag not found in database")
+		return nil, "", distribution.ErrTagUnknown{Tag: tagName}
+	}
+
+	var payload []byte
+	var mediaType string
+	var schemaVersion int
+	var dgst digest.Digest
+
+	// Find either the manifest or the manifest list by its digest. We can anticipate
+	// that most requests will be for single manifests, so we should try for manifests first.
+	if dbTag.ManifestID.Valid {
+		mStore := datastore.NewManifestStore(db)
+		dbManifest, err := mStore.FindByID(ctx, dbTag.ManifestID.Int64)
+		if err != nil {
+			return nil, "", err
+		}
+		if dbManifest == nil {
+			return nil, "", distribution.ErrManifestUnknown{Name: r.Name, Tag: dbTag.Name}
+		}
+		payload = dbManifest.Payload
+		mediaType = dbManifest.MediaType
+		schemaVersion = dbManifest.SchemaVersion
+		dgst = dbManifest.Digest
+	} else if dbTag.ManifestListID.Valid {
+		mListStore := datastore.NewManifestListStore(db)
+		dbManifestList, err := mListStore.FindByID(ctx, dbTag.ManifestListID.Int64)
+		if err != nil {
+			return nil, "", err
+		}
+		if dbManifestList == nil {
+			return nil, "", distribution.ErrManifestUnknown{Name: r.Name, Tag: dbTag.Name}
+		}
+		payload = dbManifestList.Payload
+		mediaType = dbManifestList.MediaType.String
+		schemaVersion = dbManifestList.SchemaVersion
+		dgst = dbManifestList.Digest
+	}
+
+	manifest, err := dbPayloadToManifest(payload, mediaType, schemaVersion, schema1SigningKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return manifest, dgst, nil
+}
+
+func dbPayloadToManifest(payload []byte, mediaType string, schemaVersion int, schema1SigningKey libtrust.PrivateKey) (distribution.Manifest, error) {
 	// TODO: Each case here is taken directly from the respective
 	// registry/storage/*manifesthandler Unmarshal method. These are all relatively
 	// simple with the exception of schema1. We cannot invoke them directly as
@@ -368,7 +450,7 @@ func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 			if err := resIndex.UnmarshalJSON(payload); err != nil {
 				return nil, err
 			}
-			if err == nil && resIndex.Manifests != nil {
+			if resIndex.Manifests != nil {
 				return resIndex, nil
 			}
 
