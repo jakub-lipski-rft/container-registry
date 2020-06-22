@@ -1644,12 +1644,12 @@ func TestManifestAPI_Get_Schema2MissingManifest(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
 
-	// Push up a manifest so that the repository is created. This way we can
-	// test the case were a manifest is not present in a repository, as opposed
-	// to the case where an entire repository does not exist.
 	tagName := "missingmanifesttag"
 	repoPath := "schema2/missingmanifest"
 
+	// Push up a manifest so that the repository is created. This way we can
+	// test the case where a manifest is not present in a repository, as opposed
+	// to the case where an entire repository does not exist.
 	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
 
 	dgst := digest.FromString("bogus digest")
@@ -1853,6 +1853,154 @@ func TestManifestAPI_Get_Schema2ManifestByTagNotAssociatedWithRepository(t *test
 
 	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestManifestAPI_Head_Schema2ByDigest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "headtag"
+	repoPath := "schema2/head"
+
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("HEAD", manifestDigestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+	cl, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	require.NoError(t, err)
+	require.EqualValues(t, len(payload), cl)
+
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
+func TestManifestAPI_Head_Schema2ByDigestMissingManifest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "headtag"
+	repoPath := "schema2/missingmanifest"
+
+	// Push up a manifest so that the repository is created. This way we can
+	// test the case where a manifest is not present in a repository, as opposed
+	// to the case where an entire repository does not exist.
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	digestRef, err := reference.WithDigest(repoRef, digest.FromString("bogus digest"))
+	require.NoError(t, err)
+
+	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("HEAD", manifestDigestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+}
+
+func TestManifestAPI_Head_Schema2ByTag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "headtag"
+	repoPath := "schema2/head"
+
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("HEAD", manifestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	cl, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	require.NoError(t, err)
+	require.EqualValues(t, len(payload), cl)
+
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
+func TestManifestAPI_Head_Schema2ByTagMissingManifest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "headtag"
+	repoPath := "schema2/missingmanifest"
+
+	// Push up a manifest so that the repository is created. This way we can
+	// test the case where a manifest is not present in a repository, as opposed
+	// to the case where an entire repository does not exist.
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoRef, "faketag")
+	require.NoError(t, err)
+
+	manifestURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("HEAD", manifestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
 }
 
 // TODO: Misc testing that's not currently covered by TestManifestAPI
