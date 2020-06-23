@@ -235,30 +235,6 @@ func TestManifestConfigurationStore_Update_NotFound(t *testing.T) {
 	require.EqualError(t, err, "manifest configuration not found")
 }
 
-func TestManifestConfigurationStore_SoftDelete(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
-
-	s := datastore.NewManifestConfigurationStore(suite.db)
-
-	r := &models.ManifestConfiguration{ID: 3}
-	err := s.SoftDelete(suite.ctx, r)
-	require.NoError(t, err)
-
-	r, err = s.FindByID(suite.ctx, r.ID)
-	require.NoError(t, err)
-
-	require.True(t, r.DeletedAt.Valid)
-	require.NotEmpty(t, r.DeletedAt.Time)
-}
-
-func TestManifestConfigurationStore_SoftDelete_NotFound(t *testing.T) {
-	s := datastore.NewManifestConfigurationStore(suite.db)
-
-	r := &models.ManifestConfiguration{ID: 4}
-	err := s.SoftDelete(suite.ctx, r)
-	require.EqualError(t, err, "manifest configuration not found")
-}
-
 func TestManifestConfigurationStore_Delete(t *testing.T) {
 	reloadManifestConfigurationFixtures(t)
 

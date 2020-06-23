@@ -14,7 +14,6 @@ type Repository struct {
 	Path      string
 	ParentID  sql.NullInt64
 	CreatedAt time.Time
-	DeletedAt sql.NullTime
 }
 
 // Repositories is a slice of Repository pointers.
@@ -28,7 +27,6 @@ type ManifestConfiguration struct {
 	Size       int64
 	Payload    json.RawMessage
 	CreatedAt  time.Time
-	DeletedAt  sql.NullTime
 }
 
 // ManifestConfigurations is a slice of ManifestConfiguration pointers.
@@ -42,7 +40,6 @@ type Manifest struct {
 	Payload       json.RawMessage
 	CreatedAt     time.Time
 	MarkedAt      sql.NullTime
-	DeletedAt     sql.NullTime
 }
 
 // Manifests is a slice of Manifest pointers.
@@ -57,7 +54,6 @@ type Tag struct {
 	ManifestListID sql.NullInt64
 	CreatedAt      time.Time
 	UpdatedAt      sql.NullTime
-	DeletedAt      sql.NullTime
 }
 
 // Tags is a slice of Tag pointers.
@@ -70,7 +66,6 @@ type Layer struct {
 	Size      int64
 	CreatedAt time.Time
 	MarkedAt  sql.NullTime
-	DeletedAt sql.NullTime
 }
 
 // Layers is a slice of Layer pointers.
@@ -84,7 +79,6 @@ type ManifestList struct {
 	Payload       json.RawMessage
 	CreatedAt     time.Time
 	MarkedAt      sql.NullTime
-	DeletedAt     sql.NullTime
 
 	Repository *Repository
 }

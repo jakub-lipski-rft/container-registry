@@ -987,7 +987,6 @@ func TestRepositoryStore_CreateByPath_NewLeaf(t *testing.T) {
 	require.Equal(t, "a", r.Name)
 	require.Equal(t, "a", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
-	require.Empty(t, r.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1028,7 +1027,6 @@ func TestRepositoryStore_CreateByPath_NewNestedParents(t *testing.T) {
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
-	require.Empty(t, r.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1068,7 +1066,6 @@ func TestRepositoryStore_CreateByPath_NewNestedParents(t *testing.T) {
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
 		require.NotEmpty(t, r.CreatedAt)
-		require.Empty(t, r.DeletedAt)
 	}
 }
 
@@ -1091,7 +1088,6 @@ func TestRepositoryStore_CreateByPath_ExistingNestedParents(t *testing.T) {
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
-	require.Empty(t, r.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1127,7 +1123,6 @@ func TestRepositoryStore_CreateByPath_ExistingNestedParents(t *testing.T) {
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
 		require.NotEmpty(t, r.CreatedAt)
-		require.Empty(t, r.DeletedAt)
 	}
 }
 
@@ -1143,7 +1138,6 @@ func TestRepositoryStore_CreateOrFindByPath_NewLeaf(t *testing.T) {
 	require.Equal(t, "a", r.Name)
 	require.Equal(t, "a", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
-	require.Empty(t, r.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1168,7 +1162,6 @@ func TestRepositoryStore_CreateByPath_ExistingLeafDoesNotFail(t *testing.T) {
 	require.Equal(t, "a", r2.Name)
 	require.Equal(t, "a", r2.Path)
 	require.NotEmpty(t, r2.CreatedAt)
-	require.Empty(t, r2.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1189,7 +1182,6 @@ func TestRepositoryStore_CreateOrFindByPath_NewNestedParents(t *testing.T) {
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
-	require.Empty(t, r.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1229,7 +1221,6 @@ func TestRepositoryStore_CreateOrFindByPath_NewNestedParents(t *testing.T) {
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
 		require.NotEmpty(t, r.CreatedAt)
-		require.Empty(t, r.DeletedAt)
 	}
 }
 
@@ -1252,7 +1243,6 @@ func TestRepositoryStore_CreateOrFindByPath_ExistingNestedParents(t *testing.T) 
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
-	require.Empty(t, r.DeletedAt)
 
 	// validate database state
 	actual, err := s.FindAll(suite.ctx)
@@ -1288,7 +1278,6 @@ func TestRepositoryStore_CreateOrFindByPath_ExistingNestedParents(t *testing.T) 
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
 		require.NotEmpty(t, r.CreatedAt)
-		require.Empty(t, r.DeletedAt)
 	}
 }
 
@@ -1591,30 +1580,6 @@ func TestRepositoryStore_UnlinkLayer_NotLinkedDoesNotFail(t *testing.T) {
 	err := s.UnlinkLayer(suite.ctx, r, l)
 	require.NoError(t, err)
 	require.False(t, isLayerLinked(t, r, l))
-}
-
-func TestRepositoryStore_SoftDelete(t *testing.T) {
-	reloadRepositoryFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-
-	r := &models.Repository{ID: 4}
-	err := s.SoftDelete(suite.ctx, r)
-	require.NoError(t, err)
-
-	r, err = s.FindByID(suite.ctx, r.ID)
-	require.NoError(t, err)
-
-	require.True(t, r.DeletedAt.Valid)
-	require.NotEmpty(t, r.DeletedAt.Time)
-}
-
-func TestRepositoryStore_SoftDelete_NotFound(t *testing.T) {
-	s := datastore.NewRepositoryStore(suite.db)
-
-	r := &models.Repository{ID: 100}
-	err := s.SoftDelete(suite.ctx, r)
-	require.EqualError(t, err, "repository not found")
 }
 
 func TestRepositoryStore_Delete(t *testing.T) {

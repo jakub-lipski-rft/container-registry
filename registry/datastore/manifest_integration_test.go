@@ -435,30 +435,6 @@ func TestManifestStore_DissociateLayer_NotAssociatedDoesNotFail(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestManifestStore_SoftDelete(t *testing.T) {
-	reloadManifestFixtures(t)
-
-	s := datastore.NewManifestStore(suite.db)
-
-	m := &models.Manifest{ID: 3}
-	err := s.SoftDelete(suite.ctx, m)
-	require.NoError(t, err)
-
-	m, err = s.FindByID(suite.ctx, m.ID)
-	require.NoError(t, err)
-
-	require.True(t, m.DeletedAt.Valid)
-	require.NotEmpty(t, m.DeletedAt.Time)
-}
-
-func TestManifestStore_SoftDelete_NotFound(t *testing.T) {
-	s := datastore.NewManifestStore(suite.db)
-
-	m := &models.Manifest{ID: 100}
-	err := s.SoftDelete(suite.ctx, m)
-	require.EqualError(t, err, "manifest not found")
-}
-
 func TestManifestStore_Delete(t *testing.T) {
 	reloadManifestFixtures(t)
 

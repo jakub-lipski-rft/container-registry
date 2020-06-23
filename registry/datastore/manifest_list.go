@@ -27,7 +27,6 @@ type ManifestListWriter interface {
 	Mark(ctx context.Context, ml *models.ManifestList) error
 	AssociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error
 	DissociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error
-	SoftDelete(ctx context.Context, ml *models.ManifestList) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -51,7 +50,7 @@ func scanFullManifestList(row *sql.Row) (*models.ManifestList, error) {
 	var digestHex []byte
 	ml := new(models.ManifestList)
 
-	err := row.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &digestHex, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
+	err := row.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &digestHex, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest list: %w", err)
@@ -71,7 +70,7 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 		var digestHex []byte
 		ml := new(models.ManifestList)
 
-		err := rows.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &digestHex, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt, &ml.DeletedAt)
+		err := rows.Scan(&ml.ID, &ml.SchemaVersion, &ml.MediaType, &digestHex, &ml.Payload, &ml.CreatedAt, &ml.MarkedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest list: %w", err)
 		}
@@ -87,7 +86,7 @@ func scanFullManifestLists(rows *sql.Rows) (models.ManifestLists, error) {
 
 // FindByID finds a manifest list by ID.
 func (s *manifestListStore) FindByID(ctx context.Context, id int64) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifest_lists WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
@@ -97,7 +96,7 @@ func (s *manifestListStore) FindByID(ctx context.Context, id int64) (*models.Man
 
 // FindByDigest finds a manifest list by the digest.
 func (s *manifestListStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifest_lists WHERE digest_hex = decode($1, 'hex')`
 
 	row := s.db.QueryRowContext(ctx, q, d.Hex())
@@ -107,7 +106,7 @@ func (s *manifestListStore) FindByDigest(ctx context.Context, d digest.Digest) (
 
 // FindAll finds all manifest lists.
 func (s *manifestListStore) FindAll(ctx context.Context) (models.ManifestLists, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifest_lists`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -132,7 +131,7 @@ func (s *manifestListStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests associated with a manifest list, through the ManifestListItem relationship entity.
 func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at, m.deleted_at
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN manifest_list_items as mli ON mli.manifest_id = m.id
 		JOIN manifest_lists as ml ON ml.id = mli.manifest_list_id
@@ -148,7 +147,7 @@ func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestLi
 
 // Repositories finds all repositories which reference a manifest list.
 func (s *manifestListStore) Repositories(ctx context.Context, ml *models.ManifestList) (models.Repositories, error) {
-	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at, r.deleted_at FROM repositories as r
+	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories as r
 		JOIN repository_manifest_lists as rml ON rml.repository_id = r.id
 		JOIN manifest_lists as ml ON ml.id = rml.manifest_list_id
 		WHERE ml.id = $1`
@@ -232,20 +231,6 @@ func (s *manifestListStore) DissociateManifest(ctx context.Context, ml *models.M
 
 	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating manifest: %w", err)
-	}
-
-	return nil
-}
-
-// SoftDelete soft deletes a manifest list.
-func (s *manifestListStore) SoftDelete(ctx context.Context, ml *models.ManifestList) error {
-	q := "UPDATE manifest_lists SET deleted_at = NOW() WHERE id = $1 RETURNING deleted_at"
-
-	if err := s.db.QueryRowContext(ctx, q, ml.ID).Scan(&ml.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("manifest list not found")
-		}
-		return fmt.Errorf("error soft deleting manifest list: %w", err)
 	}
 
 	return nil
