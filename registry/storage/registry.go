@@ -27,7 +27,7 @@ type registry struct {
 	driver                       storagedriver.StorageDriver
 }
 
-// manifestURLs holds regular expressions for controlling manifest URL whitelisting
+// manifestURLs holds regular expressions for controlling manifest URL allowlisting
 type manifestURLs struct {
 	allow *regexp.Regexp
 	deny  *regexp.Regexp
