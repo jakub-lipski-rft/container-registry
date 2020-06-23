@@ -320,30 +320,6 @@ func TestTagStore_Update_NotFound(t *testing.T) {
 	require.EqualError(t, err, "tag not found")
 }
 
-func TestTagStore_SoftDelete(t *testing.T) {
-	reloadTagFixtures(t)
-
-	s := datastore.NewTagStore(suite.db)
-
-	r := &models.Tag{ID: 1}
-	err := s.SoftDelete(suite.ctx, r)
-	require.NoError(t, err)
-
-	r, err = s.FindByID(suite.ctx, r.ID)
-	require.NoError(t, err)
-
-	require.True(t, r.DeletedAt.Valid)
-	require.NotEmpty(t, r.DeletedAt.Time)
-}
-
-func TestTagStore_SoftDelete_NotFound(t *testing.T) {
-	s := datastore.NewTagStore(suite.db)
-
-	r := &models.Tag{ID: 100}
-	err := s.SoftDelete(suite.ctx, r)
-	require.EqualError(t, err, "tag not found")
-}
-
 func TestTagStore_Delete(t *testing.T) {
 	reloadTagFixtures(t)
 

@@ -3,7 +3,6 @@ package datastore
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
@@ -23,7 +22,6 @@ type TagReader interface {
 type TagWriter interface {
 	Create(ctx context.Context, t *models.Tag) error
 	Update(ctx context.Context, t *models.Tag) error
-	SoftDelete(ctx context.Context, t *models.Tag) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -46,7 +44,7 @@ func NewTagStore(db Queryer) *tagStore {
 func scanFullTag(row *sql.Row) (*models.Tag, error) {
 	t := new(models.Tag)
 
-	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning tag: %w", err)
 		}
@@ -62,7 +60,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 	for rows.Next() {
 		t := new(models.Tag)
-		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning tag: %w", err)
 		}
 		tt = append(tt, t)
@@ -76,7 +74,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 // FindByID finds a Tag by ID.
 func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) {
-	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at FROM tags WHERE id = $1"
+	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at FROM tags WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullTag(row)
@@ -84,7 +82,7 @@ func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) 
 
 // FindAll finds all tags.
 func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
-	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at FROM tags"
+	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at FROM tags"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding tags: %w", err)
@@ -107,7 +105,7 @@ func (s *tagStore) Count(ctx context.Context) (int, error) {
 
 // Repository finds a tag repository.
 func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repository, error) {
-	q := "SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories WHERE id = $1"
+	q := "SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, t.RepositoryID)
 
 	return scanFullRepository(row)
@@ -115,7 +113,7 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 
 // Manifest finds a tag manifest. A tag can be associated with either a manifest or a manifest list.
 func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, t.ManifestID)
@@ -125,7 +123,7 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 
 // ManifestList finds a tag manifest list. A tag can be associated with either a manifest or a manifest list.
 func (s *tagStore) ManifestList(ctx context.Context, t *models.Tag) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifest_lists WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, t.ManifestListID)
@@ -161,20 +159,6 @@ func (s *tagStore) Update(ctx context.Context, t *models.Tag) error {
 	}
 	if n == 0 {
 		return fmt.Errorf("tag not found")
-	}
-
-	return nil
-}
-
-// SoftDelete soft deletes a Tag.
-func (s *tagStore) SoftDelete(ctx context.Context, t *models.Tag) error {
-	q := "UPDATE tags SET deleted_at = NOW() WHERE id = $1 RETURNING deleted_at"
-
-	if err := s.db.QueryRowContext(ctx, q, t.ID).Scan(&t.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("tag not found")
-		}
-		return fmt.Errorf("error soft deleting tag: %w", err)
 	}
 
 	return nil

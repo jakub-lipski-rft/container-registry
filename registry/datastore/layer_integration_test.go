@@ -310,30 +310,6 @@ func TestLayerStore_Mark_NotFound(t *testing.T) {
 	require.EqualError(t, err, "layer not found")
 }
 
-func TestLayerStore_SoftDelete(t *testing.T) {
-	reloadLayerFixtures(t)
-
-	s := datastore.NewLayerStore(suite.db)
-
-	l := &models.Layer{ID: 1}
-	err := s.SoftDelete(suite.ctx, l)
-	require.NoError(t, err)
-
-	l, err = s.FindByID(suite.ctx, l.ID)
-	require.NoError(t, err)
-
-	require.True(t, l.DeletedAt.Valid)
-	require.NotEmpty(t, l.DeletedAt.Time)
-}
-
-func TestLayerStore_SoftDelete_NotFound(t *testing.T) {
-	s := datastore.NewLayerStore(suite.db)
-
-	l := &models.Layer{ID: 100}
-	err := s.SoftDelete(suite.ctx, l)
-	require.EqualError(t, err, "layer not found")
-}
-
 func TestLayerStore_Delete(t *testing.T) {
 	reloadLayerFixtures(t)
 

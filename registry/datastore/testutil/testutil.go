@@ -78,8 +78,7 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 					encode(digest_hex, 'hex') as digest_hex,
 					size,
 					convert_from(payload, 'UTF8')::json AS payload,
-					created_at,
-					deleted_at
+					created_at
 				FROM %s
 			) t;`
 		query = fmt.Sprintf(s, t)
@@ -94,8 +93,7 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 					encode(digest_hex, 'hex') as digest_hex,
 					convert_from(payload, 'UTF8')::json AS payload,
 					created_at,
-					marked_at,
-					deleted_at
+					marked_at
 				FROM %s
 			) t;`
 		query = fmt.Sprintf(s, t)
@@ -110,8 +108,7 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 					encode(digest_hex, 'hex') as digest_hex,
 					convert_from(payload, 'UTF8')::json AS payload,
 					created_at,
-					marked_at,
-					deleted_at
+					marked_at
 				FROM %s
 			) t;`
 		query = fmt.Sprintf(s, t)

@@ -25,7 +25,6 @@ type LayerWriter interface {
 	CreateOrFind(ctx context.Context, l *models.Layer) error
 	Update(ctx context.Context, l *models.Layer) error
 	Mark(ctx context.Context, l *models.Layer) error
-	SoftDelete(ctx context.Context, l *models.Layer) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -49,7 +48,7 @@ func scanFullLayer(row *sql.Row) (*models.Layer, error) {
 	var digestHex []byte
 	l := new(models.Layer)
 
-	if err := row.Scan(&l.ID, &l.MediaType, &digestHex, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt); err != nil {
+	if err := row.Scan(&l.ID, &l.MediaType, &digestHex, &l.Size, &l.CreatedAt, &l.MarkedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scanning layer: %w", err)
 		}
@@ -68,7 +67,7 @@ func scanFullLayers(rows *sql.Rows) (models.Layers, error) {
 		var digestHex []byte
 		l := new(models.Layer)
 
-		err := rows.Scan(&l.ID, &l.MediaType, &digestHex, &l.Size, &l.CreatedAt, &l.MarkedAt, &l.DeletedAt)
+		err := rows.Scan(&l.ID, &l.MediaType, &digestHex, &l.Size, &l.CreatedAt, &l.MarkedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning layer: %w", err)
 		}
@@ -84,7 +83,7 @@ func scanFullLayers(rows *sql.Rows) (models.Layers, error) {
 
 // FindByID finds a layer by ID.
 func (s *layerStore) FindByID(ctx context.Context, id int64) (*models.Layer, error) {
-	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at FROM layers WHERE id = $1"
+	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at FROM layers WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullLayer(row)
@@ -92,7 +91,7 @@ func (s *layerStore) FindByID(ctx context.Context, id int64) (*models.Layer, err
 
 // FindByDigest finds a layer by digest.
 func (s *layerStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Layer, error) {
-	q := `SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at
+	q := `SELECT id, media_type, digest_hex, size, created_at, marked_at
 		FROM layers WHERE digest_hex = decode($1, 'hex')`
 	row := s.db.QueryRowContext(ctx, q, d.Hex())
 
@@ -101,7 +100,7 @@ func (s *layerStore) FindByDigest(ctx context.Context, d digest.Digest) (*models
 
 // FindAll finds all layers.
 func (s *layerStore) FindAll(ctx context.Context) (models.Layers, error) {
-	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at, deleted_at FROM layers"
+	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at FROM layers"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding layers: %w", err)
@@ -124,7 +123,7 @@ func (s *layerStore) Count(ctx context.Context) (int, error) {
 
 // Manifests finds all manifests that reference a layer.
 func (s *layerStore) Manifests(ctx context.Context, l *models.Layer) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at, m.deleted_at
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN manifest_layers as ml ON ml.manifest_id = m.id
 		JOIN layers as l ON l.id = ml.layer_id
@@ -206,20 +205,6 @@ func (s *layerStore) Mark(ctx context.Context, l *models.Layer) error {
 			return errors.New("layer not found")
 		}
 		return fmt.Errorf("error soft deleting layers: %w", err)
-	}
-
-	return nil
-}
-
-// SoftDelete soft deletes a layer.
-func (s *layerStore) SoftDelete(ctx context.Context, l *models.Layer) error {
-	q := "UPDATE layers SET deleted_at = NOW() WHERE id = $1 RETURNING deleted_at"
-
-	if err := s.db.QueryRowContext(ctx, q, l.ID).Scan(&l.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("layer not found")
-		}
-		return fmt.Errorf("error soft deleting layer: %w", err)
 	}
 
 	return nil

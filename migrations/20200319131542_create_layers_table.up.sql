@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS layers
     size       bigint                   NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     marked_at  timestamp with time zone,
-    deleted_at timestamp with time zone,
     CONSTRAINT pk_layers PRIMARY KEY (id),
     CONSTRAINT uq_layers_digest_hex UNIQUE (digest_hex),
     CONSTRAINT ck_layers_media_type_length CHECK ((char_length(media_type) <= 255))

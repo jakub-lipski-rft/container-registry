@@ -319,30 +319,6 @@ func TestManifestListStore_DissociateManifest_NotAssociatedDoesNotFail(t *testin
 	require.NoError(t, err)
 }
 
-func TestManifestListStore_SoftDelete(t *testing.T) {
-	reloadManifestListFixtures(t)
-
-	s := datastore.NewManifestListStore(suite.db)
-
-	r := &models.ManifestList{ID: 1}
-	err := s.SoftDelete(suite.ctx, r)
-	require.NoError(t, err)
-
-	r, err = s.FindByID(suite.ctx, r.ID)
-	require.NoError(t, err)
-
-	require.True(t, r.DeletedAt.Valid)
-	require.NotEmpty(t, r.DeletedAt.Time)
-}
-
-func TestManifestListStore_SoftDelete_NotFound(t *testing.T) {
-	s := datastore.NewManifestListStore(suite.db)
-
-	r := &models.ManifestList{ID: 100}
-	err := s.SoftDelete(suite.ctx, r)
-	require.EqualError(t, err, "manifest list not found")
-}
-
 func TestManifestListStore_Delete(t *testing.T) {
 	reloadManifestListFixtures(t)
 

@@ -29,7 +29,6 @@ type ManifestWriter interface {
 	Mark(ctx context.Context, m *models.Manifest) error
 	AssociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error
 	DissociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error
-	SoftDelete(ctx context.Context, m *models.Manifest) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -53,8 +52,7 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 	var digestHex []byte
 	m := new(models.Manifest)
 
-	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt,
-		&m.DeletedAt)
+	err := row.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest: %w", err)
@@ -74,8 +72,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 		var digestHex []byte
 		m := new(models.Manifest)
 
-		err := rows.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt,
-			&m.DeletedAt)
+		err := rows.Scan(&m.ID, &m.SchemaVersion, &m.MediaType, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest: %w", err)
 		}
@@ -91,7 +88,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 
 // FindByID finds a Manifest by ID.
 func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
@@ -101,7 +98,7 @@ func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifes
 
 // FindByDigest finds a Manifest by the digest.
 func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifests WHERE digest_hex = decode($1, 'hex')`
 
 	row := s.db.QueryRowContext(ctx, q, d.Hex())
@@ -111,7 +108,7 @@ func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*mod
 
 // FindAll finds all manifests.
 func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifests`
 
 	rows, err := s.db.QueryContext(ctx, q)
@@ -136,7 +133,7 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 
 // Config finds the manifest configuration.
 func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error) {
-	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at
+	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at
 		FROM manifest_configurations WHERE manifest_id = $1`
 	row := s.db.QueryRowContext(ctx, q, m.ID)
 
@@ -145,7 +142,7 @@ func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models
 
 // Layers finds layers associated with a manifest, through the ManifestLayer relationship entity.
 func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.Layers, error) {
-	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at, l.deleted_at FROM layers as l
+	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at FROM layers as l
 		JOIN manifest_layers as ml ON ml.layer_id = l.id
 		JOIN manifests as m ON m.id = ml.manifest_id
 		WHERE m.id = $1`
@@ -160,8 +157,8 @@ func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.
 
 // Lists finds all manifest lists which reference a manifest, through the ManifestListItem relationship entity.
 func (s *manifestStore) Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at,
-		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
+		FROM manifest_lists as ml
 		JOIN manifest_list_items as mli ON mli.manifest_list_id = ml.id
 		JOIN manifests as m ON m.id = mli.manifest_id
 		WHERE m.id = $1`
@@ -176,7 +173,7 @@ func (s *manifestStore) Lists(ctx context.Context, m *models.Manifest) (models.M
 
 // Repositories finds all repositories which reference a manifest.
 func (s *manifestStore) Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error) {
-	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at, r.deleted_at FROM repositories as r
+	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories as r
 		JOIN repository_manifests as rm ON rm.repository_id = r.id
 		JOIN manifests as m ON m.id = rm.manifest_id
 		WHERE m.id = $1`
@@ -261,20 +258,6 @@ func (s *manifestStore) DissociateLayer(ctx context.Context, m *models.Manifest,
 
 	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error dissociating layer: %w", err)
-	}
-
-	return nil
-}
-
-// SoftDelete soft deletes a Manifest.
-func (s *manifestStore) SoftDelete(ctx context.Context, m *models.Manifest) error {
-	q := "UPDATE manifests SET deleted_at = NOW() WHERE id = $1 RETURNING deleted_at"
-
-	if err := s.db.QueryRowContext(ctx, q, m.ID).Scan(&m.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("manifest not found")
-		}
-		return fmt.Errorf("error soft deleting manifest: %w", err)
 	}
 
 	return nil

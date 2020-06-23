@@ -34,7 +34,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <schema name="public" layer="0" rect-visible="true" fill-color="#e1e1e1" sql-disabled="true">
 </schema>
 
-<table name="repositories" layer="0" collapse-mode="2" max-obj-count="7">
+<table name="repositories" layer="0" collapse-mode="2" max-obj-count="6">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="851.909" y="27.1818"/>
@@ -54,9 +54,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_repositories" type="pk-constr" table="public.repositories">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -71,7 +68,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_configurations" layer="0" collapse-mode="2" max-obj-count="9">
+<table name="manifest_configurations" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="614.545" y="882.182"/>
@@ -97,9 +94,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_manifest_configurations" type="pk-constr" table="public.manifest_configurations">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -114,7 +108,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifests" layer="0" collapse-mode="2" max-obj-count="9">
+<table name="manifests" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="407.909" y="420.182"/>
@@ -140,9 +134,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="marked_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_manifests" type="pk-constr" table="public.manifests">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -154,7 +145,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="layers" layer="0" collapse-mode="1" max-obj-count="8">
+<table name="layers" layer="0" collapse-mode="1" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="52.5455" y="625.818"/>
@@ -177,9 +168,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="marked_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_layers" type="pk-constr" table="public.layers">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -191,7 +179,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_layers" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="manifest_layers" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="229.455" y="880.454"/>
@@ -208,9 +196,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_manifest_layers" type="pk-constr" table="public.manifest_layers">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -219,7 +204,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_lists" layer="0" collapse-mode="2" max-obj-count="9">
+<table name="manifest_lists" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="1290.91" y="425.182"/>
@@ -245,9 +230,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="marked_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -259,7 +241,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_list_items" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="manifest_list_items" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="788" y="627.182"/>
@@ -276,9 +258,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_manifest_list_items" type="pk-constr" table="public.manifest_list_items">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -287,7 +266,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="tags" layer="0" collapse-mode="2" max-obj-count="9">
+<table name="tags" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="824.909" y="293.182"/>
@@ -313,9 +292,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="updated_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_tags" type="pk-constr" table="public.tags">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -330,7 +306,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="repository_manifests" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="repository_manifests" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="359.909" y="60.1818"/>
@@ -347,9 +323,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="deleted_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
 	<constraint name="pk_repository_manifests" type="pk-constr" table="public.repository_manifests">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
@@ -358,7 +331,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="repository_manifest_lists" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="repository_manifest_lists" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="1233.91" y="60.1818"/>
@@ -373,9 +346,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<column name="deleted_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
 	<constraint name="pk_repository_manifest_lists" type="pk-constr" table="public.repository_manifest_lists">
@@ -482,7 +452,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<table name="repository_layers" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="repository_layers" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="5.45455" y="354.545"/>
@@ -497,9 +467,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<column name="deleted_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
 	<constraint name="pk_repository_layers" type="pk-constr" table="public.repository_layers">
@@ -621,9 +588,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.repositories" reference-fk="fk_repositories_parent_id_repositories"
 	 src-required="false" dst-required="false">
 	<line>
-		<position x="1210.18" y="101.998"/>
-	<position x="1210.18" y="-0.929293"/>
-	<position x="1072.02" y="-0.929293"/>
+		<position x="1210.18" y="97.1318"/>
+	<position x="1210.18" y="-0.929311"/>
+	<position x="1072.02" y="-0.929311"/>
 	</line>
 </relationship>
 

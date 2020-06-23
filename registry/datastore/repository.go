@@ -3,7 +3,6 @@ package datastore
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -52,7 +51,6 @@ type RepositoryWriter interface {
 	UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	LinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error
 	UnlinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error
-	SoftDelete(ctx context.Context, r *models.Repository) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -76,7 +74,7 @@ func NewRepositoryStore(db Queryer) *repositoryStore {
 func scanFullRepository(row *sql.Row) (*models.Repository, error) {
 	r := new(models.Repository)
 
-	if err := row.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.DeletedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scanning repository: %w", err)
 		}
@@ -92,7 +90,7 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 
 	for rows.Next() {
 		r := new(models.Repository)
-		if err := rows.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.DeletedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning repository: %w", err)
 		}
 		rr = append(rr, r)
@@ -106,7 +104,7 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 
 // FindByID finds a repository by ID.
 func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repository, error) {
-	q := "SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories WHERE id = $1"
+	q := "SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullRepository(row)
@@ -114,7 +112,7 @@ func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repos
 
 // FindByPath finds a repository by path.
 func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.Repository, error) {
-	q := "SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories WHERE path = $1"
+	q := "SELECT id, name, path, parent_id, created_at FROM repositories WHERE path = $1"
 	row := s.db.QueryRowContext(ctx, q, path)
 
 	return scanFullRepository(row)
@@ -122,7 +120,7 @@ func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.
 
 // FindAll finds all repositories.
 func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, error) {
-	q := "SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories"
+	q := "SELECT id, name, path, parent_id, created_at FROM repositories"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding repositories: %w", err)
@@ -138,7 +136,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 // repositories are lexicographically sorted. These constraints exists to preserve the existing API behaviour (when
 // doing a filesystem walk based pagination).
 func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
-	q := `SELECT DISTINCT r.id, r.name, r.path, r.parent_id, r.created_at, r.deleted_at 
+	q := `SELECT DISTINCT r.id, r.name, r.path, r.parent_id, r.created_at
 		FROM repositories AS r
 	 	LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
 	 	LEFT JOIN repository_manifest_lists AS rml ON r.id = rml.repository_id
@@ -157,7 +155,7 @@ func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastP
 // FindDescendantsOf finds all descendants of a given repository.
 func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE descendants AS (
-		SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories WHERE id = $1
+		SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1
 		UNION ALL
 		SELECT repositories.* FROM repositories
 		JOIN descendants ON descendants.id = repositories.parent_id
@@ -174,7 +172,7 @@ func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (mode
 // FindAncestorsOf finds all ancestors of a given repository.
 func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE ancestors AS (
-		SELECT id, name, path, parent_id, created_at, deleted_at FROM repositories  WHERE id = $1
+		SELECT id, name, path, parent_id, created_at FROM repositories  WHERE id = $1
 		UNION ALL
 		SELECT repositories.* FROM repositories
 		JOIN ancestors ON ancestors.parent_id = repositories.id
@@ -190,7 +188,7 @@ func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models
 
 // FindSiblingsOf finds all siblings of a given repository.
 func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.Repositories, error) {
-	q := `SELECT siblings.id, siblings.name, siblings.path, siblings.parent_id, siblings.created_at, siblings.deleted_at
+	q := `SELECT siblings.id, siblings.name, siblings.path, siblings.parent_id, siblings.created_at
 		FROM repositories siblings
 		LEFT JOIN repositories anchor ON siblings.parent_id = anchor.parent_id
 		WHERE anchor.id = $1 AND siblings.id != $1`
@@ -205,7 +203,7 @@ func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.
 
 // Tags finds all tags of a given repository.
 func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
@@ -222,7 +220,7 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 // lastName. Finally, tags are lexicographically sorted. These constraints exists to preserve the existing API behaviour
 // (when doing a filesystem walk based pagination).
 func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND name > $2 ORDER BY name LIMIT $3`
 	rows, err := s.db.QueryContext(ctx, q, r.ID, lastName, limit)
 	if err != nil {
@@ -250,7 +248,7 @@ func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repo
 
 // ManifestTags finds all tags of a given repository manifest.
 func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND manifest_id = $2`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID, m.ID)
@@ -263,7 +261,7 @@ func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository
 
 // ManifestListTags finds all tags of a given repository manifest list.
 func (s *repositoryStore) ManifestListTags(ctx context.Context, r *models.Repository, ml *models.ManifestList) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND manifest_list_id = $2`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID, ml.ID)
@@ -308,7 +306,7 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 
 // Manifests finds all manifests associated with a repository.
 func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at, m.deleted_at
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories as r ON r.id = rm.repository_id
@@ -324,8 +322,8 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 
 // ManifestLists finds all manifest lists associated with a repository.
 func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at,
-		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
+		FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
 		JOIN repositories as r ON r.id = rml.repository_id
 		WHERE r.id = $1`
@@ -340,7 +338,7 @@ func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repositor
 
 // FindManifestByDigest finds a manifest by digest within a repository.
 func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at, m.deleted_at
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories as r ON r.id = rm.repository_id
@@ -352,8 +350,8 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 
 // FindManifestListByDigest finds a manifest list by digest within a repository.
 func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at,
-		ml.marked_at, ml.deleted_at FROM manifest_lists as ml
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
+		FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
 		JOIN repositories as r ON r.id = rml.repository_id
 		WHERE r.id = $1 AND ml.digest_hex = decode($2, 'hex')`
@@ -364,7 +362,7 @@ func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *model
 
 // Layers finds all layers associated with the repository.
 func (s *repositoryStore) Layers(ctx context.Context, r *models.Repository) (models.Layers, error) {
-	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at, l.deleted_at 
+	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at
 		FROM layers as l
 		JOIN repository_layers as rl ON rl.layer_id = l.id
 		JOIN repositories as r ON r.id = rl.repository_id
@@ -392,7 +390,7 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 
 // FindTagByName finds a tag by name within a repository.
 func (s *repositoryStore) FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at, deleted_at
+	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND name = $2`
 	row := s.db.QueryRowContext(ctx, q, r.ID, name)
 
@@ -644,20 +642,6 @@ func (s *repositoryStore) UnlinkLayer(ctx context.Context, r *models.Repository,
 
 	if _, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("error linking layer: %w", err)
-	}
-
-	return nil
-}
-
-// SoftDelete soft deletes a repository.
-func (s *repositoryStore) SoftDelete(ctx context.Context, r *models.Repository) error {
-	q := "UPDATE repositories SET deleted_at = NOW() WHERE id = $1 RETURNING deleted_at"
-
-	if err := s.db.QueryRowContext(ctx, q, r.ID).Scan(&r.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("repository not found")
-		}
-		return fmt.Errorf("error soft deleting repository: %w", err)
 	}
 
 	return nil

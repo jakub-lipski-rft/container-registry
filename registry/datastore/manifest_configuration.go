@@ -3,7 +3,6 @@ package datastore
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
@@ -23,7 +22,6 @@ type ManifestConfigurationReader interface {
 type ManifestConfigurationWriter interface {
 	Create(ctx context.Context, c *models.ManifestConfiguration) error
 	Update(ctx context.Context, c *models.ManifestConfiguration) error
-	SoftDelete(ctx context.Context, c *models.ManifestConfiguration) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -46,7 +44,7 @@ func NewManifestConfigurationStore(db Queryer) *manifestConfigurationStore {
 func scanFullManifestConfiguration(row *sql.Row) (*models.ManifestConfiguration, error) {
 	var digestHex []byte
 	c := new(models.ManifestConfiguration)
-	err := row.Scan(&c.ID, &c.ManifestID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt)
+	err := row.Scan(&c.ID, &c.ManifestID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest configuration: %w", err)
@@ -65,7 +63,7 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 	for rows.Next() {
 		var digestHex []byte
 		c := new(models.ManifestConfiguration)
-		err := rows.Scan(&c.ID, &c.ManifestID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt, &c.DeletedAt)
+		err := rows.Scan(&c.ID, &c.ManifestID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest configuration: %w", err)
 		}
@@ -81,7 +79,7 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 
 // FindByID finds a manifest configuration by ID.
 func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int64) (*models.ManifestConfiguration, error) {
-	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at
+	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at
 		FROM manifest_configurations WHERE id = $1`
 	row := s.db.QueryRowContext(ctx, q, id)
 
@@ -90,7 +88,7 @@ func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int64) (*m
 
 // FindByDigest finds a manifest configuration by the digest.
 func (s *manifestConfigurationStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestConfiguration, error) {
-	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at
+	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at
 		FROM manifest_configurations WHERE digest_hex = decode($1, 'hex')`
 	row := s.db.QueryRowContext(ctx, q, d.Hex())
 
@@ -99,7 +97,7 @@ func (s *manifestConfigurationStore) FindByDigest(ctx context.Context, d digest.
 
 // FindAll finds all manifest configurations.
 func (s *manifestConfigurationStore) FindAll(ctx context.Context) (models.ManifestConfigurations, error) {
-	q := "SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at, deleted_at FROM manifest_configurations"
+	q := "SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at FROM manifest_configurations"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding manifest configurations: %w", err)
@@ -122,7 +120,7 @@ func (s *manifestConfigurationStore) Count(ctx context.Context) (int, error) {
 
 // Manifest finds the manifest that the configuration belongs to.
 func (s *manifestConfigurationStore) Manifest(ctx context.Context, c *models.ManifestConfiguration) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at, deleted_at
+	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
 		FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, c.ManifestID)
@@ -159,20 +157,6 @@ func (s *manifestConfigurationStore) Update(ctx context.Context, c *models.Manif
 	}
 	if n == 0 {
 		return fmt.Errorf("manifest configuration not found")
-	}
-
-	return nil
-}
-
-// SoftDelete soft deletes a manifest configuration.
-func (s *manifestConfigurationStore) SoftDelete(ctx context.Context, c *models.ManifestConfiguration) error {
-	q := "UPDATE manifest_configurations SET deleted_at = NOW() WHERE id = $1 RETURNING deleted_at"
-
-	if err := s.db.QueryRowContext(ctx, q, c.ID).Scan(&c.DeletedAt); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.New("manifest configuration not found")
-		}
-		return fmt.Errorf("error soft deleting manifest configuration: %w", err)
 	}
 
 	return nil

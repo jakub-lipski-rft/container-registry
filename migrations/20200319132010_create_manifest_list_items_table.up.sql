@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS manifest_list_items
     manifest_list_id bigint                   NOT NULL,
     manifest_id      bigint                   NOT NULL,
     created_at       timestamp with time zone NOT NULL DEFAULT now(),
-    deleted_at       timestamp with time zone,
     CONSTRAINT pk_manifest_list_items PRIMARY KEY (id),
     CONSTRAINT fk_manifest_list_items_manifest_list_id_manifest_lists FOREIGN KEY (manifest_list_id)
         REFERENCES manifest_lists (id) ON DELETE CASCADE,

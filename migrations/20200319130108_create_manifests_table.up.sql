@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS manifests
     payload        bytea                    NOT NULL,
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
     marked_at      timestamp with time zone,
-    deleted_at     timestamp with time zone,
     CONSTRAINT pk_manifests PRIMARY KEY (id),
     CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex),
     CONSTRAINT ck_manifests_media_type_length CHECK ((char_length(media_type) <= 255))

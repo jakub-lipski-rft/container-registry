@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS repository_layers
     repository_id bigint                   NOT NULL,
     layer_id      bigint                   NOT NULL,
     created_at    timestamp with time zone NOT NULL DEFAULT now(),
-    deleted_at    timestamp with time zone,
     CONSTRAINT pk_repository_layers PRIMARY KEY (id),
     CONSTRAINT fk_repository_layers_repository_id_repositories FOREIGN KEY (repository_id)
         REFERENCES repositories (id) ON DELETE CASCADE,
