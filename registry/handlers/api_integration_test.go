@@ -1640,7 +1640,353 @@ func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
 	require.NotEqual(t, originalPayload, newPayload)
 }
 
-func TestManifestAPI_Get_Schema2MissingManifest(t *testing.T) {
+func TestManifestAPI_Put_Schema2ByTag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2happypathtag"
+	repoPath := "schema2/happypath"
+
+	// putRandomSchema2ManifestByTag tests that the manifest put happened without issue.
+	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+}
+
+func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	repoPath := "schema2/happypath"
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoRef)
+	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, repoRef)
+		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	// Build URL.
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	digestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	resp := putManifest(t, "putting manifest by digest no error", digestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, digestURL, resp.Header.Get("Location"))
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
+func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2missingconfigtag"
+	repoPath := "schema2/missingconfig"
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config but do not push up its content.
+	_, cfgDesc := schema2Config()
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, repoRef)
+		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	// Build URLs.
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	tagURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	digestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+
+			// Push up the manifest with only the layer blobs pushed up.
+			resp := putManifest(t, "putting missing config manifest", test.manifestURL, schema2.MediaTypeManifest, manifest)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+			// Test that we have one missing blob.
+			_, p, counts := checkBodyHasErrorCodes(t, "putting missing config manifest", resp, v2.ErrorCodeManifestBlobUnknown)
+			expectedCounts := map[errcode.ErrorCode]int{v2.ErrorCodeManifestBlobUnknown: 1}
+
+			require.EqualValuesf(t, expectedCounts, counts, "response body: %s", p)
+		})
+	}
+}
+
+func TestManifestAPI_Put_Schema2MissingLayers(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2missinglayerstag"
+	repoPath := "schema2/missinglayers"
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoRef)
+	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers, but do not push their content.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		_, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	// Build URLs.
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	tagURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	digestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+
+			// Push up the manifest with only the config blob pushed up.
+			resp := putManifest(t, "putting missing layers", test.manifestURL, schema2.MediaTypeManifest, manifest)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+			// Test that we have two missing blobs, one for each layer.
+			_, p, counts := checkBodyHasErrorCodes(t, "putting missing config manifest", resp, v2.ErrorCodeManifestBlobUnknown)
+			expectedCounts := map[errcode.ErrorCode]int{v2.ErrorCodeManifestBlobUnknown: 2}
+
+			require.EqualValuesf(t, expectedCounts, counts, "response body: %s", p)
+		})
+	}
+}
+
+func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2missingconfigandlayerstag"
+	repoPath := "schema2/missingconfigandlayers"
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config, but do not push up its content.
+	_, cfgDesc := schema2Config()
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers, but do not push thier content.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		_, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	// Build URLs.
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	tagURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	digestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+
+			// Push up the manifest with only the config blob pushed up.
+			resp := putManifest(t, "putting missing layers", test.manifestURL, schema2.MediaTypeManifest, manifest)
+			defer resp.Body.Close()
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+			// Test that we have two missing blobs, one for each layer, and one for the config.
+			_, p, counts := checkBodyHasErrorCodes(t, "putting missing config manifest", resp, v2.ErrorCodeManifestBlobUnknown)
+			expectedCounts := map[errcode.ErrorCode]int{v2.ErrorCodeManifestBlobUnknown: 3}
+
+			require.EqualValuesf(t, expectedCounts, counts, "response body: %s", p)
+		})
+	}
+}
+
+func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
 
@@ -1776,7 +2122,7 @@ func TestManifestAPI_Get_Schema2ByTagMissingTag(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ManifestByDigestNotAssociatedWithRepository(t *testing.T) {
+func TestManifestAPI_Get_Schema2ByDigestNotAssociatedWithRepository(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
 
@@ -1818,7 +2164,7 @@ func TestManifestAPI_Get_Schema2ManifestByDigestNotAssociatedWithRepository(t *t
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ManifestByTagNotAssociatedWithRepository(t *testing.T) {
+func TestManifestAPI_Get_Schema2ByTagNotAssociatedWithRepository(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
 
@@ -2020,17 +2366,13 @@ func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
 
 // TODO: Break out logic from testManifestAPISchema2 into these tests.
 // https://gitlab.com/gitlab-org/container-registry/-/issues/140
-func TestManifestAPI_Put_Schema2WithDigest(t *testing.T)        {}
-func TestManifestAPI_Put_Schema2WithTag(t *testing.T)           {}
-func TestManifestAPI_Put_Schema2MissingRepository(t *testing.T) {}
-func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T)     {}
-func TestManifestAPI_Put_Schema2MissingLayer(t *testing.T)      {}
-
-func TestManifestAPI_Get_Schema2ByDigest(t *testing.T)            {}
-func TestManifestAPI_Get_Schema2ByTag(t *testing.T)               {}
-func TestManifestAPI_Get_Schema2ByDigestEtagMatches(t *testing.T) {}
-func TestManifestAPI_Get_Schema2ByTagEtagMatches(t *testing.T)    {}
-func TestManifestAPI_Get_Schema2AsSchema1(t *testing.T)           {}
+func TestManifestAPI_Get_Schema2ByDigest(t *testing.T)             {}
+func TestManifestAPI_Get_Schema2ByTag(t *testing.T)                {}
+func TestManifestAPI_Get_Schema2ByDigestEtagMatches(t *testing.T)  {}
+func TestManifestAPI_Get_Schema2ByTagEtagMatches(t *testing.T)     {}
+func TestManifestAPI_Get_Schema2ByDigestAsSchema1(t *testing.T)    {}
+func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T)       {}
+func TestManifestAPI_Get_Schema2ByTagMissingManifest(t *testing.T) {}
 
 // TODO: Break out logic from testManifestDelete into these tests.
 // https://gitlab.com/gitlab-org/container-registry/-/issues/144
@@ -2070,8 +2412,10 @@ func schema2Config() ([]byte, distribution.Descriptor) {
 }
 
 // seedRandomSchema2Manifest generates a random schema2 manifest and puts its config and layers.
-func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoName string) *schema2.DeserializedManifest {
-	repoPath, err := reference.WithName(repoName)
+func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string) *schema2.DeserializedManifest {
+	t.Helper()
+
+	repoRef, err := reference.WithName(repoPath)
 	require.NoError(t, err)
 
 	manifest := &schema2.Manifest{
@@ -2083,8 +2427,8 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoName string) *sch
 
 	// Create a manifest config and push up its content.
 	cfgPayload, cfgDesc := schema2Config()
-	uploadURLBase, _ := startPushLayer(t, env, repoPath)
-	pushLayer(t, env.builder, repoPath, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	uploadURLBase, _ := startPushLayer(t, env, repoRef)
+	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
 	manifest.Config = cfgDesc
 
 	// Create and push up 2 random layers.
@@ -2096,8 +2440,8 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoName string) *sch
 
 		dgst := digest.Digest(dgstStr)
 
-		uploadURLBase, _ := startPushLayer(t, env, repoPath)
-		pushLayer(t, env.builder, repoPath, dgst, uploadURLBase, rs)
+		uploadURLBase, _ := startPushLayer(t, env, repoRef)
+		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
 
 		manifest.Layers[i] = distribution.Descriptor{
 			Digest:    dgst,
@@ -2114,26 +2458,27 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoName string) *sch
 // putRandomSchema2ManifestByTag creates a random valid schema2 manifest, its
 // config, its layers, and puts them. It returns a the tag referenced url at
 // which the manifest is accessible and the serialized form of the manifest.
-func putRandomSchema2ManifestByTag(t *testing.T, env *testEnv, repoName, tagName string) *schema2.DeserializedManifest {
-	repoPath, err := reference.WithName(repoName)
+func putRandomSchema2ManifestByTag(t *testing.T, env *testEnv, repoPath, tagName string) *schema2.DeserializedManifest {
+	t.Helper()
+
+	repoRef, err := reference.WithName(repoPath)
 	require.NoError(t, err)
 
-	tagRef, err := reference.WithTag(repoPath, tagName)
+	tagRef, err := reference.WithTag(repoRef, tagName)
 	require.NoError(t, err)
 
 	manifestURL, err := env.builder.BuildManifestURL(tagRef)
 	require.NoError(t, err)
 
 	// Push up a random manifest by tag.
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoName)
-	require.NoError(t, err)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
 
 	_, payload, err := deserializedManifest.Payload()
 	require.NoError(t, err)
 
 	dgst := digest.FromBytes(payload)
 
-	digestRef, err := reference.WithDigest(repoPath, dgst)
+	digestRef, err := reference.WithDigest(repoRef, dgst)
 	require.NoError(t, err)
 
 	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
@@ -3598,19 +3943,16 @@ func checkResponse(t *testing.T, msg string, resp *http.Response, expectedStatus
 // expected error codes, returning the error structure, the json slice and a
 // count of the errors by code.
 func checkBodyHasErrorCodes(t *testing.T, msg string, resp *http.Response, errorCodes ...errcode.ErrorCode) (errcode.Errors, []byte, map[errcode.ErrorCode]int) {
+	t.Helper()
+
 	p, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("unexpected error reading body %s: %v", msg, err)
-	}
+	require.NoError(t, err)
 
 	var errs errcode.Errors
-	if err := json.Unmarshal(p, &errs); err != nil {
-		t.Fatalf("unexpected error decoding error response: %v", err)
-	}
+	err = json.Unmarshal(p, &errs)
+	require.NoError(t, err)
 
-	if len(errs) == 0 {
-		t.Fatalf("expected errors in response")
-	}
+	require.NotEmpty(t, errs, "expected errors in response")
 
 	// TODO(stevvooe): Shoot. The error setup is not working out. The content-
 	// type headers are being set after writing the status code.
@@ -3630,20 +3972,17 @@ func checkBodyHasErrorCodes(t *testing.T, msg string, resp *http.Response, error
 
 	for _, e := range errs {
 		err, ok := e.(errcode.ErrorCoder)
-		if !ok {
-			t.Fatalf("not an ErrorCoder: %#v", e)
-		}
-		if _, ok := expected[err.ErrorCode()]; !ok {
-			t.Fatalf("unexpected error code %v encountered during %s: %s ", err.ErrorCode(), msg, string(p))
-		}
+		require.Truef(t, ok, "not an ErrorCoder: %#v", e)
+
+		_, ok = expected[err.ErrorCode()]
+		require.Truef(t, ok, "unexpected error code %v encountered during %s: %s ", err.ErrorCode(), msg, p)
+
 		counts[err.ErrorCode()]++
 	}
 
 	// Ensure that counts of expected errors were all non-zero
 	for code := range expected {
-		if counts[code] == 0 {
-			t.Fatalf("expected error code %v not encountered during %s: %s", code, msg, string(p))
-		}
+		require.NotZerof(t, counts[code], "expected error code %v not encountered during %s: %s", code, msg, p)
 	}
 
 	return errs, p, counts

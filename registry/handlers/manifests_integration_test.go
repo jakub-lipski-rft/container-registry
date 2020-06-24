@@ -161,23 +161,6 @@ func newEnv(t *testing.T) *env {
 	return env
 }
 
-func TestTagManifest_Schema2(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	repoPath := "manifestdb/tagschema2"
-	tagName := "tagschema2"
-
-	// Upload schema2 manifest and tag it.
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-
-	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
-	require.NoError(t, err)
-
-	verifyManifestTag(t, env, manifestDigest, tagName, repoPath)
-}
-
 func TestTagManifest_Schema1(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
@@ -359,91 +342,6 @@ func TestTagManifestList_MissingManifestList(t *testing.T) {
 	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
 	require.NoError(t, err)
 	require.Nil(t, dbTag)
-}
-
-func TestPutManifestSchema2(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-
-	repoPath := "manifestdb/happypath"
-	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-
-	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
-}
-
-func TestPutManifestSchema2_Idempotent(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-	repoPath := "manifestdb/idempotent"
-
-	manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
-
-	manifestDigest = env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-	verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
-}
-
-func TestPutManifestSchema2_MultipleRepositories(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-
-	repoBasePath := "manifestdb/multirepo"
-
-	for i := 0; i < 10; i++ {
-		repoPath := fmt.Sprintf("%s%d", repoBasePath, i)
-		manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-
-		verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
-	}
-}
-
-func TestPutManifestSchema2_MultipleManifests(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	repoPath := "manifestdb/multimanifest"
-
-	for i := 0; i < 10; i++ {
-		manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-		manifestDigest := env.uploadSchema2ManifestToDB(t, manifest, cfgPayload, repoPath)
-
-		verifySchema2Manifest(t, env, manifestDigest, manifest, cfgPayload, repoPath)
-	}
-}
-
-func TestPutManifestSchema2_MissingLayer(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
-
-	layerStore := datastore.NewLayerStore(env.db)
-
-	// Remove layer from database before uploading manifest
-	dbLayer, err := layerStore.FindByDigest(env.ctx, manifest.Layers[0].Digest)
-	require.NoError(t, err)
-	require.NotNil(t, dbLayer)
-
-	layerStore.Delete(env.ctx, dbLayer.ID)
-	require.NoError(t, err)
-
-	// Try to put manifest with missing layer.
-	dManifest, err := schema2.FromStruct(manifest)
-	require.NoError(t, err)
-
-	path, err := reference.WithName("manifestdb/missinglayer")
-	require.NoError(t, err)
-	_, mPayload, err := dManifest.Payload()
-	require.NoError(t, err)
-
-	err = dbPutManifestSchema2(env.ctx, env.db, dManifest.Target().Digest, dManifest, mPayload, cfgPayload, path)
-	assert.Error(t, err)
 }
 
 func TestPutManifestSchema1(t *testing.T) {
