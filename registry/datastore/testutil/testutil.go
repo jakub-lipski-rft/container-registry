@@ -74,11 +74,11 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 				SELECT
 					id,
 					manifest_id,
-					media_type,
-					encode(digest_hex, 'hex') as digest_hex,
 					size,
+					created_at,
+					encode(digest_hex, 'hex') as digest_hex,
 					convert_from(payload, 'UTF8')::json AS payload,
-					created_at
+					media_type
 				FROM %s
 			) t;`
 		query = fmt.Sprintf(s, t)
@@ -88,12 +88,12 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 			FROM (
 				SELECT
 					id,
+					created_at,
+					marked_at,
 					schema_version,
-					media_type,
 					encode(digest_hex, 'hex') as digest_hex,
 					convert_from(payload, 'UTF8')::json AS payload,
-					created_at,
-					marked_at
+					media_type
 				FROM %s
 			) t;`
 		query = fmt.Sprintf(s, t)
@@ -103,12 +103,12 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 			FROM (
 				SELECT
 					id,
+					created_at,
+					marked_at,
 					schema_version,
-					media_type,
 					encode(digest_hex, 'hex') as digest_hex,
 					convert_from(payload, 'UTF8')::json AS payload,
-					created_at,
-					marked_at
+					media_type
 				FROM %s
 			) t;`
 		query = fmt.Sprintf(s, t)
