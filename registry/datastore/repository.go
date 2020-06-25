@@ -157,8 +157,8 @@ func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (mode
 	q := `WITH RECURSIVE descendants AS (
 		SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1
 		UNION ALL
-		SELECT repositories.* FROM repositories
-		JOIN descendants ON descendants.id = repositories.parent_id
+		SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories AS r
+		JOIN descendants ON descendants.id = r.parent_id
 		) SELECT * FROM descendants WHERE descendants.id != $1`
 
 	rows, err := s.db.QueryContext(ctx, q, id)
@@ -174,8 +174,8 @@ func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models
 	q := `WITH RECURSIVE ancestors AS (
 		SELECT id, name, path, parent_id, created_at FROM repositories  WHERE id = $1
 		UNION ALL
-		SELECT repositories.* FROM repositories
-		JOIN ancestors ON ancestors.parent_id = repositories.id
+		SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories AS r
+		JOIN ancestors ON ancestors.parent_id = r.id
 		) SELECT * FROM ancestors WHERE ancestors.id != $1`
 
 	rows, err := s.db.QueryContext(ctx, q, id)
