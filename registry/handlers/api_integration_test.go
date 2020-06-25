@@ -1531,28 +1531,17 @@ func TestManifestAPI_Put_ByTagIsIdempotent(t *testing.T) {
 	tagName := "idempotentag"
 	repoPath := "schema2/idempotent"
 
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
 	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
 
 	// Build URLs and headers.
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	manifestURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
 
 	_, payload, err := deserializedManifest.Payload()
 	require.NoError(t, err)
 
 	dgst := digest.FromBytes(payload)
 
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	manifestDigestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 
 	// Put the same manifest twice to test idempotentcy.
 	resp := putManifest(t, "putting manifest by tag no error", manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
@@ -1580,14 +1569,7 @@ func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
 	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
 
 	// Fetch original manifest by tag name
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	manifestURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
 
 	req, err := http.NewRequest("GET", manifestURL, nil)
 	require.NoError(t, err)
@@ -1700,11 +1682,7 @@ func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
 
 	dgst := digest.FromBytes(payload)
 
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	digestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 
 	resp := putManifest(t, "putting manifest by digest no error", digestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
 	defer resp.Body.Close()
@@ -1754,25 +1732,12 @@ func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T) {
 	}
 
 	// Build URLs.
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	tagURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
 
 	deserializedManifest, err := schema2.FromStruct(*manifest)
 	require.NoError(t, err)
 
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	digestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 
 	tt := []struct {
 		name        string
@@ -1845,25 +1810,12 @@ func TestManifestAPI_Put_Schema2MissingLayers(t *testing.T) {
 	}
 
 	// Build URLs.
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	tagURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
 
 	deserializedManifest, err := schema2.FromStruct(*manifest)
 	require.NoError(t, err)
 
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	digestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 
 	tt := []struct {
 		name        string
@@ -1904,9 +1856,6 @@ func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
 	tagName := "schema2missingconfigandlayerstag"
 	repoPath := "schema2/missingconfigandlayers"
 
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
 	manifest := &schema2.Manifest{
 		Versioned: manifest.Versioned{
 			SchemaVersion: 2,
@@ -1934,25 +1883,12 @@ func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
 	}
 
 	// Build URLs.
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	tagURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
 
 	deserializedManifest, err := schema2.FromStruct(*manifest)
 	require.NoError(t, err)
 
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	digestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 
 	tt := []struct {
 		name        string
@@ -2032,19 +1968,7 @@ func TestManifestAPI_Get_Schema2ByDigestMissingRepository(t *testing.T) {
 	// get the manifest by digest from a non-existant repository, which should fail.
 	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
 
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	repoRef, err := reference.WithName("fake/repo")
-	require.NoError(t, err)
-
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	manifestDigestURL := buildSchema2ManifestDigestURL(t, env, "fake/repo", deserializedManifest)
 
 	req, err := http.NewRequest("GET", manifestDigestURL, nil)
 	require.NoError(t, err)
@@ -2069,14 +1993,7 @@ func TestManifestAPI_Get_Schema2ByTagMissingRepository(t *testing.T) {
 	// get the manifest by tag from a non-existant repository, which should fail.
 	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
 
-	repoRef, err := reference.WithName("fake/repo")
-	require.NoError(t, err)
-
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	manifestURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	manifestURL := buildManifestTagURL(t, env, "fake/repo", tagName)
 
 	req, err := http.NewRequest("GET", manifestURL, nil)
 	require.NoError(t, err)
@@ -2101,14 +2018,7 @@ func TestManifestAPI_Get_Schema2ByTagMissingTag(t *testing.T) {
 	// get the manifest by a non-existant tag, which should fail.
 	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
 
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
-	tagRef, err := reference.WithTag(repoRef, "faketag")
-	require.NoError(t, err)
-
-	manifestURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
+	manifestURL := buildManifestTagURL(t, env, repoPath, "faketag")
 
 	req, err := http.NewRequest("GET", manifestURL, nil)
 	require.NoError(t, err)
@@ -2138,19 +2048,7 @@ func TestManifestAPI_Get_Schema2ByDigestNotAssociatedWithRepository(t *testing.T
 	putRandomSchema2ManifestByTag(t, env, repoPath1, tagName1)
 	deserializedManifest2 := putRandomSchema2ManifestByTag(t, env, repoPath2, tagName2)
 
-	_, payload, err := deserializedManifest2.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	repoRef1, err := reference.WithName(repoPath1)
-	require.NoError(t, err)
-
-	mismatcheDigestRef, err := reference.WithDigest(repoRef1, dgst)
-	require.NoError(t, err)
-
-	mismatchedManifestURL, err := env.builder.BuildManifestURL(mismatcheDigestRef)
-	require.NoError(t, err)
+	mismatchedManifestURL := buildSchema2ManifestDigestURL(t, env, repoPath1, deserializedManifest2)
 
 	req, err := http.NewRequest("GET", mismatchedManifestURL, nil)
 	require.NoError(t, err)
@@ -2180,14 +2078,7 @@ func TestManifestAPI_Get_Schema2ByTagNotAssociatedWithRepository(t *testing.T) {
 	putRandomSchema2ManifestByTag(t, env, repoPath1, tagName1)
 	putRandomSchema2ManifestByTag(t, env, repoPath2, tagName2)
 
-	repoRef1, err := reference.WithName(repoPath1)
-	require.NoError(t, err)
-
-	mismatchedTagRef, err := reference.WithTag(repoRef1, tagName2)
-	require.NoError(t, err)
-
-	mismatchedManifestURL, err := env.builder.BuildManifestURL(mismatchedTagRef)
-	require.NoError(t, err)
+	mismatchedManifestURL := buildManifestTagURL(t, env, repoPath1, tagName2)
 
 	req, err := http.NewRequest("GET", mismatchedManifestURL, nil)
 	require.NoError(t, err)
@@ -2211,25 +2102,13 @@ func TestManifestAPI_Head_Schema2(t *testing.T) {
 	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
 
 	// Build URLs.
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	tagURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
-
 	_, payload, err := deserializedManifest.Payload()
 	require.NoError(t, err)
 
 	dgst := digest.FromBytes(payload)
 
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	digestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 
 	tt := []struct {
 		name        string
@@ -2283,17 +2162,13 @@ func TestManifestAPI_Head_Schema2MissingManifest(t *testing.T) {
 	repoRef, err := reference.WithName(repoPath)
 	require.NoError(t, err)
 
-	tagRef, err := reference.WithTag(repoRef, "faketag")
-	require.NoError(t, err)
-
-	tagURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
-
 	digestRef, err := reference.WithDigest(repoRef, digest.FromString("bogus digest"))
 	require.NoError(t, err)
 
 	digestURL, err := env.builder.BuildManifestURL(digestRef)
 	require.NoError(t, err)
+
+	tagURL := buildManifestTagURL(t, env, repoPath, "faketag")
 
 	tt := []struct {
 		name        string
@@ -2324,6 +2199,41 @@ func TestManifestAPI_Head_Schema2MissingManifest(t *testing.T) {
 			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
 		})
 	}
+}
+
+func buildManifestTagURL(t *testing.T, env *testEnv, repoPath, tagName string) string {
+	t.Helper()
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	tagRef, err := reference.WithTag(repoRef, tagName)
+	require.NoError(t, err)
+
+	tagURL, err := env.builder.BuildManifestURL(tagRef)
+	require.NoError(t, err)
+
+	return tagURL
+}
+
+func buildSchema2ManifestDigestURL(t *testing.T, env *testEnv, repoPath string, deserializedManifest *schema2.DeserializedManifest) string {
+	t.Helper()
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	digestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	return digestURL
 }
 
 // TODO: Misc testing that's not currently covered by TestManifestAPI
@@ -2438,34 +2348,22 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string) *sch
 func putRandomSchema2ManifestByTag(t *testing.T, env *testEnv, repoPath, tagName string) *schema2.DeserializedManifest {
 	t.Helper()
 
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
-	tagRef, err := reference.WithTag(repoRef, tagName)
-	require.NoError(t, err)
-
-	manifestURL, err := env.builder.BuildManifestURL(tagRef)
-	require.NoError(t, err)
-
 	// Push up a random manifest by tag.
 	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
 
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	digestRef, err := reference.WithDigest(repoRef, dgst)
-	require.NoError(t, err)
-
-	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
-	require.NoError(t, err)
+	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
 
 	resp := putManifest(t, "putting manifest by tag no error", manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+	manifestDigestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
 	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
 	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 
 	return deserializedManifest
