@@ -34,7 +34,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <schema name="public" layer="0" rect-visible="true" fill-color="#e1e1e1" sql-disabled="true">
 </schema>
 
-<table name="repositories" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="repositories" layer="0" collapse-mode="2" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="851.909" y="27.1818"/>
@@ -42,17 +42,20 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
 	</column>
-	<column name="name" not-null="true">
-		<type name="text" length="0"/>
-	</column>
-	<column name="path" not-null="true">
-		<type name="text" length="0"/>
-	</column>
 	<column name="parent_id">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
+	<column name="updated_at">
+		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
+	<column name="name" not-null="true">
+		<type name="text" length="0"/>
+	</column>
+	<column name="path" not-null="true">
+		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_repositories" type="pk-constr" table="public.repositories">
 		<columns names="id" ref-type="src-columns"/>
@@ -79,20 +82,20 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="manifest_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
-	<column name="media_type" not-null="true">
-		<type name="text" length="0"/>
+	<column name="size" not-null="true">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
-	<column name="size" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
 	<column name="payload" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
-	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	<column name="media_type" not-null="true">
+		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_manifest_configurations" type="pk-constr" table="public.manifest_configurations">
 		<columns names="id" ref-type="src-columns"/>
@@ -116,11 +119,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
 	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
+	<column name="marked_at">
+		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
 	<column name="schema_version" not-null="true">
 		<type name="integer" length="0"/>
-	</column>
-	<column name="media_type" not-null="true">
-		<type name="text" length="0"/>
 	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
@@ -128,11 +134,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="payload" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
-	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<column name="marked_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	<column name="media_type" not-null="true">
+		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_manifests" type="pk-constr" table="public.manifests">
 		<columns names="id" ref-type="src-columns"/>
@@ -148,16 +151,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="layers" layer="0" collapse-mode="1" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="52.5455" y="625.818"/>
+	<position x="51.6364" y="625.818"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
-	</column>
-	<column name="media_type" not-null="true">
-		<type name="text" length="0"/>
-	</column>
-	<column name="digest_hex" not-null="true">
-		<type name="bytea" length="0"/>
 	</column>
 	<column name="size" not-null="true">
 		<type name="bigint" length="0"/>
@@ -167,6 +164,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="marked_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
+	<column name="digest_hex" not-null="true">
+		<type name="bytea" length="0"/>
+	</column>
+	<column name="media_type" not-null="true">
+		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_layers" type="pk-constr" table="public.layers">
 		<columns names="id" ref-type="src-columns"/>
@@ -212,11 +215,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
 	</column>
+	<column name="created_at" not-null="true" default-value="now()">
+		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
+	<column name="marked_at">
+		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
 	<column name="schema_version" not-null="true">
 		<type name="integer" length="0"/>
-	</column>
-	<column name="media_type">
-		<type name="text" length="0"/>
 	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
@@ -224,11 +230,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="payload" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
-	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<column name="marked_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	<column name="media_type">
+		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
 		<columns names="id" ref-type="src-columns"/>
@@ -274,9 +277,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
 	</column>
-	<column name="name" not-null="true">
-		<type name="text" length="0"/>
-	</column>
 	<column name="repository_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
@@ -291,6 +291,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</column>
 	<column name="updated_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
+	</column>
+	<column name="name" not-null="true">
+		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_tags" type="pk-constr" table="public.tags">
 		<columns names="id" ref-type="src-columns"/>
@@ -588,7 +591,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.repositories" reference-fk="fk_repositories_parent_id_repositories"
 	 src-required="false" dst-required="false">
 	<line>
-		<position x="1210.18" y="97.1318"/>
+		<position x="1210.18" y="101.998"/>
 	<position x="1210.18" y="-0.929311"/>
 	<position x="1072.02" y="-0.929311"/>
 	</line>

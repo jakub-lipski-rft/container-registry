@@ -105,7 +105,7 @@ func (s *tagStore) Count(ctx context.Context) (int, error) {
 
 // Repository finds a tag repository.
 func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repository, error) {
-	q := "SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1"
+	q := "SELECT id, name, path, parent_id, created_at, updated_at FROM repositories WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, t.RepositoryID)
 
 	return scanFullRepository(row)

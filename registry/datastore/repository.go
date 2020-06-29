@@ -3,6 +3,7 @@ package datastore
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -74,7 +75,7 @@ func NewRepositoryStore(db Queryer) *repositoryStore {
 func scanFullRepository(row *sql.Row) (*models.Repository, error) {
 	r := new(models.Repository)
 
-	if err := row.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.UpdatedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scanning repository: %w", err)
 		}
@@ -90,7 +91,7 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 
 	for rows.Next() {
 		r := new(models.Repository)
-		if err := rows.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning repository: %w", err)
 		}
 		rr = append(rr, r)
@@ -104,7 +105,7 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 
 // FindByID finds a repository by ID.
 func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repository, error) {
-	q := "SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1"
+	q := "SELECT id, name, path, parent_id, created_at, updated_at FROM repositories WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullRepository(row)
@@ -112,7 +113,7 @@ func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repos
 
 // FindByPath finds a repository by path.
 func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.Repository, error) {
-	q := "SELECT id, name, path, parent_id, created_at FROM repositories WHERE path = $1"
+	q := "SELECT id, name, path, parent_id, created_at, updated_at FROM repositories WHERE path = $1"
 	row := s.db.QueryRowContext(ctx, q, path)
 
 	return scanFullRepository(row)
@@ -120,7 +121,7 @@ func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.
 
 // FindAll finds all repositories.
 func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, error) {
-	q := "SELECT id, name, path, parent_id, created_at FROM repositories"
+	q := "SELECT id, name, path, parent_id, created_at, updated_at FROM repositories"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding repositories: %w", err)
@@ -136,7 +137,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 // repositories are lexicographically sorted. These constraints exists to preserve the existing API behaviour (when
 // doing a filesystem walk based pagination).
 func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
-	q := `SELECT DISTINCT r.id, r.name, r.path, r.parent_id, r.created_at
+	q := `SELECT DISTINCT r.id, r.name, r.path, r.parent_id, r.created_at, r.updated_at
 		FROM repositories AS r
 	 	LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
 	 	LEFT JOIN repository_manifest_lists AS rml ON r.id = rml.repository_id
@@ -155,9 +156,9 @@ func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastP
 // FindDescendantsOf finds all descendants of a given repository.
 func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE descendants AS (
-		SELECT id, name, path, parent_id, created_at FROM repositories WHERE id = $1
+		SELECT id, name, path, parent_id, created_at, updated_at FROM repositories WHERE id = $1
 		UNION ALL
-		SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories AS r
+		SELECT r.id, r.name, r.path, r.parent_id, r.created_at, r.updated_at FROM repositories AS r
 		JOIN descendants ON descendants.id = r.parent_id
 		) SELECT * FROM descendants WHERE descendants.id != $1`
 
@@ -172,9 +173,9 @@ func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (mode
 // FindAncestorsOf finds all ancestors of a given repository.
 func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models.Repositories, error) {
 	q := `WITH RECURSIVE ancestors AS (
-		SELECT id, name, path, parent_id, created_at FROM repositories  WHERE id = $1
+		SELECT id, name, path, parent_id, created_at, updated_at FROM repositories WHERE id = $1
 		UNION ALL
-		SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories AS r
+		SELECT r.id, r.name, r.path, r.parent_id, r.created_at, r.updated_at FROM repositories AS r
 		JOIN ancestors ON ancestors.parent_id = r.id
 		) SELECT * FROM ancestors WHERE ancestors.id != $1`
 
@@ -188,8 +189,8 @@ func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models
 
 // FindSiblingsOf finds all siblings of a given repository.
 func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.Repositories, error) {
-	q := `SELECT siblings.id, siblings.name, siblings.path, siblings.parent_id, siblings.created_at
-		FROM repositories siblings
+	q := `SELECT siblings.id, siblings.name, siblings.path, siblings.parent_id, siblings.created_at, siblings.updated_at
+		FROM repositories AS siblings
 		LEFT JOIN repositories anchor ON siblings.parent_id = anchor.parent_id
 		WHERE anchor.id = $1 AND siblings.id != $1`
 
@@ -309,7 +310,7 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
-		JOIN repositories as r ON r.id = rm.repository_id
+		JOIN repositories AS r ON r.id = rm.repository_id
 		WHERE r.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
@@ -325,7 +326,7 @@ func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repositor
 	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
 		FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
-		JOIN repositories as r ON r.id = rml.repository_id
+		JOIN repositories AS r ON r.id = rml.repository_id
 		WHERE r.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
@@ -341,7 +342,7 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
-		JOIN repositories as r ON r.id = rm.repository_id
+		JOIN repositories AS r ON r.id = rm.repository_id
 		WHERE r.id = $1 AND m.digest_hex = decode($2, 'hex')`
 
 	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
@@ -353,7 +354,7 @@ func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *model
 	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
 		FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
-		JOIN repositories as r ON r.id = rml.repository_id
+		JOIN repositories AS r ON r.id = rml.repository_id
 		WHERE r.id = $1 AND ml.digest_hex = decode($2, 'hex')`
 
 	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
@@ -365,7 +366,7 @@ func (s *repositoryStore) Layers(ctx context.Context, r *models.Repository) (mod
 	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at
 		FROM layers as l
 		JOIN repository_layers as rl ON rl.layer_id = l.id
-		JOIN repositories as r ON r.id = rl.repository_id
+		JOIN repositories AS r ON r.id = rl.repository_id
 		WHERE r.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
@@ -521,19 +522,15 @@ func (s *repositoryStore) CreateOrFindByPath(ctx context.Context, path string) (
 
 // Update updates an existing repository.
 func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) error {
-	q := "UPDATE repositories SET (name, path, parent_id) = ($1, $2, $3) WHERE id = $4"
+	q := `UPDATE repositories SET (name, path, parent_id, updated_at) = ($1, $2, $3, now())
+		WHERE id = $4 RETURNING updated_at`
 
-	res, err := s.db.ExecContext(ctx, q, r.Name, r.Path, r.ParentID, r.ID)
-	if err != nil {
+	row := s.db.QueryRowContext(ctx, q, r.Name, r.Path, r.ParentID, r.ID)
+	if err := row.Scan(&r.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("repository not found")
+		}
 		return fmt.Errorf("error updating repository: %w", err)
-	}
-
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error updating repository: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("repository not found")
 	}
 
 	return nil

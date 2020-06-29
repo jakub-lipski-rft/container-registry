@@ -14,6 +14,7 @@ type Repository struct {
 	Path      string
 	ParentID  sql.NullInt64
 	CreatedAt time.Time
+	UpdatedAt sql.NullTime
 }
 
 // Repositories is a slice of Repository pointers.

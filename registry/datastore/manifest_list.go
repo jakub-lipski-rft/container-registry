@@ -147,7 +147,7 @@ func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestLi
 
 // Repositories finds all repositories which reference a manifest list.
 func (s *manifestListStore) Repositories(ctx context.Context, ml *models.ManifestList) (models.Repositories, error) {
-	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at FROM repositories as r
+	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at, updated_at FROM repositories as r
 		JOIN repository_manifest_lists as rml ON rml.repository_id = r.id
 		JOIN manifest_lists as ml ON ml.id = rml.manifest_list_id
 		WHERE ml.id = $1`
