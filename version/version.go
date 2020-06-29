@@ -13,3 +13,7 @@ var Version = "v2.7.1+unknown"
 // Revision is filled with the VCS (e.g. git) revision being used to build
 // the program at linking time.
 var Revision = ""
+
+// ExtFeatures is a comma separated list of extensions/features supported by the GitLab Container Registry that are
+// not part of the Docker Distribution spec.
+const ExtFeatures = "tag_delete"

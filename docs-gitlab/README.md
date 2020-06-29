@@ -102,6 +102,21 @@ If for some reason a tag manifest link file is broken, in practice, it's as if
 it didn't exist at all, thus the `404 Not Found`. Re-pushing the tag will fix
 the broken link file.
 
+#### Custom Headers on `GET /v2/`
+
+Two new headers were added to the response of `GET /v2/` requests:
+
+* `Gitlab-Container-Registry-Version`: The semantic version of the GitLab
+Container Registry (e.g. `2.9.0-gitlab`). This is set during build time (in
+`version.Version`).
+* `Gitlab-Container-Registry-Features`: A comma separated list of supported
+features/extensions that are not part of the Docker Distribution spec (e.g.
+`tag_delete,...`). Its value (hardcoded in `version.ExtFeatures`) should be
+updated whenever a custom feature is added/deprecated.
+
+This is necessary to detect whether a registry is the GitLab Container Registry
+and which extra features it supports.
+
 ## Releases
 
 Release planning is done by using the `Release Plan` issue template during the

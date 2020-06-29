@@ -25,6 +25,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/docker/distribution/version"
+
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/configuration"
 	"github.com/docker/distribution/manifest"
@@ -109,8 +111,10 @@ func TestCheckAPI(t *testing.T) {
 
 	checkResponse(t, "issuing api base check", resp, http.StatusOK)
 	checkHeaders(t, resp, http.Header{
-		"Content-Type":   []string{"application/json; charset=utf-8"},
-		"Content-Length": []string{"2"},
+		"Content-Type":                       []string{"application/json; charset=utf-8"},
+		"Content-Length":                     []string{"2"},
+		"Gitlab-Container-Registry-Version":  []string{strings.TrimPrefix(version.Version, "v")},
+		"Gitlab-Container-Registry-Features": []string{version.ExtFeatures},
 	})
 
 	p, err := ioutil.ReadAll(resp.Body)

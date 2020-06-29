@@ -1,4 +1,12 @@
 ## [Unreleased]
+
+## [v2.9.1-gitlab] - 2020-05-05
+## Added
+- registry/api/v2: Show version and supported extra features in custom headers
+
+## Changed
+- registry/handlers: Encapsulate the value of err.detail in logs in a JSON object
+
 ### Fixed
 - registry/storage: Fix panic during uploads purge
 

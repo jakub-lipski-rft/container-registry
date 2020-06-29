@@ -804,7 +804,10 @@ func (app *App) logError(ctx context.Context, errors errcode.Errors) {
 			e, _ := e1.(errcode.Error)
 			c = context.WithValue(ctx, errCodeKey{}, e.Code)
 			c = context.WithValue(c, errMessageKey{}, e.Message)
-			c = context.WithValue(c, errDetailKey{}, e.Detail)
+			// workaround for https://gitlab.com/gitlab-org/container-registry/-/issues/40 until logging can be
+			// refactored in https://gitlab.com/gitlab-org/container-registry/-/issues/31
+			d := map[string]interface{}{"data": e.Detail}
+			c = context.WithValue(c, errDetailKey{}, d)
 		case errcode.ErrorCode:
 			e, _ := e1.(errcode.ErrorCode)
 			c = context.WithValue(ctx, errCodeKey{}, e)
@@ -946,6 +949,9 @@ func apiBase(w http.ResponseWriter, r *http.Request) {
 	// Provide a simple /v2/ 200 OK response with empty json response.
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Length", fmt.Sprint(len(emptyJSON)))
+
+	w.Header().Set("Gitlab-Container-Registry-Version", strings.TrimPrefix(version.Version, "v"))
+	w.Header().Set("Gitlab-Container-Registry-Features", version.ExtFeatures)
 
 	fmt.Fprint(w, emptyJSON)
 }

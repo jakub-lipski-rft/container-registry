@@ -401,6 +401,20 @@ var routeDescriptors = []RouteDescriptor{
 							{
 								Description: "The API implements V2 protocol and is accessible.",
 								StatusCode:  http.StatusOK,
+								Headers: []ParameterDescriptor{
+									{
+										Name:        "Gitlab-Container-Registry-Version",
+										Type:        "string",
+										Description: "The semantic version of the GitLab Container Registry.",
+										Format:      "<semantic version>",
+									},
+									{
+										Name:        "Gitlab-Container-Registry-Features",
+										Type:        "string",
+										Description: "A list of features supported by the GitLab Container Registry API.",
+										Format:      "<comma separated list of features>",
+									},
+								},
 							},
 						},
 						Failures: []ResponseDescriptor{
