@@ -1696,6 +1696,153 @@ func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
 	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 }
 
+func TestManifestAPI_Get_Schema2NonMatchingEtag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2happypathtag"
+	repoPath := "schema2/happypath"
+
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+		etag        string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+		{
+			name:        "by tag non matching etag",
+			manifestURL: tagURL,
+			etag:        digest.FromString("no match").String(),
+		},
+		{
+			name:        "by digest non matching etag",
+			manifestURL: digestURL,
+			etag:        digest.FromString("no match").String(),
+		},
+		{
+			name:        "by tag malformed etag",
+			manifestURL: tagURL,
+			etag:        "bad etag",
+		},
+		{
+			name:        "by digest malformed etag",
+			manifestURL: digestURL,
+			etag:        "bad etag",
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", test.manifestURL, nil)
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", schema2.MediaTypeManifest)
+			if test.etag != "" {
+				req.Header.Set("If-None-Match", test.etag)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+			require.Equal(t, fmt.Sprintf(`"%s"`, dgst), resp.Header.Get("ETag"))
+
+			var fetchedManifest *schema2.DeserializedManifest
+			dec := json.NewDecoder(resp.Body)
+
+			err = dec.Decode(&fetchedManifest)
+			require.NoError(t, err)
+
+			require.EqualValues(t, deserializedManifest, fetchedManifest)
+		})
+	}
+}
+
+func TestManifestAPI_Get_Schema2MatchingEtag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2happypathtag"
+	repoPath := "schema2/happypath"
+
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+		etag        string
+	}{
+		{
+			name:        "by tag quoted etag",
+			manifestURL: tagURL,
+			etag:        fmt.Sprintf("%q", dgst),
+		},
+		{
+			name:        "by digest quoted etag",
+			manifestURL: digestURL,
+			etag:        fmt.Sprintf("%q", dgst),
+		},
+		{
+			name:        "by tag non quoted etag",
+			manifestURL: tagURL,
+			etag:        dgst.String(),
+		},
+		{
+			name:        "by digest non quoted etag",
+			manifestURL: digestURL,
+			etag:        dgst.String(),
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", test.manifestURL, nil)
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", schema2.MediaTypeManifest)
+			req.Header.Set("If-None-Match", test.etag)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusNotModified, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			require.Equal(t, http.NoBody, resp.Body)
+		})
+	}
+}
+
 func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -2306,10 +2453,6 @@ func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
 
 // TODO: Break out logic from testManifestAPISchema2 into these tests.
 // https://gitlab.com/gitlab-org/container-registry/-/issues/140
-func TestManifestAPI_Get_Schema2ByDigest(t *testing.T)             {}
-func TestManifestAPI_Get_Schema2ByTag(t *testing.T)                {}
-func TestManifestAPI_Get_Schema2ByDigestEtagMatches(t *testing.T)  {}
-func TestManifestAPI_Get_Schema2ByTagEtagMatches(t *testing.T)     {}
 func TestManifestAPI_Get_Schema2ByDigestAsSchema1(t *testing.T)    {}
 func TestManifestAPI_Get_Schema2ByTagMissingManifest(t *testing.T) {}
 
