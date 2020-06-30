@@ -129,12 +129,12 @@ func (s *manifestListStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// Manifests finds all manifests associated with a manifest list, through the ManifestListItem relationship entity.
+// Manifests finds all manifests associated with a manifest list, through the ManifestListManifest relationship entity.
 func (s *manifestListStore) Manifests(ctx context.Context, ml *models.ManifestList) (models.Manifests, error) {
 	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
-		JOIN manifest_list_items as mli ON mli.manifest_id = m.id
-		JOIN manifest_lists as ml ON ml.id = mli.manifest_list_id
+		JOIN manifest_list_manifests as mlm ON mlm.manifest_id = m.id
+		JOIN manifest_lists as ml ON ml.id = mlm.manifest_list_id
 		WHERE ml.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, ml.ID)
@@ -210,7 +210,7 @@ func (s *manifestListStore) Mark(ctx context.Context, ml *models.ManifestList) e
 
 // AssociateManifest associates a manifest and a manifest list. It does nothing if already associated.
 func (s *manifestListStore) AssociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error {
-	q := `INSERT INTO manifest_list_items (manifest_list_id, manifest_id) VALUES ($1, $2)
+	q := `INSERT INTO manifest_list_manifests (manifest_list_id, manifest_id) VALUES ($1, $2)
 		ON CONFLICT (manifest_list_id, manifest_id) DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, ml.ID, m.ID); err != nil {
@@ -222,7 +222,7 @@ func (s *manifestListStore) AssociateManifest(ctx context.Context, ml *models.Ma
 
 // DissociateManifest dissociates a manifest and a manifest list. It does nothing if not associated.
 func (s *manifestListStore) DissociateManifest(ctx context.Context, ml *models.ManifestList, m *models.Manifest) error {
-	q := "DELETE FROM manifest_list_items WHERE manifest_list_id = $1 AND manifest_id = $2"
+	q := "DELETE FROM manifest_list_manifests WHERE manifest_list_id = $1 AND manifest_id = $2"
 
 	res, err := s.db.ExecContext(ctx, q, ml.ID, m.ID)
 	if err != nil {
