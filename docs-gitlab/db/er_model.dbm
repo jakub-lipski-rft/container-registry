@@ -244,7 +244,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_list_items" layer="0" collapse-mode="2" max-obj-count="4">
+<table name="manifest_list_manifests" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="788" y="627.182"/>
@@ -261,10 +261,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<constraint name="pk_manifest_list_items" type="pk-constr" table="public.manifest_list_items">
+	<constraint name="pk_manifest_list_manifests" type="pk-constr" table="public.manifest_list_manifests">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifest_list_items_manifest_list_id_manifest_id" type="uq-constr" table="public.manifest_list_items">
+	<constraint name="uq_manifest_list_manifests_manifest_list_id_manifest_id" type="uq-constr" table="public.manifest_list_manifests">
 		<columns names="manifest_list_id,manifest_id" ref-type="src-columns"/>
 	</constraint>
 </table>
@@ -399,7 +399,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_manifest_list_items_manifest_id" table="public.manifest_list_items"
+<index name="ix_manifest_list_manifests_manifest_id" table="public.manifest_list_manifests"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
@@ -407,7 +407,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_manifest_list_items_manifest_list_id" table="public.manifest_list_items"
+<index name="ix_manifest_list_manifests_manifest_list_id" table="public.manifest_list_manifests"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
@@ -520,14 +520,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_list_items_manifest_id_manifests" type="fk-constr" comparison-type="MATCH SIMPLE"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.manifests" table="public.manifest_list_items">
+<constraint name="fk_manifest_list_manifests_manifest_id_manifests" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.manifests" table="public.manifest_list_manifests">
 	<columns names="manifest_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_list_items_manifest_list_id_manifest_lists" type="fk-constr" comparison-type="MATCH SIMPLE"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.manifest_list_items">
+<constraint name="fk_manifest_list_manifests_manifest_list_id_manifest_lists" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.manifest_list_manifests">
 	<columns names="manifest_list_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
@@ -611,18 +611,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.layers" reference-fk="fk_manifest_layers_layer_id_layers"
 	 src-required="false" dst-required="false"/>
 
-<relationship name="rel_manifest_list_items_manifest_lists" type="relfk" layer="0"
-	 src-table="public.manifest_list_items"
-	 dst-table="public.manifest_lists" reference-fk="fk_manifest_list_items_manifest_list_id_manifest_lists"
+<relationship name="rel_manifest_list_manifests_manifest_lists" type="relfk" layer="0"
+	 src-table="public.manifest_list_manifests"
+	 dst-table="public.manifest_lists" reference-fk="fk_manifest_list_manifests_manifest_list_id_manifest_lists"
 	 src-required="false" dst-required="false">
 	<label ref-type="name-label">
 		<position x="0.0310159" y="-4.19399"/>
 	</label>
 </relationship>
 
-<relationship name="rel_manifest_list_items_manifests" type="relfk" layer="0"
-	 src-table="public.manifest_list_items"
-	 dst-table="public.manifests" reference-fk="fk_manifest_list_items_manifest_id_manifests"
+<relationship name="rel_manifest_list_manifests_manifests" type="relfk" layer="0"
+	 src-table="public.manifest_list_manifests"
+	 dst-table="public.manifests" reference-fk="fk_manifest_list_manifests_manifest_id_manifests"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_repository_manifests_repositories" type="relfk" layer="0"

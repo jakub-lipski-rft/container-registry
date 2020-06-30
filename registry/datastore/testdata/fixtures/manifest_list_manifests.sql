@@ -1,4 +1,4 @@
-INSERT INTO "manifest_list_items"("id","manifest_list_id","manifest_id","created_at")
+INSERT INTO "manifest_list_manifests"("id","manifest_list_id","manifest_id","created_at")
 VALUES
 (1,1,1,E'2020-04-02 18:45:03.470711+00'),
 (2,1,2,E'2020-04-02 18:45:03.470711+00'),

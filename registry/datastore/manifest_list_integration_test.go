@@ -21,7 +21,7 @@ func reloadManifestListFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListManifestsTable,
 		testutil.RepositoryManifestListsTable,
 	)
 }
@@ -31,7 +31,7 @@ func unloadManifestListFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
 		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListItemsTable,
+		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListManifestsTable,
 		testutil.RepositoryManifestListsTable,
 	))
 }
@@ -127,7 +127,7 @@ func TestManifestListStore_Manifests(t *testing.T) {
 	mm, err := s.Manifests(suite.ctx, &models.ManifestList{ID: 1})
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_list_items.sql
+	// see testdata/fixtures/manifest_list_manifests.sql
 	local := mm[0].CreatedAt.Location()
 	expected := models.Manifests{
 		{
@@ -255,11 +255,11 @@ func TestManifestListStore_Mark_NotFound(t *testing.T) {
 
 func TestManifestListStore_AssociateManifest(t *testing.T) {
 	reloadManifestListFixtures(t)
-	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestListItemsTable))
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestListManifestsTable))
 
 	s := datastore.NewManifestListStore(suite.db)
 
-	// see testdata/fixtures/manifest_list_items.sql
+	// see testdata/fixtures/manifest_list_manifests.sql
 	ml := &models.ManifestList{ID: 1}
 	m := &models.Manifest{ID: 3}
 	err := s.AssociateManifest(suite.ctx, ml, m)
@@ -280,7 +280,7 @@ func TestManifestListStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *tes
 
 	s := datastore.NewManifestListStore(suite.db)
 
-	// see testdata/fixtures/manifest_list_items.sql
+	// see testdata/fixtures/manifest_list_manifests.sql
 	ml := &models.ManifestList{ID: 1}
 	m := &models.Manifest{ID: 1}
 	err := s.AssociateManifest(suite.ctx, ml, m)
@@ -300,7 +300,7 @@ func TestManifestListStore_DissociateManifest(t *testing.T) {
 	mm, err := s.Manifests(suite.ctx, ml)
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_list_items.sql
+	// see testdata/fixtures/manifest_list_manifests.sql
 	var manifestIDs []int64
 	for _, m := range mm {
 		manifestIDs = append(manifestIDs, m.ID)

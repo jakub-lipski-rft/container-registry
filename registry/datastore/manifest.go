@@ -155,12 +155,12 @@ func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.
 	return scanFullLayers(rows)
 }
 
-// Lists finds all manifest lists which reference a manifest, through the ManifestListItem relationship entity.
+// Lists finds all manifest lists which reference a manifest, through the ManifestListManifest relationship entity.
 func (s *manifestStore) Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error) {
 	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
 		FROM manifest_lists as ml
-		JOIN manifest_list_items as mli ON mli.manifest_list_id = ml.id
-		JOIN manifests as m ON m.id = mli.manifest_id
+		JOIN manifest_list_manifests as mlm ON mlm.manifest_list_id = ml.id
+		JOIN manifests as m ON m.id = mlm.manifest_id
 		WHERE m.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
