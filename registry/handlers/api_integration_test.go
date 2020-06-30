@@ -2205,6 +2205,55 @@ func TestManifestAPI_Head_Schema2MissingManifest(t *testing.T) {
 	}
 }
 
+func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T) {
+	env := newTestEnv(t, withSchema1Compatibility)
+	defer env.Shutdown()
+
+	tagName := "schema1tag"
+	repoPath := "schema2/schema1"
+
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
+
+	resp, err := http.Get(manifestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+	manifestBytes, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	m, desc, err := distribution.UnmarshalManifest(schema1.MediaTypeManifest, manifestBytes)
+	require.NoError(t, err)
+
+	require.Equal(t, desc.Digest.String(), resp.Header.Get("Docker-Content-Digest"))
+	require.Equal(t, fmt.Sprintf("%q", desc.Digest), resp.Header.Get("ETag"))
+
+	fetchedSchema1Manifest, ok := m.(*schema1.SignedManifest)
+	require.True(t, ok)
+
+	require.Equal(t, fetchedSchema1Manifest.Manifest.SchemaVersion, 1)
+	require.Equal(t, fetchedSchema1Manifest.Architecture, "amd64")
+	require.Equal(t, fetchedSchema1Manifest.Name, repoPath)
+	require.Equal(t, fetchedSchema1Manifest.Tag, tagName)
+
+	pushedLayers := deserializedManifest.Manifest.Layers
+
+	require.Len(t, fetchedSchema1Manifest.FSLayers, len(pushedLayers))
+
+	for i := range pushedLayers {
+		require.Equal(t, fetchedSchema1Manifest.FSLayers[i].BlobSum, pushedLayers[len(pushedLayers)-i-1].Digest)
+	}
+
+	require.Len(t, fetchedSchema1Manifest.History, len(pushedLayers))
+
+	// Don't check V1Compatibility fields because we're using randomly-generated
+	// layers.
+}
+
 func buildManifestTagURL(t *testing.T, env *testEnv, repoPath, tagName string) string {
 	t.Helper()
 
@@ -2262,7 +2311,6 @@ func TestManifestAPI_Get_Schema2ByTag(t *testing.T)                {}
 func TestManifestAPI_Get_Schema2ByDigestEtagMatches(t *testing.T)  {}
 func TestManifestAPI_Get_Schema2ByTagEtagMatches(t *testing.T)     {}
 func TestManifestAPI_Get_Schema2ByDigestAsSchema1(t *testing.T)    {}
-func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T)       {}
 func TestManifestAPI_Get_Schema2ByTagMissingManifest(t *testing.T) {}
 
 // TODO: Break out logic from testManifestDelete into these tests.
