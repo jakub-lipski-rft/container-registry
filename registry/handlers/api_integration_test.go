@@ -2401,6 +2401,42 @@ func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T) {
 	// layers.
 }
 
+func TestManifestAPI_Get_Schema2ByDigestNoAcceptHeaders(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "noaccepttag"
+	repoPath := "schema2/noaccept"
+
+	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	manifestURL := buildSchema2ManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	// Without any accept headers we should still get a schema2 manifest since
+	// we will return content that does not match the digest requested in the URL.
+	resp, err := http.Get(manifestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+	require.Equal(t, fmt.Sprintf("%q", dgst), resp.Header.Get("ETag"))
+
+	var fetchedManifest *schema2.DeserializedManifest
+	dec := json.NewDecoder(resp.Body)
+
+	err = dec.Decode(&fetchedManifest)
+	require.NoError(t, err)
+
+	require.EqualValues(t, deserializedManifest, fetchedManifest)
+}
+
 func buildManifestTagURL(t *testing.T, env *testEnv, repoPath, tagName string) string {
 	t.Helper()
 
@@ -2453,7 +2489,6 @@ func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
 
 // TODO: Break out logic from testManifestAPISchema2 into these tests.
 // https://gitlab.com/gitlab-org/container-registry/-/issues/140
-func TestManifestAPI_Get_Schema2ByDigestAsSchema1(t *testing.T)    {}
 func TestManifestAPI_Get_Schema2ByTagMissingManifest(t *testing.T) {}
 
 // TODO: Break out logic from testManifestDelete into these tests.
