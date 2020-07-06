@@ -10,6 +10,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/testutil"
 )
@@ -35,7 +36,9 @@ func (s *testSuite) setup() error {
 	if err != nil {
 		return err
 	}
-	if err := db.MigrateUp(); err != nil {
+
+	m := migrations.NewMigrator(db.DB)
+	if err := m.Up(); err != nil {
 		return err
 	}
 	basePath, err := os.Getwd()

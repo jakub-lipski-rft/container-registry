@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/docker/distribution/registry/datastore"
-
 	dcontext "github.com/docker/distribution/context"
+	"github.com/docker/distribution/migrations"
+	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	"github.com/docker/distribution/version"
+
 	"github.com/docker/libtrust"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -146,7 +146,8 @@ var MigrateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if err := db.MigrateUp(); err != nil {
+		m := migrations.NewMigrator(db.DB)
+		if err := m.Up(); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 			os.Exit(1)
 		}

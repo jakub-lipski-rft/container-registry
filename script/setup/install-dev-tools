@@ -6,4 +6,3 @@
 set -eu
 
 go get -u github.com/cpuguy83/go-md2man
-go get -tags 'postgres' -u github.com/golang-migrate/migrate/cmd/migrate

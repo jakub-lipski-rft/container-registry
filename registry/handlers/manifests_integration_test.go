@@ -11,20 +11,20 @@ import (
 	"os"
 	"testing"
 
-	digest "github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
 	dbtestutil "github.com/docker/distribution/registry/datastore/testutil"
 	"github.com/docker/libtrust"
+	digest "github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type env struct {
@@ -144,7 +144,8 @@ func initDatabase(t *testing.T, env *env) {
 
 	env.db = db
 
-	err = db.MigrateUp()
+	m := migrations.NewMigrator(db.DB)
+	err = m.Up()
 	require.NoError(t, err)
 }
 
