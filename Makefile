@@ -98,9 +98,3 @@ build:
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
-
-bindata: ## embed binary data
-	@go generate ./migrations/
-
-bindata-check: bindata ## assert there are no untracked bindata changes
-	@git diff --exit-code ./migrations/bindata.go

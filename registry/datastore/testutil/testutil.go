@@ -6,13 +6,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/stretchr/testify/require"
 )
@@ -156,20 +153,6 @@ func NewDB() (*datastore.DB, error) {
 	}
 
 	return db, nil
-}
-
-// LatestMigrationVersion identifies the version of the latest database migrations in `<root>/db/migrations`.
-func LatestMigrationVersion(tb testing.TB) int {
-	tb.Helper()
-
-	all := migrations.AssetNames()
-	sort.Strings(all)
-	latest := all[len(all)-1]
-
-	v, err := strconv.Atoi(strings.Split(latest, "_")[0])
-	require.NoError(tb, err)
-
-	return v
 }
 
 // TruncateTables truncates a set of tables in the test database.

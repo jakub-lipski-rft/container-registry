@@ -21,6 +21,7 @@ import (
 	"github.com/docker/distribution/health"
 	"github.com/docker/distribution/health/checks"
 	prometheus "github.com/docker/distribution/metrics"
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/notifications"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
@@ -143,7 +144,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			panic(fmt.Sprintf("failed to construct database connection: %v", err))
 		}
 
-		if err := db.MigrateUp(); err != nil {
+		m := migrations.NewMigrator(db.DB)
+		if err := m.Up(); err != nil {
 			panic(fmt.Sprintf("failed to run database migrations: %v", err))
 		}
 
@@ -295,7 +297,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			panic(fmt.Sprintf("failed to construct database connection: %v", err))
 		}
 
-		if err := db.MigrateUp(); err != nil {
+		m := migrations.NewMigrator(db.DB)
+		if err := m.Up(); err != nil {
 			panic(fmt.Sprintf("failed to run database migrations: %v", err))
 		}
 

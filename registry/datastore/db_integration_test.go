@@ -52,28 +52,3 @@ func TestOpen(t *testing.T) {
 		})
 	}
 }
-
-func TestDB_MigrateUp(t *testing.T) {
-	db, err := testutil.NewDB()
-	require.NoError(t, err)
-	defer db.Close()
-
-	require.NoError(t, db.MigrateUp())
-
-	currentVersion, err := db.MigrateVersion()
-	require.NoError(t, err)
-	require.Equal(t, testutil.LatestMigrationVersion(t), currentVersion)
-}
-
-func TestDB_MigrateDown(t *testing.T) {
-	db, err := testutil.NewDB()
-	require.NoError(t, err)
-	defer db.Close()
-
-	require.NoError(t, db.MigrateDown())
-	defer db.MigrateUp()
-
-	currentVersion, err := db.MigrateVersion()
-	require.NoError(t, err)
-	require.Equal(t, -1, currentVersion)
-}

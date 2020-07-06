@@ -43,17 +43,9 @@ static-analysis:
       - gl-code-quality-report.json
   allow_failure: true
 
-bindata:
-  cache: {}
-  stage: validate
-  needs: []
-  before_script:
-    - go get -u github.com/jteeuwen/go-bindata/...
-  script: make bindata-check
-
 verify:
   stage: test
-  needs: ["bindata"]
+  needs: []
   script:
     - go build -i .
     - make build
@@ -62,7 +54,7 @@ verify:
 
 .storage-driver-test: &storage-driver-test
   stage: integration
-  needs: ["bindata"]
+  needs: []
   script: go test -v github.com/docker/distribution/registry/storage/driver/$CI_JOB_NAME -args -check.v -test.short
 
 filesystem:
@@ -99,12 +91,12 @@ s3-aws:
 
 api:
   stage: integration
-  needs: ["bindata"]
+  needs: []
   script: go test -v -tags=integration github.com/docker/distribution/registry/handlers
 
 .database: &database
   stage: integration
-  needs: ["bindata"]
+  needs: []
   variables:
     POSTGRES_PASSWORD: "secret"
     POSTGRES_DB: "registry_test"
@@ -120,6 +112,11 @@ api:
     - name: postgres:11-alpine
       alias: "db"
   script: go test -v -tags=integration $PACKAGE
+
+database:migrations:
+  <<: *database
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/migrations
 
 database:datastore:
   <<: *database
