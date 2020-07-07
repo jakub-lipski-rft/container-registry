@@ -894,20 +894,20 @@ func TestRepositoryStore_FindTagByName(t *testing.T) {
 }
 
 func TestRepositoryStore_Layers(t *testing.T) {
-	reloadLayerFixtures(t)
+	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 	r, err := s.FindByID(suite.ctx, 3)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	ll, err := s.Layers(suite.ctx, r)
+	ll, err := s.Blobs(suite.ctx, r)
 	require.NoError(t, err)
 	require.NotEmpty(t, ll)
 
-	// see testdata/fixtures/repository_layers.sql
+	// see testdata/fixtures/repository_blobs.sql
 	local := ll[0].CreatedAt.Location()
-	expected := models.Layers{
+	expected := models.Blobs{
 		{
 			ID:        1,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
@@ -934,15 +934,15 @@ func TestRepositoryStore_Layers(t *testing.T) {
 }
 
 func TestRepositoryStore_LayersNone(t *testing.T) {
-	reloadLayerFixtures(t)
+	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 	r, err := s.FindByID(suite.ctx, 1)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	// see testdata/fixtures/repository_layers.sql
-	ll, err := s.Layers(suite.ctx, r)
+	// see testdata/fixtures/repository_blobs.sql
+	ll, err := s.Blobs(suite.ctx, r)
 	require.NoError(t, err)
 	require.Empty(t, ll)
 }
@@ -1507,11 +1507,11 @@ func TestRepositoryStore_UntagManifestList(t *testing.T) {
 	require.Empty(t, tt)
 }
 
-func isLayerLinked(t *testing.T, r *models.Repository, l *models.Layer) bool {
+func isLayerLinked(t *testing.T, r *models.Repository, l *models.Blob) bool {
 	t.Helper()
 
 	s := datastore.NewRepositoryStore(suite.db)
-	ll, err := s.Layers(suite.ctx, r)
+	ll, err := s.Blobs(suite.ctx, r)
 	require.NoError(t, err)
 
 	for _, layer := range ll {
@@ -1524,60 +1524,60 @@ func isLayerLinked(t *testing.T, r *models.Repository, l *models.Layer) bool {
 }
 
 func TestRepositoryStore_LinkLayer(t *testing.T) {
-	reloadLayerFixtures(t)
-	require.NoError(t, testutil.TruncateTables(suite.db, testutil.RepositoryLayersTable))
+	reloadBlobFixtures(t)
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.RepositoryBlobsTable))
 
 	s := datastore.NewRepositoryStore(suite.db)
 
 	r := &models.Repository{ID: 3}
-	l := &models.Layer{ID: 4}
+	l := &models.Blob{ID: 4}
 
-	err := s.LinkLayer(suite.ctx, r, l)
+	err := s.LinkBlob(suite.ctx, r, l)
 	require.NoError(t, err)
 
 	require.True(t, isLayerLinked(t, r, l))
 }
 
 func TestRepositoryStore_LinkLayer_AlreadyLinkedDoesNotFail(t *testing.T) {
-	reloadLayerFixtures(t)
+	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	// see testdata/fixtures/repository_layers.sql
+	// see testdata/fixtures/repository_blobs.sql
 	r := &models.Repository{ID: 3}
-	l := &models.Layer{ID: 1}
+	l := &models.Blob{ID: 1}
 	require.True(t, isLayerLinked(t, r, l))
 
-	err := s.LinkLayer(suite.ctx, r, l)
+	err := s.LinkBlob(suite.ctx, r, l)
 	require.NoError(t, err)
 }
 
 func TestRepositoryStore_UnlinkLayer(t *testing.T) {
-	reloadLayerFixtures(t)
+	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	// see testdata/fixtures/repository_layers.sql
+	// see testdata/fixtures/repository_blobs.sql
 	r := &models.Repository{ID: 3}
-	l := &models.Layer{ID: 1}
+	l := &models.Blob{ID: 1}
 	require.True(t, isLayerLinked(t, r, l))
 
-	err := s.UnlinkLayer(suite.ctx, r, l)
+	err := s.UnlinkBlob(suite.ctx, r, l)
 	require.NoError(t, err)
 	require.False(t, isLayerLinked(t, r, l))
 }
 
 func TestRepositoryStore_UnlinkLayer_NotLinkedDoesNotFail(t *testing.T) {
-	reloadLayerFixtures(t)
+	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	// see testdata/fixtures/repository_layers.sql
+	// see testdata/fixtures/repository_blobs.sql
 	r := &models.Repository{ID: 3}
-	l := &models.Layer{ID: 4}
+	l := &models.Blob{ID: 4}
 	require.False(t, isLayerLinked(t, r, l))
 
-	err := s.UnlinkLayer(suite.ctx, r, l)
+	err := s.UnlinkBlob(suite.ctx, r, l)
 	require.NoError(t, err)
 	require.False(t, isLayerLinked(t, r, l))
 }

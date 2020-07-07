@@ -22,41 +22,41 @@ func TestDeleteBlobDB(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	// add layer
-	lStore := datastore.NewLayerStore(env.db)
-	l := &models.Layer{
+	// add layer blob
+	bStore := datastore.NewBlobStore(env.db)
+	b := &models.Blob{
 		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 		Digest:    "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9",
 		Size:      2802957,
 	}
-	err = lStore.Create(env.ctx, l)
+	err = bStore.Create(env.ctx, b)
 	require.NoError(t, err)
 	require.NotEmpty(t, r.ID)
 
-	// link layer to repository
-	err = rStore.LinkLayer(env.ctx, r, l)
+	// link blob to repository
+	err = rStore.LinkBlob(env.ctx, r, b)
 	require.NoError(t, err)
 
 	// make sure it's linked
-	ll, err := rStore.Layers(env.ctx, r)
+	bb, err := rStore.Blobs(env.ctx, r)
 	require.NoError(t, err)
-	require.NotNil(t, ll)
-	require.Contains(t, ll, l)
+	require.NotNil(t, bb)
+	require.Contains(t, bb, b)
 
 	// Test
 
-	err = dbDeleteBlob(env.ctx, env.db, r.Path, l.Digest)
+	err = dbDeleteBlob(env.ctx, env.db, r.Path, b.Digest)
 	require.NoError(t, err)
 
-	// the layer should still be there
-	l2, err := lStore.FindByID(env.ctx, l.ID)
+	// the layer blob should still be there
+	b2, err := bStore.FindByID(env.ctx, b.ID)
 	require.NoError(t, err)
-	require.NotNil(t, l2)
+	require.NotNil(t, b2)
 
 	// but not the link for the repository
-	ll2, err := rStore.Layers(env.ctx, r)
+	bb2, err := rStore.Blobs(env.ctx, r)
 	require.NoError(t, err)
-	require.NotContains(t, ll2, l)
+	require.NotContains(t, bb2, b)
 }
 
 func TestDeleteBlobDB_RepositoryNotFound(t *testing.T) {

@@ -1,4 +1,4 @@
-INSERT INTO "layers"("id","media_type","digest_hex","size","created_at","marked_at")
+INSERT INTO "blobs"("id","media_type","digest_hex","size","created_at","marked_at")
 VALUES
 (1,E'application/vnd.docker.image.rootfs.diff.tar.gzip',decode('c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9','hex'),2802957,E'2020-03-04 20:05:35.338639+00',NULL),
 (2,E'application/vnd.docker.image.rootfs.diff.tar.gzip',decode('6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21','hex'),108,E'2020-03-04 20:05:35.338639+00',NULL),

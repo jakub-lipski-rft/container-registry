@@ -1,4 +1,4 @@
-INSERT INTO "manifest_layers"("id","manifest_id","layer_id","created_at")
+INSERT INTO "manifest_layers"("id","manifest_id","blob_id","created_at")
 VALUES
 (1,1,1,E'2020-04-03 12:20:17.841165+00'),
 (2,1,2,E'2020-04-03 12:20:17.841165+00'),

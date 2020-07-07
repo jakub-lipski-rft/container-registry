@@ -26,7 +26,7 @@ to improve consistency and discoverability:
 | ------------------------- | ----------------------------------------------------- | ----------------------------------------------- |
 | `PRIMARY KEY` constraints | `pk_<table name>`                                     | `pk_repositories`                               |
 | `FOREIGN KEY` constraints | `fk_<table name>_<column name>_<referred table name>` | `fk_repository_manifests_manifest_id_manifests` |
-| `UNIQUE` constraints      | `uq_<table name>_<column(s) name>`                    | `uq_manifest_layers_manifest_id_layer_id`       |
+| `UNIQUE` constraints      | `uq_<table name>_<column(s) name>`                    | `uq_manifest_layers_manifest_id_blob_id`       |
 | `CHECK` constraints       | `ck_<table name>_<column(s) name>_<validation name>`  | `ck_layers_media_type_length`                   |
 | Indexes                   | `ix_<table name>_<column(s) name>`                    | `ix_tags_manifest_id`                           |
 
