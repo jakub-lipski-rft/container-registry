@@ -2487,10 +2487,6 @@ func TestManifestAPI_Put_ReuseTagManifestListToManifestList(t *testing.T) {}
 func TestManifestAPI_Put_DigestReadOnly(t *testing.T) {}
 func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
 
-// TODO: Break out logic from testManifestAPISchema2 into these tests.
-// https://gitlab.com/gitlab-org/container-registry/-/issues/140
-func TestManifestAPI_Get_Schema2ByTagMissingManifest(t *testing.T) {}
-
 // TODO: Break out logic from testManifestDelete into these tests.
 // https://gitlab.com/gitlab-org/container-registry/-/issues/144
 func TestManifestAPI_Delete_Schema2(t *testing.T)                  {}
