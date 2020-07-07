@@ -29,6 +29,7 @@ func init() {
 	GCCmd.Flags().BoolVarP(&removeUntagged, "delete-untagged", "m", false, "delete manifests that are not currently referenced via tag")
 	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
 
+	MigrateCmd.AddCommand(MigrateVersionCmd)
 	MigrateCmd.AddCommand(MigrateUpCmd)
 	DBCmd.AddCommand(MigrateCmd)
 	DBCmd.AddCommand(ImportCmd)
@@ -161,6 +162,46 @@ var MigrateUpCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 			os.Exit(1)
 		}
+	},
+}
+
+// MigrateVersionCmd is the `version` sub-command of `database migrate` that shows the current migration version.
+var MigrateVersionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show current migration version",
+	Long:  "Show current migration version",
+	Run: func(cmd *cobra.Command, args []string) {
+		config, err := resolveConfiguration(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
+			os.Exit(1)
+		}
+
+		m := migrations.NewMigrator(db.DB)
+		v, err := m.Version()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to detect database version: %v", err)
+			os.Exit(1)
+		}
+		if v == "" {
+			v = "Unknown"
+		}
+
+		fmt.Printf("%s\n", v)
 	},
 }
 
