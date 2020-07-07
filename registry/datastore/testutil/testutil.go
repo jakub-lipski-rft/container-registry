@@ -22,8 +22,8 @@ const (
 	ManifestConfigurationsTable  table = "manifest_configurations"
 	ManifestsTable               table = "manifests"
 	RepositoryManifestsTable     table = "repository_manifests"
-	LayersTable                  table = "layers"
-	RepositoryLayersTable        table = "repository_layers"
+	BlobsTable                   table = "blobs"
+	RepositoryBlobsTable         table = "repository_blobs"
 	ManifestLayersTable          table = "manifest_layers"
 	ManifestListsTable           table = "manifest_lists"
 	ManifestListManifestsTable   table = "manifest_list_manifests"
@@ -37,8 +37,8 @@ var AllTables = []table{
 	ManifestConfigurationsTable,
 	ManifestsTable,
 	RepositoryManifestsTable,
-	LayersTable,
-	RepositoryLayersTable,
+	BlobsTable,
+	RepositoryBlobsTable,
 	ManifestLayersTable,
 	ManifestListsTable,
 	ManifestListManifestsTable,

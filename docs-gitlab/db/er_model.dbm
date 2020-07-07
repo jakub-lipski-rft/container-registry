@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.2" last-position="0,0" last-zoom="1.1" max-obj-count="18"
+<dbmodel pgmodeler-ver="0.9.2" last-position="0,91" last-zoom="1.1" max-obj-count="18"
 	 default-schema="public" default-owner="postgres">
 <role name="withspace"
       inherit="true"
@@ -148,7 +148,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="layers" layer="0" collapse-mode="1" max-obj-count="7">
+<table name="blobs" layer="0" collapse-mode="2" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="51.6364" y="625.818"/>
@@ -171,13 +171,13 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
 	</column>
-	<constraint name="pk_layers" type="pk-constr" table="public.layers">
+	<constraint name="pk_blobs" type="pk-constr" table="public.blobs">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_layers_digest_hex" type="uq-constr" table="public.layers">
+	<constraint name="uq_blobs_digest_hex" type="uq-constr" table="public.blobs">
 		<columns names="digest_hex" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="ck_layers_media_type_length" type="ck-constr" table="public.layers">
+	<constraint name="ck_blobs_media_type_length" type="ck-constr" table="public.blobs">
 			<expression><![CDATA[(char_length(media_type) <= 255)]]></expression>
 	</constraint>
 </table>
@@ -185,7 +185,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="manifest_layers" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="229.455" y="880.454"/>
+	<position x="162.182" y="882.272"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -193,7 +193,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="manifest_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
-	<column name="layer_id" not-null="true">
+	<column name="blob_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
@@ -202,8 +202,8 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_manifest_layers" type="pk-constr" table="public.manifest_layers">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifest_layers_manifest_id_layer_id" type="uq-constr" table="public.manifest_layers">
-		<columns names="manifest_id,layer_id" ref-type="src-columns"/>
+	<constraint name="uq_manifest_layers_manifest_id_blob_id" type="uq-constr" table="public.manifest_layers">
+		<columns names="manifest_id,blob_id" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -391,11 +391,11 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_manifest_layers_layer_id" table="public.manifest_layers"
+<index name="ix_manifest_layers_blob_id" table="public.manifest_layers"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
-			<column name="layer_id"/>
+			<column name="blob_id"/>
 		</idxelement>
 </index>
 
@@ -455,7 +455,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<table name="repository_layers" layer="0" collapse-mode="2" max-obj-count="4">
+<table name="repository_blobs" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="5.45455" y="354.545"/>
@@ -466,21 +466,21 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="repository_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
-	<column name="layer_id" not-null="true">
+	<column name="blob_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<constraint name="pk_repository_layers" type="pk-constr" table="public.repository_layers">
+	<constraint name="pk_repository_blobs" type="pk-constr" table="public.repository_blobs">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_repository_layers_repository_id_layer_id" type="uq-constr" table="public.repository_layers">
-		<columns names="repository_id,layer_id" ref-type="src-columns"/>
+	<constraint name="uq_repository_blobs_repository_id_blob_id" type="uq-constr" table="public.repository_blobs">
+		<columns names="repository_id,blob_id" ref-type="src-columns"/>
 	</constraint>
 </table>
 
-<index name="ix_repository_layers_repository_id" table="public.repository_layers"
+<index name="ix_repository_blobs_repository_id" table="public.repository_blobs"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
@@ -488,11 +488,11 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_repository_layers_layer_id" table="public.repository_layers"
+<index name="ix_repository_blobs_blob_id" table="public.repository_blobs"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
-			<column name="layer_id"/>
+			<column name="blob_id"/>
 		</idxelement>
 </index>
 
@@ -514,9 +514,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_layers_layer_id_layers" type="fk-constr" comparison-type="MATCH SIMPLE"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.layers" table="public.manifest_layers">
-	<columns names="layer_id" ref-type="src-columns"/>
+<constraint name="fk_manifest_layers_blob_id_blobs" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.blobs" table="public.manifest_layers">
+	<columns names="blob_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -574,15 +574,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_repository_layers_repository_id_repositories" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_layers">
+<constraint name="fk_repository_blobs_repository_id_repositories" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_blobs">
 	<columns names="repository_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_repository_layers_layer_id_layers" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.layers" table="public.repository_layers">
-	<columns names="layer_id" ref-type="src-columns"/>
+<constraint name="fk_repository_blobs_blob_id_blobs" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.blobs" table="public.repository_blobs">
+	<columns names="blob_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -608,7 +608,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 
 <relationship name="rel_manifest_layers_layers" type="relfk" layer="0"
 	 src-table="public.manifest_layers"
-	 dst-table="public.layers" reference-fk="fk_manifest_layers_layer_id_layers"
+	 dst-table="public.blobs" reference-fk="fk_manifest_layers_blob_id_blobs"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_manifest_list_manifests_manifest_lists" type="relfk" layer="0"
@@ -665,14 +665,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.manifests" reference-fk="fk_manifest_configurations_manifest_id_manifests"
 	 src-required="false" dst-required="false"/>
 
-<relationship name="rel_repository_layers_repositories" type="relfk" layer="0"
-	 src-table="public.repository_layers"
-	 dst-table="public.repositories" reference-fk="fk_repository_layers_repository_id_repositories"
+<relationship name="rel_repository_blobs_repositories" type="relfk" layer="0"
+	 src-table="public.repository_blobs"
+	 dst-table="public.repositories" reference-fk="fk_repository_blobs_repository_id_repositories"
 	 src-required="false" dst-required="false"/>
 
-<relationship name="rel_repository_layers_layers" type="relfk" layer="0"
-	 src-table="public.repository_layers"
-	 dst-table="public.layers" reference-fk="fk_repository_layers_layer_id_layers"
+<relationship name="rel_repository_blobs_layers" type="relfk" layer="0"
+	 src-table="public.repository_blobs"
+	 dst-table="public.blobs" reference-fk="fk_repository_blobs_blob_id_blobs"
 	 src-required="false" dst-required="false"/>
 
 <permission>

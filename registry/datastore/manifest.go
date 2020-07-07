@@ -17,7 +17,7 @@ type ManifestReader interface {
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
 	Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error)
-	Layers(ctx context.Context, m *models.Manifest) (models.Layers, error)
+	LayerBlobs(ctx context.Context, m *models.Manifest) (models.Blobs, error)
 	Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error)
 	Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error)
 }
@@ -27,8 +27,8 @@ type ManifestWriter interface {
 	Create(ctx context.Context, m *models.Manifest) error
 	Update(ctx context.Context, m *models.Manifest) error
 	Mark(ctx context.Context, m *models.Manifest) error
-	AssociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error
-	DissociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error
+	AssociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error
+	DissociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -140,19 +140,19 @@ func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models
 	return scanFullManifestConfiguration(row)
 }
 
-// Layers finds layers associated with a manifest, through the ManifestLayer relationship entity.
-func (s *manifestStore) Layers(ctx context.Context, m *models.Manifest) (models.Layers, error) {
-	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at FROM layers as l
-		JOIN manifest_layers as ml ON ml.layer_id = l.id
+// LayerBlobs finds layer blobs associated with a manifest, through the `manifest_layers` relationship entity.
+func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (models.Blobs, error) {
+	q := `SELECT b.id, b.media_type, b.digest_hex, b.size, b.created_at, b.marked_at FROM blobs as b
+		JOIN manifest_layers as ml ON ml.blob_id = b.id
 		JOIN manifests as m ON m.id = ml.manifest_id
 		WHERE m.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding layers: %w", err)
+		return nil, fmt.Errorf("error finding blobs: %w", err)
 	}
 
-	return scanFullLayers(rows)
+	return scanFullBlobs(rows)
 }
 
 // Lists finds all manifest lists which reference a manifest, through the ManifestListManifest relationship entity.
@@ -235,29 +235,29 @@ func (s *manifestStore) Mark(ctx context.Context, m *models.Manifest) error {
 	return nil
 }
 
-// AssociateLayer associates a layer and a manifest. It does nothing if already associated.
-func (s *manifestStore) AssociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error {
-	q := `INSERT INTO manifest_layers (manifest_id, layer_id) VALUES ($1, $2)
-		ON CONFLICT (manifest_id, layer_id) DO NOTHING`
+// AssociateLayerBlob associates a layer blob and a manifest. It does nothing if already associated.
+func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
+	q := `INSERT INTO manifest_layers (manifest_id, blob_id) VALUES ($1, $2)
+		ON CONFLICT (manifest_id, blob_id) DO NOTHING`
 
-	if _, err := s.db.ExecContext(ctx, q, m.ID, l.ID); err != nil {
-		return fmt.Errorf("error associating layer: %w", err)
+	if _, err := s.db.ExecContext(ctx, q, m.ID, b.ID); err != nil {
+		return fmt.Errorf("error associating layer blob: %w", err)
 	}
 
 	return nil
 }
 
-// DissociateLayer dissociates a layer and a manifest. It does nothing if not associated.
-func (s *manifestStore) DissociateLayer(ctx context.Context, m *models.Manifest, l *models.Layer) error {
-	q := "DELETE FROM manifest_layers WHERE manifest_id = $1 AND layer_id = $2"
+// DissociateLayerBlob dissociates a layer blob and a manifest. It does nothing if not associated.
+func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
+	q := "DELETE FROM manifest_layers WHERE manifest_id = $1 AND blob_id = $2"
 
-	res, err := s.db.ExecContext(ctx, q, m.ID, l.ID)
+	res, err := s.db.ExecContext(ctx, q, m.ID, b.ID)
 	if err != nil {
-		return fmt.Errorf("error dissociating layer: %w", err)
+		return fmt.Errorf("error dissociating layer blob: %w", err)
 	}
 
 	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error dissociating layer: %w", err)
+		return fmt.Errorf("error dissociating layer blob: %w", err)
 	}
 
 	return nil

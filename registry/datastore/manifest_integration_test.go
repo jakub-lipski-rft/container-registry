@@ -21,7 +21,7 @@ func reloadManifestFixtures(tb testing.TB) {
 		tb, suite.db, suite.basePath,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
 		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.RepositoryManifestsTable, testutil.LayersTable, testutil.ManifestLayersTable,
+		testutil.RepositoryManifestsTable, testutil.BlobsTable, testutil.ManifestLayersTable,
 	)
 }
 
@@ -30,7 +30,7 @@ func unloadManifestFixtures(tb testing.TB) {
 		suite.db,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
 		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.RepositoryManifestsTable, testutil.LayersTable, testutil.ManifestLayersTable,
+		testutil.RepositoryManifestsTable, testutil.BlobsTable, testutil.ManifestLayersTable,
 	))
 }
 
@@ -187,12 +187,12 @@ func TestManifestStore_Layers(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
-	ll, err := s.Layers(suite.ctx, &models.Manifest{ID: 1})
+	bb, err := s.LayerBlobs(suite.ctx, &models.Manifest{ID: 1})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/manifest_layers.sql
-	local := ll[0].CreatedAt.Location()
-	expected := models.Layers{
+	local := bb[0].CreatedAt.Location()
+	expected := models.Blobs{
 		{
 			ID:        1,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
@@ -208,18 +208,18 @@ func TestManifestStore_Layers(t *testing.T) {
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
 		},
 	}
-	require.Equal(t, expected, ll)
+	require.Equal(t, expected, bb)
 }
 
 func TestManifestStore_Lists(t *testing.T) {
 	reloadManifestListFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
-	ll, err := s.Lists(suite.ctx, &models.Manifest{ID: 1})
+	bb, err := s.Lists(suite.ctx, &models.Manifest{ID: 1})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/manifest_layers.sql
-	local := ll[0].CreatedAt.Location()
+	local := bb[0].CreatedAt.Location()
 	expected := models.ManifestLists{
 		{
 			ID:            1,
@@ -238,7 +238,7 @@ func TestManifestStore_Lists(t *testing.T) {
 			CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:04.470711", local),
 		},
 	}
-	require.Equal(t, expected, ll)
+	require.Equal(t, expected, bb)
 }
 
 func TestManifestStore_Repositories(t *testing.T) {
@@ -357,23 +357,23 @@ func TestManifestStore_Mark_NotFound(t *testing.T) {
 	require.EqualError(t, err, "manifest not found")
 }
 
-func TestManifestStore_AssociateLayer(t *testing.T) {
+func TestManifestStore_AssociateLayerBlob(t *testing.T) {
 	reloadManifestFixtures(t)
 	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestLayersTable))
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{ID: 1}
-	l := &models.Layer{ID: 3}
+	b := &models.Blob{ID: 3}
 
-	err := s.AssociateLayer(suite.ctx, m, l)
+	err := s.AssociateLayerBlob(suite.ctx, m, b)
 	require.NoError(t, err)
 
-	ll, err := s.Layers(suite.ctx, m)
+	bb, err := s.LayerBlobs(suite.ctx, m)
 	require.NoError(t, err)
 
 	// see testdata/fixtures/manifest_layers.sql
-	local := ll[0].CreatedAt.Location()
-	expected := models.Layers{
+	local := bb[0].CreatedAt.Location()
+	expected := models.Blobs{
 		{
 			ID:        3,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
@@ -382,37 +382,37 @@ func TestManifestStore_AssociateLayer(t *testing.T) {
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:06:32.856423", local),
 		},
 	}
-	require.Equal(t, expected, ll)
+	require.Equal(t, expected, bb)
 }
 
-func TestManifestStore_AssociateLayer_AlreadyAssociatedDoesNotFail(t *testing.T) {
+func TestManifestStore_AssociateLayerBlob_AlreadyAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
 
 	// see testdata/fixtures/manifest_layers.sql
 	m := &models.Manifest{ID: 1}
-	l := &models.Layer{ID: 1}
-	err := s.AssociateLayer(suite.ctx, m, l)
+	b := &models.Blob{ID: 1}
+	err := s.AssociateLayerBlob(suite.ctx, m, b)
 	require.NoError(t, err)
 }
 
-func TestManifestStore_DissociateLayer(t *testing.T) {
+func TestManifestStore_DissociateLayerBlob(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{ID: 1}
-	l := &models.Layer{ID: 1}
+	b := &models.Blob{ID: 1}
 
-	err := s.DissociateLayer(suite.ctx, m, l)
+	err := s.DissociateLayerBlob(suite.ctx, m, b)
 	require.NoError(t, err)
 
-	ll, err := s.Layers(suite.ctx, m)
+	bb, err := s.LayerBlobs(suite.ctx, m)
 	require.NoError(t, err)
 
 	// see testdata/fixtures/manifest_layers.sql
-	local := ll[0].CreatedAt.Location()
-	unexpected := models.Layers{
+	local := bb[0].CreatedAt.Location()
+	unexpected := models.Blobs{
 		{
 			ID:        1,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
@@ -421,17 +421,17 @@ func TestManifestStore_DissociateLayer(t *testing.T) {
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
 		},
 	}
-	require.NotContains(t, ll, unexpected)
+	require.NotContains(t, bb, unexpected)
 }
 
-func TestManifestStore_DissociateLayer_NotAssociatedDoesNotFail(t *testing.T) {
+func TestManifestStore_DissociateLayerBlob_NotAssociatedDoesNotFail(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{ID: 1}
-	l := &models.Layer{ID: 5}
+	b := &models.Blob{ID: 5}
 
-	err := s.DissociateLayer(suite.ctx, m, l)
+	err := s.DissociateLayerBlob(suite.ctx, m, b)
 	require.NoError(t, err)
 }
 

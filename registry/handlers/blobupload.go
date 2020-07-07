@@ -124,19 +124,19 @@ func dbMountBlob(ctx context.Context, db datastore.Queryer, fromRepoPath, toRepo
 		return errors.New("source repository not found in database")
 	}
 
-	// find source layer, which must be linked in the source repository
-	srcLayers, err := rStore.Layers(ctx, srcRepo)
+	// find source blob which must be linked in the source repository
+	srcBlobs, err := rStore.Blobs(ctx, srcRepo)
 	if err != nil {
 		return err
 	}
-	var l *models.Layer
-	for _, layer := range srcLayers {
-		if layer.Digest == d {
-			l = layer
+	var b *models.Blob
+	for _, blob := range srcBlobs {
+		if blob.Digest == d {
+			b = blob
 			break
 		}
 	}
-	if l == nil {
+	if b == nil {
 		return errors.New("blob not found in database")
 	}
 
@@ -146,8 +146,8 @@ func dbMountBlob(ctx context.Context, db datastore.Queryer, fromRepoPath, toRepo
 		return err
 	}
 
-	// link layer (does nothing if already linked)
-	return rStore.LinkLayer(ctx, destRepo, l)
+	// link blob (does nothing if already linked)
+	return rStore.LinkBlob(ctx, destRepo, b)
 }
 
 // StartBlobUpload begins the blob upload process and allocates a server-side
@@ -253,14 +253,14 @@ func dbPutBlobUploadComplete(ctx context.Context, db *datastore.DB, repoPath str
 	}
 	defer tx.Rollback()
 
-	// create or find layer
-	ls := datastore.NewLayerStore(tx)
-	l := &models.Layer{
+	// create or find blob
+	bs := datastore.NewBlobStore(tx)
+	b := &models.Blob{
 		MediaType: desc.MediaType,
 		Digest:    desc.Digest,
 		Size:      desc.Size,
 	}
-	if err := ls.CreateOrFind(ctx, l); err != nil {
+	if err := bs.CreateOrFind(ctx, b); err != nil {
 		return err
 	}
 
@@ -271,8 +271,8 @@ func dbPutBlobUploadComplete(ctx context.Context, db *datastore.DB, repoPath str
 		return err
 	}
 
-	// link layer to repository
-	if err := rStore.LinkLayer(ctx, r, l); err != nil {
+	// link blob to repository
+	if err := rStore.LinkBlob(ctx, r, b); err != nil {
 		return err
 	}
 

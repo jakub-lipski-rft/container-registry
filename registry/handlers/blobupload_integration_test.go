@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/opencontainers/go-digest"
@@ -35,59 +34,59 @@ func randomDigest(t *testing.T) digest.Digest {
 	return digest.FromBytes(bytes)
 }
 
-func buildRandomLayer(t *testing.T, env *env) *models.Layer {
+func buildRandomBlob(t *testing.T, env *env) *models.Blob {
 	t.Helper()
 
-	lStore := datastore.NewLayerStore(env.db)
+	bStore := datastore.NewBlobStore(env.db)
 
-	l := &models.Layer{
-		MediaType: schema2.MediaTypeLayer,
+	b := &models.Blob{
+		MediaType: "application/octect-stream",
 		Digest:    randomDigest(t),
 		Size:      rand.Int63n(10000),
 	}
-	err := lStore.Create(env.ctx, l)
+	err := bStore.Create(env.ctx, b)
 	require.NoError(t, err)
 
-	return l
+	return b
 }
 
-func randomLayerDescriptor(t *testing.T) distribution.Descriptor {
+func randomBlobDescriptor(t *testing.T) distribution.Descriptor {
 	t.Helper()
 
 	return distribution.Descriptor{
-		MediaType: schema2.MediaTypeLayer,
+		MediaType: "application/octect-stream",
 		Digest:    randomDigest(t),
 		Size:      rand.Int63n(10000),
 	}
 }
 
-func descriptorFromLayer(t *testing.T, l *models.Layer) distribution.Descriptor {
+func descriptorFromBlob(t *testing.T, b *models.Blob) distribution.Descriptor {
 	t.Helper()
 
 	return distribution.Descriptor{
-		MediaType: l.MediaType,
-		Digest:    l.Digest,
-		Size:      l.Size,
+		MediaType: b.MediaType,
+		Digest:    b.Digest,
+		Size:      b.Size,
 	}
 }
 
-func linkLayer(t *testing.T, env *env, r *models.Repository, l *models.Layer) {
+func linkBlob(t *testing.T, env *env, r *models.Repository, b *models.Blob) {
 	t.Helper()
 
 	rStore := datastore.NewRepositoryStore(env.db)
-	err := rStore.LinkLayer(env.ctx, r, l)
+	err := rStore.LinkBlob(env.ctx, r, b)
 	require.NoError(t, err)
 }
 
-func isLayerLinked(t *testing.T, env *env, r *models.Repository, l *models.Layer) bool {
+func isBlobLinked(t *testing.T, env *env, r *models.Repository, b *models.Blob) bool {
 	t.Helper()
 
 	rStore := datastore.NewRepositoryStore(env.db)
-	ll, err := rStore.Layers(env.ctx, r)
+	bb, err := rStore.Blobs(env.ctx, r)
 	require.NoError(t, err)
 
-	for _, layer := range ll {
-		if layer.Digest == l.Digest {
+	for _, blob := range bb {
+		if blob.Digest == b.Digest {
 			return true
 		}
 	}
@@ -106,15 +105,15 @@ func findRepository(t *testing.T, env *env, path string) *models.Repository {
 	return r
 }
 
-func findLayer(t *testing.T, env *env, d digest.Digest) *models.Layer {
+func findBlob(t *testing.T, env *env, d digest.Digest) *models.Blob {
 	t.Helper()
 
-	rStore := datastore.NewLayerStore(env.db)
-	l, err := rStore.FindByDigest(env.ctx, d)
+	rStore := datastore.NewBlobStore(env.db)
+	b, err := rStore.FindByDigest(env.ctx, d)
 	require.NoError(t, err)
-	require.NotNil(t, l)
+	require.NotNil(t, b)
 
-	return l
+	return b
 }
 
 func TestDBMountBlob_NonExistentSourceRepo(t *testing.T) {
@@ -142,9 +141,9 @@ func TestDBMountBlob_NonExistentBlobLinkInSourceRepo(t *testing.T) {
 	defer env.shutdown(t)
 
 	fromRepo := buildRepository(t, env, "from")
-	l := buildRandomLayer(t, env) // not linked in fromRepo
+	b := buildRandomBlob(t, env) // not linked in fromRepo
 
-	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", l.Digest)
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", b.Digest)
 	require.Error(t, err)
 	require.Equal(t, err.Error(), "blob not found in database")
 }
@@ -154,109 +153,109 @@ func TestDBMountBlob_NonExistentDestinationRepo(t *testing.T) {
 	defer env.shutdown(t)
 
 	fromRepo := buildRepository(t, env, "from")
-	l := buildRandomLayer(t, env)
-	linkLayer(t, env, fromRepo, l)
+	b := buildRandomBlob(t, env)
+	linkBlob(t, env, fromRepo, b)
 
-	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", l.Digest)
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", b.Digest)
 	require.NoError(t, err)
 
 	destRepo := findRepository(t, env, "to")
-	require.True(t, isLayerLinked(t, env, destRepo, l))
+	require.True(t, isBlobLinked(t, env, destRepo, b))
 }
 
 func TestDBMountBlob_AlreadyLinked(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
-	l := buildRandomLayer(t, env)
+	b := buildRandomBlob(t, env)
 
 	fromRepo := buildRepository(t, env, "from")
-	linkLayer(t, env, fromRepo, l)
+	linkBlob(t, env, fromRepo, b)
 
 	destRepo := buildRepository(t, env, "to")
-	linkLayer(t, env, destRepo, l)
+	linkBlob(t, env, destRepo, b)
 
-	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, destRepo.Path, l.Digest)
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, destRepo.Path, b.Digest)
 	require.NoError(t, err)
 
-	require.True(t, isLayerLinked(t, env, destRepo, l))
+	require.True(t, isBlobLinked(t, env, destRepo, b))
 }
 
-func TestDBPutBlobUploadComplete_NonExistentRepoAndLayer(t *testing.T) {
+func TestDBPutBlobUploadComplete_NonExistentRepoAndBlob(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
-	desc := randomLayerDescriptor(t)
+	desc := randomBlobDescriptor(t)
 	err := dbPutBlobUploadComplete(env.ctx, env.db, "foo", desc)
 	require.NoError(t, err)
 
-	// the layer should have been created
-	l := findLayer(t, env, desc.Digest)
+	// the blob should have been created
+	b := findBlob(t, env, desc.Digest)
 	// and so does the repository
 	r := findRepository(t, env, "foo")
-	// and the link between layer and repository
-	require.True(t, isLayerLinked(t, env, r, l))
+	// and the link between blob and repository
+	require.True(t, isBlobLinked(t, env, r, b))
 }
 
-func TestDBPutBlobUploadComplete_NonExistentRepoAndExistentLayer(t *testing.T) {
+func TestDBPutBlobUploadComplete_NonExistentRepoAndExistentBlob(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
-	l := buildRandomLayer(t, env)
+	b := buildRandomBlob(t, env)
 
-	desc := descriptorFromLayer(t, l)
+	desc := descriptorFromBlob(t, b)
 	err := dbPutBlobUploadComplete(env.ctx, env.db, "foo", desc)
 	require.NoError(t, err)
 
 	// the repository should have been created
 	r := findRepository(t, env, "foo")
-	// and so does the link between layer and repository
-	require.True(t, isLayerLinked(t, env, r, l))
+	// and so does the link between blob and repository
+	require.True(t, isBlobLinked(t, env, r, b))
 }
 
-func TestDBPutBlobUploadComplete_ExistentRepoAndNonExistentLayer(t *testing.T) {
+func TestDBPutBlobUploadComplete_ExistentRepoAndNonExistentBlob(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
 	r := buildRepository(t, env, "foo")
 
-	desc := randomLayerDescriptor(t)
+	desc := randomBlobDescriptor(t)
 	err := dbPutBlobUploadComplete(env.ctx, env.db, r.Path, desc)
 	require.NoError(t, err)
 
-	// the layer should have been created
-	l := findLayer(t, env, desc.Digest)
-	// and so does the link between layer and repository
-	require.True(t, isLayerLinked(t, env, r, l))
+	// the blob should have been created
+	b := findBlob(t, env, desc.Digest)
+	// and so does the link between blob and repository
+	require.True(t, isBlobLinked(t, env, r, b))
 }
 
-func TestDBPutBlobUploadComplete_ExistentRepoAndLayerButNotLinked(t *testing.T) {
+func TestDBPutBlobUploadComplete_ExistentRepoAndBlobButNotLinked(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
 	r := buildRepository(t, env, "foo")
-	l := buildRandomLayer(t, env)
+	b := buildRandomBlob(t, env)
 
-	desc := descriptorFromLayer(t, l)
+	desc := descriptorFromBlob(t, b)
 	err := dbPutBlobUploadComplete(env.ctx, env.db, r.Path, desc)
 	require.NoError(t, err)
 
-	// the link between layer and repository should have been created
-	require.True(t, isLayerLinked(t, env, r, l))
+	// the link between blob and repository should have been created
+	require.True(t, isBlobLinked(t, env, r, b))
 }
 
-func TestDBPutBlobUploadComplete_ExistentRepoAndLayerAlreadyLinked(t *testing.T) {
+func TestDBPutBlobUploadComplete_ExistentRepoAndBlobAlreadyLinked(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
 	r := buildRepository(t, env, "foo")
-	l := buildRandomLayer(t, env)
-	linkLayer(t, env, r, l)
+	b := buildRandomBlob(t, env)
+	linkBlob(t, env, r, b)
 
-	desc := descriptorFromLayer(t, l)
+	desc := descriptorFromBlob(t, b)
 	err := dbPutBlobUploadComplete(env.ctx, env.db, r.Path, desc)
 	require.NoError(t, err)
 
-	// the link between layer and repository should remain
-	require.True(t, isLayerLinked(t, env, r, l))
+	// the link between blob and repository should remain
+	require.True(t, isBlobLinked(t, env, r, b))
 }

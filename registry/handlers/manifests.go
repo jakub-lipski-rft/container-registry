@@ -864,19 +864,22 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 
 		dbManifest = m
 
-		// find and associate manifest layers
-		layerStore := datastore.NewLayerStore(db)
+		// find and associate manifest layer blobs
+		blobStore := datastore.NewBlobStore(db)
 		for _, reqLayer := range manifest.Layers {
-			dbLayer, err := layerStore.FindByDigest(ctx, reqLayer.Digest)
+			dbBlob, err := blobStore.FindByDigest(ctx, reqLayer.Digest)
 			if err != nil {
 				return err
 			}
 
-			if dbLayer == nil {
-				return fmt.Errorf("layer %s not found in database", reqLayer.Digest)
+			if dbBlob == nil {
+				return fmt.Errorf("layer blob %s not found in database", reqLayer.Digest)
 			}
 
-			if err := mStore.AssociateLayer(ctx, dbManifest, dbLayer); err != nil {
+			// TODO: update the layer blob media_type here, it was set to "application/octect-stream" during the upload
+			// 		 but now we know its concrete type (reqLayer.MediaType).
+
+			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
 				return err
 			}
 		}
@@ -902,6 +905,8 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 				return err
 			}
 		}
+		// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
+		// 		 but now we know its concrete type (manifest.Config.MediaType).
 	}
 
 	// Associate manifest and repository.
@@ -942,19 +947,22 @@ func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, dgst digest
 
 		dbManifest = m
 
-		// find and associate manifest layers
-		layerStore := datastore.NewLayerStore(db)
+		// find and associate manifest layer blobs
+		blobStore := datastore.NewBlobStore(db)
 		for _, layer := range manifest.FSLayers {
-			dbLayer, err := layerStore.FindByDigest(ctx, layer.BlobSum)
+			dbBlob, err := blobStore.FindByDigest(ctx, layer.BlobSum)
 			if err != nil {
 				return err
 			}
 
-			if dbLayer == nil {
-				return fmt.Errorf("layer %s not found in database", layer.BlobSum)
+			if dbBlob == nil {
+				return fmt.Errorf("layer blob %s not found in database", layer.BlobSum)
 			}
 
-			if err := mStore.AssociateLayer(ctx, dbManifest, dbLayer); err != nil {
+			// TODO: update the layer blob media_type here, it was set to "application/octect-stream" during the upload
+			// 		 but now we know its concrete type (reqLayer.MediaType).
+
+			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
 				return err
 			}
 		}

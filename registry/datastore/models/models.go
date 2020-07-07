@@ -60,7 +60,7 @@ type Tag struct {
 // Tags is a slice of Tag pointers.
 type Tags []*Tag
 
-type Layer struct {
+type Blob struct {
 	ID        int64
 	MediaType string
 	Digest    digest.Digest
@@ -69,8 +69,8 @@ type Layer struct {
 	MarkedAt  sql.NullTime
 }
 
-// Layers is a slice of Layer pointers.
-type Layers []*Layer
+// Blobs is a slice of Blob pointers.
+type Blobs []*Blob
 
 type ManifestList struct {
 	ID            int64

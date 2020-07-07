@@ -32,7 +32,7 @@ type Importer struct {
 	manifestStore              *manifestStore
 	manifestListStore          *manifestListStore
 	tagStore                   *tagStore
-	layerStore                 *layerStore
+	blobStore                  *blobStore
 }
 
 // NewImporter creates a new Importer.
@@ -43,7 +43,7 @@ func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distri
 		manifestConfigurationStore: NewManifestConfigurationStore(db),
 		manifestStore:              NewManifestStore(db),
 		manifestListStore:          NewManifestListStore(db),
-		layerStore:                 NewLayerStore(db),
+		blobStore:                  NewBlobStore(db),
 		repositoryStore:            NewRepositoryStore(db),
 		tagStore:                   NewTagStore(db),
 	}
@@ -65,10 +65,10 @@ func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manif
 	return dbManifest, nil
 }
 
-func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distribution.Repository, l *models.Layer) (*models.Layer, error) {
-	dbLayer, err := imp.layerStore.FindByDigest(ctx, l.Digest)
+func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distribution.Repository, l *models.Blob) (*models.Blob, error) {
+	dbLayer, err := imp.blobStore.FindByDigest(ctx, l.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for layer: %w", err)
+		return nil, fmt.Errorf("error searching for layer blob: %w", err)
 	}
 
 	if dbLayer == nil {
@@ -77,14 +77,14 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 			blobStore := fsRepo.Blobs(ctx)
 			desc, err := blobStore.Stat(ctx, digest.Digest(l.Digest))
 			if err != nil {
-				return nil, fmt.Errorf("error obtaining layer size: %w", err)
+				return nil, fmt.Errorf("error obtaining blob layer size: %w", err)
 			}
 			l.Size = desc.Size
 			l.MediaType = desc.MediaType
 		}
 
-		if err := imp.layerStore.Create(ctx, l); err != nil {
-			return nil, fmt.Errorf("error creating layer: %w", err)
+		if err := imp.blobStore.Create(ctx, l); err != nil {
+			return nil, fmt.Errorf("error creating layer blob: %w", err)
 		}
 		dbLayer = l
 	}
@@ -108,17 +108,17 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, mc *model
 	return dbConfig, nil
 }
 
-func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, l *models.Layer) error {
+func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, l *models.Blob) error {
 	dbLayer, err := imp.findOrCreateDBLayer(ctx, fsRepo, l)
 	if err != nil {
 		return err
 	}
-	if err := imp.manifestStore.AssociateLayer(ctx, dbManifest, dbLayer); err != nil {
-		return fmt.Errorf("error associating layer with manifest: %w", err)
+	if err := imp.manifestStore.AssociateLayerBlob(ctx, dbManifest, dbLayer); err != nil {
+		return fmt.Errorf("error associating layer blob with manifest: %w", err)
 	}
 
-	if err := imp.repositoryStore.LinkLayer(ctx, dbRepo, dbLayer); err != nil {
-		return fmt.Errorf("error linking layer to repository: %w", err)
+	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbLayer); err != nil {
+		return fmt.Errorf("error linking layer blob to repository: %w", err)
 	}
 
 	return nil
@@ -134,7 +134,7 @@ func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distributio
 		})
 		log.Info("importing layer")
 
-		if err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Layer{Digest: fsLayer.BlobSum}); err != nil {
+		if err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Blob{Digest: fsLayer.BlobSum}); err != nil {
 			log.WithError(err).Error("error importing layer")
 			continue
 		}
@@ -155,7 +155,7 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 		})
 		log.Info("importing layer")
 
-		err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Layer{
+		err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Blob{
 			MediaType: fsLayer.MediaType,
 			Digest:    fsLayer.Digest,
 			Size:      fsLayer.Size,
@@ -507,7 +507,7 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	numLayers, err := imp.layerStore.Count(ctx)
+	numLayers, err := imp.blobStore.Count(ctx)
 	if err != nil {
 		return nil, err
 	}

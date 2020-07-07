@@ -34,7 +34,7 @@ type RepositoryReader interface {
 	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
 	FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error)
 	FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error)
-	Layers(ctx context.Context, r *models.Repository) (models.Layers, error)
+	Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error)
 }
 
 // RepositoryWriter is the interface that defines write operations for a repository store.
@@ -50,8 +50,8 @@ type RepositoryWriter interface {
 	DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
-	LinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error
-	UnlinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error
+	LinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error
+	UnlinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -361,20 +361,20 @@ func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *model
 	return scanFullManifestList(row)
 }
 
-// Layers finds all layers associated with the repository.
-func (s *repositoryStore) Layers(ctx context.Context, r *models.Repository) (models.Layers, error) {
-	q := `SELECT l.id, l.media_type, l.digest_hex, l.size, l.created_at, l.marked_at
-		FROM layers as l
-		JOIN repository_layers as rl ON rl.layer_id = l.id
-		JOIN repositories AS r ON r.id = rl.repository_id
+// Blobs finds all blobs associated with the repository.
+func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error) {
+	q := `SELECT b.id, b.media_type, b.digest_hex, b.size, b.created_at, b.marked_at
+		FROM blobs as b
+		JOIN repository_blobs as rb ON rb.blob_id = b.id
+		JOIN repositories AS r ON r.id = rb.repository_id
 		WHERE r.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding layers: %w", err)
+		return nil, fmt.Errorf("error finding blobs: %w", err)
 	}
 
-	return scanFullLayers(rows)
+	return scanFullBlobs(rows)
 }
 
 // Create saves a new repository.
@@ -616,29 +616,29 @@ func (s *repositoryStore) UntagManifestList(ctx context.Context, r *models.Repos
 	return nil
 }
 
-// LinkLayer links a layer to a repository. It does nothing if already linked.
-func (s *repositoryStore) LinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error {
-	q := `INSERT INTO repository_layers (repository_id, layer_id) VALUES ($1, $2)
-		ON CONFLICT (repository_id, layer_id) DO NOTHING`
+// LinkBlob links a blob to a repository. It does nothing if already linked.
+func (s *repositoryStore) LinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error {
+	q := `INSERT INTO repository_blobs (repository_id, blob_id) VALUES ($1, $2)
+		ON CONFLICT (repository_id, blob_id) DO NOTHING`
 
-	if _, err := s.db.ExecContext(ctx, q, r.ID, l.ID); err != nil {
-		return fmt.Errorf("error linking layer: %w", err)
+	if _, err := s.db.ExecContext(ctx, q, r.ID, b.ID); err != nil {
+		return fmt.Errorf("error linking blob: %w", err)
 	}
 
 	return nil
 }
 
-// UnlinkLayer unlinks a layer from a repository. It does nothing if not linked.
-func (s *repositoryStore) UnlinkLayer(ctx context.Context, r *models.Repository, l *models.Layer) error {
-	q := "DELETE FROM repository_layers WHERE repository_id = $1 AND layer_id = $2"
+// UnlinkBlob unlinks a blob from a repository. It does nothing if not linked.
+func (s *repositoryStore) UnlinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error {
+	q := "DELETE FROM repository_blobs WHERE repository_id = $1 AND blob_id = $2"
 
-	res, err := s.db.ExecContext(ctx, q, r.ID, l.ID)
+	res, err := s.db.ExecContext(ctx, q, r.ID, b.ID)
 	if err != nil {
-		return fmt.Errorf("error linking layer: %w", err)
+		return fmt.Errorf("error linking blob: %w", err)
 	}
 
 	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error linking layer: %w", err)
+		return fmt.Errorf("error linking blob: %w", err)
 	}
 
 	return nil

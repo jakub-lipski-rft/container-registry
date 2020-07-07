@@ -1,4 +1,4 @@
-INSERT INTO "repository_layers"("id", "repository_id", "layer_id", "created_at")
+INSERT INTO "repository_blobs"("id", "repository_id", "blob_id", "created_at")
 VALUES (1, 3, 1, E'2020-05-27 13:05:35.338639+00'),
        (2, 3, 2, E'2020-05-27 13:05:35.338639+00'),
        (3, 3, 3, E'2020-05-27 13:05:35.338639+00'),

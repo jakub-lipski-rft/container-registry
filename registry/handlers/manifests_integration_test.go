@@ -44,17 +44,17 @@ func (e *env) isDatabaseEnabled() bool {
 func (e *env) uploadLayerToDB(t *testing.T, desc distribution.Descriptor) {
 	t.Helper()
 
-	layerStore := datastore.NewLayerStore(e.db)
+	blobStore := datastore.NewBlobStore(e.db)
 
-	dbLayer, err := layerStore.FindByDigest(e.ctx, desc.Digest)
+	dbBlob, err := blobStore.FindByDigest(e.ctx, desc.Digest)
 	require.NoError(t, err)
 
-	// Layer is already present.
-	if dbLayer != nil {
+	// Layer blob is already present.
+	if dbBlob != nil {
 		return
 	}
 
-	err = layerStore.Create(e.ctx, &models.Layer{
+	err = blobStore.Create(e.ctx, &models.Blob{
 		MediaType: desc.MediaType,
 		Digest:    desc.Digest,
 		Size:      desc.Size,
@@ -407,17 +407,17 @@ func TestPutManifestSchema1_MissingLayer(t *testing.T) {
 
 	manifest := seedRandomSchema1Manifest(t, env)
 
-	layerStore := datastore.NewLayerStore(env.db)
+	blobStore := datastore.NewBlobStore(env.db)
 
-	// Remove layer from database before uploading manifest
-	dbLayer, err := layerStore.FindByDigest(env.ctx, manifest.FSLayers[0].BlobSum)
+	// Remove layer blob from database before uploading manifest
+	dbBlob, err := blobStore.FindByDigest(env.ctx, manifest.FSLayers[0].BlobSum)
 	require.NoError(t, err)
-	require.NotNil(t, dbLayer)
+	require.NotNil(t, dbBlob)
 
-	layerStore.Delete(env.ctx, dbLayer.ID)
+	blobStore.Delete(env.ctx, dbBlob.ID)
 	require.NoError(t, err)
 
-	// Try to put manifest with missing layer.
+	// Try to put manifest with missing layer blob.
 	sm, err := schema1.Sign(&manifest, env.pk)
 	require.NoError(t, err)
 
@@ -540,15 +540,15 @@ func verifySchema1Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	}
 	assert.True(t, foundRepo)
 
-	// Ensure presence of each layer.
-	dbLayers, err := mStore.Layers(env.ctx, dbManifest)
+	// Ensure presence of each layer blob.
+	dbBlobs, err := mStore.LayerBlobs(env.ctx, dbManifest)
 	require.NoError(t, err)
-	require.NotEmpty(t, dbLayers)
+	require.NotEmpty(t, dbBlobs)
 
 	for _, fsLayer := range manifest.FSLayers {
 		var foundLayer bool
-		for _, layer := range dbLayers {
-			if layer.Digest == fsLayer.BlobSum {
+		for _, blob := range dbBlobs {
+			if blob.Digest == fsLayer.BlobSum {
 				foundLayer = true
 				break
 			}
@@ -594,16 +594,16 @@ func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	assert.NotNil(t, dbMCfg)
 	assert.EqualValues(t, cfgPayload, dbMCfg.Payload)
 
-	// Ensure presence of each layer.
-	dbLayers, err := mStore.Layers(env.ctx, dbManifest)
+	// Ensure presence of each layer blob.
+	dbBlobs, err := mStore.LayerBlobs(env.ctx, dbManifest)
 	require.NoError(t, err)
-	require.NotEmpty(t, dbLayers)
+	require.NotEmpty(t, dbBlobs)
 
 	for _, desc := range manifest.Layers {
 		var foundLayer bool
-		for _, layer := range dbLayers {
-			if layer.Digest == desc.Digest &&
-				layer.Size == desc.Size {
+		for _, blob := range dbBlobs {
+			if blob.Digest == desc.Digest &&
+				blob.Size == desc.Size {
 				foundLayer = true
 				break
 			}

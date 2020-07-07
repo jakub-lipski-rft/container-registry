@@ -72,14 +72,14 @@ func dbGetBlob(ctx context.Context, db datastore.Queryer, repoPath string, dgst 
 		return v2.ErrorCodeBlobUnknown.WithDetail(dgst)
 	}
 
-	ll, err := rStore.Layers(ctx, r)
+	bb, err := rStore.Blobs(ctx, r)
 	if err != nil {
 		return errcode.ErrorCodeUnknown.WithDetail(err)
 	}
 
 	var found bool
-	for _, l := range ll {
-		if l.Digest == dgst {
+	for _, b := range bb {
+		if b.Digest == dgst {
 			found = true
 			break
 		}
@@ -136,23 +136,23 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		return errors.New("repository not found in database")
 	}
 
-	ll, err := rStore.Layers(ctx, r)
+	bb, err := rStore.Blobs(ctx, r)
 	if err != nil {
 		return err
 	}
 
-	var l *models.Layer
-	for _, layer := range ll {
+	var b *models.Blob
+	for _, layer := range bb {
 		if layer.Digest == d {
-			l = layer
+			b = layer
 			break
 		}
 	}
-	if l == nil {
+	if b == nil {
 		return errors.New("blob not found in database")
 	}
 
-	return rStore.UnlinkLayer(ctx, r, l)
+	return rStore.UnlinkBlob(ctx, r, b)
 }
 
 // DeleteBlob deletes a layer blob
