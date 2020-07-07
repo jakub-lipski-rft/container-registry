@@ -17,15 +17,15 @@ func init() {
 }
 
 type migrator struct {
-	db *sql.DB
+	db  *sql.DB
+	src *migrate.MemoryMigrationSource
 }
 
 func NewMigrator(db *sql.DB) *migrator {
-	return &migrator{db: db}
-}
-
-func migrateSource() migrate.MigrationSource {
-	return &migrate.MemoryMigrationSource{Migrations: allMigrations}
+	return &migrator{
+		db:  db,
+		src: &migrate.MemoryMigrationSource{Migrations: allMigrations},
+	}
 }
 
 // versionFromID splits a migration ID in the form of `<version>_<name>` and returns version.
@@ -49,7 +49,7 @@ func (m *migrator) Version() (string, error) {
 
 // LatestVersion identifies the version of the most recent migration in the repository (if any).
 func (m *migrator) LatestVersion() (string, error) {
-	all, err := migrateSource().FindMigrations()
+	all, err := m.src.FindMigrations()
 	if err != nil {
 		return "", err
 	}
@@ -62,7 +62,7 @@ func (m *migrator) LatestVersion() (string, error) {
 }
 
 func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) error {
-	_, err := migrate.ExecMax(m.db, dialect, migrateSource(), direction, limit)
+	_, err := migrate.ExecMax(m.db, dialect, m.src, direction, limit)
 	return err
 }
 
