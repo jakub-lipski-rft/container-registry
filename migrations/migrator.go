@@ -79,6 +79,17 @@ func (m *migrator) Down() error {
 	return m.migrate(migrate.Down, 0)
 }
 
+// DownN applies up to n pending down migrations. All migrations will be applied if n is 0.
+func (m *migrator) DownN(n int) error {
+	return m.migrate(migrate.Down, n)
+}
+
+// DownNPlan plans up to n pending down migrations and returns the ordered list of migration IDs. All pending migrations
+// will be planned if n is 0.
+func (m *migrator) DownNPlan(n int) ([]string, error) {
+	return m.plan(migrate.Down, n)
+}
+
 func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
 	planned, _, err := migrate.PlanMigration(m.db, dialect, m.src, direction, limit)
 	if err != nil {
