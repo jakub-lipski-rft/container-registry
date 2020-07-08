@@ -98,3 +98,8 @@ build:
 clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
+
+new-migration:
+	@./script/dev/new-migration $(filter-out $@,$(MAKECMDGOALS))
+%:
+	@:
