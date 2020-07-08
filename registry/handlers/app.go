@@ -145,7 +145,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		}
 
 		m := migrations.NewMigrator(db.DB)
-		if err := m.Up(); err != nil {
+		if _, err := m.Up(); err != nil {
 			panic(fmt.Sprintf("failed to run database migrations: %v", err))
 		}
 
@@ -298,7 +298,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		}
 
 		m := migrations.NewMigrator(db.DB)
-		if err := m.Up(); err != nil {
+		if _, err := m.Up(); err != nil {
 			panic(fmt.Sprintf("failed to run database migrations: %v", err))
 		}
 

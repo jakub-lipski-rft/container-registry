@@ -145,7 +145,7 @@ func initDatabase(t *testing.T, env *env) {
 	env.db = db
 
 	m := migrations.NewMigrator(db.DB)
-	err = m.Up()
+	_, err = m.Up()
 	require.NoError(t, err)
 }
 

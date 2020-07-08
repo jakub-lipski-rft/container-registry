@@ -54,18 +54,18 @@ func (m *migrator) LatestVersion() (string, error) {
 	return all[len(all)-1].Id, nil
 }
 
-func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) error {
-	_, err := migrate.ExecMax(m.db, dialect, m.src, direction, limit)
-	return err
+func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) (int, error) {
+	return migrate.ExecMax(m.db, dialect, m.src, direction, limit)
 }
 
-// Up applies all pending up migrations.
-func (m *migrator) Up() error {
+// Up applies all pending up migrations. Returns the number of applied migrations.
+func (m *migrator) Up() (int, error) {
 	return m.migrate(migrate.Up, 0)
 }
 
-// UpN applies up to n pending up migrations. All pending migrations will be applied if n is 0.
-func (m *migrator) UpN(n int) error {
+// UpN applies up to n pending up migrations. All pending migrations will be applied if n is 0.  Returns the number of
+// applied migrations.
+func (m *migrator) UpN(n int) (int, error) {
 	return m.migrate(migrate.Up, n)
 }
 
@@ -75,9 +75,21 @@ func (m *migrator) UpNPlan(n int) ([]string, error) {
 	return m.plan(migrate.Up, n)
 }
 
-// Down applies all pending down migrations.
-func (m *migrator) Down() error {
+// Down applies all pending down migrations.  Returns the number of applied migrations.
+func (m *migrator) Down() (int, error) {
 	return m.migrate(migrate.Down, 0)
+}
+
+// DownN applies up to n pending down migrations. All migrations will be applied if n is 0.  Returns the number of
+// applied migrations.
+func (m *migrator) DownN(n int) (int, error) {
+	return m.migrate(migrate.Down, n)
+}
+
+// DownNPlan plans up to n pending down migrations and returns the ordered list of migration IDs. All pending migrations
+// will be planned if n is 0.
+func (m *migrator) DownNPlan(n int) ([]string, error) {
+	return m.plan(migrate.Down, n)
 }
 
 // migrationStatus represents the status of a migration. Unknown will be set to true if a migration was applied but is
@@ -107,17 +119,6 @@ func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	}
 
 	return statuses, nil
-}
-
-// DownN applies up to n pending down migrations. All migrations will be applied if n is 0.
-func (m *migrator) DownN(n int) error {
-	return m.migrate(migrate.Down, n)
-}
-
-// DownNPlan plans up to n pending down migrations and returns the ordered list of migration IDs. All pending migrations
-// will be planned if n is 0.
-func (m *migrator) DownNPlan(n int) ([]string, error) {
-	return m.plan(migrate.Down, n)
 }
 
 func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
