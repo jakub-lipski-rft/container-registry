@@ -133,8 +133,11 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 
 // Config finds the manifest configuration.
 func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error) {
-	q := `SELECT id, manifest_id, media_type, digest_hex, size, payload, created_at
-		FROM manifest_configurations WHERE manifest_id = $1`
+	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_hex, b.size, mc.payload, mc.created_at
+		FROM manifest_configurations AS mc
+		JOIN blobs AS b ON mc.blob_id = b.id
+		WHERE mc.manifest_id = $1`
+
 	row := s.db.QueryRowContext(ctx, q, m.ID)
 
 	return scanFullManifestConfiguration(row)
