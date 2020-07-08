@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/migrations"
@@ -18,6 +20,7 @@ import (
 )
 
 var showVersion bool
+var maxNumMigrations *int
 
 func init() {
 	RootCmd.AddCommand(ServeCmd)
@@ -30,10 +33,39 @@ func init() {
 	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
 
 	MigrateCmd.AddCommand(MigrateVersionCmd)
+	MigrateUpCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
+	MigrateUpCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
 	MigrateCmd.AddCommand(MigrateUpCmd)
 	DBCmd.AddCommand(MigrateCmd)
+
 	DBCmd.AddCommand(ImportCmd)
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
+}
+
+// nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
+// https://pkg.go.dev/github.com/spf13/pflag?tab=doc#Value
+type nullableInt struct {
+	ptr **int
+}
+
+func (f nullableInt) String() string {
+	if *f.ptr == nil {
+		return "0"
+	}
+	return strconv.Itoa(**f.ptr)
+}
+
+func (f nullableInt) Type() string {
+	return "int"
+}
+
+func (f nullableInt) Set(s string) error {
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return err
+	}
+	*f.ptr = &v
+	return nil
 }
 
 // RootCmd is the main command for the 'registry' binary.
@@ -144,6 +176,14 @@ var MigrateUpCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		if maxNumMigrations == nil {
+			var all int
+			maxNumMigrations = &all
+		} else if *maxNumMigrations < 1 {
+			fmt.Fprintf(os.Stderr, "limit must be greater than or equal to 1")
+			os.Exit(1)
+		}
+
 		db, err := datastore.Open(&datastore.DSN{
 			Host:     config.Database.Host,
 			Port:     config.Database.Port,
@@ -158,10 +198,14 @@ var MigrateUpCmd = &cobra.Command{
 		}
 
 		m := migrations.NewMigrator(db.DB)
-		if err := m.Up(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
-			os.Exit(1)
+		plan, err := m.UpNPlan(*maxNumMigrations)
+		if !dryRun {
+			if err := m.UpN(*maxNumMigrations); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
+				os.Exit(1)
+			}
 		}
+		fmt.Println(strings.Join(plan, "\n"))
 	},
 }
 

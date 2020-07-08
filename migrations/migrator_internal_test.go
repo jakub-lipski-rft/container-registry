@@ -14,8 +14,7 @@ func TestMigrator_LatestVersion(t *testing.T) {
 	v, err := m.LatestVersion()
 	require.NoError(t, err)
 
-	id := versionFromID(allMigrations[len(allMigrations)-1].Id)
-	require.Equal(t, v, id)
+	require.Equal(t, v, allMigrations[len(allMigrations)-1].Id)
 }
 
 func TestMigrator_LatestVersion_NoMigrations(t *testing.T) {
