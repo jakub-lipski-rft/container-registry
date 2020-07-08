@@ -5,6 +5,7 @@ package migrations_test
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore/testutil"
@@ -227,4 +228,91 @@ func TestMigrator_DownNPlan(t *testing.T) {
 	plan, err = m.DownNPlan(100)
 	require.NoError(t, err)
 	require.Equal(t, allExceptFirstTwoPlan, plan)
+}
+
+func TestMigrator_Status_Empty(t *testing.T) {
+	db, err := testutil.NewDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	m := migrations.NewMigrator(db.DB)
+
+	require.NoError(t, m.Down())
+	defer m.Up()
+
+	all := migrations.All()
+
+	statuses, err := m.Status()
+	require.NoError(t, err)
+	require.Len(t, statuses, len(all))
+
+	var expectedIDs, actualIDs []string
+	for _, m := range all {
+		expectedIDs = append(expectedIDs, m.ID)
+	}
+	for id := range statuses {
+		actualIDs = append(actualIDs, id)
+	}
+	require.ElementsMatch(t, expectedIDs, actualIDs)
+
+	for _, s := range statuses {
+		require.False(t, s.Unknown)
+		require.Nil(t, s.AppliedAt)
+	}
+}
+
+func TestMigrator_Status_Full(t *testing.T) {
+	db, err := testutil.NewDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	m := migrations.NewMigrator(db.DB)
+	require.NoError(t, m.Up())
+
+	all := migrations.All()
+
+	statuses, err := m.Status()
+	require.NoError(t, err)
+	require.Len(t, statuses, len(all))
+
+	var expectedIDs, actualIDs []string
+	for _, m := range all {
+		expectedIDs = append(expectedIDs, m.ID)
+	}
+	for id := range statuses {
+		actualIDs = append(actualIDs, id)
+	}
+	require.ElementsMatch(t, expectedIDs, actualIDs)
+
+	for _, s := range statuses {
+		require.False(t, s.Unknown)
+		require.NotNil(t, s.AppliedAt)
+	}
+}
+
+func TestMigrator_Status_Unknown(t *testing.T) {
+	db, err := testutil.NewDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	m := migrations.NewMigrator(db.DB)
+	require.NoError(t, m.Up())
+
+	all := migrations.All()
+
+	// temporarily insert fake migration record
+	fakeID := "20060102150405_foo"
+	fakeAppliedAt := time.Now()
+	_, err = db.DB.Exec("INSERT INTO schema_migrations (id, applied_at) VALUES ($1, $2)", fakeID, fakeAppliedAt)
+	require.NoError(t, err)
+	defer db.DB.Exec("DELETE FROM schema_migrations WHERE id = $1", fakeID)
+
+	statuses, err := m.Status()
+	require.NoError(t, err)
+	require.Len(t, statuses, len(all)+1)
+
+	fakeStatus := statuses[fakeID]
+	require.NotNil(t, fakeStatus)
+	require.True(t, fakeStatus.Unknown)
+	require.Equal(t, fakeAppliedAt.Round(time.Millisecond).UTC(), fakeStatus.AppliedAt.Round(time.Millisecond).UTC())
 }

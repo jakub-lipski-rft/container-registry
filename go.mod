@@ -28,6 +28,7 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f // indirect
 	github.com/ncw/swift v1.0.40
+	github.com/olekukonko/tablewriter v0.0.4
 	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/opencontainers/image-spec v1.0.0
 	github.com/rubenv/sql-migrate v0.0.0-20200616145509-8d140a17f351
