@@ -20,8 +20,8 @@ func reloadManifestFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.RepositoryManifestsTable, testutil.BlobsTable, testutil.ManifestLayersTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.BlobsTable, testutil.ManifestConfigurationsTable,
+		testutil.RepositoryManifestsTable, testutil.ManifestLayersTable,
 	)
 }
 
@@ -29,8 +29,8 @@ func unloadManifestFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
 		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
-		testutil.RepositoryManifestsTable, testutil.BlobsTable, testutil.ManifestLayersTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.BlobsTable, testutil.ManifestConfigurationsTable,
+		testutil.RepositoryManifestsTable, testutil.ManifestLayersTable,
 	))
 }
 
@@ -174,6 +174,7 @@ func TestManifestStore_Config(t *testing.T) {
 	expected := &models.ManifestConfiguration{
 		ID:         1,
 		ManifestID: 1,
+		BlobID:     8,
 		MediaType:  "application/vnd.docker.container.image.v1+json",
 		Digest:     "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
 		Size:       123,

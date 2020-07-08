@@ -895,11 +895,17 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 		if dbCfg == nil {
 			log.Debug("manifest config not found in database")
 
+			dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
+			if err != nil {
+				return err
+			}
+			if dbCfgBlob == nil {
+				return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
+			}
+
 			if err := mCfgStore.Create(ctx, &models.ManifestConfiguration{
 				ManifestID: dbManifest.ID,
-				MediaType:  manifest.Config.MediaType,
-				Digest:     manifest.Config.Digest,
-				Size:       manifest.Config.Size,
+				BlobID:     dbCfgBlob.ID,
 				Payload:    cfgPayload,
 			}); err != nil {
 				return err

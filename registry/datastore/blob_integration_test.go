@@ -134,6 +134,27 @@ func TestBlobStore_All(t *testing.T) {
 			Size:      107,
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:08:00.405042", local),
 		},
+		{
+			ID:        8,
+			MediaType: "application/vnd.docker.container.image.v1+json",
+			Digest:    "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
+			Size:      123,
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:56:26.573726", local),
+		},
+		{
+			ID:        9,
+			MediaType: "application/vnd.docker.container.image.v1+json",
+			Digest:    "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
+			Size:      321,
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:57:23.405516", local),
+		},
+		{
+			ID:        10,
+			MediaType: "application/vnd.docker.container.image.v1+json",
+			Digest:    "sha256:33f3ef3322b28ecfc368872e621ab715a04865471c47ca7426f3e93846157780",
+			Size:      252,
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:57:23.405516", local),
+		},
 	}
 
 	require.Equal(t, expected, bb)
@@ -156,7 +177,7 @@ func TestBlobStore_Count(t *testing.T) {
 	require.NoError(t, err)
 
 	// see testdata/fixtures/blobs.sql
-	require.Equal(t, 7, count)
+	require.Equal(t, 10, count)
 }
 
 func TestBlobStore_Create(t *testing.T) {

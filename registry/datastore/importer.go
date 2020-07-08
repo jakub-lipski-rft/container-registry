@@ -92,17 +92,36 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 	return dbLayer, nil
 }
 
-func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, mc *models.ManifestConfiguration) (*models.ManifestConfiguration, error) {
-	dbConfig, err := imp.manifestConfigurationStore.FindByDigest(ctx, mc.Digest)
+func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, m *models.Manifest, d distribution.Descriptor, payload []byte) (*models.ManifestConfiguration, error) {
+	dbBlob, err := imp.blobStore.FindByDigest(ctx, d.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("error searching for manifest configuration blob: %w", err)
+	}
+	if dbBlob == nil {
+		dbBlob = &models.Blob{
+			MediaType: d.MediaType,
+			Digest:    d.Digest,
+			Size:      d.Size,
+		}
+		if err := imp.blobStore.Create(ctx, dbBlob); err != nil {
+			return nil, err
+		}
+	}
+
+	dbConfig, err := imp.manifestConfigurationStore.FindByDigest(ctx, d.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("error searching for manifest configuration: %w", err)
 	}
 
 	if dbConfig == nil {
-		if err := imp.manifestConfigurationStore.Create(ctx, mc); err != nil {
+		dbConfig = &models.ManifestConfiguration{
+			ManifestID: m.ID,
+			BlobID:     dbBlob.ID,
+			Payload:    payload,
+		}
+		if err := imp.manifestConfigurationStore.Create(ctx, dbConfig); err != nil {
 			return nil, fmt.Errorf("error creating manifest configuration: %w", err)
 		}
-		dbConfig = mc
 	}
 
 	return dbConfig, nil
@@ -224,14 +243,7 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
 	}
 
-	_, err = imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
-		ManifestID: dbManifest.ID,
-		MediaType:  m.Config.MediaType,
-		Digest:     m.Config.Digest,
-		Size:       m.Config.Size,
-		Payload:    configPayload,
-	})
-	if err != nil {
+	if _, err = imp.findOrCreateDBManifestConfig(ctx, dbManifest, m.Config, configPayload); err != nil {
 		return nil, err
 	}
 
@@ -272,14 +284,7 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
 	}
 
-	_, err = imp.findOrCreateDBManifestConfig(ctx, &models.ManifestConfiguration{
-		ManifestID: dbManifest.ID,
-		MediaType:  m.Config.MediaType,
-		Digest:     m.Config.Digest,
-		Size:       m.Config.Size,
-		Payload:    configPayload,
-	})
-	if err != nil {
+	if _, err = imp.findOrCreateDBManifestConfig(ctx, dbManifest, m.Config, configPayload); err != nil {
 		return nil, err
 	}
 

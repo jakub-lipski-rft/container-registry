@@ -23,6 +23,7 @@ type Repositories []*Repository
 type ManifestConfiguration struct {
 	ID         int64
 	ManifestID int64
+	BlobID     int64
 	MediaType  string
 	Digest     digest.Digest
 	Size       int64

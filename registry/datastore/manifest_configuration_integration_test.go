@@ -14,11 +14,13 @@ import (
 )
 
 func reloadManifestConfigurationFixtures(tb testing.TB) {
-	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.ManifestsTable, testutil.ManifestConfigurationsTable)
+	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.ManifestsTable, testutil.BlobsTable,
+		testutil.ManifestConfigurationsTable)
 }
 
 func unloadManifestConfigurationFixtures(tb testing.TB) {
-	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.ManifestsTable, testutil.ManifestConfigurationsTable))
+	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.ManifestsTable, testutil.BlobsTable,
+		testutil.ManifestConfigurationsTable))
 }
 
 func TestManifestConfigurationStore_ImplementsReaderAndWriter(t *testing.T) {
@@ -37,6 +39,7 @@ func TestManifestConfigurationStore_FindByID(t *testing.T) {
 	expected := &models.ManifestConfiguration{
 		ID:         1,
 		ManifestID: 1,
+		BlobID:     8,
 		MediaType:  "application/vnd.docker.container.image.v1+json",
 		Digest:     "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
 		Size:       123,
@@ -66,6 +69,7 @@ func TestManifestConfigurationStore_FindByDigest(t *testing.T) {
 	excepted := &models.ManifestConfiguration{
 		ID:         2,
 		ManifestID: 2,
+		BlobID:     9,
 		MediaType:  "application/vnd.docker.container.image.v1+json",
 		Digest:     "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
 		Size:       321,
@@ -97,6 +101,7 @@ func TestManifestConfigurationStore_FindAll(t *testing.T) {
 		{
 			ID:         1,
 			ManifestID: 1,
+			BlobID:     8,
 			MediaType:  "application/vnd.docker.container.image.v1+json",
 			Digest:     "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
 			Size:       123,
@@ -106,6 +111,7 @@ func TestManifestConfigurationStore_FindAll(t *testing.T) {
 		{
 			ID:         2,
 			ManifestID: 2,
+			BlobID:     9,
 			MediaType:  "application/vnd.docker.container.image.v1+json",
 			Digest:     "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
 			Size:       321,
@@ -115,6 +121,7 @@ func TestManifestConfigurationStore_FindAll(t *testing.T) {
 		{
 			ID:         3,
 			ManifestID: 3,
+			BlobID:     10,
 			MediaType:  "application/vnd.docker.container.image.v1+json",
 			Digest:     "sha256:33f3ef3322b28ecfc368872e621ab715a04865471c47ca7426f3e93846157780",
 			Size:       252,
@@ -167,15 +174,14 @@ func TestManifestConfigurationStore_Manifest(t *testing.T) {
 }
 
 func TestManifestConfigurationStore_Create(t *testing.T) {
+	reloadBlobFixtures(t)
 	reloadManifestFixtures(t)
 	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestConfigurationsTable))
 
 	s := datastore.NewManifestConfigurationStore(suite.db)
 	c := &models.ManifestConfiguration{
 		ManifestID: 4,
-		MediaType:  "application/vnd.docker.container.image.v1+json",
-		Digest:     "sha256:46b163863b462eadc1b17dca382ccbfb08a853cffc79e2049607f95455cc44fa",
-		Size:       242,
+		BlobID:     10,
 		Payload:    json.RawMessage(`{"architecture":"amd64","config":"foo"}`),
 	}
 	err := s.Create(suite.ctx, c)
@@ -185,20 +191,6 @@ func TestManifestConfigurationStore_Create(t *testing.T) {
 	require.NotEmpty(t, c.CreatedAt)
 }
 
-func TestManifestConfigurationStore_Create_NonUniqueDigestFails(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
-
-	s := datastore.NewManifestConfigurationStore(suite.db)
-	c := &models.ManifestConfiguration{
-		MediaType: "application/vnd.docker.container.image.v1+json",
-		Digest:    "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9", // same as ID 1
-		Size:      242,
-		Payload:   json.RawMessage(`{"architecture":"amd64","config":"foo"}`),
-	}
-	err := s.Create(suite.ctx, c)
-	require.Error(t, err)
-}
-
 func TestManifestConfigurationStore_Update(t *testing.T) {
 	reloadManifestConfigurationFixtures(t)
 
@@ -206,9 +198,10 @@ func TestManifestConfigurationStore_Update(t *testing.T) {
 	update := &models.ManifestConfiguration{
 		ID:         1,
 		ManifestID: 1,
+		BlobID:     8,
 		MediaType:  "application/vnd.docker.container.image.v1+json",
-		Digest:     "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
-		Size:       242,
+		Digest:     "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
+		Size:       123,
 		Payload:    json.RawMessage(`{"architecture":"amd64","config":"bar"}`),
 	}
 	err := s.Update(suite.ctx, update)
@@ -225,11 +218,8 @@ func TestManifestConfigurationStore_Update_NotFound(t *testing.T) {
 	s := datastore.NewManifestConfigurationStore(suite.db)
 
 	update := &models.ManifestConfiguration{
-		ID:        4,
-		MediaType: "application/vnd.docker.container.image.v1+json",
-		Digest:    "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
-		Size:      242,
-		Payload:   json.RawMessage(`{"architecture":"amd64","config":"bar"}`),
+		ID:      100,
+		Payload: json.RawMessage(`{"architecture":"amd64","config":"bar"}`),
 	}
 	err := s.Update(suite.ctx, update)
 	require.EqualError(t, err, "manifest configuration not found")
