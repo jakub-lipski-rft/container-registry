@@ -38,7 +38,7 @@ func (s *testSuite) setup() error {
 	}
 
 	m := migrations.NewMigrator(db.DB)
-	if err := m.Up(); err != nil {
+	if _, err := m.Up(); err != nil {
 		return err
 	}
 	basePath, err := os.Getwd()

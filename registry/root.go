@@ -205,13 +205,16 @@ var MigrateUpCmd = &cobra.Command{
 
 		m := migrations.NewMigrator(db.DB)
 		plan, err := m.UpNPlan(*maxNumMigrations)
+		fmt.Println(strings.Join(plan, "\n"))
+
 		if !dryRun {
-			if err := m.UpN(*maxNumMigrations); err != nil {
+			n, err := m.UpN(*maxNumMigrations)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 				os.Exit(1)
 			}
+			fmt.Printf("OK: applied %d migrations\n", n)
 		}
-		fmt.Println(strings.Join(plan, "\n"))
 	},
 }
 
@@ -250,13 +253,16 @@ var MigrateDownCmd = &cobra.Command{
 
 		m := migrations.NewMigrator(db.DB)
 		plan, err := m.DownNPlan(*maxNumMigrations)
+		fmt.Println(strings.Join(plan, "\n"))
+
 		if !dryRun {
-			if err := m.DownN(*maxNumMigrations); err != nil {
+			n, err := m.DownN(*maxNumMigrations)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 				os.Exit(1)
 			}
+			fmt.Printf("OK: applied %d migrations\n", n)
 		}
-		fmt.Println(strings.Join(plan, "\n"))
 	},
 }
 

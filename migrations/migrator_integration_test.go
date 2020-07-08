@@ -19,7 +19,8 @@ func TestMigrator_Version(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Up())
+	_, err = m.Up()
+	require.NoError(t, err)
 
 	latest, err := m.LatestVersion()
 	require.NoError(t, err)
@@ -35,7 +36,8 @@ func TestMigrator_Version_NoMigrations(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Down())
+	_, err = m.Down()
+	require.NoError(t, err)
 	defer m.Up()
 
 	v, err := m.Version()
@@ -49,7 +51,15 @@ func TestMigrator_Up(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Up())
+	_, err = m.Down()
+	require.NoError(t, err)
+	defer m.Up()
+
+	all := migrations.All()
+
+	count, err := m.Up()
+	require.NoError(t, err)
+	require.Equal(t, len(all), count)
 
 	currentVersion, err := m.Version()
 	require.NoError(t, err)
@@ -65,7 +75,8 @@ func TestMigrator_UpN(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Down())
+	_, err = m.Down()
+	require.NoError(t, err)
 	defer m.Up()
 
 	// apply all except the last two
@@ -73,24 +84,27 @@ func TestMigrator_UpN(t *testing.T) {
 	n := len(all) - 1 - 2
 	nth := all[n-1]
 
-	err = m.UpN(n)
+	count, err := m.UpN(n)
 	require.NoError(t, err)
+	require.Equal(t, n, count)
 
 	v, err := m.Version()
 	require.NoError(t, err)
 	require.Equal(t, nth.ID, v)
 
 	// resume and apply the remaining
-	err = m.UpN(0)
+	count, err = m.UpN(0)
 	require.NoError(t, err)
+	require.Equal(t, len(all)-n, count)
 
 	v, err = m.Version()
 	require.NoError(t, err)
 	require.Equal(t, all[len(all)-1].ID, v)
 
 	// make sure it's idempotent
-	err = m.UpN(100)
+	count, err = m.UpN(100)
 	require.NoError(t, err)
+	require.Zero(t, count)
 
 	v2, err := m.Version()
 	require.NoError(t, err)
@@ -103,7 +117,8 @@ func TestMigrator_UpNPlan(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Down())
+	_, err = m.Down()
+	require.NoError(t, err)
 	defer m.Up()
 
 	all := migrations.All()
@@ -122,7 +137,7 @@ func TestMigrator_UpNPlan(t *testing.T) {
 	require.Equal(t, allExceptLastTwoPlan, plan)
 
 	// apply two migrations and re-plan all (the first two shouldn't be part of the plan anymore)
-	err = m.UpN(2)
+	_, err = m.UpN(2)
 	require.NoError(t, err)
 
 	plan, err = m.UpNPlan(0)
@@ -143,7 +158,14 @@ func TestMigrator_Down(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Down())
+	_, err = m.Up()
+	require.NoError(t, err)
+
+	all := migrations.All()
+
+	count, err := m.Down()
+	require.NoError(t, err)
+	require.Equal(t, len(all), count)
 	defer m.Up()
 
 	currentVersion, err := m.Version()
@@ -157,32 +179,35 @@ func TestMigrator_DownN(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Up())
-	defer m.Up()
+	_, err = m.Up()
+	require.NoError(t, err)
 
 	// rollback all except the first two
 	all := migrations.All()
-	n := len(all) - 1 - 2
-	third := all[2]
+	n := len(all) - 2
+	second := all[1]
 
-	err = m.DownN(n)
+	count, err := m.DownN(n)
 	require.NoError(t, err)
+	require.Equal(t, n, count)
 
 	v, err := m.Version()
 	require.NoError(t, err)
-	require.Equal(t, third.ID, v)
+	require.Equal(t, second.ID, v)
 
 	// resume and rollback the remaining two
-	err = m.DownN(0)
+	count, err = m.DownN(0)
 	require.NoError(t, err)
+	require.Equal(t, 2, count)
 
 	v, err = m.Version()
 	require.NoError(t, err)
 	require.Empty(t, v)
 
 	// make sure it's idempotent
-	err = m.DownN(100)
+	count, err = m.DownN(100)
 	require.NoError(t, err)
+	require.Zero(t, count)
 
 	v, err = m.Version()
 	require.NoError(t, err)
@@ -195,7 +220,8 @@ func TestMigrator_DownNPlan(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Up())
+	_, err = m.Up()
+	require.NoError(t, err)
 
 	all := migrations.All()
 
@@ -215,7 +241,7 @@ func TestMigrator_DownNPlan(t *testing.T) {
 	require.Equal(t, allExceptLastTwoPlan, plan)
 
 	// apply two migrations and re-plan all (the first two shouldn't be part of the plan anymore)
-	err = m.DownN(2)
+	_, err = m.DownN(2)
 	require.NoError(t, err)
 
 	plan, err = m.DownNPlan(0)
@@ -237,7 +263,8 @@ func TestMigrator_Status_Empty(t *testing.T) {
 
 	m := migrations.NewMigrator(db.DB)
 
-	require.NoError(t, m.Down())
+	_, err = m.Down()
+	require.NoError(t, err)
 	defer m.Up()
 
 	all := migrations.All()
@@ -267,7 +294,8 @@ func TestMigrator_Status_Full(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Up())
+	_, err = m.Up()
+	require.NoError(t, err)
 
 	all := migrations.All()
 
@@ -296,7 +324,8 @@ func TestMigrator_Status_Unknown(t *testing.T) {
 	defer db.Close()
 
 	m := migrations.NewMigrator(db.DB)
-	require.NoError(t, m.Up())
+	_, err = m.Up()
+	require.NoError(t, err)
 
 	all := migrations.All()
 
