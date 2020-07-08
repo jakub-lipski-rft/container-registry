@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/distribution/version"
 
 	"github.com/docker/libtrust"
+	"github.com/olekukonko/tablewriter"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +35,7 @@ func init() {
 	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
 
 	MigrateCmd.AddCommand(MigrateVersionCmd)
+	MigrateCmd.AddCommand(MigrateStatusCmd)
 	MigrateUpCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	MigrateUpCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
 	MigrateCmd.AddCommand(MigrateUpCmd)
@@ -294,6 +297,68 @@ var MigrateVersionCmd = &cobra.Command{
 		}
 
 		fmt.Printf("%s\n", v)
+	},
+}
+
+// MigrateStatusCmd is the `status` sub-command of `database migrate` that shows the migrations status.
+var MigrateStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show migration status",
+	Long:  "Show migration status",
+	Run: func(cmd *cobra.Command, args []string) {
+		config, err := resolveConfiguration(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
+			os.Exit(1)
+		}
+
+		m := migrations.NewMigrator(db.DB)
+		statuses, err := m.Status()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to detect database status: %v", err)
+			os.Exit(1)
+		}
+
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetHeader([]string{"Migration", "Applied"})
+		table.SetColWidth(80)
+
+		// Display table rows sorted by migration ID
+		var ids []string
+		for id := range statuses {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+
+		for _, id := range ids {
+			name := id
+			if statuses[id].Unknown {
+				name += " (unknown)"
+			}
+
+			var appliedAt string
+			if statuses[id].AppliedAt != nil {
+				appliedAt = statuses[id].AppliedAt.String()
+			}
+
+			table.Append([]string{name, appliedAt})
+		}
+
+		table.Render()
 	},
 }
 

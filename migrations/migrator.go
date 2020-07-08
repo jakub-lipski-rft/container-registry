@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"database/sql"
+	"time"
 
 	migrate "github.com/rubenv/sql-migrate"
 )
@@ -77,6 +78,35 @@ func (m *migrator) UpNPlan(n int) ([]string, error) {
 // Down applies all pending down migrations.
 func (m *migrator) Down() error {
 	return m.migrate(migrate.Down, 0)
+}
+
+// migrationStatus represents the status of a migration. Unknown will be set to true if a migration was applied but is
+// not known by the current build.
+type migrationStatus struct {
+	Unknown   bool
+	AppliedAt *time.Time
+}
+
+// Status returns the status of all migrations, indexed by migration ID.
+func (m *migrator) Status() (map[string]*migrationStatus, error) {
+	applied, err := migrate.GetMigrationRecords(m.db, dialect)
+	known, err := m.src.FindMigrations()
+	if err != nil {
+		return nil, err
+	}
+
+	statuses := make(map[string]*migrationStatus, len(applied))
+	for _, m := range known {
+		statuses[m.Id] = &migrationStatus{}
+	}
+	for _, m := range applied {
+		if _, ok := statuses[m.Id]; !ok {
+			statuses[m.Id] = &migrationStatus{Unknown: true}
+		}
+		statuses[m.Id].AppliedAt = &m.AppliedAt
+	}
+
+	return statuses, nil
 }
 
 // DownN applies up to n pending down migrations. All migrations will be applied if n is 0.
