@@ -36,6 +36,9 @@ func init() {
 	MigrateUpCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	MigrateUpCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
 	MigrateCmd.AddCommand(MigrateUpCmd)
+	MigrateDownCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
+	MigrateDownCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
+	MigrateCmd.AddCommand(MigrateDownCmd)
 	DBCmd.AddCommand(MigrateCmd)
 
 	DBCmd.AddCommand(ImportCmd)
@@ -201,6 +204,51 @@ var MigrateUpCmd = &cobra.Command{
 		plan, err := m.UpNPlan(*maxNumMigrations)
 		if !dryRun {
 			if err := m.UpN(*maxNumMigrations); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
+				os.Exit(1)
+			}
+		}
+		fmt.Println(strings.Join(plan, "\n"))
+	},
+}
+
+var MigrateDownCmd = &cobra.Command{
+	Use:   "down",
+	Short: "Apply down migrations",
+	Long:  "Apply down migrations",
+	Run: func(cmd *cobra.Command, args []string) {
+		config, err := resolveConfiguration(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+			cmd.Usage()
+			os.Exit(1)
+		}
+
+		if maxNumMigrations == nil {
+			var all int
+			maxNumMigrations = &all
+		} else if *maxNumMigrations < 1 {
+			fmt.Fprintf(os.Stderr, "limit must be greater than or equal to 1")
+			os.Exit(1)
+		}
+
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
+			os.Exit(1)
+		}
+
+		m := migrations.NewMigrator(db.DB)
+		plan, err := m.DownNPlan(*maxNumMigrations)
+		if !dryRun {
+			if err := m.DownN(*maxNumMigrations); err != nil {
 				fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
 				os.Exit(1)
 			}
