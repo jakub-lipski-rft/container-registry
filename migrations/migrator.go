@@ -2,7 +2,6 @@ package migrations
 
 import (
 	"database/sql"
-	"strings"
 
 	migrate "github.com/rubenv/sql-migrate"
 )
@@ -28,11 +27,6 @@ func NewMigrator(db *sql.DB) *migrator {
 	}
 }
 
-// versionFromID splits a migration ID in the form of `<version>_<name>` and returns version.
-func versionFromID(ID string) string {
-	return strings.Split(ID, "_")[0]
-}
-
 // Version returns the current applied migration version (if any).
 func (m *migrator) Version() (string, error) {
 	records, err := migrate.GetMigrationRecords(m.db, dialect)
@@ -43,8 +37,7 @@ func (m *migrator) Version() (string, error) {
 		return "", nil
 	}
 
-	id := records[len(records)-1].Id
-	return versionFromID(id), nil
+	return records[len(records)-1].Id, nil
 }
 
 // LatestVersion identifies the version of the most recent migration in the repository (if any).
@@ -57,8 +50,7 @@ func (m *migrator) LatestVersion() (string, error) {
 		return "", nil
 	}
 
-	id := all[len(all)-1].Id
-	return versionFromID(id), nil
+	return all[len(all)-1].Id, nil
 }
 
 func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) error {
@@ -66,12 +58,37 @@ func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) erro
 	return err
 }
 
-// Up applies all non-applied up migrations.
+// Up applies all pending up migrations.
 func (m *migrator) Up() error {
 	return m.migrate(migrate.Up, 0)
 }
 
-// Down applies all non-applied down migrations.
+// UpN applies up to n pending up migrations. All pending migrations will be applied if n is 0.
+func (m *migrator) UpN(n int) error {
+	return m.migrate(migrate.Up, n)
+}
+
+// UpNPlan plans up to n pending up migrations and returns the ordered list of migration IDs. All pending migrations
+// will be planned if n is 0.
+func (m *migrator) UpNPlan(n int) ([]string, error) {
+	return m.plan(migrate.Up, n)
+}
+
+// Down applies all pending down migrations.
 func (m *migrator) Down() error {
 	return m.migrate(migrate.Down, 0)
+}
+
+func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
+	planned, _, err := migrate.PlanMigration(m.db, dialect, m.src, direction, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0, len(planned))
+	for _, m := range planned {
+		result = append(result, m.Id)
+	}
+
+	return result, nil
 }
