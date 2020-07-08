@@ -142,3 +142,13 @@ changelog entry is made, the release tag will be pushed upstream.
 Merge requests which make change that will impact users of this project
 should have an accompanying [changelog](../CHANGELOG.md) entry in the same
 merge request. These entries should be added under the `[Unreleased]` header.
+
+### Golang Version Support
+
+Starting from version 1.13, this project will support being built with the
+latest three major [releases](https://golang.org/doc/devel/release.html) of the
+Go Programming Language.
+
+This support is ensured via the `.gitlab-ci.yml` file in the root of this
+repository, if you modify this file to add additional jobs, please ensure that
+those jobs are ran with all three versions.
