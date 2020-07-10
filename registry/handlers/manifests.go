@@ -305,7 +305,7 @@ func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 			}
 		}
 		payload = dbManifestList.Payload
-		mediaType = dbManifestList.MediaType.String
+		mediaType = dbManifestList.MediaType
 		schemaVersion = dbManifestList.SchemaVersion
 	} else {
 		payload = dbManifest.Payload
@@ -369,7 +369,7 @@ func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName strin
 			return nil, "", distribution.ErrManifestUnknown{Name: r.Name, Tag: dbTag.Name}
 		}
 		payload = dbManifestList.Payload
-		mediaType = dbManifestList.MediaType.String
+		mediaType = dbManifestList.MediaType
 		schemaVersion = dbManifestList.SchemaVersion
 		dgst = dbManifestList.Digest
 	}
@@ -1000,15 +1000,18 @@ func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical dige
 	if dbManifestList == nil {
 		log.Debug("manifest list not found in database")
 
+		// Media type can be either Docker (`application/vnd.docker.distribution.manifest.list.v2+json`) or OCI (empty).
+		// We need to make it explicit if empty, otherwise we're not able to distinguish between media types.
+		mediaType := manifestList.MediaType
+		if mediaType == "" {
+			mediaType = v1.MediaTypeImageIndex
+		}
+
 		dbManifestList = &models.ManifestList{
 			SchemaVersion: manifestList.SchemaVersion,
-			// Mediatype will be empty for OCI manifests.
-			MediaType: sql.NullString{
-				String: manifestList.MediaType,
-				Valid:  manifestList.MediaType != "",
-			},
-			Digest:  canonical,
-			Payload: payload,
+			MediaType:     mediaType,
+			Digest:        canonical,
+			Payload:       payload,
 		}
 		if err := mListStore.Create(ctx, dbManifestList); err != nil {
 			return err

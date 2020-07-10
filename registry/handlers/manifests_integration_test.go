@@ -886,7 +886,7 @@ func TestDeleteManifestDB_ManifestList(t *testing.T) {
 	mlStore := datastore.NewManifestListStore(env.db)
 	ml := &models.ManifestList{
 		SchemaVersion: 2,
-		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+		MediaType:     manifestlist.MediaTypeManifestList,
 		Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
 		Payload:       json.RawMessage(`{"schemaVersion":2}`),
 	}
@@ -989,7 +989,7 @@ func TestDeleteManifestDB_DissociatedManifestList(t *testing.T) {
 	mlStore := datastore.NewManifestListStore(env.db)
 	ml := &models.ManifestList{
 		SchemaVersion: 2,
-		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+		MediaType:     manifestlist.MediaTypeManifestList,
 		Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
 		Payload:       json.RawMessage(`{"schemaVersion":2}`),
 	}

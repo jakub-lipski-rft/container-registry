@@ -307,8 +307,12 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 		return nil, fmt.Errorf("error parsing manifest list payload: %w", err)
 	}
 
-	// media type can be either Docker (`application/vnd.docker.distribution.manifest.list.v2+json`) or OCI (empty)
-	mediaType := sql.NullString{String: ml.MediaType, Valid: len(ml.MediaType) > 0}
+	// Media type can be either Docker (`application/vnd.docker.distribution.manifest.list.v2+json`) or OCI (empty).
+	// We need to make it explicit if empty, otherwise we're not able to distinguish between media types.
+	mediaType := ml.MediaType
+	if mediaType == "" {
+		mediaType = v1.MediaTypeImageIndex
+	}
 
 	// create manifest list on DB
 	dbManifestList := &models.ManifestList{
