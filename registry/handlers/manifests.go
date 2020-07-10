@@ -41,12 +41,12 @@ const (
 type storageType int
 
 const (
-	manifestSchema1     storageType = iota // 0
-	manifestSchema2                        // 1
-	manifestlistSchema                     // 2
-	ociSchema                              // 3
-	ociImageIndexSchema                    // 4
-	numStorageTypes                        // 5
+	manifestSchema1        storageType = iota // 0
+	manifestSchema2                           // 1
+	manifestlistSchema                        // 2
+	ociImageManifestSchema                    // 3
+	ociImageIndexSchema                       // 4
+	numStorageTypes                           // 5
 )
 
 // manifestDispatcher takes the request context and builds the
@@ -116,7 +116,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 				supports[manifestlistSchema] = true
 			}
 			if mediaType == v1.MediaTypeImageManifest {
-				supports[ociSchema] = true
+				supports[ociImageManifestSchema] = true
 			}
 			if mediaType == v1.MediaTypeImageIndex {
 				supports[ociImageIndexSchema] = true
@@ -182,7 +182,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	if isSchema2 {
 		manifestType = manifestSchema2
 	} else if _, isOCImanifest := manifest.(*ocischema.DeserializedManifest); isOCImanifest {
-		manifestType = ociSchema
+		manifestType = ociImageManifestSchema
 	} else if isManifestList {
 		if manifestList.MediaType == manifestlist.MediaTypeManifestList {
 			manifestType = manifestlistSchema
@@ -191,7 +191,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	if manifestType == ociSchema && !supports[ociSchema] {
+	if manifestType == ociImageManifestSchema && !supports[ociImageManifestSchema] {
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithMessage("OCI manifest found, but accept header does not support OCI manifests"))
 		return
 	}
@@ -631,9 +631,6 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			}
 		case *schema2.DeserializedManifest:
 			// The config payload should already be pushed up and stored as a blob.
-			// We're running this outside dbPutManifestSchema2 to limit the manifest
-			// database writing logic's dependence on other parts of the system until
-			// we've settled on a final design and to reduce the overall transaction time.
 			cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, reqManifest.Config.Digest)
 			if err != nil {
 				imh.Errors = append(imh.Errors,
@@ -642,6 +639,20 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			}
 
 			if err = dbPutManifestSchema2(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), cfgPayload, imh.Repository.Named()); err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
+				return
+			}
+		case *ocischema.DeserializedManifest:
+			// The config payload should already be pushed up and stored as a blob.
+			cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, reqManifest.Config.Digest)
+			if err != nil {
+				imh.Errors = append(imh.Errors,
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to obtain manifest configuration payload: %v", err)))
+				return
+			}
+
+			if err = dbPutManifestOCI(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), cfgPayload, imh.Repository.Named()); err != nil {
 				imh.Errors = append(imh.Errors,
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
@@ -682,7 +693,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			defer tx.Rollback()
 
 			switch reqManifest := manifest.(type) {
-			case *schema2.DeserializedManifest, *schema1.SignedManifest:
+			case *schema2.DeserializedManifest, *schema1.SignedManifest, *ocischema.DeserializedManifest:
 				if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
 					e := fmt.Errorf("failed to create tag in database: %v", err)
 					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
@@ -837,6 +848,95 @@ func dbTagManifestList(ctx context.Context, db datastore.Queryer, dgst digest.Di
 		RepositoryID:   dbRepo.ID,
 		ManifestListID: sql.NullInt64{Int64: dbManifestList.ID, Valid: true},
 	})
+}
+
+func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Digest, manifest *ocischema.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
+	log.Debug("putting manifest")
+
+	mStore := datastore.NewManifestStore(db)
+	dbManifest, err := mStore.FindByDigest(ctx, dgst)
+	if err != nil {
+		return err
+	}
+	if dbManifest == nil {
+		log.Debug("manifest not found in database")
+
+		m := &models.Manifest{
+			SchemaVersion: manifest.SchemaVersion,
+			MediaType:     manifest.MediaType,
+			Digest:        dgst,
+			Payload:       payload,
+		}
+
+		if err := mStore.Create(ctx, m); err != nil {
+			return err
+		}
+
+		dbManifest = m
+
+		// find and associate manifest layer blobs
+		blobStore := datastore.NewBlobStore(db)
+		for _, reqLayer := range manifest.Layers {
+			dbBlob, err := blobStore.FindByDigest(ctx, reqLayer.Digest)
+			if err != nil {
+				return err
+			}
+
+			if dbBlob == nil {
+				return fmt.Errorf("layer blob %s not found in database", reqLayer.Digest)
+			}
+
+			// TODO: update the layer blob media_type here, it was set to "application/octect-stream" during the upload
+			// 		 but now we know its concrete type (reqLayer.MediaType).
+
+			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
+				return err
+			}
+		}
+
+		// Find or create the manifest configuration.
+		mCfgStore := datastore.NewManifestConfigurationStore(db)
+
+		dbCfg, err := mCfgStore.FindByDigest(ctx, manifest.Config.Digest)
+		if err != nil {
+			return err
+		}
+
+		if dbCfg == nil {
+			log.Debug("manifest config not found in database")
+
+			dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
+			if err != nil {
+				return err
+			}
+			if dbCfgBlob == nil {
+				return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
+			}
+
+			if err := mCfgStore.Create(ctx, &models.ManifestConfiguration{
+				ManifestID: dbManifest.ID,
+				BlobID:     dbCfgBlob.ID,
+				Payload:    cfgPayload,
+			}); err != nil {
+				return err
+			}
+		}
+		// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
+		// 		 but now we know its concrete type (manifest.Config.MediaType).
+	}
+
+	// Associate manifest and repository.
+	repositoryStore := datastore.NewRepositoryStore(db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path.Name())
+	if err != nil {
+		return err
+	}
+
+	if err := repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
+		return err
+	}
+	return nil
 }
 
 func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
