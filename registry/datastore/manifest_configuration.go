@@ -42,16 +42,23 @@ func NewManifestConfigurationStore(db Queryer) *manifestConfigurationStore {
 }
 
 func scanFullManifestConfiguration(row *sql.Row) (*models.ManifestConfiguration, error) {
+	var digestAlgorithm DigestAlgorithm
 	var digestHex []byte
+
 	c := new(models.ManifestConfiguration)
-	err := row.Scan(&c.ID, &c.ManifestID, &c.BlobID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
+	err := row.Scan(&c.ID, &c.ManifestID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning manifest configuration: %w", err)
 		}
 		return nil, nil
 	}
-	c.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
+
+	alg, err := digestAlgorithm.Parse()
+	if err != nil {
+		return nil, err
+	}
+	c.Digest = digest.NewDigestFromBytes(alg, digestHex)
 
 	return c, nil
 }
@@ -61,13 +68,21 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 	defer rows.Close()
 
 	for rows.Next() {
+		var digestAlgorithm DigestAlgorithm
 		var digestHex []byte
+
 		c := new(models.ManifestConfiguration)
-		err := rows.Scan(&c.ID, &c.ManifestID, &c.BlobID, &c.MediaType, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
+		err := rows.Scan(&c.ID, &c.ManifestID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning manifest configuration: %w", err)
 		}
-		c.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
+
+		alg, err := digestAlgorithm.Parse()
+		if err != nil {
+			return nil, err
+		}
+		c.Digest = digest.NewDigestFromBytes(alg, digestHex)
+
 		cc = append(cc, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -79,7 +94,7 @@ func scanFullManifestConfigurations(rows *sql.Rows) (models.ManifestConfiguratio
 
 // FindByID finds a manifest configuration by ID.
 func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int64) (*models.ManifestConfiguration, error) {
-	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_hex, b.size, mc.payload, mc.created_at
+	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, mc.payload, mc.created_at
 		FROM manifest_configurations AS mc
 		JOIN blobs AS b ON mc.blob_id = b.id
 		WHERE mc.id = $1`
@@ -90,18 +105,23 @@ func (s *manifestConfigurationStore) FindByID(ctx context.Context, id int64) (*m
 
 // FindByDigest finds a manifest configuration by the digest.
 func (s *manifestConfigurationStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.ManifestConfiguration, error) {
-	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_hex, b.size, mc.payload, mc.created_at
+	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, mc.payload, mc.created_at
 		FROM manifest_configurations AS mc
 		JOIN blobs AS b ON mc.blob_id = b.id
-		WHERE b.digest_hex = decode($1, 'hex')`
-	row := s.db.QueryRowContext(ctx, q, d.Hex())
+		WHERE b.digest_algorithm = $1 AND b.digest_hex = decode($2, 'hex')`
+
+	alg, err := NewDigestAlgorithm(d.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+	row := s.db.QueryRowContext(ctx, q, alg, d.Hex())
 
 	return scanFullManifestConfiguration(row)
 }
 
 // FindAll finds all manifest configurations.
 func (s *manifestConfigurationStore) FindAll(ctx context.Context) (models.ManifestConfigurations, error) {
-	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_hex, b.size, mc.payload, mc.created_at
+	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, mc.payload, mc.created_at
 		FROM manifest_configurations AS mc
 		JOIN blobs AS b ON mc.blob_id = b.id`
 	rows, err := s.db.QueryContext(ctx, q)
@@ -126,7 +146,7 @@ func (s *manifestConfigurationStore) Count(ctx context.Context) (int, error) {
 
 // Manifest finds the manifest that the configuration belongs to.
 func (s *manifestConfigurationStore) Manifest(ctx context.Context, c *models.ManifestConfiguration) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_hex, payload, created_at, marked_at
+	q := `SELECT id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
 		FROM manifests WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, c.ManifestID)

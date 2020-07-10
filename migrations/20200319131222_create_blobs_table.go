@@ -11,10 +11,12 @@ func init() {
                 size bigint NOT NULL,
                 created_at timestamp WITH time zone NOT NULL DEFAULT now(),
                 marked_at timestamp WITH time zone,
+                digest_algorithm smallint NOT NULL,
                 digest_hex bytea NOT NULL,
                 media_type text NOT NULL,
                 CONSTRAINT pk_blobs PRIMARY KEY (id),
-                CONSTRAINT uq_blobs_digest_hex UNIQUE (digest_hex),
+                CONSTRAINT uq_blobs_digest_algorithm_digest_hex UNIQUE (digest_algorithm, digest_hex),
+                CONSTRAINT ck_blobs_digest_algorithm_enum CHECK ((digest_algorithm IN (1, 2))),
                 CONSTRAINT ck_blobs_media_type_length CHECK ((char_length(media_type) <= 255))
             )`,
 		},

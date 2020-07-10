@@ -102,10 +102,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifests" layer="0" collapse-mode="2" max-obj-count="8">
+<table name="manifests" layer="0" collapse-mode="2" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="407.909" y="420.182"/>
+	<position x="410.636" y="390.182"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -119,6 +119,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="schema_version" not-null="true">
 		<type name="integer" length="0"/>
 	</column>
+	<column name="digest_algorithm" not-null="true">
+		<type name="smallint" length="0"/>
+	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
@@ -131,15 +134,18 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_manifests" type="pk-constr" table="public.manifests">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifests_digest_hex" type="uq-constr" table="public.manifests">
-		<columns names="digest_hex" ref-type="src-columns"/>
+	<constraint name="uq_manifests_digest_algorithm_digest_hex" type="uq-constr" table="public.manifests">
+		<columns names="digest_algorithm,digest_hex" ref-type="src-columns"/>
 	</constraint>
 	<constraint name="ck_manifests_media_type_length" type="ck-constr" table="public.manifests">
 			<expression><![CDATA[(char_length(media_type) <= 255)]]></expression>
 	</constraint>
+	<constraint name="ck_manifests_digest_algorithm_enum" type="ck-constr" table="public.manifests">
+			<expression><![CDATA[(digest_algorithm IN (1, 2))]]></expression>
+	</constraint>
 </table>
 
-<table name="blobs" layer="0" collapse-mode="2" max-obj-count="7">
+<table name="blobs" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="51.6364" y="625.818"/>
@@ -156,6 +162,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="marked_at">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
+	<column name="digest_algorithm" not-null="true">
+		<type name="smallint" length="0"/>
+	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
@@ -165,11 +174,14 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_blobs" type="pk-constr" table="public.blobs">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_blobs_digest_hex" type="uq-constr" table="public.blobs">
-		<columns names="digest_hex" ref-type="src-columns"/>
+	<constraint name="uq_blobs_digest_algorithm_digest_hex" type="uq-constr" table="public.blobs">
+		<columns names="digest_algorithm,digest_hex" ref-type="src-columns"/>
 	</constraint>
 	<constraint name="ck_blobs_media_type_length" type="ck-constr" table="public.blobs">
 			<expression><![CDATA[(char_length(media_type) <= 255)]]></expression>
+	</constraint>
+	<constraint name="ck_blobs_digest_algorithm_enum" type="ck-constr" table="public.blobs">
+			<expression><![CDATA[(digest_algorithm IN (1, 2))]]></expression>
 	</constraint>
 </table>
 
@@ -198,7 +210,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_lists" layer="0" collapse-mode="2" max-obj-count="8">
+<table name="manifest_lists" layer="0" collapse-mode="2" max-obj-count="9">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="1290.91" y="425.182"/>
@@ -215,6 +227,9 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="schema_version" not-null="true">
 		<type name="integer" length="0"/>
 	</column>
+	<column name="digest_algorithm" not-null="true">
+		<type name="smallint" length="0"/>
+	</column>
 	<column name="digest_hex" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
@@ -227,18 +242,21 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifest_lists_digest_hex" type="uq-constr" table="public.manifest_lists">
-		<columns names="digest_hex" ref-type="src-columns"/>
+	<constraint name="uq_manifest_lists_digest_algorithm_digest_hex" type="uq-constr" table="public.manifest_lists">
+		<columns names="digest_algorithm,digest_hex" ref-type="src-columns"/>
 	</constraint>
 	<constraint name="ck_manifest_lists_media_type_length" type="ck-constr" table="public.manifest_lists">
 			<expression><![CDATA[(char_length(media_type) <= 255)]]></expression>
+	</constraint>
+	<constraint name="ck_manifest_lists_digest_algorithm_enum" type="ck-constr" table="public.manifest_lists">
+			<expression><![CDATA[(digest_algorithm IN (1, 2))]]></expression>
 	</constraint>
 </table>
 
 <table name="manifest_list_manifests" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="788" y="627.182"/>
+	<position x="803.455" y="633.546"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -263,7 +281,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="tags" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="824.909" y="293.182"/>
+	<position x="844" y="302.273"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
