@@ -14,7 +14,7 @@ func init() {
                 digest_algorithm smallint NOT NULL,
                 digest_hex bytea NOT NULL,
                 payload bytea NOT NULL,
-                media_type text,
+                media_type text NOT NULL,
                 CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
                 CONSTRAINT uq_manifest_lists_digest_algorithm_digest_hex UNIQUE (digest_algorithm,digest_hex),
                 CONSTRAINT ck_manifest_lists_digest_algorithm_enum CHECK ((digest_algorithm IN (1, 2))),

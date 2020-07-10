@@ -236,7 +236,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="payload" not-null="true">
 		<type name="bytea" length="0"/>
 	</column>
-	<column name="media_type">
+	<column name="media_type" not-null="true">
 		<type name="text" length="0"/>
 	</column>
 	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
