@@ -76,7 +76,7 @@ type Blobs []*Blob
 type ManifestList struct {
 	ID            int64
 	SchemaVersion int
-	MediaType     sql.NullString
+	MediaType     string
 	Digest        digest.Digest
 	Payload       json.RawMessage
 	CreatedAt     time.Time

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/docker/distribution/manifest/manifestlist"
+
 	"github.com/docker/distribution/registry/datastore"
 
 	"github.com/docker/distribution/registry/datastore/models"
@@ -219,7 +221,7 @@ func TestTagStore_ManifestList(t *testing.T) {
 	excepted := &models.ManifestList{
 		ID:            2,
 		SchemaVersion: 2,
-		MediaType:     sql.NullString{String: "application/vnd.docker.distribution.manifest.list.v2+json", Valid: true},
+		MediaType:     manifestlist.MediaTypeManifestList,
 		Digest:        "sha256:45e85a20d32f249c323ed4085026b6b0ee264788276aa7c06cf4b5da1669067a",
 		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":42212,"digest":"sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6","platform":{"architecture":"amd64","os":"linux"}}]}`),
 		CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:04.470711", ml.CreatedAt.Location()),

@@ -480,7 +480,7 @@ func TestRepositoryStore_ManifestLists(t *testing.T) {
 		{
 			ID:            1,
 			SchemaVersion: 2,
-			MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+			MediaType:     manifestlist.MediaTypeManifestList,
 			Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
 			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
 			CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:03.470711", local),
@@ -867,7 +867,7 @@ func TestRepositoryStore_FindManifestListByDigest(t *testing.T) {
 	expected := &models.ManifestList{
 		ID:            1,
 		SchemaVersion: 2,
-		MediaType:     sql.NullString{String: manifestlist.MediaTypeManifestList, Valid: true},
+		MediaType:     manifestlist.MediaTypeManifestList,
 		Digest:        d,
 		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
 		CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:03.470711", ml.CreatedAt.Location()),
