@@ -54,12 +54,14 @@ CREATE TABLE public.manifests (
 	created_at timestamp with time zone NOT NULL DEFAULT now(),
 	marked_at timestamp with time zone,
 	schema_version integer NOT NULL,
+	digest_algorithm smallint NOT NULL,
 	digest_hex bytea NOT NULL,
 	payload bytea NOT NULL,
 	media_type text NOT NULL,
 	CONSTRAINT pk_manifests PRIMARY KEY (id),
-	CONSTRAINT uq_manifests_digest_hex UNIQUE (digest_hex),
-	CONSTRAINT ck_manifests_media_type_length CHECK ((char_length(media_type) <= 255))
+	CONSTRAINT uq_manifests_digest_algorithm_digest_hex UNIQUE (digest_algorithm,digest_hex),
+	CONSTRAINT ck_manifests_media_type_length CHECK ((char_length(media_type) <= 255)),
+	CONSTRAINT ck_manifests_digest_algorithm_enum CHECK ((digest_algorithm IN (1, 2)))
 
 );
 -- ddl-end --
@@ -73,11 +75,13 @@ CREATE TABLE public.blobs (
 	size bigint NOT NULL,
 	created_at timestamp with time zone NOT NULL DEFAULT now(),
 	marked_at timestamp with time zone,
+	digest_algorithm smallint NOT NULL,
 	digest_hex bytea NOT NULL,
 	media_type text NOT NULL,
 	CONSTRAINT pk_blobs PRIMARY KEY (id),
-	CONSTRAINT uq_blobs_digest_hex UNIQUE (digest_hex),
-	CONSTRAINT ck_blobs_media_type_length CHECK ((char_length(media_type) <= 255))
+	CONSTRAINT uq_blobs_digest_algorithm_digest_hex UNIQUE (digest_algorithm,digest_hex),
+	CONSTRAINT ck_blobs_media_type_length CHECK ((char_length(media_type) <= 255)),
+	CONSTRAINT ck_blobs_digest_algorithm_enum CHECK ((digest_algorithm IN (1, 2)))
 
 );
 -- ddl-end --
@@ -106,12 +110,14 @@ CREATE TABLE public.manifest_lists (
 	created_at timestamp with time zone NOT NULL DEFAULT now(),
 	marked_at timestamp with time zone,
 	schema_version integer NOT NULL,
+	digest_algorithm smallint NOT NULL,
 	digest_hex bytea NOT NULL,
 	payload bytea NOT NULL,
 	media_type text,
 	CONSTRAINT pk_manifest_lists PRIMARY KEY (id),
-	CONSTRAINT uq_manifest_lists_digest_hex UNIQUE (digest_hex),
-	CONSTRAINT ck_manifest_lists_media_type_length CHECK ((char_length(media_type) <= 255))
+	CONSTRAINT uq_manifest_lists_digest_algorithm_digest_hex UNIQUE (digest_algorithm,digest_hex),
+	CONSTRAINT ck_manifest_lists_media_type_length CHECK ((char_length(media_type) <= 255)),
+	CONSTRAINT ck_manifest_lists_digest_algorithm_enum CHECK ((digest_algorithm IN (1, 2)))
 
 );
 -- ddl-end --

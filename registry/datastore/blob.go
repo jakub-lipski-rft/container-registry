@@ -44,16 +44,22 @@ func NewBlobStore(db Queryer) *blobStore {
 }
 
 func scanFullBlob(row *sql.Row) (*models.Blob, error) {
+	var digestAlgorithm DigestAlgorithm
 	var digestHex []byte
 	b := new(models.Blob)
 
-	if err := row.Scan(&b.ID, &b.MediaType, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt); err != nil {
+	if err := row.Scan(&b.ID, &b.MediaType, &digestAlgorithm, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scanning blob: %w", err)
 		}
 		return nil, nil
 	}
-	b.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
+
+	alg, err := digestAlgorithm.Parse()
+	if err != nil {
+		return nil, err
+	}
+	b.Digest = digest.NewDigestFromBytes(alg, digestHex)
 
 	return b, nil
 }
@@ -63,14 +69,21 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var digestAlgorithm DigestAlgorithm
 		var digestHex []byte
 		b := new(models.Blob)
 
-		err := rows.Scan(&b.ID, &b.MediaType, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt)
+		err := rows.Scan(&b.ID, &b.MediaType, &digestAlgorithm, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning blob: %w", err)
 		}
-		b.Digest = digest.NewDigestFromBytes(digest.SHA256, digestHex)
+
+		alg, err := digestAlgorithm.Parse()
+		if err != nil {
+			return nil, err
+		}
+		b.Digest = digest.NewDigestFromBytes(alg, digestHex)
+
 		bb = append(bb, b)
 	}
 	if err := rows.Err(); err != nil {
@@ -82,7 +95,7 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 
 // FindByID finds a blob by ID.
 func (s *blobStore) FindByID(ctx context.Context, id int64) (*models.Blob, error) {
-	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at FROM blobs WHERE id = $1"
+	q := "SELECT id, media_type, digest_algorithm, digest_hex, size, created_at, marked_at FROM blobs WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullBlob(row)
@@ -90,16 +103,21 @@ func (s *blobStore) FindByID(ctx context.Context, id int64) (*models.Blob, error
 
 // FindByDigest finds a blob by digest.
 func (s *blobStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Blob, error) {
-	q := `SELECT id, media_type, digest_hex, size, created_at, marked_at
-		FROM blobs WHERE digest_hex = decode($1, 'hex')`
-	row := s.db.QueryRowContext(ctx, q, d.Hex())
+	q := `SELECT id, media_type, digest_algorithm, digest_hex, size, created_at, marked_at
+		FROM blobs WHERE digest_algorithm = $1 AND digest_hex = decode($2, 'hex')`
+
+	alg, err := NewDigestAlgorithm(d.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+	row := s.db.QueryRowContext(ctx, q, alg, d.Hex())
 
 	return scanFullBlob(row)
 }
 
 // FindAll finds all blobs.
 func (s *blobStore) FindAll(ctx context.Context) (models.Blobs, error) {
-	q := "SELECT id, media_type, digest_hex, size, created_at, marked_at FROM blobs"
+	q := "SELECT id, media_type, digest_algorithm, digest_hex, size, created_at, marked_at FROM blobs"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding blobs: %w", err)
@@ -122,10 +140,14 @@ func (s *blobStore) Count(ctx context.Context) (int, error) {
 
 // Create saves a new blob.
 func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
-	q := `INSERT INTO blobs (media_type, digest_hex, size) VALUES ($1, decode($2, 'hex'), $3)
+	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size) VALUES ($1, $2, decode($3, 'hex'), $4)
 		RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, b.MediaType, b.Digest.Hex(), b.Size)
+	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
+	if err != nil {
+		return err
+	}
+	row := s.db.QueryRowContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size)
 	if err := row.Scan(&b.ID, &b.CreatedAt); err != nil {
 		return fmt.Errorf("error creating blob: %w", err)
 	}
@@ -138,12 +160,17 @@ func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
 // on write operations between the corresponding read (FindByDigest) and write (Create) operations. Separate Find* and
 // Create method calls should be preferred to this when race conditions are not a concern.
 func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
-	q := `INSERT INTO blobs (media_type, digest_hex, size)
-		VALUES ($1, decode($2, 'hex'), $3)
-		ON CONFLICT (digest_hex) DO NOTHING
+	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size)
+		VALUES ($1, $2, decode($3, 'hex'), $4)
+		ON CONFLICT (digest_algorithm, digest_hex) DO NOTHING
 		RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, b.MediaType, b.Digest.Hex(), b.Size)
+	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
+	if err != nil {
+		return err
+	}
+	row := s.db.QueryRowContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size)
+
 	if err := row.Scan(&b.ID, &b.CreatedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return fmt.Errorf("creating blob: %w", err)
@@ -161,9 +188,13 @@ func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
 
 // Update updates an existing blob.
 func (s *blobStore) Update(ctx context.Context, b *models.Blob) error {
-	q := "UPDATE blobs SET (media_type, digest_hex, size) = ($1, decode($2, 'hex'), $3) WHERE id = $4"
+	q := "UPDATE blobs SET (media_type, digest_algorithm, digest_hex, size) = ($1, $2, decode($3, 'hex'), $4) WHERE id = $5"
 
-	res, err := s.db.ExecContext(ctx, q, b.MediaType, b.Digest.Hex(), b.Size, b.ID)
+	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
+	if err != nil {
+		return err
+	}
+	res, err := s.db.ExecContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size, b.ID)
 	if err != nil {
 		return fmt.Errorf("error updating blob: %w", err)
 	}

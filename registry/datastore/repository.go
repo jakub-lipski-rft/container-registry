@@ -307,7 +307,7 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 
 // Manifests finds all manifests associated with a repository.
 func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories AS r ON r.id = rm.repository_id
@@ -323,7 +323,7 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 
 // ManifestLists finds all manifest lists associated with a repository.
 func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_algorithm, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
 		FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
 		JOIN repositories AS r ON r.id = rml.repository_id
@@ -339,31 +339,41 @@ func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repositor
 
 // FindManifestByDigest finds a manifest by digest within a repository.
 func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_hex, m.payload, m.created_at, m.marked_at
+	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload, m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories AS r ON r.id = rm.repository_id
-		WHERE r.id = $1 AND m.digest_hex = decode($2, 'hex')`
+		WHERE r.id = $1 AND m.digest_algorithm = $2 AND m.digest_hex = decode($3, 'hex')`
 
-	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
+	alg, err := NewDigestAlgorithm(d.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+	row := s.db.QueryRowContext(ctx, q, r.ID, alg, d.Hex())
+
 	return scanFullManifest(row)
 }
 
 // FindManifestListByDigest finds a manifest list by digest within a repository.
 func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
+	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_algorithm, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
 		FROM manifest_lists as ml
 		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
 		JOIN repositories AS r ON r.id = rml.repository_id
-		WHERE r.id = $1 AND ml.digest_hex = decode($2, 'hex')`
+		WHERE r.id = $1 AND ml.digest_algorithm = $2 AND ml.digest_hex = decode($3, 'hex')`
 
-	row := s.db.QueryRowContext(ctx, q, r.ID, d.Hex())
+	alg, err := NewDigestAlgorithm(d.Algorithm())
+	if err != nil {
+		return nil, err
+	}
+	row := s.db.QueryRowContext(ctx, q, r.ID, alg, d.Hex())
+
 	return scanFullManifestList(row)
 }
 
 // Blobs finds all blobs associated with the repository.
 func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error) {
-	q := `SELECT b.id, b.media_type, b.digest_hex, b.size, b.created_at, b.marked_at
+	q := `SELECT b.id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, b.created_at, b.marked_at
 		FROM blobs as b
 		JOIN repository_blobs as rb ON rb.blob_id = b.id
 		JOIN repositories AS r ON r.id = rb.repository_id
