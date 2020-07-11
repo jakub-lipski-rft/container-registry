@@ -13,30 +13,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func reloadManifestConfigurationFixtures(tb testing.TB) {
+func reloadConfigurationFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.ManifestsTable, testutil.BlobsTable,
-		testutil.ManifestConfigurationsTable)
+		testutil.ConfigurationsTable)
 }
 
-func unloadManifestConfigurationFixtures(tb testing.TB) {
+func unloadConfigurationFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.ManifestsTable, testutil.BlobsTable,
-		testutil.ManifestConfigurationsTable))
+		testutil.ConfigurationsTable))
 }
 
-func TestManifestConfigurationStore_ImplementsReaderAndWriter(t *testing.T) {
-	require.Implements(t, (*datastore.ManifestConfigurationStore)(nil), datastore.NewManifestConfigurationStore(suite.db))
+func TestConfigurationStore_ImplementsReaderAndWriter(t *testing.T) {
+	require.Implements(t, (*datastore.ConfigurationStore)(nil), datastore.NewConfigurationStore(suite.db))
 }
 
-func TestManifestConfigurationStore_FindByID(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_FindByID(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
+	s := datastore.NewConfigurationStore(suite.db)
 
 	c, err := s.FindByID(suite.ctx, 1)
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_configurations.sql
-	expected := &models.ManifestConfiguration{
+	// see testdata/fixtures/configurations.sql
+	expected := &models.Configuration{
 		ID:         1,
 		ManifestID: 1,
 		BlobID:     8,
@@ -49,24 +49,24 @@ func TestManifestConfigurationStore_FindByID(t *testing.T) {
 	require.Equal(t, expected, c)
 }
 
-func TestManifestConfigurationStore_FindByID_NotFound(t *testing.T) {
-	s := datastore.NewManifestConfigurationStore(suite.db)
+func TestConfigurationStore_FindByID_NotFound(t *testing.T) {
+	s := datastore.NewConfigurationStore(suite.db)
 
 	r, err := s.FindByID(suite.ctx, 0)
 	require.Nil(t, r)
 	require.NoError(t, err)
 }
 
-func TestManifestConfigurationStore_FindByDigest(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_FindByDigest(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
+	s := datastore.NewConfigurationStore(suite.db)
 
 	c, err := s.FindByDigest(suite.ctx, "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073")
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_configurations.sql
-	excepted := &models.ManifestConfiguration{
+	// see testdata/fixtures/configurations.sql
+	excepted := &models.Configuration{
 		ID:         2,
 		ManifestID: 2,
 		BlobID:     9,
@@ -79,25 +79,25 @@ func TestManifestConfigurationStore_FindByDigest(t *testing.T) {
 	require.Equal(t, excepted, c)
 }
 
-func TestManifestConfigurationStore_FindByDigest_NotFound(t *testing.T) {
-	s := datastore.NewManifestConfigurationStore(suite.db)
+func TestConfigurationStore_FindByDigest_NotFound(t *testing.T) {
+	s := datastore.NewConfigurationStore(suite.db)
 
 	c, err := s.FindByDigest(suite.ctx, "sha256:ab8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9")
 	require.Nil(t, c)
 	require.NoError(t, err)
 }
 
-func TestManifestConfigurationStore_FindAll(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_FindAll(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
+	s := datastore.NewConfigurationStore(suite.db)
 
 	cc, err := s.FindAll(suite.ctx)
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_configurations.sql
+	// see testdata/fixtures/configurations.sql
 	local := cc[0].CreatedAt.Location()
-	expected := models.ManifestConfigurations{
+	expected := models.Configurations{
 		{
 			ID:         1,
 			ManifestID: 1,
@@ -132,35 +132,35 @@ func TestManifestConfigurationStore_FindAll(t *testing.T) {
 	require.Equal(t, expected, cc)
 }
 
-func TestManifestConfigurationStore_FindAll_NotFound(t *testing.T) {
-	unloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_FindAll_NotFound(t *testing.T) {
+	unloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
+	s := datastore.NewConfigurationStore(suite.db)
 
 	cc, err := s.FindAll(suite.ctx)
 	require.Empty(t, cc)
 	require.NoError(t, err)
 }
 
-func TestManifestConfigurationStore_Count(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_Count(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
+	s := datastore.NewConfigurationStore(suite.db)
 	count, err := s.Count(suite.ctx)
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_configurations.sql
+	// see testdata/fixtures/configurations.sql
 	require.Equal(t, 3, count)
 }
 
-func TestManifestConfigurationStore_Manifest(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_Manifest(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
-	m, err := s.Manifest(suite.ctx, &models.ManifestConfiguration{ID: 1, ManifestID: 1})
+	s := datastore.NewConfigurationStore(suite.db)
+	m, err := s.Manifest(suite.ctx, &models.Configuration{ID: 1, ManifestID: 1})
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_configurations.sql
+	// see testdata/fixtures/configurations.sql
 	local := m.CreatedAt.Location()
 	expected := &models.Manifest{
 		ID:            1,
@@ -173,13 +173,13 @@ func TestManifestConfigurationStore_Manifest(t *testing.T) {
 	require.Equal(t, expected, m)
 }
 
-func TestManifestConfigurationStore_Create(t *testing.T) {
+func TestConfigurationStore_Create(t *testing.T) {
 	reloadBlobFixtures(t)
 	reloadManifestFixtures(t)
-	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestConfigurationsTable))
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ConfigurationsTable))
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
-	c := &models.ManifestConfiguration{
+	s := datastore.NewConfigurationStore(suite.db)
+	c := &models.Configuration{
 		ManifestID: 4,
 		BlobID:     10,
 		Payload:    json.RawMessage(`{"architecture":"amd64","config":"foo"}`),
@@ -191,11 +191,11 @@ func TestManifestConfigurationStore_Create(t *testing.T) {
 	require.NotEmpty(t, c.CreatedAt)
 }
 
-func TestManifestConfigurationStore_Update(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_Update(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
-	update := &models.ManifestConfiguration{
+	s := datastore.NewConfigurationStore(suite.db)
+	update := &models.Configuration{
 		ID:         1,
 		ManifestID: 1,
 		BlobID:     8,
@@ -214,30 +214,30 @@ func TestManifestConfigurationStore_Update(t *testing.T) {
 	require.Equal(t, update, r)
 }
 
-func TestManifestConfigurationStore_Update_NotFound(t *testing.T) {
-	s := datastore.NewManifestConfigurationStore(suite.db)
+func TestConfigurationStore_Update_NotFound(t *testing.T) {
+	s := datastore.NewConfigurationStore(suite.db)
 
-	update := &models.ManifestConfiguration{
+	update := &models.Configuration{
 		ID:      100,
 		Payload: json.RawMessage(`{"architecture":"amd64","config":"bar"}`),
 	}
 	err := s.Update(suite.ctx, update)
-	require.EqualError(t, err, "manifest configuration not found")
+	require.EqualError(t, err, "configuration not found")
 }
 
-func TestManifestConfigurationStore_Delete(t *testing.T) {
-	reloadManifestConfigurationFixtures(t)
+func TestConfigurationStore_Delete(t *testing.T) {
+	reloadConfigurationFixtures(t)
 
-	s := datastore.NewManifestConfigurationStore(suite.db)
+	s := datastore.NewConfigurationStore(suite.db)
 	err := s.Delete(suite.ctx, 3)
 	require.NoError(t, err)
 
-	mc, err := s.FindByID(suite.ctx, 3)
-	require.Nil(t, mc)
+	c, err := s.FindByID(suite.ctx, 3)
+	require.Nil(t, c)
 }
 
-func TestManifestConfigurationStore_Delete_NotFound(t *testing.T) {
-	s := datastore.NewManifestConfigurationStore(suite.db)
+func TestConfigurationStore_Delete_NotFound(t *testing.T) {
+	s := datastore.NewConfigurationStore(suite.db)
 	err := s.Delete(suite.ctx, 5)
-	require.EqualError(t, err, "manifest configuration not found")
+	require.EqualError(t, err, "configuration not found")
 }

@@ -20,7 +20,7 @@ type Repository struct {
 // Repositories is a slice of Repository pointers.
 type Repositories []*Repository
 
-type ManifestConfiguration struct {
+type Configuration struct {
 	ID         int64
 	ManifestID int64
 	BlobID     int64
@@ -31,8 +31,8 @@ type ManifestConfiguration struct {
 	CreatedAt  time.Time
 }
 
-// ManifestConfigurations is a slice of ManifestConfiguration pointers.
-type ManifestConfigurations []*ManifestConfiguration
+// Configurations is a slice of Configuration pointers.
+type Configurations []*Configuration
 
 type Manifest struct {
 	ID            int64

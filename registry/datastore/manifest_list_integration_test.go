@@ -20,7 +20,7 @@ func reloadManifestListFixtures(tb testing.TB) {
 	// A ManifestList has a relationship with Repository and Manifest (the insert order matters)
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ConfigurationsTable,
 		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListManifestsTable,
 		testutil.RepositoryManifestListsTable,
 	)
@@ -30,7 +30,7 @@ func unloadManifestListFixtures(tb testing.TB) {
 	// A ManifestList has a relationship with Repository and Manifest (the insert order matters)
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ConfigurationsTable,
 		testutil.RepositoryManifestsTable, testutil.ManifestListsTable, testutil.ManifestListManifestsTable,
 		testutil.RepositoryManifestListsTable,
 	))
