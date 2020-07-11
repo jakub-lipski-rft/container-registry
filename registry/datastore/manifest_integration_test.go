@@ -19,8 +19,8 @@ import (
 func reloadManifestFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
-		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.BlobsTable, testutil.ManifestConfigurationsTable,
+		// Manifest has a relationship with Repository, Configuration and ManifestLayer (insert order matters)
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.BlobsTable, testutil.ConfigurationsTable,
 		testutil.RepositoryManifestsTable, testutil.ManifestLayersTable,
 	)
 }
@@ -28,8 +28,8 @@ func reloadManifestFixtures(tb testing.TB) {
 func unloadManifestFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
-		// Manifest has a relationship with Repository, ManifestConfiguration and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.BlobsTable, testutil.ManifestConfigurationsTable,
+		// Manifest has a relationship with Repository, Configuration and ManifestLayer (insert order matters)
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.BlobsTable, testutil.ConfigurationsTable,
 		testutil.RepositoryManifestsTable, testutil.ManifestLayersTable,
 	))
 }
@@ -169,9 +169,9 @@ func TestManifestStore_Config(t *testing.T) {
 	c, err := s.Config(suite.ctx, &models.Manifest{ID: 1})
 	require.NoError(t, err)
 
-	// see testdata/fixtures/manifest_configurations.sql
+	// see testdata/fixtures/configurations.sql
 	local := c.CreatedAt.Location()
-	expected := &models.ManifestConfiguration{
+	expected := &models.Configuration{
 		ID:         1,
 		ManifestID: 1,
 		BlobID:     8,

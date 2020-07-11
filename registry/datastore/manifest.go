@@ -16,7 +16,7 @@ type ManifestReader interface {
 	FindByID(ctx context.Context, id int64) (*models.Manifest, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
-	Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error)
+	Config(ctx context.Context, m *models.Manifest) (*models.Configuration, error)
 	LayerBlobs(ctx context.Context, m *models.Manifest) (models.Blobs, error)
 	Lists(ctx context.Context, m *models.Manifest) (models.ManifestLists, error)
 	Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error)
@@ -148,17 +148,16 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// Config finds the manifest configuration.
-func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models.ManifestConfiguration, error) {
-	q := `SELECT mc.id, mc.manifest_id, mc.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, mc.payload,
-		mc.created_at
-		FROM manifest_configurations AS mc
-		JOIN blobs AS b ON mc.blob_id = b.id
-		WHERE mc.manifest_id = $1`
+// Config finds the configuration associated with a manifest.
+func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models.Configuration, error) {
+	q := `SELECT c.id, c.manifest_id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
+		FROM configurations AS c
+		JOIN blobs AS b ON c.blob_id = b.id
+		WHERE c.manifest_id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, m.ID)
 
-	return scanFullManifestConfiguration(row)
+	return scanFullConfiguration(row)
 }
 
 // LayerBlobs finds layer blobs associated with a manifest, through the `manifest_layers` relationship entity.

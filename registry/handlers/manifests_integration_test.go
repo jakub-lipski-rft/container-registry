@@ -587,7 +587,7 @@ func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 	}
 	assert.True(t, foundRepo)
 
-	// Ensure manifest configuration is associated with manifest and has the
+	// Ensure configuration is associated with manifest and has the
 	// correct payload.
 	dbMCfg, err := mStore.Config(env.ctx, dbManifest)
 	require.NoError(t, err)

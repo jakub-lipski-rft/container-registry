@@ -27,25 +27,25 @@ type Importer struct {
 	storageDriver driver.StorageDriver
 	registry      distribution.Namespace
 
-	repositoryStore            *repositoryStore
-	manifestConfigurationStore *manifestConfigurationStore
-	manifestStore              *manifestStore
-	manifestListStore          *manifestListStore
-	tagStore                   *tagStore
-	blobStore                  *blobStore
+	repositoryStore    *repositoryStore
+	configurationStore *configurationStore
+	manifestStore      *manifestStore
+	manifestListStore  *manifestListStore
+	tagStore           *tagStore
+	blobStore          *blobStore
 }
 
 // NewImporter creates a new Importer.
 func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distribution.Namespace) *Importer {
 	return &Importer{
-		storageDriver:              storageDriver,
-		registry:                   registry,
-		manifestConfigurationStore: NewManifestConfigurationStore(db),
-		manifestStore:              NewManifestStore(db),
-		manifestListStore:          NewManifestListStore(db),
-		blobStore:                  NewBlobStore(db),
-		repositoryStore:            NewRepositoryStore(db),
-		tagStore:                   NewTagStore(db),
+		storageDriver:      storageDriver,
+		registry:           registry,
+		configurationStore: NewConfigurationStore(db),
+		manifestStore:      NewManifestStore(db),
+		manifestListStore:  NewManifestListStore(db),
+		blobStore:          NewBlobStore(db),
+		repositoryStore:    NewRepositoryStore(db),
+		tagStore:           NewTagStore(db),
 	}
 }
 
@@ -92,10 +92,10 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 	return dbLayer, nil
 }
 
-func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, m *models.Manifest, d distribution.Descriptor, payload []byte) (*models.ManifestConfiguration, error) {
+func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, m *models.Manifest, d distribution.Descriptor, payload []byte) (*models.Configuration, error) {
 	dbBlob, err := imp.blobStore.FindByDigest(ctx, d.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for manifest configuration blob: %w", err)
+		return nil, fmt.Errorf("error searching for configuration blob: %w", err)
 	}
 	if dbBlob == nil {
 		dbBlob = &models.Blob{
@@ -108,19 +108,19 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, m *models
 		}
 	}
 
-	dbConfig, err := imp.manifestConfigurationStore.FindByDigest(ctx, d.Digest)
+	dbConfig, err := imp.configurationStore.FindByDigest(ctx, d.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for manifest configuration: %w", err)
+		return nil, fmt.Errorf("error searching for configuration: %w", err)
 	}
 
 	if dbConfig == nil {
-		dbConfig = &models.ManifestConfiguration{
+		dbConfig = &models.Configuration{
 			ManifestID: m.ID,
 			BlobID:     dbBlob.ID,
 			Payload:    payload,
 		}
-		if err := imp.manifestConfigurationStore.Create(ctx, dbConfig); err != nil {
-			return nil, fmt.Errorf("error creating manifest configuration: %w", err)
+		if err := imp.configurationStore.Create(ctx, dbConfig); err != nil {
+			return nil, fmt.Errorf("error creating configuration: %w", err)
 		}
 	}
 
@@ -236,11 +236,11 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 		return nil, err
 	}
 
-	// find or create DB manifest configuration
+	// find or create DB configuration
 	blobStore := fsRepo.Blobs(ctx)
 	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
+		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
 	}
 
 	if _, err = imp.findOrCreateDBManifestConfig(ctx, dbManifest, m.Config, configPayload); err != nil {
@@ -277,11 +277,11 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 		return nil, err
 	}
 
-	// find or create DB manifest configuration
+	// find or create DB configuration
 	blobStore := fsRepo.Blobs(ctx)
 	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error obtaining manifest configuration payload: %w", err)
+		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
 	}
 
 	if _, err = imp.findOrCreateDBManifestConfig(ctx, dbManifest, m.Config, configPayload); err != nil {
@@ -512,7 +512,7 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	numManifestConfigs, err := imp.manifestConfigurationStore.Count(ctx)
+	numManifestConfigs, err := imp.configurationStore.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -526,12 +526,12 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	}
 
 	count := map[string]int{
-		"repositories":            numRepositories,
-		"manifests":               numManifests,
-		"manifest_lists":          numManifestLists,
-		"manifest_configurations": numManifestConfigs,
-		"layers":                  numLayers,
-		"tags":                    numTags,
+		"repositories":   numRepositories,
+		"manifests":      numManifests,
+		"manifest_lists": numManifestLists,
+		"configurations": numManifestConfigs,
+		"layers":         numLayers,
+		"tags":           numTags,
 	}
 
 	return count, nil

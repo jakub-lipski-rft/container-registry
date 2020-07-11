@@ -634,7 +634,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, reqManifest.Config.Digest)
 			if err != nil {
 				imh.Errors = append(imh.Errors,
-					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to obtain manifest configuration payload: %v", err)))
+					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to obtain configuration payload: %v", err)))
 				return
 			}
 
@@ -896,7 +896,7 @@ func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Dig
 		}
 
 		// Find or create the manifest configuration.
-		mCfgStore := datastore.NewManifestConfigurationStore(db)
+		mCfgStore := datastore.NewConfigurationStore(db)
 
 		dbCfg, err := mCfgStore.FindByDigest(ctx, manifest.Config.Digest)
 		if err != nil {
@@ -914,7 +914,7 @@ func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Dig
 				return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
 			}
 
-			if err := mCfgStore.Create(ctx, &models.ManifestConfiguration{
+			if err := mCfgStore.Create(ctx, &models.Configuration{
 				ManifestID: dbManifest.ID,
 				BlobID:     dbCfgBlob.ID,
 				Payload:    cfgPayload,
@@ -984,8 +984,8 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 			}
 		}
 
-		// Find or create the manifest configuration.
-		mCfgStore := datastore.NewManifestConfigurationStore(db)
+		// Find or create the configuration.
+		mCfgStore := datastore.NewConfigurationStore(db)
 
 		dbCfg, err := mCfgStore.FindByDigest(ctx, manifest.Config.Digest)
 		if err != nil {
@@ -1003,7 +1003,7 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 				return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
 			}
 
-			if err := mCfgStore.Create(ctx, &models.ManifestConfiguration{
+			if err := mCfgStore.Create(ctx, &models.Configuration{
 				ManifestID: dbManifest.ID,
 				BlobID:     dbCfgBlob.ID,
 				Payload:    cfgPayload,

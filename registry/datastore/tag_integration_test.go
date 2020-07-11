@@ -21,7 +21,7 @@ func reloadTagFixtures(tb testing.TB) {
 		tb, suite.db, suite.basePath,
 		// A Tag has a foreign key for a Manifest or a ManifestList, which in turn references
 		// a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ConfigurationsTable,
 		testutil.ManifestListsTable, testutil.TagsTable,
 	)
 }
@@ -31,7 +31,7 @@ func unloadTagFixtures(tb testing.TB) {
 		suite.db,
 		// A Tag has a foreign key for a Manifest or a ManifestList, which in turn references
 		// a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ManifestConfigurationsTable,
+		testutil.RepositoriesTable, testutil.ManifestsTable, testutil.ConfigurationsTable,
 		testutil.ManifestListsTable, testutil.TagsTable,
 	))
 }

@@ -19,7 +19,7 @@ type table string
 
 const (
 	RepositoriesTable            table = "repositories"
-	ManifestConfigurationsTable  table = "manifest_configurations"
+	ConfigurationsTable          table = "configurations"
 	ManifestsTable               table = "manifests"
 	RepositoryManifestsTable     table = "repository_manifests"
 	BlobsTable                   table = "blobs"
@@ -34,7 +34,7 @@ const (
 // AllTables represents all tables in the test database.
 var AllTables = []table{
 	RepositoriesTable,
-	ManifestConfigurationsTable,
+	ConfigurationsTable,
 	ManifestsTable,
 	RepositoryManifestsTable,
 	BlobsTable,
@@ -64,7 +64,7 @@ func (t table) seedFileName() string {
 func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, error) {
 	var query string
 	switch t {
-	case ManifestConfigurationsTable:
+	case ConfigurationsTable:
 		s := `SELECT
 				json_agg(t)
 			FROM (
