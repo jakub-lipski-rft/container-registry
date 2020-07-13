@@ -1,9 +1,12 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,6 +26,7 @@ import (
 
 var showVersion bool
 var maxNumMigrations *int
+var force bool
 
 func init() {
 	RootCmd.AddCommand(ServeCmd)
@@ -39,6 +43,7 @@ func init() {
 	MigrateUpCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	MigrateUpCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
 	MigrateCmd.AddCommand(MigrateUpCmd)
+	MigrateDownCmd.Flags().BoolVarP(&force, "force", "f", false, "no confirmation message")
 	MigrateDownCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	MigrateDownCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
 	MigrateCmd.AddCommand(MigrateDownCmd)
@@ -255,7 +260,20 @@ var MigrateDownCmd = &cobra.Command{
 		plan, err := m.DownNPlan(*maxNumMigrations)
 		fmt.Println(strings.Join(plan, "\n"))
 
-		if !dryRun {
+		if !dryRun && len(plan) > 0 {
+			if !force {
+				var response string
+				fmt.Print("Preparing to apply the above down migrations. Are you sure? [y/N] ")
+				_, err := fmt.Scanln(&response)
+				if err != nil && errors.Is(err, io.EOF) {
+					fmt.Fprintf(os.Stderr, "failed to scan user input: %v", err)
+					os.Exit(1)
+				}
+				if !regexp.MustCompile(`(?i)^y(es)?$`).MatchString(response) {
+					return
+				}
+			}
+
 			n, err := m.DownN(*maxNumMigrations)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to run database migrations: %v", err)
