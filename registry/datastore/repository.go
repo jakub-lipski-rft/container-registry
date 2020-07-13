@@ -307,7 +307,8 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 
 // Manifests finds all manifests associated with a repository.
 func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload, m.created_at, m.marked_at
+	q := `SELECT m.id, m.configuration_id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload,
+		m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories AS r ON r.id = rm.repository_id
@@ -339,7 +340,8 @@ func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repositor
 
 // FindManifestByDigest finds a manifest by digest within a repository.
 func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
-	q := `SELECT m.id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload, m.created_at, m.marked_at
+	q := `SELECT m.id, m.configuration_id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload,
+		m.created_at, m.marked_at
 		FROM manifests as m
 		JOIN repository_manifests as rm ON rm.manifest_id = m.id
 		JOIN repositories AS r ON r.id = rm.repository_id

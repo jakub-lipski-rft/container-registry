@@ -15,7 +15,7 @@ type ConfigurationReader interface {
 	FindByID(ctx context.Context, id int64) (*models.Configuration, error)
 	FindByDigest(ctx context.Context, d digest.Digest) (*models.Configuration, error)
 	Count(ctx context.Context) (int, error)
-	Manifest(ctx context.Context, c *models.Configuration) (*models.Manifest, error)
+	Manifests(ctx context.Context, c *models.Configuration) (models.Manifests, error)
 }
 
 // ConfigurationWriter is the interface that defines write operations for a configuration store.
@@ -45,7 +45,7 @@ func scanFullConfiguration(row *sql.Row) (*models.Configuration, error) {
 	var digestAlgorithm DigestAlgorithm
 	var digestHex []byte
 	c := new(models.Configuration)
-	err := row.Scan(&c.ID, &c.ManifestID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
+	err := row.Scan(&c.ID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning configuration: %w", err)
@@ -70,7 +70,7 @@ func scanFullConfigurations(rows *sql.Rows) (models.Configurations, error) {
 		var digestAlgorithm DigestAlgorithm
 		var digestHex []byte
 		c := new(models.Configuration)
-		err := rows.Scan(&c.ID, &c.ManifestID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
+		err := rows.Scan(&c.ID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("error scanning configuration: %w", err)
 		}
@@ -92,7 +92,7 @@ func scanFullConfigurations(rows *sql.Rows) (models.Configurations, error) {
 
 // FindByID finds a configuration by ID.
 func (s *configurationStore) FindByID(ctx context.Context, id int64) (*models.Configuration, error) {
-	q := `SELECT c.id, c.manifest_id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
+	q := `SELECT c.id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
 		FROM configurations AS c
 		JOIN blobs AS b ON c.blob_id = b.id
 		WHERE c.id = $1`
@@ -103,7 +103,7 @@ func (s *configurationStore) FindByID(ctx context.Context, id int64) (*models.Co
 
 // FindByDigest finds a configuration by the digest.
 func (s *configurationStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Configuration, error) {
-	q := `SELECT c.id, c.manifest_id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
+	q := `SELECT c.id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
 		FROM configurations AS c
 		JOIN blobs AS b ON c.blob_id = b.id
 		WHERE b.digest_algorithm = $1 AND b.digest_hex = decode($2, 'hex')`
@@ -119,7 +119,7 @@ func (s *configurationStore) FindByDigest(ctx context.Context, d digest.Digest) 
 
 // FindAll finds all configurations.
 func (s *configurationStore) FindAll(ctx context.Context) (models.Configurations, error) {
-	q := `SELECT c.id, c.manifest_id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
+	q := `SELECT c.id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
 		FROM configurations AS c
 		JOIN blobs AS b ON c.blob_id = b.id`
 	rows, err := s.db.QueryContext(ctx, q)
@@ -142,22 +142,25 @@ func (s *configurationStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// Manifest finds the manifest that the configuration belongs to.
-func (s *configurationStore) Manifest(ctx context.Context, c *models.Configuration) (*models.Manifest, error) {
-	q := `SELECT id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
-		FROM manifests WHERE id = $1`
+// Manifests finds the manifests that reference a configuration.
+func (s *configurationStore) Manifests(ctx context.Context, c *models.Configuration) (models.Manifests, error) {
+	q := `SELECT id, configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
+		FROM manifests WHERE configuration_id = $1`
 
-	row := s.db.QueryRowContext(ctx, q, c.ManifestID)
+	rows, err := s.db.QueryContext(ctx, q, c.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding manifests: %w", err)
+	}
 
-	return scanFullManifest(row)
+	return scanFullManifests(rows)
 }
 
 // Create saves a new configuration.
 func (s *configurationStore) Create(ctx context.Context, c *models.Configuration) error {
-	q := `INSERT INTO configurations (manifest_id, blob_id, payload)
-		VALUES ($1, $2, $3) RETURNING id, created_at`
+	q := `INSERT INTO configurations (blob_id, payload)
+		VALUES ($1, $2) RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, c.ManifestID, c.BlobID, c.Payload)
+	row := s.db.QueryRowContext(ctx, q, c.BlobID, c.Payload)
 	if err := row.Scan(&c.ID, &c.CreatedAt); err != nil {
 		return fmt.Errorf("error creating configuration: %w", err)
 	}
@@ -168,9 +171,9 @@ func (s *configurationStore) Create(ctx context.Context, c *models.Configuration
 // Update updates an existing configuration.
 func (s *configurationStore) Update(ctx context.Context, c *models.Configuration) error {
 	q := `UPDATE configurations
-		SET (manifest_id, blob_id, payload) = ($1, $2, $3) WHERE id = $4`
+		SET (blob_id, payload) = ($1, $2) WHERE id = $3`
 
-	res, err := s.db.ExecContext(ctx, q, c.ManifestID, c.BlobID, c.Payload, c.ID)
+	res, err := s.db.ExecContext(ctx, q, c.BlobID, c.Payload, c.ID)
 	if err != nil {
 		return fmt.Errorf("error updating configuration: %w", err)
 	}

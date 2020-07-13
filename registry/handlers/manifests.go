@@ -854,6 +854,34 @@ func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Dig
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
+	// Find or create the configuration.
+	cfgStore := datastore.NewConfigurationStore(db)
+	blobStore := datastore.NewBlobStore(db)
+
+	dbCfg, err := cfgStore.FindByDigest(ctx, manifest.Config.Digest)
+	if err != nil {
+		return err
+	}
+
+	if dbCfg == nil {
+		log.Debug("manifest config not found in database")
+
+		dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
+		if err != nil {
+			return err
+		}
+		if dbCfgBlob == nil {
+			return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
+		}
+
+		dbCfg = &models.Configuration{BlobID: dbCfgBlob.ID, Payload: cfgPayload}
+		if err := cfgStore.Create(ctx, dbCfg); err != nil {
+			return err
+		}
+	}
+	// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
+	// 		 but now we know its concrete type (manifest.Config.MediaType).
+
 	mStore := datastore.NewManifestStore(db)
 	dbManifest, err := mStore.FindByDigest(ctx, dgst)
 	if err != nil {
@@ -863,10 +891,11 @@ func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Dig
 		log.Debug("manifest not found in database")
 
 		m := &models.Manifest{
-			SchemaVersion: manifest.SchemaVersion,
-			MediaType:     manifest.MediaType,
-			Digest:        dgst,
-			Payload:       payload,
+			ConfigurationID: sql.NullInt64{Int64: dbCfg.ID, Valid: true},
+			SchemaVersion:   manifest.SchemaVersion,
+			MediaType:       manifest.MediaType,
+			Digest:          dgst,
+			Payload:         payload,
 		}
 
 		if err := mStore.Create(ctx, m); err != nil {
@@ -876,7 +905,6 @@ func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Dig
 		dbManifest = m
 
 		// find and associate manifest layer blobs
-		blobStore := datastore.NewBlobStore(db)
 		for _, reqLayer := range manifest.Layers {
 			dbBlob, err := blobStore.FindByDigest(ctx, reqLayer.Digest)
 			if err != nil {
@@ -894,36 +922,6 @@ func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Dig
 				return err
 			}
 		}
-
-		// Find or create the manifest configuration.
-		mCfgStore := datastore.NewConfigurationStore(db)
-
-		dbCfg, err := mCfgStore.FindByDigest(ctx, manifest.Config.Digest)
-		if err != nil {
-			return err
-		}
-
-		if dbCfg == nil {
-			log.Debug("manifest config not found in database")
-
-			dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
-			if err != nil {
-				return err
-			}
-			if dbCfgBlob == nil {
-				return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
-			}
-
-			if err := mCfgStore.Create(ctx, &models.Configuration{
-				ManifestID: dbManifest.ID,
-				BlobID:     dbCfgBlob.ID,
-				Payload:    cfgPayload,
-			}); err != nil {
-				return err
-			}
-		}
-		// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
-		// 		 but now we know its concrete type (manifest.Config.MediaType).
 	}
 
 	// Associate manifest and repository.
@@ -943,6 +941,34 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
+	// Find or create the configuration.
+	cfgStore := datastore.NewConfigurationStore(db)
+	blobStore := datastore.NewBlobStore(db)
+
+	dbCfg, err := cfgStore.FindByDigest(ctx, manifest.Config.Digest)
+	if err != nil {
+		return err
+	}
+
+	if dbCfg == nil {
+		log.Debug("manifest config not found in database")
+
+		dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
+		if err != nil {
+			return err
+		}
+		if dbCfgBlob == nil {
+			return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
+		}
+
+		dbCfg = &models.Configuration{BlobID: dbCfgBlob.ID, Payload: cfgPayload}
+		if err := cfgStore.Create(ctx, dbCfg); err != nil {
+			return err
+		}
+	}
+	// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
+	// 		 but now we know its concrete type (manifest.Config.MediaType).
+
 	mStore := datastore.NewManifestStore(db)
 	dbManifest, err := mStore.FindByDigest(ctx, dgst)
 	if err != nil {
@@ -952,10 +978,11 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 		log.Debug("manifest not found in database")
 
 		m := &models.Manifest{
-			SchemaVersion: manifest.SchemaVersion,
-			MediaType:     manifest.MediaType,
-			Digest:        dgst,
-			Payload:       payload,
+			ConfigurationID: sql.NullInt64{Int64: dbCfg.ID, Valid: true},
+			SchemaVersion:   manifest.SchemaVersion,
+			MediaType:       manifest.MediaType,
+			Digest:          dgst,
+			Payload:         payload,
 		}
 
 		if err := mStore.Create(ctx, m); err != nil {
@@ -965,7 +992,6 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 		dbManifest = m
 
 		// find and associate manifest layer blobs
-		blobStore := datastore.NewBlobStore(db)
 		for _, reqLayer := range manifest.Layers {
 			dbBlob, err := blobStore.FindByDigest(ctx, reqLayer.Digest)
 			if err != nil {
@@ -983,36 +1009,6 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, dgst digest
 				return err
 			}
 		}
-
-		// Find or create the configuration.
-		mCfgStore := datastore.NewConfigurationStore(db)
-
-		dbCfg, err := mCfgStore.FindByDigest(ctx, manifest.Config.Digest)
-		if err != nil {
-			return err
-		}
-
-		if dbCfg == nil {
-			log.Debug("manifest config not found in database")
-
-			dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
-			if err != nil {
-				return err
-			}
-			if dbCfgBlob == nil {
-				return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
-			}
-
-			if err := mCfgStore.Create(ctx, &models.Configuration{
-				ManifestID: dbManifest.ID,
-				BlobID:     dbCfgBlob.ID,
-				Payload:    cfgPayload,
-			}); err != nil {
-				return err
-			}
-		}
-		// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
-		// 		 but now we know its concrete type (manifest.Config.MediaType).
 	}
 
 	// Associate manifest and repository.

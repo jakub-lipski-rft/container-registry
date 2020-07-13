@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.2" last-position="0,1" last-zoom="1.1" max-obj-count="19"
+<dbmodel pgmodeler-ver="0.9.2" last-position="0,122" last-zoom="1.1" max-obj-count="19"
 	 default-schema="public" default-owner="postgres">
 <role name="withspace"
       inherit="true"
@@ -71,15 +71,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="configurations" layer="0" collapse-mode="2" max-obj-count="6">
+<table name="configurations" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="610.909" y="846.727"/>
+	<position x="615.454" y="875.818"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="manifest_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="blob_id" not-null="true">
@@ -94,20 +91,20 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="pk_configurations" type="pk-constr" table="public.configurations">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_configurations_manifest_id" type="uq-constr" table="public.configurations">
-		<columns names="manifest_id" ref-type="src-columns"/>
-	</constraint>
 	<constraint name="uq_configurations_blob_id" type="uq-constr" table="public.configurations">
 		<columns names="blob_id" ref-type="src-columns"/>
 	</constraint>
 </table>
 
-<table name="manifests" layer="0" collapse-mode="2" max-obj-count="9">
+<table name="manifests" layer="0" collapse-mode="2" max-obj-count="10">
 	<schema name="public"/>
 	<role name="postgres"/>
 	<position x="410.636" y="390.182"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="configuration_id">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
@@ -505,19 +502,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_configurations_manifest_id" table="public.configurations"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="manifest_id"/>
-		</idxelement>
-</index>
-
 <index name="ix_configurations_blob_id" table="public.configurations"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
 			<column name="blob_id"/>
+		</idxelement>
+</index>
+
+<index name="ix_manifests_configuration_id" table="public.manifests"
+	 concurrent="false" unique="false" fast-update="false" buffering="false"
+	 index-type="btree" factor="0">
+		<idxelement use-sorting="false">
+			<column name="configuration_id"/>
 		</idxelement>
 </index>
 
@@ -527,15 +524,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_configurations_manifest_id_manifests" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.configurations">
-	<columns names="manifest_id" ref-type="src-columns"/>
-	<columns names="id" ref-type="dst-columns"/>
-</constraint>
-
 <constraint name="fk_configurations_blob_id_blobs" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.blobs" table="public.configurations">
 	<columns names="blob_id" ref-type="src-columns"/>
+	<columns names="id" ref-type="dst-columns"/>
+</constraint>
+
+<constraint name="fk_manifests_configuration_id_configurations" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.configurations" table="public.manifests">
+	<columns names="configuration_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -691,11 +688,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.manifest_lists" reference-fk="fk_tags_manifest_list_id_manifest_lists"
 	 src-required="false" dst-required="false"/>
 
-<relationship name="rel_configurations_manifests" type="relfk" layer="0"
-	 src-table="public.configurations"
-	 dst-table="public.manifests" reference-fk="fk_configurations_manifest_id_manifests"
-	 src-required="false" dst-required="false"/>
-
 <relationship name="rel_repository_blobs_repositories" type="relfk" layer="0"
 	 src-table="public.repository_blobs"
 	 dst-table="public.repositories" reference-fk="fk_repository_blobs_repository_id_repositories"
@@ -709,6 +701,11 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <relationship name="rel_configurations_blobs" type="relfk" layer="0"
 	 src-table="public.configurations"
 	 dst-table="public.blobs" reference-fk="fk_configurations_blob_id_blobs"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_manifests_configurations" type="relfk" layer="0"
+	 src-table="public.manifests"
+	 dst-table="public.configurations" reference-fk="fk_manifests_configuration_id_configurations"
 	 src-required="false" dst-required="false"/>
 
 <permission>

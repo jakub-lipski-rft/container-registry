@@ -70,7 +70,6 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 			FROM (
 				SELECT
 					id,
-					manifest_id,
 					blob_id,
 					created_at,
 					convert_from(payload, 'UTF8')::json AS payload
@@ -83,6 +82,7 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 			FROM (
 				SELECT
 					id,
+					configuration_id,
 					created_at,
 					marked_at,
 					schema_version,
