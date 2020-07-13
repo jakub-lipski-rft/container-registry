@@ -8,7 +8,7 @@ set -euo pipefail
 TIMESTAMP=$(date +"%Y%m%d%H%M%S")
 NAME=$1
 ID=$TIMESTAMP'_'$NAME
-MIGRATIONS_DIR=./migrationss
+MIGRATIONS_DIR=./migrations
 FILE_PATH=$MIGRATIONS_DIR/$ID.go
 
 # Show help message if no argument was provided
