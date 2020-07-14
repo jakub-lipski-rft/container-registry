@@ -18,17 +18,15 @@ import (
 type table string
 
 const (
-	RepositoriesTable            table = "repositories"
-	ConfigurationsTable          table = "configurations"
-	ManifestsTable               table = "manifests"
-	RepositoryManifestsTable     table = "repository_manifests"
-	BlobsTable                   table = "blobs"
-	RepositoryBlobsTable         table = "repository_blobs"
-	ManifestLayersTable          table = "manifest_layers"
-	ManifestListsTable           table = "manifest_lists"
-	ManifestListManifestsTable   table = "manifest_list_manifests"
-	RepositoryManifestListsTable table = "repository_manifest_lists"
-	TagsTable                    table = "tags"
+	RepositoriesTable        table = "repositories"
+	ConfigurationsTable      table = "configurations"
+	ManifestsTable           table = "manifests"
+	ManifestReferencesTable  table = "manifest_references"
+	RepositoryManifestsTable table = "repository_manifests"
+	BlobsTable               table = "blobs"
+	RepositoryBlobsTable     table = "repository_blobs"
+	ManifestLayersTable      table = "manifest_layers"
+	TagsTable                table = "tags"
 )
 
 // AllTables represents all tables in the test database.
@@ -36,13 +34,11 @@ var AllTables = []table{
 	RepositoriesTable,
 	ConfigurationsTable,
 	ManifestsTable,
+	ManifestReferencesTable,
 	RepositoryManifestsTable,
 	BlobsTable,
 	RepositoryBlobsTable,
 	ManifestLayersTable,
-	ManifestListsTable,
-	ManifestListManifestsTable,
-	RepositoryManifestListsTable,
 	TagsTable,
 }
 
@@ -83,21 +79,6 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 				SELECT
 					id,
 					configuration_id,
-					created_at,
-					marked_at,
-					schema_version,
-					encode(digest_hex, 'hex') as digest_hex,
-					convert_from(payload, 'UTF8')::json AS payload,
-					media_type
-				FROM %s
-			) t;`
-		query = fmt.Sprintf(s, t)
-	case ManifestListsTable:
-		s := `SELECT
-				json_agg(t)
-			FROM (
-				SELECT
-					id,
 					created_at,
 					marked_at,
 					schema_version,

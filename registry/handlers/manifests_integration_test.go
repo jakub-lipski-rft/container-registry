@@ -4,7 +4,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -190,10 +189,10 @@ func TestTagManifestList(t *testing.T) {
 	manifestList := seedRandomManifestList(t, env)
 	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
 
-	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	err := dbTagManifest(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
-	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, manifestListDigest, tagName, repoPath)
 }
 
 func TestTagManifestList_Idempotent(t *testing.T) {
@@ -208,15 +207,15 @@ func TestTagManifestList_Idempotent(t *testing.T) {
 	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
 
 	// Tag manifest list twice.
-	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	err := dbTagManifest(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
-	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, manifestListDigest, tagName, repoPath)
 
-	err = dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	err = dbTagManifest(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
-	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, manifestListDigest, tagName, repoPath)
 }
 
 func TestTagManifest_TagReplacesPreviousManifestList(t *testing.T) {
@@ -230,11 +229,11 @@ func TestTagManifest_TagReplacesPreviousManifestList(t *testing.T) {
 	manifestList := seedRandomManifestList(t, env)
 	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
 
-	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	err := dbTagManifest(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
 	// Ensure tag is initially associated with correct manifest list.
-	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, manifestListDigest, tagName, repoPath)
 
 	// Upload a schema2 manifest, retagging it with the same tag used for the manifest list.
 	manifest, cfgPayload := seedRandomSchema2Manifest(t, env)
@@ -258,21 +257,21 @@ func TestTagManifestList_TagReplacesPreviousManifestList(t *testing.T) {
 	oldManifestList := seedRandomManifestList(t, env)
 	oldManifestListDigest := env.uploadManifestListToDB(t, oldManifestList, repoPath)
 
-	err := dbTagManifestList(env.ctx, env.db, oldManifestListDigest, tagName, repoPath)
+	err := dbTagManifest(env.ctx, env.db, oldManifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
 	// Ensure that tag is initially associated with correct manifest list.
-	verifyManifestListTag(t, env, oldManifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, oldManifestListDigest, tagName, repoPath)
 
 	// Upload a new manifest list, retagging it with the same tag used
 	// for the old manifest list.
 	manifestList := seedRandomManifestList(t, env)
 	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
 
-	err = dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	err = dbTagManifest(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
-	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, manifestListDigest, tagName, repoPath)
 }
 
 func TestTagManifestList_TagReplacesPreviousManifest(t *testing.T) {
@@ -296,11 +295,11 @@ func TestTagManifestList_TagReplacesPreviousManifest(t *testing.T) {
 	manifestList := seedRandomManifestList(t, env)
 	manifestListDigest := env.uploadManifestListToDB(t, manifestList, repoPath)
 
-	err = dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
+	err = dbTagManifest(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.NoError(t, err)
 
 	// Ensure that tag is associated with correct manifest list.
-	verifyManifestListTag(t, env, manifestListDigest, tagName, repoPath)
+	verifyManifestTag(t, env, manifestListDigest, tagName, repoPath)
 }
 
 func TestTagManifest_MissingManifest(t *testing.T) {
@@ -312,27 +311,6 @@ func TestTagManifest_MissingManifest(t *testing.T) {
 	manifestDigest := digest.FromString("invalid digest")
 
 	err := dbTagManifest(env.ctx, env.db, manifestDigest, tagName, repoPath)
-	require.Error(t, err)
-
-	// Ensure tag is not present in database.
-	repoStore := datastore.NewRepositoryStore(env.db)
-	dbRepo, err := repoStore.CreateOrFindByPath(env.ctx, repoPath)
-	require.NoError(t, err)
-
-	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
-	require.NoError(t, err)
-	require.Nil(t, dbTag)
-}
-
-func TestTagManifestList_MissingManifestList(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	tagName := "tagmanifestlistmissing"
-	repoPath := "manifestdb/tagmanifestlistmissing"
-	manifestListDigest := digest.FromString("invalid digest")
-
-	err := dbTagManifestList(env.ctx, env.db, manifestListDigest, tagName, repoPath)
 	require.Error(t, err)
 
 	// Ensure tag is not present in database.
@@ -615,15 +593,15 @@ func verifySchema2Manifest(t *testing.T, env *env, dgst digest.Digest, manifest 
 func verifyManifestList(t *testing.T, env *env, dgst digest.Digest, manifestList manifestlist.ManifestList, repoPath string) {
 	t.Helper()
 
-	mListStore := datastore.NewManifestListStore(env.db)
+	mStore := datastore.NewManifestStore(env.db)
 
 	// Ensure presence of manifest list.
-	dbManifestList, err := mListStore.FindByDigest(env.ctx, dgst)
+	dbManifestList, err := mStore.FindByDigest(env.ctx, dgst)
 	require.NoError(t, err)
 	require.NotNil(t, dbManifestList)
 
 	// Ensure manifests are associated with manifest list.
-	dbManifests, err := mListStore.Manifests(env.ctx, dbManifestList)
+	dbManifests, err := mStore.References(env.ctx, dbManifestList)
 	require.NoError(t, err)
 	require.NotEmpty(t, dbManifests)
 
@@ -638,7 +616,7 @@ func verifyManifestList(t *testing.T, env *env, dgst digest.Digest, manifestList
 	}
 
 	// Ensure manifest list is associated with repository.
-	dbRepos, err := mListStore.Repositories(env.ctx, dbManifestList)
+	dbRepos, err := mStore.Repositories(env.ctx, dbManifestList)
 	require.NoError(t, err)
 	require.NotEmpty(t, dbRepos)
 
@@ -679,35 +657,6 @@ func verifyManifestTag(t *testing.T, env *env, dgst digest.Digest, tagName, repo
 	require.NotNil(t, dbManifest)
 
 	require.Equal(t, dbManifest, tagDBManifest)
-}
-
-func verifyManifestListTag(t *testing.T, env *env, dgst digest.Digest, tagName, repoPath string) {
-	t.Helper()
-
-	// Ensure tag is present in database.
-	repoStore := datastore.NewRepositoryStore(env.db)
-
-	dbRepo, err := repoStore.FindByPath(env.ctx, repoPath)
-	require.NoError(t, err)
-	require.NotNil(t, dbRepo)
-
-	dbTag, err := repoStore.FindTagByName(env.ctx, dbRepo, tagName)
-	require.NoError(t, err)
-	require.NotNil(t, dbTag)
-
-	// Ensure that tag is associated with correct manifest list.
-	tagstore := datastore.NewTagStore(env.db)
-	mListStore := datastore.NewManifestListStore(env.db)
-
-	tagDBManifestList, err := tagstore.ManifestList(env.ctx, dbTag)
-	require.NoError(t, err)
-	require.NotNil(t, tagDBManifestList)
-
-	dbManifestList, err := mListStore.FindByDigest(env.ctx, dgst)
-	require.NoError(t, err)
-	require.NotNil(t, dbManifestList)
-
-	require.Equal(t, dbManifestList, tagDBManifestList)
 }
 
 // seedRandomSchema1Manifest generates a random schema1 manifest and ensures
@@ -834,12 +783,12 @@ func TestDeleteManifestDB_Manifest(t *testing.T) {
 		{
 			Name:         "1.0.0",
 			RepositoryID: r.ID,
-			ManifestID:   sql.NullInt64{Int64: m.ID, Valid: true},
+			ManifestID:   m.ID,
 		},
 		{
 			Name:         "latest",
 			RepositoryID: r.ID,
-			ManifestID:   sql.NullInt64{Int64: m.ID, Valid: true},
+			ManifestID:   m.ID,
 		},
 	}
 	for _, tag := range tags {
@@ -883,32 +832,32 @@ func TestDeleteManifestDB_ManifestList(t *testing.T) {
 	require.NotNil(t, r)
 
 	// add a manifest list
-	mlStore := datastore.NewManifestListStore(env.db)
-	ml := &models.ManifestList{
+	mStore := datastore.NewManifestStore(env.db)
+	ml := &models.Manifest{
 		SchemaVersion: 2,
 		MediaType:     manifestlist.MediaTypeManifestList,
 		Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
 		Payload:       json.RawMessage(`{"schemaVersion":2}`),
 	}
-	err = mlStore.Create(env.ctx, ml)
+	err = mStore.Create(env.ctx, ml)
 	require.NoError(t, err)
 
 	// associate manifest list with repository
-	err = rStore.AssociateManifestList(env.ctx, r, ml)
+	err = rStore.AssociateManifest(env.ctx, r, ml)
 	require.NoError(t, err)
 
 	// tag manifest list
 	tStore := datastore.NewTagStore(env.db)
 	tags := []*models.Tag{
 		{
-			Name:           "1.0.0",
-			RepositoryID:   r.ID,
-			ManifestListID: sql.NullInt64{Int64: ml.ID, Valid: true},
+			Name:         "1.0.0",
+			RepositoryID: r.ID,
+			ManifestID:   ml.ID,
 		},
 		{
-			Name:           "latest",
-			RepositoryID:   r.ID,
-			ManifestListID: sql.NullInt64{Int64: ml.ID, Valid: true},
+			Name:         "latest",
+			RepositoryID: r.ID,
+			ManifestID:   ml.ID,
 		},
 	}
 	for _, tag := range tags {
@@ -922,12 +871,12 @@ func TestDeleteManifestDB_ManifestList(t *testing.T) {
 	require.NoError(t, err)
 
 	// the manifest list should still be there (deleting it is GC's responsibility, if no other repo uses it)
-	ml2, err := mlStore.FindByID(env.ctx, ml.ID)
+	ml2, err := mStore.FindByID(env.ctx, ml.ID)
 	require.NoError(t, err)
 	require.Equal(t, ml, ml2)
 
 	// but the manifest list and repository association should not
-	mm, err := rStore.ManifestLists(env.ctx, r)
+	mm, err := rStore.Manifests(env.ctx, r)
 	require.NoError(t, err)
 	require.Empty(t, mm)
 
@@ -971,38 +920,4 @@ func TestDeleteManifestDB_DissociatedManifest(t *testing.T) {
 	m2, err := mStore.FindByID(env.ctx, m.ID)
 	require.NoError(t, err)
 	require.Equal(t, m, m2)
-}
-
-func TestDeleteManifestDB_DissociatedManifestList(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	// Setup
-
-	// build test repository
-	rStore := datastore.NewRepositoryStore(env.db)
-	r, err := rStore.CreateByPath(env.ctx, "foo")
-	require.NoError(t, err)
-	require.NotNil(t, r)
-
-	// add a manifest list
-	mlStore := datastore.NewManifestListStore(env.db)
-	ml := &models.ManifestList{
-		SchemaVersion: 2,
-		MediaType:     manifestlist.MediaTypeManifestList,
-		Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
-		Payload:       json.RawMessage(`{"schemaVersion":2}`),
-	}
-	err = mlStore.Create(env.ctx, ml)
-	require.NoError(t, err)
-
-	// Test
-
-	err = dbDeleteManifest(env.ctx, env.db, r.Path, ml.Digest)
-	require.Error(t, err, "no manifest or manifest list found in database")
-
-	// the manifest list should still be there (it was not associated with the repository)
-	ml2, err := mlStore.FindByID(env.ctx, ml.ID)
-	require.NoError(t, err)
-	require.Equal(t, ml, ml2)
 }

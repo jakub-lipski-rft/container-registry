@@ -30,7 +30,6 @@ type Importer struct {
 	repositoryStore    *repositoryStore
 	configurationStore *configurationStore
 	manifestStore      *manifestStore
-	manifestListStore  *manifestListStore
 	tagStore           *tagStore
 	blobStore          *blobStore
 }
@@ -42,7 +41,6 @@ func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distri
 		registry:           registry,
 		configurationStore: NewConfigurationStore(db),
 		manifestStore:      NewManifestStore(db),
-		manifestListStore:  NewManifestListStore(db),
 		blobStore:          NewBlobStore(db),
 		repositoryStore:    NewRepositoryStore(db),
 		tagStore:           NewTagStore(db),
@@ -304,7 +302,7 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 	return dbManifest, nil
 }
 
-func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, ml *manifestlist.DeserializedManifestList, dgst digest.Digest) (*models.ManifestList, error) {
+func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, ml *manifestlist.DeserializedManifestList, dgst digest.Digest) (*models.Manifest, error) {
 	_, payload, err := ml.Payload()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing manifest list payload: %w", err)
@@ -318,13 +316,13 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 	}
 
 	// create manifest list on DB
-	dbManifestList := &models.ManifestList{
+	dbManifestList := &models.Manifest{
 		SchemaVersion: ml.SchemaVersion,
 		MediaType:     mediaType,
 		Digest:        dgst,
 		Payload:       payload,
 	}
-	if err := imp.manifestListStore.Create(ctx, dbManifestList); err != nil {
+	if err := imp.manifestStore.Create(ctx, dbManifestList); err != nil {
 		return nil, fmt.Errorf("error creating manifest list: %w", err)
 	}
 
@@ -355,14 +353,14 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 			continue
 		}
 
-		if err := imp.manifestListStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
+		if err := imp.manifestStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
 			logrus.WithError(err).Error("error associating manifest and manifest list")
 			continue
 		}
 	}
 
 	// associate repository and manifest list
-	if err := imp.repositoryStore.AssociateManifestList(ctx, dbRepo, dbManifestList); err != nil {
+	if err := imp.repositoryStore.AssociateManifest(ctx, dbRepo, dbManifestList); err != nil {
 		return nil, fmt.Errorf("error associating repository and manifest list: %w", err)
 	}
 
@@ -445,24 +443,16 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 
 		dbTag := &models.Tag{Name: fsTag, RepositoryID: dbRepo.ID}
 
-		// find corresponding manifest or manifest list in DB
+		// find corresponding manifest in DB
 		dbManifest, err := imp.manifestStore.FindByDigest(ctx, desc.Digest)
 		if err != nil {
 			return fmt.Errorf("error finding target manifest: %w", err)
 		}
 		if dbManifest == nil {
-			dbManifestList, err := imp.manifestListStore.FindByDigest(ctx, desc.Digest)
-			if err != nil {
-				return fmt.Errorf("error finding target manifest list: %w", err)
-			}
-			if dbManifestList == nil {
-				log.WithError(err).Errorf("no manifest or manifest list found for digest %q", desc.Digest)
-				continue
-			}
-			dbTag.ManifestListID = sql.NullInt64{Int64: int64(dbManifestList.ID), Valid: true}
-		} else {
-			dbTag.ManifestID = sql.NullInt64{Int64: int64(dbManifest.ID), Valid: true}
+			log.WithError(err).Errorf("no manifest found for digest %q", desc.Digest)
+			continue
 		}
+		dbTag.ManifestID = dbManifest.ID
 
 		// create tag
 		if err := imp.tagStore.Create(ctx, dbTag); err != nil {
@@ -511,10 +501,6 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	numManifestLists, err := imp.manifestListStore.Count(ctx)
-	if err != nil {
-		return nil, err
-	}
 	numManifestConfigs, err := imp.configurationStore.Count(ctx)
 	if err != nil {
 		return nil, err
@@ -531,7 +517,6 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	count := map[string]int{
 		"repositories":   numRepositories,
 		"manifests":      numManifests,
-		"manifest_lists": numManifestLists,
 		"configurations": numManifestConfigs,
 		"layers":         numLayers,
 		"tags":           numTags,

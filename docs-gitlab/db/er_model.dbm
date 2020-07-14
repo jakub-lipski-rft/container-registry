@@ -3,7 +3,7 @@
 CAUTION: Do not modify this file unless you know what you are doing.
          Unexpected results may occur if the code is changed deliberately.
 -->
-<dbmodel pgmodeler-ver="0.9.2" last-position="0,122" last-zoom="1.1" max-obj-count="19"
+<dbmodel pgmodeler-ver="0.9.2" last-position="0,0" last-zoom="1.1" max-obj-count="15"
 	 default-schema="public" default-owner="postgres">
 <role name="withspace"
       inherit="true"
@@ -37,7 +37,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="repositories" layer="0" collapse-mode="2" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="851.909" y="27.1818"/>
+	<position x="581.909" y="58.0909"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -74,7 +74,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="configurations" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="615.454" y="875.818"/>
+	<position x="1051.82" y="745.818"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -99,7 +99,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="manifests" layer="0" collapse-mode="2" max-obj-count="10">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="410.636" y="390.182"/>
+	<position x="107.909" y="395.637"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -145,7 +145,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="blobs" layer="0" collapse-mode="2" max-obj-count="8">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="51.6364" y="625.818"/>
+	<position x="1036.18" y="405.818"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -185,7 +185,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <table name="manifest_layers" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="162.182" y="882.272"/>
+	<position x="567.636" y="740.454"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -207,78 +207,38 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 </table>
 
-<table name="manifest_lists" layer="0" collapse-mode="2" max-obj-count="9">
+<table name="manifest_references" layer="0" collapse-mode="2" max-obj-count="6">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="1290.91" y="425.182"/>
+	<position x="88.1818" y="729.909"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="parent_id" not-null="true">
+		<type name="bigint" length="0"/>
+	</column>
+	<column name="child_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
 		<type name="timestamp with time zone" length="0" with-timezone="true"/>
 	</column>
-	<column name="marked_at">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<column name="schema_version" not-null="true">
-		<type name="integer" length="0"/>
-	</column>
-	<column name="digest_algorithm" not-null="true">
-		<type name="smallint" length="0"/>
-	</column>
-	<column name="digest_hex" not-null="true">
-		<type name="bytea" length="0"/>
-	</column>
-	<column name="payload" not-null="true">
-		<type name="bytea" length="0"/>
-	</column>
-	<column name="media_type" not-null="true">
-		<type name="text" length="0"/>
-	</column>
-	<constraint name="pk_manifest_lists" type="pk-constr" table="public.manifest_lists">
+	<constraint name="pk_manifest_references" type="pk-constr" table="public.manifest_references">
 		<columns names="id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="uq_manifest_lists_digest_algorithm_digest_hex" type="uq-constr" table="public.manifest_lists">
-		<columns names="digest_algorithm,digest_hex" ref-type="src-columns"/>
+	<constraint name="uq_manifest_references_parent_id_child_id" type="uq-constr" table="public.manifest_references">
+		<columns names="parent_id,child_id" ref-type="src-columns"/>
 	</constraint>
-	<constraint name="ck_manifest_lists_media_type_length" type="ck-constr" table="public.manifest_lists">
-			<expression><![CDATA[(char_length(media_type) <= 255)]]></expression>
-	</constraint>
-	<constraint name="ck_manifest_lists_digest_algorithm_enum" type="ck-constr" table="public.manifest_lists">
-			<expression><![CDATA[(digest_algorithm IN (1, 2))]]></expression>
+	<constraint name="ck_manifest_references_parent_id_child_id_differ" type="ck-constr" table="public.manifest_references">
+			<expression><![CDATA[((parent_id <> child_id))]]></expression>
 	</constraint>
 </table>
 
-<table name="manifest_list_manifests" layer="0" collapse-mode="2" max-obj-count="4">
+<table name="tags" layer="0" collapse-mode="2" max-obj-count="7">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="803.455" y="633.546"/>
-	<column name="id" not-null="true"
-	 identity-type="BY DEFAULT">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="manifest_list_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="manifest_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<constraint name="pk_manifest_list_manifests" type="pk-constr" table="public.manifest_list_manifests">
-		<columns names="id" ref-type="src-columns"/>
-	</constraint>
-	<constraint name="uq_manifest_list_manifests_manifest_list_id_manifest_id" type="uq-constr" table="public.manifest_list_manifests">
-		<columns names="manifest_list_id,manifest_id" ref-type="src-columns"/>
-	</constraint>
-</table>
-
-<table name="tags" layer="0" collapse-mode="2" max-obj-count="8">
-	<schema name="public"/>
-	<role name="postgres"/>
-	<position x="844" y="302.273"/>
+	<position x="594" y="388.637"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -286,10 +246,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<column name="repository_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
-	<column name="manifest_id">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="manifest_list_id">
+	<column name="manifest_id" not-null="true">
 		<type name="bigint" length="0"/>
 	</column>
 	<column name="created_at" not-null="true" default-value="now()">
@@ -310,15 +267,12 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<constraint name="ck_tags_name_length" type="ck-constr" table="public.tags">
 			<expression><![CDATA[(char_length(name) <= 255)]]></expression>
 	</constraint>
-	<constraint name="ck_tags_manifest_id_manifest_list_id_one_of" type="ck-constr" table="public.tags">
-			<expression><![CDATA[((manifest_id is not null and manifest_list_id is null) or (manifest_id is null and manifest_list_id is not null))]]></expression>
-	</constraint>
 </table>
 
 <table name="repository_manifests" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="359.909" y="60.1818"/>
+	<position x="88.0908" y="112.909"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -337,31 +291,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	</constraint>
 	<constraint name="uq_repository_manifests_repository_id_manifest_id" type="uq-constr" table="public.repository_manifests">
 		<columns names="repository_id,manifest_id" ref-type="src-columns"/>
-	</constraint>
-</table>
-
-<table name="repository_manifest_lists" layer="0" collapse-mode="2" max-obj-count="4">
-	<schema name="public"/>
-	<role name="postgres"/>
-	<position x="1233.91" y="60.1818"/>
-	<column name="id" not-null="true"
-	 identity-type="BY DEFAULT">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="repository_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="manifest_list_id" not-null="true">
-		<type name="bigint" length="0"/>
-	</column>
-	<column name="created_at" not-null="true" default-value="now()">
-		<type name="timestamp with time zone" length="0" with-timezone="true"/>
-	</column>
-	<constraint name="pk_repository_manifest_lists" type="pk-constr" table="public.repository_manifest_lists">
-		<columns names="id" ref-type="src-columns"/>
-	</constraint>
-	<constraint name="uq_repository_manifests_repository_id_manifest_list_id" type="uq-constr" table="public.repository_manifest_lists">
-		<columns names="repository_id,manifest_list_id" ref-type="src-columns"/>
 	</constraint>
 </table>
 
@@ -405,27 +334,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_manifest_list_manifests_manifest_id" table="public.manifest_list_manifests"
+<index name="ix_manifest_references_parent_id" table="public.manifest_references"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
-			<column name="manifest_id"/>
+			<column name="parent_id"/>
 		</idxelement>
 </index>
 
-<index name="ix_manifest_list_manifests_manifest_list_id" table="public.manifest_list_manifests"
+<index name="ix_manifest_references_child_id" table="public.manifest_references"
 	 concurrent="false" unique="false" fast-update="false" buffering="false"
 	 index-type="btree" factor="0">
 		<idxelement use-sorting="false">
-			<column name="manifest_list_id"/>
-		</idxelement>
-</index>
-
-<index name="ix_tags_manifest_list_id" table="public.tags"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="manifest_list_id"/>
+			<column name="child_id"/>
 		</idxelement>
 </index>
 
@@ -445,26 +366,10 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<index name="ix_repository_manifest_lists_repository_id" table="public.repository_manifest_lists"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="repository_id"/>
-		</idxelement>
-</index>
-
-<index name="ix_repository_manifest_lists_manifest_list_id" table="public.repository_manifest_lists"
-	 concurrent="false" unique="false" fast-update="false" buffering="false"
-	 index-type="btree" factor="0">
-		<idxelement use-sorting="false">
-			<column name="manifest_list_id"/>
-		</idxelement>
-</index>
-
 <table name="repository_blobs" layer="0" collapse-mode="2" max-obj-count="4">
 	<schema name="public"/>
 	<role name="postgres"/>
-	<position x="4.54546" y="354.545"/>
+	<position x="1017.27" y="110.909"/>
 	<column name="id" not-null="true"
 	 identity-type="BY DEFAULT">
 		<type name="bigint" length="0"/>
@@ -531,7 +436,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 </constraint>
 
 <constraint name="fk_manifests_configuration_id_configurations" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.configurations" table="public.manifests">
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.configurations" table="public.manifests">
 	<columns names="configuration_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
@@ -548,15 +453,15 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_list_manifests_manifest_id_manifests" type="fk-constr" comparison-type="MATCH SIMPLE"
-	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.manifests" table="public.manifest_list_manifests">
-	<columns names="manifest_id" ref-type="src-columns"/>
+<constraint name="fk_manifest_references_parent_id_manifests" type="fk-constr" comparison-type="MATCH SIMPLE"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.manifest_references">
+	<columns names="parent_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_list_manifests_manifest_list_id_manifest_lists" type="fk-constr" comparison-type="MATCH SIMPLE"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.manifest_list_manifests">
-	<columns names="manifest_list_id" ref-type="src-columns"/>
+<constraint name="fk_manifest_references_child_id_manifests" type="fk-constr" comparison-type="MATCH FULL"
+	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.manifest_references">
+	<columns names="child_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -572,12 +477,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_tags_manifest_list_id_manifest_lists" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.tags">
-	<columns names="manifest_list_id" ref-type="src-columns"/>
-	<columns names="id" ref-type="dst-columns"/>
-</constraint>
-
 <constraint name="fk_repository_manifests_repository_id_repositories" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_manifests">
 	<columns names="repository_id" ref-type="src-columns"/>
@@ -587,18 +486,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <constraint name="fk_repository_manifests_manifest_id_manifests" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.repository_manifests">
 	<columns names="manifest_id" ref-type="src-columns"/>
-	<columns names="id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="fk_repository_manifest_lists_repository_id_repositories" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repository_manifest_lists">
-	<columns names="repository_id" ref-type="src-columns"/>
-	<columns names="id" ref-type="dst-columns"/>
-</constraint>
-
-<constraint name="fk_repository_manifest_lists_manifest_list_id_manifest_lists" type="fk-constr" comparison-type="MATCH FULL"
-	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifest_lists" table="public.repository_manifest_lists">
-	<columns names="manifest_list_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
@@ -619,38 +506,25 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.repositories" reference-fk="fk_repositories_parent_id_repositories"
 	 src-required="false" dst-required="false">
 	<line>
-		<position x="1210.18" y="101.998"/>
-	<position x="1210.18" y="-0.929311"/>
-	<position x="1072.02" y="-0.929311"/>
+		<position x="940.183" y="132.908"/>
+	<position x="940.183" y="29.9798"/>
+	<position x="802.017" y="29.9798"/>
 	</line>
 </relationship>
 
 <relationship name="rel_manifest_layers_manifests" type="relfk" layer="0"
 	 src-table="public.manifest_layers"
 	 dst-table="public.manifests" reference-fk="fk_manifest_layers_manifest_id_manifests"
-	 src-required="false" dst-required="false">
-	<label ref-type="name-label">
-		<position x="44.0929" y="11.206"/>
-	</label>
-</relationship>
+	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_manifest_layers_layers" type="relfk" layer="0"
 	 src-table="public.manifest_layers"
 	 dst-table="public.blobs" reference-fk="fk_manifest_layers_blob_id_blobs"
 	 src-required="false" dst-required="false"/>
 
-<relationship name="rel_manifest_list_manifests_manifest_lists" type="relfk" layer="0"
-	 src-table="public.manifest_list_manifests"
-	 dst-table="public.manifest_lists" reference-fk="fk_manifest_list_manifests_manifest_list_id_manifest_lists"
-	 src-required="false" dst-required="false">
-	<label ref-type="name-label">
-		<position x="0.0310159" y="-4.19399"/>
-	</label>
-</relationship>
-
-<relationship name="rel_manifest_list_manifests_manifests" type="relfk" layer="0"
-	 src-table="public.manifest_list_manifests"
-	 dst-table="public.manifests" reference-fk="fk_manifest_list_manifests_manifest_id_manifests"
+<relationship name="rel_manifest_references_manifests" type="relfk" layer="0"
+	 src-table="public.manifest_references"
+	 dst-table="public.manifests" reference-fk="fk_manifest_references_parent_id_manifests"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_repository_manifests_repositories" type="relfk" layer="0"
@@ -663,16 +537,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	 dst-table="public.manifests" reference-fk="fk_repository_manifests_manifest_id_manifests"
 	 src-required="false" dst-required="false"/>
 
-<relationship name="rel_repository_manifests_cp_repositories" type="relfk" layer="0"
-	 src-table="public.repository_manifest_lists"
-	 dst-table="public.repositories" reference-fk="fk_repository_manifest_lists_repository_id_repositories"
-	 src-required="false" dst-required="false"/>
-
-<relationship name="rel_repository_manifests_cp_manifest_lists" type="relfk" layer="0"
-	 src-table="public.repository_manifest_lists"
-	 dst-table="public.manifest_lists" reference-fk="fk_repository_manifest_lists_manifest_list_id_manifest_lists"
-	 src-required="false" dst-required="false"/>
-
 <relationship name="rel_tags_manifests" type="relfk" layer="0"
 	 src-table="public.tags"
 	 dst-table="public.manifests" reference-fk="fk_tags_manifest_id_manifests"
@@ -681,11 +545,6 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <relationship name="rel_tags_repositories" type="relfk" layer="0"
 	 src-table="public.tags"
 	 dst-table="public.repositories" reference-fk="fk_tags_repository_id_repositories"
-	 src-required="false" dst-required="false"/>
-
-<relationship name="rel_tags_manifest_lists" type="relfk" layer="0"
-	 src-table="public.tags"
-	 dst-table="public.manifest_lists" reference-fk="fk_tags_manifest_list_id_manifest_lists"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_repository_blobs_repositories" type="relfk" layer="0"
@@ -701,6 +560,11 @@ CAUTION: Do not modify this file unless you know what you are doing.
 <relationship name="rel_configurations_blobs" type="relfk" layer="0"
 	 src-table="public.configurations"
 	 dst-table="public.blobs" reference-fk="fk_configurations_blob_id_blobs"
+	 src-required="false" dst-required="false"/>
+
+<relationship name="rel_manifest_references_manifests1" type="relfk" layer="0"
+	 src-table="public.manifest_references"
+	 dst-table="public.manifests" reference-fk="fk_manifest_references_child_id_manifests"
 	 src-required="false" dst-required="false"/>
 
 <relationship name="rel_manifests_configurations" type="relfk" layer="0"
