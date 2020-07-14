@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/opencontainers/go-digest"
-
 	"github.com/docker/distribution/manifest/manifestlist"
+
+	"github.com/opencontainers/go-digest"
 
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
@@ -152,14 +152,14 @@ func TestRepositoryStore_FindAll_NotFound(t *testing.T) {
 }
 
 func TestRepositoryStore_FindAllPaginated(t *testing.T) {
-	reloadManifestListFixtures(t)
+	reloadManifestFixtures(t)
 
 	tt := []struct {
 		name     string
 		limit    int
 		lastPath string
 
-		// see testdata/fixtures/[repositories|repository_manifests|repository_manifest_lists].sql:
+		// see testdata/fixtures/[repositories|repository_manifests].sql:
 		//
 		// 		gitlab-org 						(0 manifests, 0 manifest lists)
 		// 		gitlab-org/gitlab-test 			(0 manifests, 0 manifest lists)
@@ -286,7 +286,7 @@ func TestRepositoryStore_FindAllPaginated(t *testing.T) {
 }
 
 func TestRepositoryStore_FindAllPaginated_NoRepositories(t *testing.T) {
-	unloadManifestListFixtures(t)
+	unloadManifestFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
@@ -465,22 +465,8 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
 			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
 		},
-	}
-	require.Equal(t, expected, mm)
-}
-
-func TestRepositoryStore_ManifestLists(t *testing.T) {
-	reloadManifestListFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	mm, err := s.ManifestLists(suite.ctx, &models.Repository{ID: 3})
-	require.NoError(t, err)
-
-	// see testdata/fixtures/repository_manifest_lists.sql
-	local := mm[0].CreatedAt.Location()
-	expected := models.ManifestLists{
 		{
-			ID:            1,
+			ID:            5,
 			SchemaVersion: 2,
 			MediaType:     manifestlist.MediaTypeManifestList,
 			Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
@@ -505,29 +491,29 @@ func TestRepositoryStore_Tags(t *testing.T) {
 			ID:           4,
 			Name:         "1.0.0",
 			RepositoryID: 4,
-			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+			ManifestID:   3,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:46.283783", local),
 		},
 		{
 			ID:           5,
 			Name:         "stable-9ede8db0",
 			RepositoryID: 4,
-			ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+			ManifestID:   3,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:47.283783", local),
 		},
 		{
 			ID:           6,
 			Name:         "stable-91ac07a9",
 			RepositoryID: 4,
-			ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+			ManifestID:   4,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 		{
-			ID:             8,
-			Name:           "rc2",
-			RepositoryID:   4,
-			ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
-			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
+			ID:           8,
+			Name:         "rc2",
+			RepositoryID: 4,
+			ManifestID:   6,
+			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
 	require.Equal(t, expected, tt)
@@ -558,25 +544,25 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           4,
 					Name:         "1.0.0",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+					ManifestID:   3,
 				},
 				{
-					ID:             8,
-					Name:           "rc2",
-					RepositoryID:   4,
-					ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:           8,
+					Name:         "rc2",
+					RepositoryID: 4,
+					ManifestID:   6,
 				},
 				{
 					ID:           6,
 					Name:         "stable-91ac07a9",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+					ManifestID:   4,
 				},
 				{
 					ID:           5,
 					Name:         "stable-9ede8db0",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+					ManifestID:   3,
 				},
 			},
 		},
@@ -589,13 +575,13 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           4,
 					Name:         "1.0.0",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+					ManifestID:   3,
 				},
 				{
-					ID:             8,
-					Name:           "rc2",
-					RepositoryID:   4,
-					ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:           8,
+					Name:         "rc2",
+					RepositoryID: 4,
+					ManifestID:   6,
 				},
 			},
 		},
@@ -608,7 +594,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           6,
 					Name:         "stable-91ac07a9",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+					ManifestID:   4,
 				},
 			},
 		},
@@ -621,7 +607,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           5,
 					Name:         "stable-9ede8db0",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+					ManifestID:   3,
 				},
 			},
 		},
@@ -631,22 +617,22 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 			lastName: "does-not-exist",
 			expectedTags: models.Tags{
 				{
-					ID:             8,
-					Name:           "rc2",
-					RepositoryID:   4,
-					ManifestListID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:           8,
+					Name:         "rc2",
+					RepositoryID: 4,
+					ManifestID:   6,
 				},
 				{
 					ID:           6,
 					Name:         "stable-91ac07a9",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 4, Valid: true},
+					ManifestID:   4,
 				},
 				{
 					ID:           5,
 					Name:         "stable-9ede8db0",
 					RepositoryID: 4,
-					ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+					ManifestID:   3,
 				},
 			},
 		},
@@ -731,29 +717,8 @@ func TestRepositoryStore_ManifestTags(t *testing.T) {
 			ID:           1,
 			Name:         "1.0.0",
 			RepositoryID: 3,
-			ManifestID:   sql.NullInt64{Int64: 1, Valid: true},
+			ManifestID:   1,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:43.283783", local),
-		},
-	}
-	require.Equal(t, expected, tt)
-}
-
-func TestRepositoryStore_ManifestListTags(t *testing.T) {
-	reloadTagFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	tt, err := s.ManifestListTags(suite.ctx, &models.Repository{ID: 3}, &models.ManifestList{ID: 1})
-	require.NoError(t, err)
-
-	// see testdata/fixtures/tags.sql
-	local := tt[0].CreatedAt.Location()
-	expected := models.Tags{
-		{
-			ID:             7,
-			Name:           "0.2.0",
-			RepositoryID:   3,
-			ManifestListID: sql.NullInt64{Int64: 1, Valid: true},
-			CreatedAt:      testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
 	require.Equal(t, expected, tt)
@@ -771,13 +736,13 @@ func TestRepositoryStore_Count(t *testing.T) {
 }
 
 func TestRepositoryStore_CountAfterPath(t *testing.T) {
-	reloadManifestListFixtures(t)
+	reloadManifestFixtures(t)
 
 	tt := []struct {
 		name string
 		path string
 
-		// see testdata/fixtures/[repositories|repository_manifests|repository_manifest_lists].sql:
+		// see testdata/fixtures/[repositories|repository_manifests].sql:
 		//
 		// 		gitlab-org 						(0 manifests, 0 manifest lists)
 		// 		gitlab-org/gitlab-test 			(0 manifests, 0 manifest lists)
@@ -826,7 +791,7 @@ func TestRepositoryStore_CountAfterPath(t *testing.T) {
 }
 
 func TestRepositoryStore_CountAfterPath_NoRepositories(t *testing.T) {
-	unloadManifestListFixtures(t)
+	unloadManifestFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
@@ -857,27 +822,6 @@ func TestRepositoryStore_FindManifestByDigest(t *testing.T) {
 	require.Equal(t, expected, m)
 }
 
-func TestRepositoryStore_FindManifestListByDigest(t *testing.T) {
-	reloadManifestListFixtures(t)
-
-	d := digest.Digest("sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0")
-	s := datastore.NewRepositoryStore(suite.db)
-
-	ml, err := s.FindManifestListByDigest(suite.ctx, &models.Repository{ID: 3}, d)
-	require.NoError(t, err)
-
-	// see testdata/fixtures/repository_manifest_lists.sql
-	expected := &models.ManifestList{
-		ID:            1,
-		SchemaVersion: 2,
-		MediaType:     manifestlist.MediaTypeManifestList,
-		Digest:        d,
-		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":23321,"digest":"sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155","platform":{"architecture":"amd64","os":"linux"}},{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","size":24123,"digest":"sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f","platform":{"architecture":"amd64","os":"windows","os.version":"10.0.14393.2189"}}]}`),
-		CreatedAt:     testutil.ParseTimestamp(t, "2020-04-02 18:45:03.470711", ml.CreatedAt.Location()),
-	}
-	require.Equal(t, expected, ml)
-}
-
 func TestRepositoryStore_FindTagByName(t *testing.T) {
 	reloadTagFixtures(t)
 
@@ -890,7 +834,7 @@ func TestRepositoryStore_FindTagByName(t *testing.T) {
 		ID:           4,
 		Name:         "1.0.0",
 		RepositoryID: 4,
-		ManifestID:   sql.NullInt64{Int64: 3, Valid: true},
+		ManifestID:   3,
 		CreatedAt:    testutil.ParseTimestamp(t, "2020-03-02 17:57:46.283783", tag.CreatedAt.Location()),
 	}
 	require.Equal(t, expected, tag)
@@ -1405,69 +1349,6 @@ func TestRepositoryStore_DissociateManifest_NotAssociatedDoesNotFail(t *testing.
 	require.NoError(t, err)
 }
 
-func TestRepositoryStore_AssociateManifestList(t *testing.T) {
-	reloadManifestListFixtures(t)
-	require.NoError(t, testutil.TruncateTables(suite.db, testutil.RepositoryManifestListsTable))
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifest_lists.sql
-	r := &models.Repository{ID: 4}
-	ml := &models.ManifestList{ID: 2}
-
-	err := s.AssociateManifestList(suite.ctx, r, ml)
-	require.NoError(t, err)
-
-	ll, err := s.ManifestLists(suite.ctx, r)
-	require.NoError(t, err)
-
-	var assocManifestListIDs []int64
-	for _, ml := range ll {
-		assocManifestListIDs = append(assocManifestListIDs, ml.ID)
-	}
-	require.Contains(t, assocManifestListIDs, int64(2))
-}
-
-func TestRepositoryStore_AssociateManifestList_AlreadyAssociatedDoesNotFail(t *testing.T) {
-	reloadManifestListFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifest_lists.sql
-	r := &models.Repository{ID: 3}
-	ml := &models.ManifestList{ID: 1}
-	err := s.AssociateManifestList(suite.ctx, r, ml)
-	require.NoError(t, err)
-}
-
-func TestRepositoryStore_DissociateManifestList(t *testing.T) {
-	reloadManifestListFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifest_lists.sql
-	r := &models.Repository{ID: 3}
-	ml := &models.ManifestList{ID: 1}
-
-	err := s.DissociateManifestList(suite.ctx, r, ml)
-	require.NoError(t, err)
-
-	ll, err := s.ManifestLists(suite.ctx, r)
-	require.NoError(t, err)
-
-	for _, ml := range ll {
-		require.NotEqual(t, 1, ml.ID)
-	}
-}
-
-func TestRepositoryStore_DissociateManifestList_NotAssociatedDoesNotFail(t *testing.T) {
-	reloadManifestListFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifest_lists.sql
-	r := &models.Repository{ID: 4}
-	ml := &models.ManifestList{ID: 1}
-	err := s.DissociateManifestList(suite.ctx, r, ml)
-	require.NoError(t, err)
-}
-
 func TestRepositoryStore_UntagManifest(t *testing.T) {
 	reloadTagFixtures(t)
 
@@ -1485,27 +1366,6 @@ func TestRepositoryStore_UntagManifest(t *testing.T) {
 	require.NoError(t, err)
 
 	tt, err = s.ManifestTags(suite.ctx, r, m)
-	require.NoError(t, err)
-	require.Empty(t, tt)
-}
-
-func TestRepositoryStore_UntagManifestList(t *testing.T) {
-	reloadTagFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-
-	// see testdata/fixtures/tags.sql
-	r := &models.Repository{ID: 3}
-	ml := &models.ManifestList{ID: 1}
-
-	tt, err := s.ManifestListTags(suite.ctx, r, ml)
-	require.NoError(t, err)
-	require.NotEmpty(t, tt)
-
-	err = s.UntagManifestList(suite.ctx, r, ml)
-	require.NoError(t, err)
-
-	tt, err = s.ManifestListTags(suite.ctx, r, ml)
 	require.NoError(t, err)
 	require.Empty(t, tt)
 }

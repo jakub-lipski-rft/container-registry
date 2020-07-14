@@ -25,14 +25,11 @@ type RepositoryReader interface {
 	Count(ctx context.Context) (int, error)
 	CountAfterPath(ctx context.Context, path string) (int, error)
 	Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error)
-	ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error)
 	Tags(ctx context.Context, r *models.Repository) (models.Tags, error)
 	TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error)
 	TagsCountAfterName(ctx context.Context, r *models.Repository, lastName string) (int, error)
 	ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error)
-	ManifestListTags(ctx context.Context, r *models.Repository, m *models.ManifestList) (models.Tags, error)
 	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
-	FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error)
 	FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error)
 	Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error)
 }
@@ -46,10 +43,7 @@ type RepositoryWriter interface {
 	Update(ctx context.Context, r *models.Repository) error
 	AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
-	AssociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
-	DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
-	UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error
 	LinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error
 	UnlinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error
 	Delete(ctx context.Context, id int64) error
@@ -132,16 +126,15 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 
 // FindAllPaginated finds up to limit repositories with path lexicographically after lastPath. This is used exclusively
 // for the GET /v2/_catalog API route, where pagination is done with a marker (lastPath). Empty repositories (which do
-// not have at least a manifest or a manifest list) are ignored. Also, even if there is no repository with a path
-// of lastPath, the returned repositories will always be those with a path lexicographically after lastPath. Finally,
-// repositories are lexicographically sorted. These constraints exists to preserve the existing API behaviour (when
-// doing a filesystem walk based pagination).
+// not have at least a manifest) are ignored. Also, even if there is no repository with a path of lastPath, the returned
+// repositories will always be those with a path lexicographically after lastPath. Finally, repositories are
+// lexicographically sorted. These constraints exists to preserve the existing API behaviour (when doing a filesystem
+// walk based pagination).
 func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
 	q := `SELECT DISTINCT r.id, r.name, r.path, r.parent_id, r.created_at, r.updated_at
 		FROM repositories AS r
 	 	LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
-	 	LEFT JOIN repository_manifest_lists AS rml ON r.id = rml.repository_id
-		WHERE COALESCE(rm.repository_id, rml.repository_id) IS NOT NULL
+		WHERE rm.repository_id IS NOT NULL
 		AND r.path > $1
 		ORDER BY r.path
 		LIMIT $2`
@@ -204,7 +197,7 @@ func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.
 
 // Tags finds all tags of a given repository.
 func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
+	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
@@ -221,7 +214,7 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 // lastName. Finally, tags are lexicographically sorted. These constraints exists to preserve the existing API behaviour
 // (when doing a filesystem walk based pagination).
 func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
+	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND name > $2 ORDER BY name LIMIT $3`
 	rows, err := s.db.QueryContext(ctx, q, r.ID, lastName, limit)
 	if err != nil {
@@ -249,23 +242,10 @@ func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repo
 
 // ManifestTags finds all tags of a given repository manifest.
 func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
+	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND manifest_id = $2`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID, m.ID)
-	if err != nil {
-		return nil, fmt.Errorf("error finding tags: %w", err)
-	}
-
-	return scanFullTags(rows)
-}
-
-// ManifestListTags finds all tags of a given repository manifest list.
-func (s *repositoryStore) ManifestListTags(ctx context.Context, r *models.Repository, ml *models.ManifestList) (models.Tags, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
-		FROM tags WHERE repository_id = $1 AND manifest_list_id = $2`
-
-	rows, err := s.db.QueryContext(ctx, q, r.ID, ml.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error finding tags: %w", err)
 	}
@@ -287,14 +267,13 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 
 // CountAfterPath counts all repositories with path lexicographically after lastPath. This is used exclusively
 // for the GET /v2/_catalog API route, where pagination is done with a marker (lastPath). Empty repositories (which do
-// not have at least a manifest or a manifest list) are ignored. Also, even if there is no repository with a path
-// of lastPath, the counted repositories will always be those with a path lexicographically after lastPath. These
-// constraints exists to preserve the existing API behaviour (when doing a filesystem walk based pagination).
+// not have at least a manifest) are ignored. Also, even if there is no repository with a path of lastPath, the counted
+// repositories will always be those with a path lexicographically after lastPath. These constraints exists to preserve
+// the existing API behaviour (when doing a filesystem walk based pagination).
 func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int, error) {
 	q := `SELECT COUNT(DISTINCT(r.id)) FROM repositories AS r
 		LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
-	 	LEFT JOIN repository_manifest_lists AS rml ON r.id = rml.repository_id
-		WHERE COALESCE(rm.repository_id, rml.repository_id) IS NOT NULL
+		WHERE rm.repository_id IS NOT NULL
 		AND r.path > $1`
 
 	var count int
@@ -322,22 +301,6 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 	return scanFullManifests(rows)
 }
 
-// ManifestLists finds all manifest lists associated with a repository.
-func (s *repositoryStore) ManifestLists(ctx context.Context, r *models.Repository) (models.ManifestLists, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_algorithm, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
-		FROM manifest_lists as ml
-		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
-		JOIN repositories AS r ON r.id = rml.repository_id
-		WHERE r.id = $1`
-
-	rows, err := s.db.QueryContext(ctx, q, r.ID)
-	if err != nil {
-		return nil, fmt.Errorf("error finding manifest lists: %w", err)
-	}
-
-	return scanFullManifestLists(rows)
-}
-
 // FindManifestByDigest finds a manifest by digest within a repository.
 func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
 	q := `SELECT m.id, m.configuration_id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload,
@@ -354,23 +317,6 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 	row := s.db.QueryRowContext(ctx, q, r.ID, alg, d.Hex())
 
 	return scanFullManifest(row)
-}
-
-// FindManifestListByDigest finds a manifest list by digest within a repository.
-func (s *repositoryStore) FindManifestListByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.ManifestList, error) {
-	q := `SELECT ml.id, ml.schema_version, ml.media_type, ml.digest_algorithm, ml.digest_hex, ml.payload, ml.created_at, ml.marked_at
-		FROM manifest_lists as ml
-		JOIN repository_manifest_lists as rml ON rml.manifest_list_id = ml.id
-		JOIN repositories AS r ON r.id = rml.repository_id
-		WHERE r.id = $1 AND ml.digest_algorithm = $2 AND ml.digest_hex = decode($3, 'hex')`
-
-	alg, err := NewDigestAlgorithm(d.Algorithm())
-	if err != nil {
-		return nil, err
-	}
-	row := s.db.QueryRowContext(ctx, q, r.ID, alg, d.Hex())
-
-	return scanFullManifestList(row)
 }
 
 // Blobs finds all blobs associated with the repository.
@@ -403,7 +349,7 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 
 // FindTagByName finds a tag by name within a repository.
 func (s *repositoryStore) FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error) {
-	q := `SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at
+	q := `SELECT id, name, repository_id, manifest_id, created_at, updated_at
 		FROM tags WHERE repository_id = $1 AND name = $2`
 	row := s.db.QueryRowContext(ctx, q, r.ID, name)
 
@@ -560,18 +506,6 @@ func (s *repositoryStore) AssociateManifest(ctx context.Context, r *models.Repos
 	return nil
 }
 
-// AssociateManifestList associates a manifest list and a repository. It does nothing if already associated.
-func (s *repositoryStore) AssociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error {
-	q := `INSERT INTO repository_manifest_lists (repository_id, manifest_list_id) VALUES ($1, $2)
-		ON CONFLICT (repository_id, manifest_list_id) DO NOTHING`
-
-	if _, err := s.db.ExecContext(ctx, q, r.ID, ml.ID); err != nil {
-		return fmt.Errorf("error associating manifest list: %w", err)
-	}
-
-	return nil
-}
-
 // DissociateManifest dissociates a manifest and a repository. It does nothing if not associated.
 func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
 	q := "DELETE FROM repository_manifests WHERE repository_id = $1 AND manifest_id = $2"
@@ -588,22 +522,6 @@ func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repo
 	return nil
 }
 
-// DissociateManifestList dissociates a manifest list and a repository. It does nothing if not associated.
-func (s *repositoryStore) DissociateManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error {
-	q := "DELETE FROM repository_manifest_lists WHERE repository_id = $1 AND manifest_list_id = $2"
-
-	res, err := s.db.ExecContext(ctx, q, r.ID, ml.ID)
-	if err != nil {
-		return fmt.Errorf("error dissociating manifest list: %w", err)
-	}
-
-	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error dissociating manifest list: %w", err)
-	}
-
-	return nil
-}
-
 // UntagManifest deletes all tags of a manifest in a repository.
 func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
 	q := "DELETE FROM tags WHERE repository_id = $1 AND manifest_id = $2"
@@ -611,18 +529,6 @@ func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repositor
 	_, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
 	if err != nil {
 		return fmt.Errorf("error untagging manifest: %w", err)
-	}
-
-	return nil
-}
-
-// UntagManifest deletes all tags of a manifest list in a repository.
-func (s *repositoryStore) UntagManifestList(ctx context.Context, r *models.Repository, ml *models.ManifestList) error {
-	q := "DELETE FROM tags WHERE repository_id = $1 AND manifest_list_id = $2"
-
-	_, err := s.db.ExecContext(ctx, q, r.ID, ml.ID)
-	if err != nil {
-		return fmt.Errorf("error untagging manifest list: %w", err)
 	}
 
 	return nil

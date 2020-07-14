@@ -3,7 +3,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"testing"
 
@@ -46,7 +45,7 @@ func TestDeleteTagDB(t *testing.T) {
 	tag := &models.Tag{
 		Name:         "latest",
 		RepositoryID: r.ID,
-		ManifestID:   sql.NullInt64{Int64: m.ID, Valid: true},
+		ManifestID:   m.ID,
 	}
 	err = tStore.Create(env.ctx, tag)
 	require.NoError(t, err)

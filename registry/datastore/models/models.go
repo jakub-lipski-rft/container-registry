@@ -51,11 +51,9 @@ type Tag struct {
 	ID           int64
 	Name         string
 	RepositoryID int64
-	// a tag can be associated with either a manifest or a manifest list
-	ManifestID     sql.NullInt64
-	ManifestListID sql.NullInt64
-	CreatedAt      time.Time
-	UpdatedAt      sql.NullTime
+	ManifestID   int64
+	CreatedAt    time.Time
+	UpdatedAt    sql.NullTime
 }
 
 // Tags is a slice of Tag pointers.
@@ -72,18 +70,3 @@ type Blob struct {
 
 // Blobs is a slice of Blob pointers.
 type Blobs []*Blob
-
-type ManifestList struct {
-	ID            int64
-	SchemaVersion int
-	MediaType     string
-	Digest        digest.Digest
-	Payload       json.RawMessage
-	CreatedAt     time.Time
-	MarkedAt      sql.NullTime
-
-	Repository *Repository
-}
-
-// ManifestLists is a slice of ManifestList pointers.
-type ManifestLists []*ManifestList

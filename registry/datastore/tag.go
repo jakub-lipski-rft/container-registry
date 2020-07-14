@@ -15,7 +15,6 @@ type TagReader interface {
 	Count(ctx context.Context) (int, error)
 	Repository(ctx context.Context, t *models.Tag) (*models.Repository, error)
 	Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error)
-	ManifestList(ctx context.Context, t *models.Tag) (*models.ManifestList, error)
 }
 
 // TagWriter is the interface that defines write operations for a tag store.
@@ -44,7 +43,7 @@ func NewTagStore(db Queryer) *tagStore {
 func scanFullTag(row *sql.Row) (*models.Tag, error) {
 	t := new(models.Tag)
 
-	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("error scaning tag: %w", err)
 		}
@@ -60,7 +59,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 	for rows.Next() {
 		t := new(models.Tag)
-		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.ManifestListID, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning tag: %w", err)
 		}
 		tt = append(tt, t)
@@ -74,7 +73,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 // FindByID finds a Tag by ID.
 func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) {
-	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at FROM tags WHERE id = $1"
+	q := "SELECT id, name, repository_id, manifest_id, created_at, updated_at FROM tags WHERE id = $1"
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullTag(row)
@@ -82,7 +81,7 @@ func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) 
 
 // FindAll finds all tags.
 func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
-	q := "SELECT id, name, repository_id, manifest_id, manifest_list_id, created_at, updated_at FROM tags"
+	q := "SELECT id, name, repository_id, manifest_id, created_at, updated_at FROM tags"
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding tags: %w", err)
@@ -121,22 +120,12 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 	return scanFullManifest(row)
 }
 
-// ManifestList finds a tag manifest list. A tag can be associated with either a manifest or a manifest list.
-func (s *tagStore) ManifestList(ctx context.Context, t *models.Tag) (*models.ManifestList, error) {
-	q := `SELECT id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
-		FROM manifest_lists WHERE id = $1`
-
-	row := s.db.QueryRowContext(ctx, q, t.ManifestListID)
-
-	return scanFullManifestList(row)
-}
-
 // Create saves a new Tag.
 func (s *tagStore) Create(ctx context.Context, t *models.Tag) error {
-	q := `INSERT INTO tags (name, repository_id, manifest_id, manifest_list_id) VALUES ($1, $2, $3, $4)
+	q := `INSERT INTO tags (name, repository_id, manifest_id) VALUES ($1, $2, $3)
 		RETURNING id, created_at`
 
-	row := s.db.QueryRowContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ManifestListID)
+	row := s.db.QueryRowContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID)
 	if err := row.Scan(&t.ID, &t.CreatedAt); err != nil {
 		return fmt.Errorf("error creating tag: %w", err)
 	}
@@ -146,9 +135,9 @@ func (s *tagStore) Create(ctx context.Context, t *models.Tag) error {
 
 // Update updates an existing Tag.
 func (s *tagStore) Update(ctx context.Context, t *models.Tag) error {
-	q := "UPDATE tags SET (name, repository_id, manifest_id, manifest_list_id) = ($1, $2, $3, $4) WHERE id = $5"
+	q := "UPDATE tags SET (name, repository_id, manifest_id) = ($1, $2, $3) WHERE id = $4"
 
-	res, err := s.db.ExecContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ManifestListID, t.ID)
+	res, err := s.db.ExecContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ID)
 	if err != nil {
 		return fmt.Errorf("error updating tag: %w", err)
 	}

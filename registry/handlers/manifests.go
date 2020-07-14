@@ -283,37 +283,19 @@ func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 		}
 	}
 
-	var payload []byte
-	var mediaType string
-	var schemaVersion int
-
-	// Find either the manifest or the manifest list by its digest. We can anticipate
-	// that most requests will be for single manifests, so we should try for manifests first.
+	// Find manifest by its digest
 	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, r, dgst)
 	if err != nil {
 		return nil, err
 	}
 	if dbManifest == nil {
-		dbManifestList, err := repositoryStore.FindManifestListByDigest(ctx, r, dgst)
-		if err != nil {
-			return nil, err
+		return nil, distribution.ErrManifestUnknownRevision{
+			Name:     path,
+			Revision: dgst,
 		}
-		if dbManifestList == nil {
-			return nil, distribution.ErrManifestUnknownRevision{
-				Name:     path,
-				Revision: dgst,
-			}
-		}
-		payload = dbManifestList.Payload
-		mediaType = dbManifestList.MediaType
-		schemaVersion = dbManifestList.SchemaVersion
-	} else {
-		payload = dbManifest.Payload
-		mediaType = dbManifest.MediaType
-		schemaVersion = dbManifest.SchemaVersion
 	}
 
-	return dbPayloadToManifest(payload, mediaType, schemaVersion, schema1SigningKey)
+	return dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion, schema1SigningKey)
 }
 
 func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName string, schema1SigningKey libtrust.PrivateKey, path string) (distribution.Manifest, digest.Digest, error) {
@@ -339,47 +321,22 @@ func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName strin
 		return nil, "", distribution.ErrTagUnknown{Tag: tagName}
 	}
 
-	var payload []byte
-	var mediaType string
-	var schemaVersion int
-	var dgst digest.Digest
-
-	// Find either the manifest or the manifest list by its digest. We can anticipate
-	// that most requests will be for single manifests, so we should try for manifests first.
-	if dbTag.ManifestID.Valid {
-		mStore := datastore.NewManifestStore(db)
-		dbManifest, err := mStore.FindByID(ctx, dbTag.ManifestID.Int64)
-		if err != nil {
-			return nil, "", err
-		}
-		if dbManifest == nil {
-			return nil, "", distribution.ErrManifestUnknown{Name: r.Name, Tag: dbTag.Name}
-		}
-		payload = dbManifest.Payload
-		mediaType = dbManifest.MediaType
-		schemaVersion = dbManifest.SchemaVersion
-		dgst = dbManifest.Digest
-	} else if dbTag.ManifestListID.Valid {
-		mListStore := datastore.NewManifestListStore(db)
-		dbManifestList, err := mListStore.FindByID(ctx, dbTag.ManifestListID.Int64)
-		if err != nil {
-			return nil, "", err
-		}
-		if dbManifestList == nil {
-			return nil, "", distribution.ErrManifestUnknown{Name: r.Name, Tag: dbTag.Name}
-		}
-		payload = dbManifestList.Payload
-		mediaType = dbManifestList.MediaType
-		schemaVersion = dbManifestList.SchemaVersion
-		dgst = dbManifestList.Digest
+	// Find manifest by its digest
+	mStore := datastore.NewManifestStore(db)
+	dbManifest, err := mStore.FindByID(ctx, dbTag.ManifestID)
+	if err != nil {
+		return nil, "", err
+	}
+	if dbManifest == nil {
+		return nil, "", distribution.ErrManifestUnknown{Name: r.Name, Tag: dbTag.Name}
 	}
 
-	manifest, err := dbPayloadToManifest(payload, mediaType, schemaVersion, schema1SigningKey)
+	manifest, err := dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion, schema1SigningKey)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return manifest, dgst, nil
+	return manifest, dbManifest.Digest, nil
 }
 
 func dbPayloadToManifest(payload []byte, mediaType string, schemaVersion int, schema1SigningKey libtrust.PrivateKey) (distribution.Manifest, error) {
@@ -693,14 +650,8 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			defer tx.Rollback()
 
 			switch reqManifest := manifest.(type) {
-			case *schema2.DeserializedManifest, *schema1.SignedManifest, *ocischema.DeserializedManifest:
+			case *schema2.DeserializedManifest, *schema1.SignedManifest, *ocischema.DeserializedManifest, *manifestlist.DeserializedManifestList:
 				if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
-					e := fmt.Errorf("failed to create tag in database: %v", err)
-					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
-					return
-				}
-			case *manifestlist.DeserializedManifestList:
-				if err := dbTagManifestList(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
 					e := fmt.Errorf("failed to create tag in database: %v", err)
 					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 					return
@@ -771,16 +722,14 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 		log.Debug("tag already exists in database")
 
 		// Tag exists and already points to the current manifest.
-		if dbTag.ManifestID.Int64 == dbManifest.ID {
+		if dbTag.ManifestID == dbManifest.ID {
 			log.Debug("tag already associated with current manifest")
 			return nil
 		}
 
-		// Tag exists, but refers to another manifest, update the manifest to which
-		// the tag refers. Ensuring that any previous reference to a manifest list ID is cleared.
+		// Tag exists, but refers to another manifest, update the manifest to which the tag refers.
 		log.Debug("updating tag with manifest ID")
-		dbTag.ManifestID = sql.NullInt64{Int64: dbManifest.ID, Valid: true}
-		dbTag.ManifestListID = sql.NullInt64{}
+		dbTag.ManifestID = dbManifest.ID
 
 		return tagStore.Update(ctx, dbTag)
 	}
@@ -790,63 +739,7 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 	return tagStore.Create(ctx, &models.Tag{
 		Name:         tagName,
 		RepositoryID: dbRepo.ID,
-		ManifestID:   sql.NullInt64{Int64: dbManifest.ID, Valid: true},
-	})
-}
-
-func dbTagManifestList(ctx context.Context, db datastore.Queryer, dgst digest.Digest, tagName, path string) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "manifest_list_digest": dgst, "tag": tagName})
-	log.Debug("tagging manifest list")
-
-	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.FindByPath(ctx, path)
-	if err != nil {
-		return err
-	}
-
-	// TODO: If we return the manifest ID from the putDatabase methods, we can
-	// avoid looking up the manifest by digest.
-	manifestListStore := datastore.NewManifestListStore(db)
-	dbManifestList, err := manifestListStore.FindByDigest(ctx, dgst)
-	if err != nil {
-		return err
-	}
-	if dbManifestList == nil {
-		return fmt.Errorf("manifest list %s not found in database", dgst)
-	}
-
-	tagStore := datastore.NewTagStore(db)
-
-	dbTag, err := repositoryStore.FindTagByName(ctx, dbRepo, tagName)
-	if err != nil {
-		return err
-	}
-
-	if dbTag != nil {
-		log.Debug("tag already exists in database")
-
-		// Tag exists and already points to the current manifest list.
-		if dbTag.ManifestListID.Int64 == dbManifestList.ID {
-			log.Debug("tag already associated with current manifest list")
-			return nil
-		}
-
-		// Tag exists, but refers to another manifest, update the manifest list to
-		// which the tag refers. Ensuring that any previous referece to a manifest
-		// ID is cleared.
-		log.Debug("updating tag with manifest list ID")
-		dbTag.ManifestListID = sql.NullInt64{Int64: dbManifestList.ID, Valid: true}
-		dbTag.ManifestID = sql.NullInt64{}
-
-		return tagStore.Update(ctx, dbTag)
-	}
-
-	// Tag does not exist, create it.
-	log.Debug("creating new tag")
-	return tagStore.Create(ctx, &models.Tag{
-		Name:           tagName,
-		RepositoryID:   dbRepo.ID,
-		ManifestListID: sql.NullInt64{Int64: dbManifestList.ID, Valid: true},
+		ManifestID:   dbManifest.ID,
 	})
 }
 
@@ -1087,8 +980,8 @@ func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical dige
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": canonical})
 	log.Debug("putting manifest list")
 
-	mListStore := datastore.NewManifestListStore(db)
-	dbManifestList, err := mListStore.FindByDigest(ctx, canonical)
+	mStore := datastore.NewManifestStore(db)
+	dbManifestList, err := mStore.FindByDigest(ctx, canonical)
 	if err != nil {
 		return err
 	}
@@ -1103,18 +996,17 @@ func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical dige
 			mediaType = v1.MediaTypeImageIndex
 		}
 
-		dbManifestList = &models.ManifestList{
+		dbManifestList = &models.Manifest{
 			SchemaVersion: manifestList.SchemaVersion,
 			MediaType:     mediaType,
 			Digest:        canonical,
 			Payload:       payload,
 		}
-		if err := mListStore.Create(ctx, dbManifestList); err != nil {
+		if err := mStore.Create(ctx, dbManifestList); err != nil {
 			return err
 		}
 
 		// Associate manifests to the manifest list.
-		mStore := datastore.NewManifestStore(db)
 		for _, m := range manifestList.Manifests {
 			dbManifest, err := mStore.FindByDigest(ctx, m.Digest)
 			if err != nil {
@@ -1123,7 +1015,7 @@ func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical dige
 			if dbManifest == nil {
 				return fmt.Errorf("manifest %s not found", m.Digest)
 			}
-			if err := mListStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
+			if err := mStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
 				return err
 			}
 		}
@@ -1136,7 +1028,7 @@ func dbPutManifestList(ctx context.Context, db datastore.Queryer, canonical dige
 		return err
 	}
 
-	return repositoryStore.AssociateManifestList(ctx, dbRepo, dbManifestList)
+	return repositoryStore.AssociateManifest(ctx, dbRepo, dbManifestList)
 }
 
 // applyResourcePolicy checks whether the resource class matches what has
@@ -1225,27 +1117,12 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return fmt.Errorf("repository not found in database: %w", err)
 	}
 
-	// the target digest may reference a manifest or manifest list, start by searching for a manifest
 	m, err := rStore.FindManifestByDigest(ctx, r, d)
 	if err != nil {
 		return err
 	}
 	if m == nil {
-		// search for manifest lists if a manifest does not exist
-		ml, err := rStore.FindManifestListByDigest(ctx, r, d)
-		if err != nil {
-			return err
-		}
-		if ml == nil {
-			return errors.New("no manifest or manifest list found in database")
-		}
-
-		log.Debug("manifest list found in database")
-		if err := rStore.DissociateManifestList(ctx, r, ml); err != nil {
-			return err
-		}
-
-		return rStore.UntagManifestList(ctx, r, ml)
+		return errors.New("no manifest found in database")
 	}
 
 	log.Debug("manifest found in database")
