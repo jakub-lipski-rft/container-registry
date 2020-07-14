@@ -21,7 +21,6 @@ type ConfigurationReader interface {
 // ConfigurationWriter is the interface that defines write operations for a configuration store.
 type ConfigurationWriter interface {
 	Create(ctx context.Context, c *models.Configuration) error
-	Update(ctx context.Context, c *models.Configuration) error
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -163,27 +162,6 @@ func (s *configurationStore) Create(ctx context.Context, c *models.Configuration
 	row := s.db.QueryRowContext(ctx, q, c.BlobID, c.Payload)
 	if err := row.Scan(&c.ID, &c.CreatedAt); err != nil {
 		return fmt.Errorf("error creating configuration: %w", err)
-	}
-
-	return nil
-}
-
-// Update updates an existing configuration.
-func (s *configurationStore) Update(ctx context.Context, c *models.Configuration) error {
-	q := `UPDATE configurations
-		SET (blob_id, payload) = ($1, $2) WHERE id = $3`
-
-	res, err := s.db.ExecContext(ctx, q, c.BlobID, c.Payload, c.ID)
-	if err != nil {
-		return fmt.Errorf("error updating configuration: %w", err)
-	}
-
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error updating configuration: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("configuration not found")
 	}
 
 	return nil

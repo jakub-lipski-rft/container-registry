@@ -25,7 +25,6 @@ type ManifestReader interface {
 // ManifestWriter is the interface that defines write operations for a Manifest store.
 type ManifestWriter interface {
 	Create(ctx context.Context, m *models.Manifest) error
-	Update(ctx context.Context, m *models.Manifest) error
 	Mark(ctx context.Context, m *models.Manifest) error
 	AssociateManifest(ctx context.Context, ml *models.Manifest, m *models.Manifest) error
 	DissociateManifest(ctx context.Context, ml *models.Manifest, m *models.Manifest) error
@@ -219,32 +218,6 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 	row := s.db.QueryRowContext(ctx, q, m.ConfigurationID, m.SchemaVersion, m.MediaType, digestAlgorithm, m.Digest.Hex(), m.Payload)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
 		return fmt.Errorf("error creating manifest: %w", err)
-	}
-
-	return nil
-}
-
-// Update updates an existing Manifest.
-func (s *manifestStore) Update(ctx context.Context, m *models.Manifest) error {
-	q := `UPDATE manifests
-		SET (configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload) = ($1, $2, $3, $4, decode($5, 'hex'), $6)
-		WHERE id = $7`
-
-	digestAlgorithm, err := NewDigestAlgorithm(m.Digest.Algorithm())
-	if err != nil {
-		return err
-	}
-	res, err := s.db.ExecContext(ctx, q, m.ConfigurationID, m.SchemaVersion, m.MediaType, digestAlgorithm, m.Digest.Hex(), m.Payload, m.ID)
-	if err != nil {
-		return fmt.Errorf("error updating manifest: %w", err)
-	}
-
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error updating manifest: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("manifest not found")
 	}
 
 	return nil
