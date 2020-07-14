@@ -244,27 +244,26 @@ func TestBlobStore_Create_NonUniqueDigestFails(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestBlobStore_Update(t *testing.T) {
+func TestBlobStore_UpdateMediaType(t *testing.T) {
 	reloadBlobFixtures(t)
 
 	s := datastore.NewBlobStore(suite.db)
 	update := &models.Blob{
 		ID:        7,
-		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		MediaType: "application/vnd.docker.image.rootfs.diff.tar",
 		Digest:    "sha256:16844840277191fb603cc971dd59c97f05e12b49ae33766d33ae1b1333ab4f2a",
 		Size:      642,
 	}
-	err := s.Update(suite.ctx, update)
+	err := s.UpdateMediaType(suite.ctx, update)
 	require.NoError(t, err)
 
 	b, err := s.FindByID(suite.ctx, update.ID)
 	require.NoError(t, err)
 
-	update.CreatedAt = b.CreatedAt
-	require.Equal(t, update, b)
+	require.Equal(t, update.MediaType, b.MediaType)
 }
 
-func TestBlobStore_Update_NotFound(t *testing.T) {
+func TestBlobStore_UpdateMediaType_NotFound(t *testing.T) {
 	s := datastore.NewBlobStore(suite.db)
 
 	update := &models.Blob{
@@ -272,7 +271,7 @@ func TestBlobStore_Update_NotFound(t *testing.T) {
 		Digest:    "sha256:16844840277191fb603cc971dd59c97f05e12b49ae33766d33ae1b1333ab4f2a",
 		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 	}
-	err := s.Update(suite.ctx, update)
+	err := s.UpdateMediaType(suite.ctx, update)
 	require.EqualError(t, err, "blob not found")
 }
 

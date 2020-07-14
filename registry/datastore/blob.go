@@ -22,7 +22,7 @@ type BlobReader interface {
 type BlobWriter interface {
 	Create(ctx context.Context, b *models.Blob) error
 	CreateOrFind(ctx context.Context, b *models.Blob) error
-	Update(ctx context.Context, b *models.Blob) error
+	UpdateMediaType(ctx context.Context, b *models.Blob) error
 	Mark(ctx context.Context, b *models.Blob) error
 	Delete(ctx context.Context, id int64) error
 }
@@ -186,22 +186,19 @@ func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
 	return nil
 }
 
-// Update updates an existing blob.
-func (s *blobStore) Update(ctx context.Context, b *models.Blob) error {
-	q := "UPDATE blobs SET (media_type, digest_algorithm, digest_hex, size) = ($1, $2, decode($3, 'hex'), $4) WHERE id = $5"
+// UpdateMediaType updates an existing blob media type. Blobs are usually received and stored with a generic media type
+// of application/octet-stream. Once we know their concrete media type we can update them.
+func (s *blobStore) UpdateMediaType(ctx context.Context, b *models.Blob) error {
+	q := "UPDATE blobs SET media_type = $1 WHERE id = $2"
 
-	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
+	res, err := s.db.ExecContext(ctx, q, b.MediaType, b.ID)
 	if err != nil {
-		return err
-	}
-	res, err := s.db.ExecContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size, b.ID)
-	if err != nil {
-		return fmt.Errorf("error updating blob: %w", err)
+		return fmt.Errorf("error updating blob media type: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error updating blob: %w", err)
+		return fmt.Errorf("error updating blob media type: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("blob not found")

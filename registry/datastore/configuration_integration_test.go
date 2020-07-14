@@ -187,39 +187,6 @@ func TestConfigurationStore_Create(t *testing.T) {
 	require.NotEmpty(t, c.CreatedAt)
 }
 
-func TestConfigurationStore_Update(t *testing.T) {
-	reloadConfigurationFixtures(t)
-
-	s := datastore.NewConfigurationStore(suite.db)
-	update := &models.Configuration{
-		ID:        1,
-		BlobID:    8,
-		MediaType: "application/vnd.docker.container.image.v1+json",
-		Digest:    "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
-		Size:      123,
-		Payload:   json.RawMessage(`{"architecture":"amd64","config":"bar"}`),
-	}
-	err := s.Update(suite.ctx, update)
-	require.NoError(t, err)
-
-	r, err := s.FindByID(suite.ctx, update.ID)
-	require.NoError(t, err)
-
-	update.CreatedAt = r.CreatedAt
-	require.Equal(t, update, r)
-}
-
-func TestConfigurationStore_Update_NotFound(t *testing.T) {
-	s := datastore.NewConfigurationStore(suite.db)
-
-	update := &models.Configuration{
-		ID:      100,
-		Payload: json.RawMessage(`{"architecture":"amd64","config":"bar"}`),
-	}
-	err := s.Update(suite.ctx, update)
-	require.EqualError(t, err, "configuration not found")
-}
-
 func TestConfigurationStore_Delete(t *testing.T) {
 	reloadConfigurationFixtures(t)
 

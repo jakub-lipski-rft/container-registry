@@ -342,42 +342,6 @@ func TestManifestStore_Create_NonUniqueDigestFails(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestManifestStore_Update(t *testing.T) {
-	reloadManifestFixtures(t)
-
-	s := datastore.NewManifestStore(suite.db)
-	update := &models.Manifest{
-		ID:            3,
-		SchemaVersion: 2,
-		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:        "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
-		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
-	}
-	err := s.Update(suite.ctx, update)
-	require.NoError(t, err)
-
-	m, err := s.FindByID(suite.ctx, update.ID)
-	require.NoError(t, err)
-
-	update.CreatedAt = m.CreatedAt
-	require.Equal(t, update, m)
-}
-
-func TestManifestStore_Update_NotFound(t *testing.T) {
-	s := datastore.NewManifestStore(suite.db)
-
-	update := &models.Manifest{
-		ID:            100,
-		SchemaVersion: 2,
-		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:        "sha256:2a878989cffc014c2ffbb8da930b28b00be1ba2dd2910e05996e238f42344a37",
-		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
-	}
-
-	err := s.Update(suite.ctx, update)
-	require.EqualError(t, err, "manifest not found")
-}
-
 func TestManifestStore_Mark(t *testing.T) {
 	reloadManifestFixtures(t)
 
