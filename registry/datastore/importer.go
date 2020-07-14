@@ -234,6 +234,11 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 		return nil, err
 	}
 
+	// link configuration to repository
+	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, &models.Blob{ID: dbConfig.BlobID}); err != nil {
+		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
+	}
+
 	// find or create DB manifest
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
 		ConfigurationID: sql.NullInt64{Int64: dbConfig.ID, Valid: true},
@@ -275,6 +280,11 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, m.Config, configPayload)
 	if err != nil {
 		return nil, err
+	}
+
+	// link configuration to repository
+	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, &models.Blob{ID: dbConfig.BlobID}); err != nil {
+		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
 	}
 
 	// find or create DB manifest
