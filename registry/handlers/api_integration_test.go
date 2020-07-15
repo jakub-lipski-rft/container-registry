@@ -1572,7 +1572,7 @@ func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
 	tagName := "replacesmanifesttag"
 	repoPath := "schema2/replacesmanifest"
 
-	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Fetch original manifest by tag name
 	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -1597,7 +1597,7 @@ func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a new manifest and push it up with the same tag.
-	newManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	newManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Fetch new manifest by tag name
 	req, err = http.NewRequest("GET", manifestURL, nil)
@@ -1635,8 +1635,10 @@ func TestManifestAPI_Put_Schema2ByTag(t *testing.T) {
 	tagName := "schema2happypathtag"
 	repoPath := "schema2/happypath"
 
-	// putRandomSchema2ManifestByTag tests that the manifest put happened without issue.
-	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	// seedRandomSchema2Manifest with putByTag tests that the manifest put
+	// happened without issue.
+	seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
 }
 
 func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
@@ -1645,57 +1647,9 @@ func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
 
 	repoPath := "schema2/happypath"
 
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
-	manifest := &schema2.Manifest{
-		Versioned: manifest.Versioned{
-			SchemaVersion: 2,
-			MediaType:     schema2.MediaTypeManifest,
-		},
-	}
-
-	// Create a manifest config and push up its content.
-	cfgPayload, cfgDesc := schema2Config()
-	uploadURLBase, _ := startPushLayer(t, env, repoRef)
-	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
-	manifest.Config = cfgDesc
-
-	// Create and push up 2 random layers.
-	manifest.Layers = make([]distribution.Descriptor, 2)
-
-	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
-
-		uploadURLBase, _ := startPushLayer(t, env, repoRef)
-		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
-
-		manifest.Layers[i] = distribution.Descriptor{
-			Digest:    dgst,
-			MediaType: schema2.MediaTypeLayer,
-		}
-	}
-
-	// Build URL.
-	deserializedManifest, err := schema2.FromStruct(*manifest)
-	require.NoError(t, err)
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp := putManifest(t, "putting manifest by digest no error", digestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-	require.Equal(t, digestURL, resp.Header.Get("Location"))
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+	// seedRandomSchema2Manifest with putByDigest tests that the manifest put
+	// happened without issue.
+	seedRandomSchema2Manifest(t, env, repoPath, putByDigest)
 }
 
 func TestManifestAPI_Get_Schema2NonMatchingEtag(t *testing.T) {
@@ -1705,7 +1659,7 @@ func TestManifestAPI_Get_Schema2NonMatchingEtag(t *testing.T) {
 	tagName := "schema2happypathtag"
 	repoPath := "schema2/happypath"
 
-	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -1788,7 +1742,7 @@ func TestManifestAPI_Get_Schema2MatchingEtag(t *testing.T) {
 	tagName := "schema2happypathtag"
 	repoPath := "schema2/happypath"
 
-	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -2085,7 +2039,7 @@ func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
 	// Push up a manifest so that the repository is created. This way we can
 	// test the case where a manifest is not present in a repository, as opposed
 	// to the case where an entire repository does not exist.
-	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	dgst := digest.FromString("bogus digest")
 
@@ -2119,7 +2073,7 @@ func TestManifestAPI_Get_Schema2ByDigestMissingRepository(t *testing.T) {
 
 	// Push up a manifest so that it exists within the registry. We'll attempt to
 	// get the manifest by digest from a non-existant repository, which should fail.
-	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	manifestDigestURL := buildManifestDigestURL(t, env, "fake/repo", deserializedManifest)
 
@@ -2144,7 +2098,7 @@ func TestManifestAPI_Get_Schema2ByTagMissingRepository(t *testing.T) {
 
 	// Push up a manifest so that it exists within the registry. We'll attempt to
 	// get the manifest by tag from a non-existant repository, which should fail.
-	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	manifestURL := buildManifestTagURL(t, env, "fake/repo", tagName)
 
@@ -2169,7 +2123,7 @@ func TestManifestAPI_Get_Schema2ByTagMissingTag(t *testing.T) {
 
 	// Push up a manifest so that it exists within the registry. We'll attempt to
 	// get the manifest by a non-existant tag, which should fail.
-	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	manifestURL := buildManifestTagURL(t, env, repoPath, "faketag")
 
@@ -2198,8 +2152,8 @@ func TestManifestAPI_Get_Schema2ByDigestNotAssociatedWithRepository(t *testing.T
 	// Push up two manifests in different repositories so that they both exist
 	// within the registry. We'll attempt to get a manifest by digest from the
 	// repository to which it does not belong, which should fail.
-	putRandomSchema2ManifestByTag(t, env, repoPath1, tagName1)
-	deserializedManifest2 := putRandomSchema2ManifestByTag(t, env, repoPath2, tagName2)
+	seedRandomSchema2Manifest(t, env, repoPath1, putByTag(tagName1))
+	deserializedManifest2 := seedRandomSchema2Manifest(t, env, repoPath2, putByTag(tagName2))
 
 	mismatchedManifestURL := buildManifestDigestURL(t, env, repoPath1, deserializedManifest2)
 
@@ -2228,8 +2182,8 @@ func TestManifestAPI_Get_Schema2ByTagNotAssociatedWithRepository(t *testing.T) {
 	// Push up two manifests in different repositories so that they both exist
 	// within the registry. We'll attempt to get a manifest by tag from the
 	// repository to which it does not belong, which should fail.
-	putRandomSchema2ManifestByTag(t, env, repoPath1, tagName1)
-	putRandomSchema2ManifestByTag(t, env, repoPath2, tagName2)
+	seedRandomSchema2Manifest(t, env, repoPath1, putByTag(tagName1))
+	seedRandomSchema2Manifest(t, env, repoPath2, putByTag(tagName2))
 
 	mismatchedManifestURL := buildManifestTagURL(t, env, repoPath1, tagName2)
 
@@ -2252,7 +2206,7 @@ func TestManifestAPI_Head_Schema2(t *testing.T) {
 	tagName := "headtag"
 	repoPath := "schema2/head"
 
-	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Build URLs.
 	_, payload, err := deserializedManifest.Payload()
@@ -2309,7 +2263,7 @@ func TestManifestAPI_Head_Schema2MissingManifest(t *testing.T) {
 	// Push up a manifest so that the repository is created. This way we can
 	// test the case where a manifest is not present in a repository, as opposed
 	// to the case where an entire repository does not exist.
-	putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Build URLs.
 	repoRef, err := reference.WithName(repoPath)
@@ -2361,7 +2315,7 @@ func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T) {
 	tagName := "schema1tag"
 	repoPath := "schema2/schema1"
 
-	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
 
@@ -2410,7 +2364,7 @@ func TestManifestAPI_Get_Schema2ByDigestNoAcceptHeaders(t *testing.T) {
 	tagName := "noaccepttag"
 	repoPath := "schema2/noaccept"
 
-	deserializedManifest := putRandomSchema2ManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	_, payload, err := deserializedManifest.Payload()
 	require.NoError(t, err)
@@ -2446,8 +2400,8 @@ func TestManifestAPI_Put_OCIByTag(t *testing.T) {
 	tagName := "ocihappypathtag"
 	repoPath := "oci/happypath"
 
-	// putRandomOCIManifestByTag tests that the manifest put happened without issue.
-	putRandomOCIManifestByTag(t, env, repoPath, tagName)
+	// seedRandomOCIManifest with putByTag tests that the manifest put happened without issue.
+	seedRandomOCIManifest(t, env, repoPath, putByTag(tagName))
 }
 
 func TestManifestAPI_Get_OCINonMatchingEtag(t *testing.T) {
@@ -2457,7 +2411,7 @@ func TestManifestAPI_Get_OCINonMatchingEtag(t *testing.T) {
 	tagName := "ocihappypathtag"
 	repoPath := "oci/happypath"
 
-	deserializedManifest := putRandomOCIManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomOCIManifest(t, env, repoPath, putByTag(tagName))
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -2540,7 +2494,7 @@ func TestManifestAPI_Get_OCIMatchingEtag(t *testing.T) {
 	tagName := "ocihappypathtag"
 	repoPath := "oci/happypath"
 
-	deserializedManifest := putRandomOCIManifestByTag(t, env, repoPath, tagName)
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -2655,6 +2609,27 @@ func TestManifestAPI_Delete_Schema2UnknownManifest(t *testing.T)   {}
 func TestManifestAPI_Delete_Schema2Reupload(t *testing.T)          {}
 func TestManifestAPI_Delete_Schema2ClearsTags(t *testing.T)        {}
 
+type manifestOpts struct {
+	manifestURL string
+	putManifest bool
+
+	// Non-optional values which be passed through by the testing func for ease of use.
+	repoPath string
+}
+
+type manifestOptsFunc func(*testing.T, *testEnv, *manifestOpts)
+
+func putByTag(tagName string) manifestOptsFunc {
+	return func(t *testing.T, env *testEnv, opts *manifestOpts) {
+		opts.manifestURL = buildManifestTagURL(t, env, opts.repoPath, tagName)
+		opts.putManifest = true
+	}
+}
+
+func putByDigest(t *testing.T, env *testEnv, opts *manifestOpts) {
+	opts.putManifest = true
+}
+
 func schema2Config() ([]byte, distribution.Descriptor) {
 	payload := []byte(`{
 		"architecture": "amd64",
@@ -2685,8 +2660,16 @@ func schema2Config() ([]byte, distribution.Descriptor) {
 }
 
 // seedRandomSchema2Manifest generates a random schema2 manifest and puts its config and layers.
-func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string) *schema2.DeserializedManifest {
+func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string, opts ...manifestOptsFunc) *schema2.DeserializedManifest {
 	t.Helper()
+
+	config := &manifestOpts{
+		repoPath: repoPath,
+	}
+
+	for _, o := range opts {
+		o(t, env, config)
+	}
 
 	repoRef, err := reference.WithName(repoPath)
 	require.NoError(t, err)
@@ -2725,31 +2708,24 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string) *sch
 	deserializedManifest, err := schema2.FromStruct(*manifest)
 	require.NoError(t, err)
 
-	return deserializedManifest
-}
+	if config.putManifest {
+		manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
 
-// putRandomSchema2ManifestByTag creates a random valid schema2 manifest, its
-// config, its layers, and puts them.
-func putRandomSchema2ManifestByTag(t *testing.T, env *testEnv, repoPath, tagName string) *schema2.DeserializedManifest {
-	t.Helper()
+		if config.manifestURL == "" {
+			config.manifestURL = manifestDigestURL
+		}
 
-	// Push up a random manifest by tag.
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
+		resp := putManifest(t, "putting manifest no error", config.manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+		require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
 
-	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
-
-	resp := putManifest(t, "putting manifest by tag no error", manifestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-
-	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+		_, payload, err := deserializedManifest.Payload()
+		require.NoError(t, err)
+		dgst := digest.FromBytes(payload)
+		require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+	}
 
 	return deserializedManifest
 }
@@ -2816,8 +2792,16 @@ func ociConfig() ([]byte, distribution.Descriptor) {
 }
 
 // seedRandomOCIManifest generates a random oci manifest and puts its config and layers.
-func seedRandomOCIManifest(t *testing.T, env *testEnv, repoPath string) *ocischema.DeserializedManifest {
+func seedRandomOCIManifest(t *testing.T, env *testEnv, repoPath string, opts ...manifestOptsFunc) *ocischema.DeserializedManifest {
 	t.Helper()
+
+	config := &manifestOpts{
+		repoPath: repoPath,
+	}
+
+	for _, o := range opts {
+		o(t, env, config)
+	}
 
 	repoRef, err := reference.WithName(repoPath)
 	require.NoError(t, err)
@@ -2856,57 +2840,24 @@ func seedRandomOCIManifest(t *testing.T, env *testEnv, repoPath string) *ocische
 	deserializedManifest, err := ocischema.FromStruct(*manifest)
 	require.NoError(t, err)
 
-	return deserializedManifest
-}
+	if config.putManifest {
+		manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
 
-// putRandomOCIManifestByTag creates a random valid oci manifest, its
-// config, its layers, and puts them
-func putRandomOCIManifestByTag(t *testing.T, env *testEnv, repoPath, tagName string) *ocischema.DeserializedManifest {
-	t.Helper()
+		if config.manifestURL == "" {
+			config.manifestURL = manifestDigestURL
+		}
 
-	// Push up a random manifest by tag.
-	deserializedManifest := seedRandomOCIManifest(t, env, repoPath)
+		resp := putManifest(t, "putting manifest no error", config.manifestURL, v1.MediaTypeImageManifest, deserializedManifest)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+		require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
 
-	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
-
-	resp := putManifest(t, "putting manifest by tag no error", manifestURL, v1.MediaTypeImageManifest, deserializedManifest.Manifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-
-	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
-
-	return deserializedManifest
-}
-
-// putRandomOCIManifestByDigest creates a random valid oci manifest, its
-// config, its layers, and puts them
-func putRandomOCIManifestByDigest(t *testing.T, env *testEnv, repoPath string) *ocischema.DeserializedManifest {
-	t.Helper()
-
-	// Push up a random manifest by digest.
-	deserializedManifest := seedRandomOCIManifest(t, env, repoPath)
-
-	manifestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp := putManifest(t, "putting manifest by tag no error", manifestURL, v1.MediaTypeImageManifest, deserializedManifest.Manifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-
-	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+		_, payload, err := deserializedManifest.Payload()
+		require.NoError(t, err)
+		dgst := digest.FromBytes(payload)
+		require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+	}
 
 	return deserializedManifest
 }
@@ -2947,7 +2898,7 @@ func seedRandomOCIImageIndex(t *testing.T, env *testEnv, repoPath string) *manif
 	ociImageIndex.Manifests = make([]manifestlist.ManifestDescriptor, 2)
 
 	for i := range ociImageIndex.Manifests {
-		deserializedManifest := putRandomOCIManifestByDigest(t, env, repoPath)
+		deserializedManifest := seedRandomOCIManifest(t, env, repoPath, putByDigest)
 
 		_, payload, err := deserializedManifest.Payload()
 		require.NoError(t, err)
