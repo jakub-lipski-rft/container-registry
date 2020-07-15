@@ -423,7 +423,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 		</idxelement>
 </index>
 
-<constraint name="fk_repositories_parent_id_repositories" type="fk-constr" comparison-type="MATCH SIMPLE"
+<constraint name="fk_repositories_parent_id_repositories" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.repositories">
 	<columns names="parent_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
@@ -441,19 +441,19 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_layers_manifest_id_manifests" type="fk-constr" comparison-type="MATCH SIMPLE"
+<constraint name="fk_manifest_layers_manifest_id_manifests" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.manifest_layers">
 	<columns names="manifest_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_layers_blob_id_blobs" type="fk-constr" comparison-type="MATCH SIMPLE"
+<constraint name="fk_manifest_layers_blob_id_blobs" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="NO ACTION" ref-table="public.blobs" table="public.manifest_layers">
 	<columns names="blob_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_manifest_references_parent_id_manifests" type="fk-constr" comparison-type="MATCH SIMPLE"
+<constraint name="fk_manifest_references_parent_id_manifests" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.manifests" table="public.manifest_references">
 	<columns names="parent_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>
@@ -465,7 +465,7 @@ CAUTION: Do not modify this file unless you know what you are doing.
 	<columns names="id" ref-type="dst-columns"/>
 </constraint>
 
-<constraint name="fk_tags_repository_id_repositories" type="fk-constr" comparison-type="MATCH SIMPLE"
+<constraint name="fk_tags_repository_id_repositories" type="fk-constr" comparison-type="MATCH FULL"
 	 upd-action="NO ACTION" del-action="CASCADE" ref-table="public.repositories" table="public.tags">
 	<columns names="repository_id" ref-type="src-columns"/>
 	<columns names="id" ref-type="dst-columns"/>

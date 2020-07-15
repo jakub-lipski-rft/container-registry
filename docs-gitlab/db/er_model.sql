@@ -126,7 +126,7 @@ CREATE INDEX ix_configurations_blob_id ON public.configurations USING btree (blo
 CREATE INDEX ix_manifests_configuration_id ON public.manifests USING btree (configuration_id);
 
 ALTER TABLE public.repositories
-    ADD CONSTRAINT fk_repositories_parent_id_repositories FOREIGN KEY (parent_id) REFERENCES public.repositories (id) MATCH SIMPLE ON DELETE CASCADE ON UPDATE NO ACTION;
+    ADD CONSTRAINT fk_repositories_parent_id_repositories FOREIGN KEY (parent_id) REFERENCES public.repositories (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
 
 ALTER TABLE public.configurations
     ADD CONSTRAINT fk_configurations_blob_id_blobs FOREIGN KEY (blob_id) REFERENCES public.blobs (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -135,19 +135,19 @@ ALTER TABLE public.manifests
     ADD CONSTRAINT fk_manifests_configuration_id_configurations FOREIGN KEY (configuration_id) REFERENCES public.configurations (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
 
 ALTER TABLE public.manifest_layers
-    ADD CONSTRAINT fk_manifest_layers_manifest_id_manifests FOREIGN KEY (manifest_id) REFERENCES public.manifests (id) MATCH SIMPLE ON DELETE CASCADE ON UPDATE NO ACTION;
+    ADD CONSTRAINT fk_manifest_layers_manifest_id_manifests FOREIGN KEY (manifest_id) REFERENCES public.manifests (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
 
 ALTER TABLE public.manifest_layers
-    ADD CONSTRAINT fk_manifest_layers_blob_id_blobs FOREIGN KEY (blob_id) REFERENCES public.blobs (id) MATCH SIMPLE ON DELETE NO ACTION ON UPDATE NO ACTION;
+    ADD CONSTRAINT fk_manifest_layers_blob_id_blobs FOREIGN KEY (blob_id) REFERENCES public.blobs (id) MATCH FULL ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 ALTER TABLE public.manifest_references
-    ADD CONSTRAINT fk_manifest_references_parent_id_manifests FOREIGN KEY (parent_id) REFERENCES public.manifests (id) MATCH SIMPLE ON DELETE CASCADE ON UPDATE NO ACTION;
+    ADD CONSTRAINT fk_manifest_references_parent_id_manifests FOREIGN KEY (parent_id) REFERENCES public.manifests (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
 
 ALTER TABLE public.manifest_references
     ADD CONSTRAINT fk_manifest_references_child_id_manifests FOREIGN KEY (child_id) REFERENCES public.manifests (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
 
 ALTER TABLE public.tags
-    ADD CONSTRAINT fk_tags_repository_id_repositories FOREIGN KEY (repository_id) REFERENCES public.repositories (id) MATCH SIMPLE ON DELETE CASCADE ON UPDATE NO ACTION;
+    ADD CONSTRAINT fk_tags_repository_id_repositories FOREIGN KEY (repository_id) REFERENCES public.repositories (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
 
 ALTER TABLE public.tags
     ADD CONSTRAINT fk_tags_manifest_id_manifests FOREIGN KEY (manifest_id) REFERENCES public.manifests (id) MATCH FULL ON DELETE CASCADE ON UPDATE NO ACTION;
