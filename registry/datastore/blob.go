@@ -95,7 +95,18 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 
 // FindByID finds a blob by ID.
 func (s *blobStore) FindByID(ctx context.Context, id int64) (*models.Blob, error) {
-	q := "SELECT id, media_type, digest_algorithm, digest_hex, size, created_at, marked_at FROM blobs WHERE id = $1"
+	q := `SELECT
+			id,
+			media_type,
+			digest_algorithm,
+			digest_hex,
+			size,
+			created_at,
+			marked_at
+		FROM
+			blobs
+		WHERE
+			id = $1`
 	row := s.db.QueryRowContext(ctx, q, id)
 
 	return scanFullBlob(row)
@@ -103,8 +114,19 @@ func (s *blobStore) FindByID(ctx context.Context, id int64) (*models.Blob, error
 
 // FindByDigest finds a blob by digest.
 func (s *blobStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Blob, error) {
-	q := `SELECT id, media_type, digest_algorithm, digest_hex, size, created_at, marked_at
-		FROM blobs WHERE digest_algorithm = $1 AND digest_hex = decode($2, 'hex')`
+	q := `SELECT
+			id,
+			media_type,
+			digest_algorithm,
+			digest_hex,
+			size,
+			created_at,
+			marked_at
+		FROM
+			blobs
+		WHERE
+			digest_algorithm = $1
+			AND digest_hex = decode($2, 'hex')`
 
 	alg, err := NewDigestAlgorithm(d.Algorithm())
 	if err != nil {
@@ -117,7 +139,16 @@ func (s *blobStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.
 
 // FindAll finds all blobs.
 func (s *blobStore) FindAll(ctx context.Context) (models.Blobs, error) {
-	q := "SELECT id, media_type, digest_algorithm, digest_hex, size, created_at, marked_at FROM blobs"
+	q := `SELECT
+			id,
+			media_type,
+			digest_algorithm,
+			digest_hex,
+			size,
+			created_at,
+			marked_at
+		FROM
+			blobs`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("error finding blobs: %w", err)
@@ -140,8 +171,10 @@ func (s *blobStore) Count(ctx context.Context) (int, error) {
 
 // Create saves a new blob.
 func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
-	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size) VALUES ($1, $2, decode($3, 'hex'), $4)
-		RETURNING id, created_at`
+	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size)
+			VALUES ($1, $2, decode($3, 'hex'), $4)
+		RETURNING
+			id, created_at`
 
 	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
 	if err != nil {
@@ -161,9 +194,11 @@ func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
 // Create method calls should be preferred to this when race conditions are not a concern.
 func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
 	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size)
-		VALUES ($1, $2, decode($3, 'hex'), $4)
-		ON CONFLICT (digest_algorithm, digest_hex) DO NOTHING
-		RETURNING id, created_at`
+			VALUES ($1, $2, decode($3, 'hex'), $4)
+		ON CONFLICT (digest_algorithm, digest_hex)
+			DO NOTHING
+		RETURNING
+			id, created_at`
 
 	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
 	if err != nil {
@@ -209,7 +244,14 @@ func (s *blobStore) UpdateMediaType(ctx context.Context, b *models.Blob) error {
 
 // Mark marks a blob during garbage collection.
 func (s *blobStore) Mark(ctx context.Context, b *models.Blob) error {
-	q := "UPDATE blobs SET marked_at = NOW() WHERE id = $1 RETURNING marked_at"
+	q := `UPDATE
+			blobs
+		SET
+			marked_at = NOW()
+		WHERE
+			id = $1
+		RETURNING
+			marked_at`
 
 	if err := s.db.QueryRowContext(ctx, q, b.ID).Scan(&b.MarkedAt); err != nil {
 		if err == sql.ErrNoRows {

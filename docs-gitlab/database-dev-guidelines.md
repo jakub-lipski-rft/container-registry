@@ -30,6 +30,13 @@ to improve consistency and discoverability:
 | `CHECK` constraints       | `ck_<table name>_<column(s) name>_<validation name>`  | `ck_layers_media_type_length`                   |
 | Indexes                   | `ix_<table name>_<column(s) name>`                    | `ix_tags_manifest_id`                           |
 
+## SQL Formatting
+
+Long, complex or multi-line SQL statements must be formatted with
+[pgFormatter](https://github.com/darold/pgFormatter), using the default settings.
+There are plugins for several editors/IDEs and there is also an online version at
+[sqlformat.darold.net](http://sqlformat.darold.net/).
+
 ## Testing
 
 ### Golden Files
