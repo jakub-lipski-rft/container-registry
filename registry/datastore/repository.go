@@ -404,12 +404,16 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 // the existing API behaviour (when doing a filesystem walk based pagination).
 func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int, error) {
 	q := `SELECT
-			COUNT(DISTINCT (r.id))
+			COUNT(*)
 		FROM
 			repositories AS r
-			LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
 		WHERE
-			rm.repository_id IS NOT NULL
+			EXISTS (
+				SELECT
+				FROM
+					repository_manifests AS rm
+				WHERE
+					rm.repository_id = r.id)
 			AND r.path > $1`
 
 	var count int
