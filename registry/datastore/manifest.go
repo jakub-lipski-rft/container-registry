@@ -102,8 +102,20 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 
 // FindByID finds a Manifest by ID.
 func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifest, error) {
-	q := `SELECT id, configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
-		FROM manifests WHERE id = $1`
+	q := `SELECT
+			id,
+			configuration_id,
+			schema_version,
+			media_type,
+			digest_algorithm,
+			digest_hex,
+			payload,
+			created_at,
+			marked_at
+		FROM
+			manifests
+		WHERE
+			id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, id)
 
@@ -112,8 +124,21 @@ func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifes
 
 // FindByDigest finds a Manifest by the digest.
 func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error) {
-	q := `SELECT id, configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
-		FROM manifests WHERE digest_algorithm = $1 AND digest_hex = decode($2, 'hex')`
+	q := `SELECT
+			id,
+			configuration_id,
+			schema_version,
+			media_type,
+			digest_algorithm,
+			digest_hex,
+			payload,
+			created_at,
+			marked_at
+		FROM
+			manifests
+		WHERE
+			digest_algorithm = $1
+			AND digest_hex = decode($2, 'hex')`
 
 	alg, err := NewDigestAlgorithm(d.Algorithm())
 	if err != nil {
@@ -126,8 +151,18 @@ func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*mod
 
 // FindAll finds all manifests.
 func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
-	q := `SELECT id, configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload, created_at, marked_at
-		FROM manifests`
+	q := `SELECT
+			id,
+			configuration_id,
+			schema_version,
+			media_type,
+			digest_algorithm,
+			digest_hex,
+			payload,
+			created_at,
+			marked_at
+		FROM
+			manifests`
 
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
@@ -151,10 +186,20 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 
 // Config finds the configuration associated with a manifest.
 func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models.Configuration, error) {
-	q := `SELECT c.id, c.blob_id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, c.payload, c.created_at
-		FROM configurations AS c
-		JOIN blobs AS b ON c.blob_id = b.id
-		WHERE c.id = $1`
+	q := `SELECT
+			c.id,
+			c.blob_id,
+			b.media_type,
+			b.digest_algorithm,
+			b.digest_hex,
+			b.size,
+			c.payload,
+			c.created_at
+		FROM
+			configurations AS c
+			JOIN blobs AS b ON c.blob_id = b.id
+		WHERE
+			c.id = $1`
 
 	row := s.db.QueryRowContext(ctx, q, m.ConfigurationID)
 
@@ -163,10 +208,20 @@ func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models
 
 // LayerBlobs finds layer blobs associated with a manifest, through the `manifest_layers` relationship entity.
 func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (models.Blobs, error) {
-	q := `SELECT b.id, b.media_type, b.digest_algorithm, b.digest_hex, b.size, b.created_at, b.marked_at FROM blobs as b
-		JOIN manifest_layers as ml ON ml.blob_id = b.id
-		JOIN manifests as m ON m.id = ml.manifest_id
-		WHERE m.id = $1`
+	q := `SELECT
+			b.id,
+			b.media_type,
+			b.digest_algorithm,
+			b.digest_hex,
+			b.size,
+			b.created_at,
+			b.marked_at
+		FROM
+			blobs AS b
+			JOIN manifest_layers AS ml ON ml.blob_id = b.id
+			JOIN manifests AS m ON m.id = ml.manifest_id
+		WHERE
+			m.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
@@ -178,10 +233,19 @@ func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (mod
 
 // Repositories finds all repositories which reference a manifest.
 func (s *manifestStore) Repositories(ctx context.Context, m *models.Manifest) (models.Repositories, error) {
-	q := `SELECT r.id, r.name, r.path, r.parent_id, r.created_at, updated_at FROM repositories as r
-		JOIN repository_manifests as rm ON rm.repository_id = r.id
-		JOIN manifests as m ON m.id = rm.manifest_id
-		WHERE m.id = $1`
+	q := `SELECT
+			r.id,
+			r.name,
+			r.path,
+			r.parent_id,
+			r.created_at,
+			updated_at
+		FROM
+			repositories AS r
+			JOIN repository_manifests AS rm ON rm.repository_id = r.id
+			JOIN manifests AS m ON m.id = rm.manifest_id
+		WHERE
+			m.id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
@@ -193,10 +257,21 @@ func (s *manifestStore) Repositories(ctx context.Context, m *models.Manifest) (m
 
 // References finds all manifests directly referenced by a manifest (if any).
 func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (models.Manifests, error) {
-	q := `SELECT DISTINCT m.id, m.configuration_id, m.schema_version, m.media_type, m.digest_algorithm, m.digest_hex, m.payload, m.created_at, m.marked_at
-		FROM manifests AS m
-		JOIN manifest_references AS mr ON mr.child_id = m.id
-		WHERE mr.parent_id = $1`
+	q := `SELECT DISTINCT
+			m.id,
+			m.configuration_id,
+			m.schema_version,
+			m.media_type,
+			m.digest_algorithm,
+			m.digest_hex,
+			m.payload,
+			m.created_at,
+			m.marked_at
+		FROM
+			manifests AS m
+			JOIN manifest_references AS mr ON mr.child_id = m.id
+		WHERE
+			mr.parent_id = $1`
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
@@ -209,7 +284,9 @@ func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (mod
 // Create saves a new Manifest.
 func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 	q := `INSERT INTO manifests (configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload)
-		VALUES ($1, $2, $3, $4, decode($5, 'hex'), $6) RETURNING id, created_at`
+			VALUES ($1, $2, $3, $4, decode($5, 'hex'), $6)
+		RETURNING
+			id, created_at`
 
 	digestAlgorithm, err := NewDigestAlgorithm(m.Digest.Algorithm())
 	if err != nil {
@@ -225,7 +302,14 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 
 // Mark marks a Manifest during garbage collection.
 func (s *manifestStore) Mark(ctx context.Context, m *models.Manifest) error {
-	q := "UPDATE manifests SET marked_at = NOW() WHERE id = $1 RETURNING marked_at"
+	q := `UPDATE
+			manifests
+		SET
+			marked_at = NOW()
+		WHERE
+			id = $1
+		RETURNING
+			marked_at`
 
 	if err := s.db.QueryRowContext(ctx, q, m.ID).Scan(&m.MarkedAt); err != nil {
 		if err == sql.ErrNoRows {
@@ -243,8 +327,10 @@ func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manife
 		return fmt.Errorf("cannot associate a manifest with itself")
 	}
 
-	q := `INSERT INTO manifest_references (parent_id, child_id) VALUES ($1, $2)
-		ON CONFLICT (parent_id, child_id) DO NOTHING`
+	q := `INSERT INTO manifest_references (parent_id, child_id)
+			VALUES ($1, $2)
+		ON CONFLICT (parent_id, child_id)
+			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, ml.ID, m.ID); err != nil {
 		return fmt.Errorf("error associating manifest: %w", err)
@@ -271,8 +357,10 @@ func (s *manifestStore) DissociateManifest(ctx context.Context, ml *models.Manif
 
 // AssociateLayerBlob associates a layer blob and a manifest. It does nothing if already associated.
 func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
-	q := `INSERT INTO manifest_layers (manifest_id, blob_id) VALUES ($1, $2)
-		ON CONFLICT (manifest_id, blob_id) DO NOTHING`
+	q := `INSERT INTO manifest_layers (manifest_id, blob_id)
+			VALUES ($1, $2)
+		ON CONFLICT (manifest_id, blob_id)
+			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, m.ID, b.ID); err != nil {
 		return fmt.Errorf("error associating layer blob: %w", err)
