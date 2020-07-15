@@ -159,7 +159,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 // lexicographically sorted. These constraints exists to preserve the existing API behaviour (when doing a filesystem
 // walk based pagination).
 func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
-	q := `SELECT DISTINCT
+	q := `SELECT
 			r.id,
 			r.name,
 			r.path,
@@ -168,9 +168,13 @@ func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastP
 			r.updated_at
 		FROM
 			repositories AS r
-			LEFT JOIN repository_manifests AS rm ON r.id = rm.repository_id
 		WHERE
-			rm.repository_id IS NOT NULL
+			EXISTS (
+				SELECT
+				FROM
+					repository_manifests AS rm
+				WHERE
+					rm.repository_id = r.id)
 			AND r.path > $1
 		ORDER BY
 			r.path
