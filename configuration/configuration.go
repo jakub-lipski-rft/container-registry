@@ -53,6 +53,9 @@ type Configuration struct {
 	// Storage is the configuration for the registry's storage driver
 	Storage Storage `yaml:"storage"`
 
+	// Database is the configuration for the registry's metadata database
+	Database Database `yaml:"database"`
+
 	// Auth allows configuration of various authorization methods that may be
 	// used to gate requests.
 	Auth Auth `yaml:"auth,omitempty"`
@@ -239,6 +242,27 @@ type Configuration struct {
 			Classes []string `yaml:"classes"`
 		} `yaml:"repository,omitempty"`
 	} `yaml:"policy,omitempty"`
+}
+
+// Database is the configuration for the registry's metadata database
+type Database struct {
+	// Enabled can be used to enable or bypass the metadata database
+	Enabled bool `yaml:"enabled"`
+	// Host is the database server hostname
+	Host string `yaml:"host"`
+	// Port is the database server port
+	Port int `yaml:"port"`
+	// Username is the database username
+	User string `yaml:"user"`
+	// Password is the database password
+	Password string `yaml:"password"`
+	// Name is the database name
+	DBName string `yaml:"dbname"`
+	// Schema is the database schema (e.g. `public`)
+	Schema string `yaml:"schema"`
+	// SSLMode is the SSL mode:
+	// http://www.postgresql.cn/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS
+	SSLMode string `yaml:"sslmode"`
 }
 
 // LogHook is composed of hook Level and Type.

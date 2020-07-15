@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -43,6 +44,16 @@ var configStruct = Configuration{
 			"host":          nil,
 			"port":          42,
 		},
+	},
+	Database: Database{
+		Enabled:  true,
+		Host:     "localhost",
+		Port:     5432,
+		User:     "postgres",
+		Password: "",
+		DBName:   "registry",
+		Schema:   "public",
+		SSLMode:  "disable",
 	},
 	Auth: Auth{
 		"silly": Parameters{
@@ -144,6 +155,15 @@ storage:
     secretkey: SUPERSECRET
     host: ~
     port: 42
+database:
+  enabled: true
+  host: localhost
+  port: 5432
+  user: postgres
+  password:
+  dbname: registry
+  schema: public
+  sslmode: disable
 auth:
   silly:
     realm: silly
@@ -234,6 +254,7 @@ func (suite *ConfigSuite) TestParseSimple(c *C) {
 // a string can be parsed into a Configuration struct with no storage parameters
 func (suite *ConfigSuite) TestParseInmemory(c *C) {
 	suite.expectedConfig.Storage = Storage{"inmemory": Parameters{}}
+	suite.expectedConfig.Database = Database{}
 	suite.expectedConfig.Reporting = Reporting{}
 	suite.expectedConfig.Log.Fields = nil
 
@@ -252,6 +273,7 @@ func (suite *ConfigSuite) TestParseIncomplete(c *C) {
 
 	suite.expectedConfig.Log.Fields = nil
 	suite.expectedConfig.Storage = Storage{"filesystem": Parameters{"rootdirectory": "/tmp/testroot"}}
+	suite.expectedConfig.Database = Database{}
 	suite.expectedConfig.Auth = Auth{"silly": Parameters{"realm": "silly"}}
 	suite.expectedConfig.Reporting = Reporting{}
 	suite.expectedConfig.Notifications = Notifications{}
@@ -374,6 +396,34 @@ func (suite *ConfigSuite) TestParseWithDifferentEnvReporting(c *C) {
 	os.Setenv("REGISTRY_REPORTING_BUGSNAG_ENDPOINT", "localhost:8080")
 	os.Setenv("REGISTRY_REPORTING_NEWRELIC_LICENSEKEY", "NewRelicLicenseKey")
 	os.Setenv("REGISTRY_REPORTING_NEWRELIC_NAME", "some NewRelic NAME")
+
+	config, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
+	c.Assert(err, IsNil)
+	c.Assert(config, DeepEquals, suite.expectedConfig)
+}
+
+// TestParseWithDifferentEnvDatabase validates that environment variables properly override database parameters
+func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
+	expected := Database{
+		Enabled:  true,
+		Host:     "127.0.0.1",
+		Port:     1234,
+		User:     "user",
+		Password: "passwd",
+		DBName:   "foo",
+		Schema:   "bar",
+		SSLMode:  "allow",
+	}
+	suite.expectedConfig.Database = expected
+
+	os.Setenv("REGISTRY_DATABASE_DISABLE", strconv.FormatBool(expected.Enabled))
+	os.Setenv("REGISTRY_DATABASE_HOST", expected.Host)
+	os.Setenv("REGISTRY_DATABASE_PORT", strconv.Itoa(expected.Port))
+	os.Setenv("REGISTRY_DATABASE_USER", expected.User)
+	os.Setenv("REGISTRY_DATABASE_PASSWORD", expected.Password)
+	os.Setenv("REGISTRY_DATABASE_DBNAME", expected.DBName)
+	os.Setenv("REGISTRY_DATABASE_SCHEMA", expected.Schema)
+	os.Setenv("REGISTRY_DATABASE_SSLMODE", expected.SSLMode)
 
 	config, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
 	c.Assert(err, IsNil)
@@ -530,6 +580,9 @@ func copyConfig(config Configuration) *Configuration {
 	for k, v := range config.Storage.Parameters() {
 		configCopy.Storage.setParameter(k, v)
 	}
+
+	configCopy.Database = config.Database
+
 	configCopy.Reporting = Reporting{
 		Bugsnag:  BugsnagReporting{config.Reporting.Bugsnag.APIKey, config.Reporting.Bugsnag.ReleaseStage, config.Reporting.Bugsnag.Endpoint},
 		NewRelic: NewRelicReporting{config.Reporting.NewRelic.LicenseKey, config.Reporting.NewRelic.Name, config.Reporting.NewRelic.Verbose},

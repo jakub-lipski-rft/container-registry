@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,6 +12,8 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
+	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
@@ -102,6 +106,50 @@ type blobUploadHandler struct {
 	State blobUploadState
 }
 
+func dbMountBlob(ctx context.Context, db datastore.Queryer, fromRepoPath, toRepoPath string, d digest.Digest) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+		"source":      fromRepoPath,
+		"destination": toRepoPath,
+		"digest":      d,
+	})
+	log.Debug("cross repository blob mounting")
+
+	// find source repository
+	rStore := datastore.NewRepositoryStore(db)
+	srcRepo, err := rStore.FindByPath(ctx, fromRepoPath)
+	if err != nil {
+		return err
+	}
+	if srcRepo == nil {
+		return errors.New("source repository not found in database")
+	}
+
+	// find source blob which must be linked in the source repository
+	srcBlobs, err := rStore.Blobs(ctx, srcRepo)
+	if err != nil {
+		return err
+	}
+	var b *models.Blob
+	for _, blob := range srcBlobs {
+		if blob.Digest == d {
+			b = blob
+			break
+		}
+	}
+	if b == nil {
+		return errors.New("blob not found in database")
+	}
+
+	// create or find destination repository
+	destRepo, err := rStore.CreateOrFindByPath(ctx, toRepoPath)
+	if err != nil {
+		return err
+	}
+
+	// link blob (does nothing if already linked)
+	return rStore.LinkBlob(ctx, destRepo, b)
+}
+
 // StartBlobUpload begins the blob upload process and allocates a server-side
 // blob writer session, optionally mounting the blob from a separate repository.
 func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +170,12 @@ func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Req
 
 	if err != nil {
 		if ebm, ok := err.(distribution.ErrBlobMounted); ok {
+			if buh.Config.Database.Enabled {
+				if err := dbMountBlob(buh, buh.db, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
+					e := fmt.Errorf("failed to mount blob in database: %v", err)
+					buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				}
+			}
 			if err := buh.writeBlobCreatedHeaders(w, ebm.Descriptor); err != nil {
 				buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 			}
@@ -192,6 +246,43 @@ func (buh *blobUploadHandler) PatchBlobData(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func dbPutBlobUploadComplete(ctx context.Context, db *datastore.DB, repoPath string, desc distribution.Descriptor) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning database transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// create or find blob
+	bs := datastore.NewBlobStore(tx)
+	b := &models.Blob{
+		MediaType: desc.MediaType,
+		Digest:    desc.Digest,
+		Size:      desc.Size,
+	}
+	if err := bs.CreateOrFind(ctx, b); err != nil {
+		return err
+	}
+
+	// create or find repository
+	rStore := datastore.NewRepositoryStore(tx)
+	r, err := rStore.CreateOrFindByPath(ctx, repoPath)
+	if err != nil {
+		return err
+	}
+
+	// link blob to repository
+	if err := rStore.LinkBlob(ctx, r, b); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing database transaction: %w", err)
+	}
+
+	return nil
+}
+
 // PutBlobUploadComplete takes the final request of a blob upload. The
 // request may include all the blob data or no blob data. Any data
 // provided is received and verified. If successful, the blob is linked
@@ -259,6 +350,15 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 
 		return
 	}
+
+	if buh.Config.Database.Enabled {
+		if err := dbPutBlobUploadComplete(buh, buh.db, buh.Repository.Named().Name(), desc); err != nil {
+			e := fmt.Errorf("failed to persist metadata to database: %v", err)
+			buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			return
+		}
+	}
+
 	if err := buh.writeBlobCreatedHeaders(w, desc); err != nil {
 		buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		return

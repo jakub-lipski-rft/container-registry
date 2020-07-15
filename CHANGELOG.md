@@ -1,4 +1,6 @@
 ## [Unreleased]
+## Added
+- registry: Experimental PostgreSQL metadata database (incomplete, in progress)
 
 ## [v2.9.1-gitlab] - 2020-05-05
 ## Added

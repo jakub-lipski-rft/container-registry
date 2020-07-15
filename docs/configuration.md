@@ -168,6 +168,15 @@ storage:
       dryrun: false
     readonly:
       enabled: false
+database:
+  enabled: true
+  host: localhost
+  port: 5432
+  user: postgres
+  password:
+  dbname: registry
+  schema: public
+  sslmode: disable
 auth:
   silly:
     realm: silly-realm
@@ -574,6 +583,33 @@ under the `redirect` section:
 redirect:
   disable: true
 ```
+
+## `database`
+
+The `database` subsection configures the PostgreSQL metadata database.
+
+```none
+database:
+  enabled: true
+  host: localhost
+  port: 5432
+  user: postgres
+  password:
+  dbname: registry
+  schema: public
+  sslmode: disable
+```
+
+| Parameter  | Required | Description                                                                                                                                                                                                                                          |
+|------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `enabled`  | no       | When set to `false` the metadata database is bypassed. Defaults to `false`.                                                                                                                                                                           |
+| `host`     | yes      | The database server hostname.                                                                                                                                                                                                                        |
+| `port`     | yes      | The database server port.                                                                                                                                                                                                                            |
+| `user`     | yes      | The database username.                                                                                                                                                                                                                               |
+| `password` | yes      | The database password.                                                                                                                                                                                                                               |
+| `dbname`   | yes      | The database name.                                                                                                                                                                                                                                   |
+| `schema`   | yes      | The database schema.                                                                                                                                                                                                                                 |
+| `sslmode`  | yes      | The SSL mode. Can be one of `disable`, `allow`, `prefer`, `require`, `verify-ca` or `verify-full`. See the [PostgreSQL documentation](http://www.postgresql.cn/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS) for additional information. |
 
 ## `auth`
 

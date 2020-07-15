@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
+	"github.com/docker/distribution/registry/datastore"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
 	"github.com/sirupsen/logrus"
@@ -37,6 +38,7 @@ type blobWriter struct {
 
 	fileWriter storagedriver.FileWriter
 	driver     storagedriver.StorageDriver
+	db         *datastore.DB
 	path       string
 
 	resumableDigestEnabled bool

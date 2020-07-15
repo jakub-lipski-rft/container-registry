@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# new-migration - A script to generate a new database migration from a template.
+
+set -euo pipefail
+
+# Constants
+TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+NAME=$1
+ID=$TIMESTAMP'_'$NAME
+MIGRATIONS_DIR=./migrations
+FILE_PATH=$MIGRATIONS_DIR/$ID.go
+
+# Show help message if no argument was provided
+if [ $# -eq 0 ]; then
+    echo "usage: new-migration [name]"
+    exit 0
+fi
+
+# Make sure exactly one argument was provided
+if [ $# -gt 1 ]; then
+    echo "Expecting 1 argument, received $#"
+    exit 1
+fi
+
+# Make sure the migration name is valid
+if [[ ! $NAME =~ ^[a-z0-9_]+$ ]]; then
+    echo "Name can only contain alphanumeric and underscore characters"
+    exit 1
+fi
+
+# Make sure $MIGRATIONS_DIR exists
+if [ ! -d $MIGRATIONS_DIR ]; then
+    echo "$MIGRATIONS_DIR directory not found in path"
+    exit 1
+fi
+
+# Generate migration file
+cat << _EOF_ > "$FILE_PATH"
+package migrations
+
+import migrate "github.com/rubenv/sql-migrate"
+
+func init() {
+    m := &migrate.Migration{
+        Id:   "$ID",
+        Up:   []string{},
+        Down: []string{},
+    }
+
+    allMigrations = append(allMigrations, m)
+}
+_EOF_
+
+if [ $? -eq 0 ]; then
+    echo OK: "$FILE_PATH"
+fi

@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/storage/cache"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/libtrust"
@@ -25,6 +26,7 @@ type registry struct {
 	blobDescriptorServiceFactory distribution.BlobDescriptorServiceFactory
 	manifestURLs                 manifestURLs
 	driver                       storagedriver.StorageDriver
+	db                           *datastore.DB
 }
 
 // manifestURLs holds regular expressions for controlling manifest URL allowlisting
@@ -114,6 +116,14 @@ func BlobDescriptorCacheProvider(blobDescriptorCacheProvider cache.BlobDescripto
 			registry.blobServer.statter = statter
 			registry.blobDescriptorCacheProvider = blobDescriptorCacheProvider
 		}
+		return nil
+	}
+}
+
+// Database configures the registry to use the passed database.
+func Database(db *datastore.DB) RegistryOption {
+	return func(registry *registry) error {
+		registry.db = db
 		return nil
 	}
 }

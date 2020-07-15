@@ -15,19 +15,21 @@ default:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
       - $GOPATH/pkg/mod/
-    
+
 variables:
   BUILDTAGS: "include_gcs include_oss"
   CGO_ENABLED: "1"
 
 stages:
+  - validate
   - test
   - integration
 
 static-analysis:
   cache: {}
   image: registry.gitlab.com/gitlab-org/gitlab-build-images:golangci-lint-alpine
-  stage: test
+  stage: validate
+  needs: []
   script:
     # Use default .golangci.yml file from the image if one is not present in the project root.
     - '[ -e .golangci.yml ] || cp /golangci/.golangci.yml .'
@@ -40,8 +42,9 @@ static-analysis:
     paths:
       - gl-code-quality-report.json
 
-verify:
+.verify:
   stage: test
+  needs: []
   script:
     - go build -i .
     - make build
@@ -50,18 +53,25 @@ verify:
 
 .storage-driver-test: &storage-driver-test
   stage: integration
-  script: go test -v github.com/docker/distribution/registry/storage/driver/$CI_JOB_NAME -args -check.v -test.short
+  needs: []
+  script: go test -v $PACKAGE -args -check.v -test.short
 
-filesystem:
+.filesystem:
   <<: *storage-driver-test
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/storage/driver/filesystem
 
-inmemory:
+.inmemory:
   <<: *storage-driver-test
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/storage/driver/inmemory
 
-swift:
+.swift:
   <<: *storage-driver-test
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/storage/driver/swift
 
-s3-aws:
+.s3-aws:
   <<: *storage-driver-test
   variables:
     AWS_ACCESS_KEY: "AKIAIOSFODNN7EXAMPLE"
@@ -77,9 +87,121 @@ s3-aws:
       alias: "minio"
       command: ["server", "/data"]
   before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/storage/driver/s3-aws
     # Download the minio client
     - wget --no-verbose https://dl.min.io/client/mc/release/linux-amd64/mc
     - chmod u+x ./mc
     # Configure the minio client to use the local minio service rather than play.minio.io
     - ./mc config host add s3v4 $REGION_ENDPOINT $AWS_ACCESS_KEY $AWS_SECRET_KEY --api S3v4
     - ./mc mb s3v4/$S3_BUCKET
+
+.api:
+  stage: integration
+  needs: []
+  script: go test -v -tags=integration github.com/docker/distribution/registry/handlers
+
+.database: &database
+  stage: integration
+  needs: []
+  variables:
+    POSTGRES_PASSWORD: "secret"
+    POSTGRES_DB: "registry_test"
+
+    REGISTRY_DATABASE_ENABLED: "true"
+    REGISTRY_DATABASE_HOST: "db"
+    REGISTRY_DATABASE_PORT: "5432"
+    REGISTRY_DATABASE_USER: "postgres"
+    REGISTRY_DATABASE_PASSWORD: "secret"
+    REGISTRY_DATABASE_DBNAME: "registry_test"
+    REGISTRY_DATABASE_SSLMODE: "disable"
+  services:
+    - name: postgres:11-alpine
+      alias: "db"
+  script: go test -v -tags=integration $PACKAGE
+
+.database:migrations:
+  <<: *database
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/migrations
+
+.database:datastore:
+  <<: *database
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/datastore
+
+.database:api:
+  <<: *database
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/handlers
+
+database:migrations Go 1.13:
+  extends: .database:migrations
+  image: golang:1.13-buster
+
+database:migrations Go 1.14:
+  extends: .database:migrations
+  image: golang:1.14-buster
+
+database:datastore Go 1.13:
+  extends: .database:datastore
+  image: golang:1.13-buster
+
+database:datastore Go 1.14:
+  extends: .database:datastore
+  image: golang:1.14-buster
+
+database:api Go 1.13:
+  extends: .database:api
+  image: golang:1.13-buster
+
+database:api Go 1.14:
+  extends: .database:api
+  image: golang:1.14-buster
+
+api Go 1.13:
+  extends: .api
+  image: golang:1.13-buster
+
+api Go 1.14:
+  extends: .api
+  image: golang:1.14-buster
+
+filesystem storage driver Go 1.13:
+  extends: .filesystem
+  image: golang:1.13-buster
+
+filesystem storage driver Go 1.14:
+  extends: .filesystem
+  image: golang:1.14-buster
+
+inmemory storage driver Go 1.13:
+  extends: .inmemory
+  image: golang:1.13-buster
+
+inmemory storage driver Go 1.14:
+  extends: .inmemory
+  image: golang:1.14-buster
+
+swift storage driver Go 1.13:
+  extends: .swift
+  image: golang:1.13-buster
+
+swift storage driver Go 1.14:
+  extends: .swift
+  image: golang:1.14-buster
+
+s3 storage driver Go 1.13:
+  extends: .s3-aws
+  image: golang:1.13-buster
+
+s3 storage driver Go 1.14:
+  extends: .s3-aws
+  image: golang:1.14-buster
+
+verify Go 1.13:
+  extends: .verify
+  image: golang:1.13-buster
+
+verify Go 1.14:
+  extends: .verify
+  image: golang:1.14-buster

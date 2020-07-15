@@ -21,11 +21,13 @@ import (
 	"github.com/docker/distribution/health"
 	"github.com/docker/distribution/health/checks"
 	prometheus "github.com/docker/distribution/metrics"
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/notifications"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/auth"
+	"github.com/docker/distribution/registry/datastore"
 	registrymiddleware "github.com/docker/distribution/registry/middleware/registry"
 	repositorymiddleware "github.com/docker/distribution/registry/middleware/repository"
 	"github.com/docker/distribution/registry/proxy"
@@ -60,6 +62,7 @@ type App struct {
 
 	router           *mux.Router                    // main application router, configured with dispatchers
 	driver           storagedriver.StorageDriver    // driver maintains the app global storage driver instance.
+	db               *datastore.DB                  // db is the global database handle used across the app.
 	registry         distribution.Namespace         // registry is the primary registry backend for the app instance.
 	repoRemover      distribution.RepositoryRemover // repoRemover provides ability to delete repos
 	accessController auth.AccessController          // main access controller for application
@@ -125,6 +128,28 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		// method, where this is created lazily. Its status can be queried via
 		// a health check.
 		panic(err)
+	}
+
+	// Connect to the metadata database, if enabled.
+	if config.Database.Enabled {
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("failed to construct database connection: %v", err))
+		}
+
+		m := migrations.NewMigrator(db.DB)
+		if _, err := m.Up(); err != nil {
+			panic(fmt.Sprintf("failed to run database migrations: %v", err))
+		}
+
+		app.db = db
 	}
 
 	purgeConfig := uploadPurgeDefaultConfig()
@@ -256,6 +281,29 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 				options = append(options, storage.ManifestURLsDenyRegexp(re))
 			}
 		}
+	}
+
+	// Connect to the metadata database, if enabled.
+	if config.Database.Enabled {
+		db, err := datastore.Open(&datastore.DSN{
+			Host:     config.Database.Host,
+			Port:     config.Database.Port,
+			User:     config.Database.User,
+			Password: config.Database.Password,
+			DBName:   config.Database.DBName,
+			SSLMode:  config.Database.SSLMode,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("failed to construct database connection: %v", err))
+		}
+
+		m := migrations.NewMigrator(db.DB)
+		if _, err := m.Up(); err != nil {
+			panic(fmt.Sprintf("failed to run database migrations: %v", err))
+		}
+
+		app.db = db
+		options = append(options, storage.Database(app.db))
 	}
 
 	// configure storage caches
@@ -1079,4 +1127,9 @@ func startUploadPurger(ctx context.Context, storageDriver storagedriver.StorageD
 			time.Sleep(intervalDuration)
 		}
 	}()
+}
+
+// GracefulShutdown allows the app to free any resources befefore shutdown.
+func (app *App) GracefulShutdown(ctx context.Context) error {
+	return app.db.Close()
 }
