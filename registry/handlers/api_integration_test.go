@@ -2885,6 +2885,115 @@ func putRandomOCIManifestByTag(t *testing.T, env *testEnv, repoPath, tagName str
 	return deserializedManifest
 }
 
+// putRandomOCIManifestByDigest creates a random valid oci manifest, its
+// config, its layers, and puts them
+func putRandomOCIManifestByDigest(t *testing.T, env *testEnv, repoPath string) *ocischema.DeserializedManifest {
+	t.Helper()
+
+	// Push up a random manifest by digest.
+	deserializedManifest := seedRandomOCIManifest(t, env, repoPath)
+
+	manifestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp := putManifest(t, "putting manifest by tag no error", manifestURL, v1.MediaTypeImageManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+
+	return deserializedManifest
+}
+
+// randomPlatformSpec generates a random platfromSpec. Arch and OS combinations
+// may not strictly be valid for the Go runtime.
+func randomPlatformSpec() manifestlist.PlatformSpec {
+	rand.Seed(time.Now().Unix())
+
+	architectures := []string{"amd64", "arm64", "ppc64le", "mips64", "386"}
+	oses := []string{"aix", "darwin", "linux", "freebsd", "plan9"}
+
+	return manifestlist.PlatformSpec{
+		Architecture: architectures[rand.Intn(len(architectures))],
+		OS:           oses[rand.Intn(len(oses))],
+		// Optional values.
+		OSVersion:  "",
+		OSFeatures: nil,
+		Variant:    "",
+		Features:   nil,
+	}
+}
+
+// seedRandomOCIImageIndex generates a random oci image index and puts its images.
+func seedRandomOCIImageIndex(t *testing.T, env *testEnv, repoPath string) *manifestlist.DeserializedManifestList {
+	t.Helper()
+
+	ociImageIndex := &manifestlist.ManifestList{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			// MediaType field for OCI image indexes is reserved to maintain compatibility and can be blank:
+			// https://github.com/opencontainers/image-spec/blob/master/image-index.md#image-index-property-descriptions
+			MediaType: "",
+		},
+	}
+
+	// Create and push up 2 random OCI images.
+	ociImageIndex.Manifests = make([]manifestlist.ManifestDescriptor, 2)
+
+	for i := range ociImageIndex.Manifests {
+		deserializedManifest := putRandomOCIManifestByDigest(t, env, repoPath)
+
+		_, payload, err := deserializedManifest.Payload()
+		require.NoError(t, err)
+		dgst := digest.FromBytes(payload)
+
+		ociImageIndex.Manifests[i] = manifestlist.ManifestDescriptor{
+			Descriptor: distribution.Descriptor{
+				Digest:    dgst,
+				MediaType: v1.MediaTypeImageManifest,
+			},
+			Platform: randomPlatformSpec(),
+		}
+	}
+
+	deserializedManifest, err := manifestlist.FromDescriptors(ociImageIndex.Manifests)
+	require.NoError(t, err)
+
+	return deserializedManifest
+}
+
+// putRandomOCIImageIndexByTag creates a random valid oci image index and its
+// manifests and puts them by tag.
+func putRandomOCIImageIndexByTag(t *testing.T, env *testEnv, repoPath, tagName string) *manifestlist.DeserializedManifestList {
+	t.Helper()
+
+	// Push up a random manifest by tag.
+	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath)
+
+	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
+
+	resp := putManifest(t, "putting manifest by tag no error", manifestURL, v1.MediaTypeImageIndex, deserializedManifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+
+	return deserializedManifest
+}
+
 func testManifestAPISchema2(t *testing.T, env *testEnv, imageName reference.Named) manifestArgs {
 	tag := "schema2tag"
 	args := manifestArgs{
