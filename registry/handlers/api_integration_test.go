@@ -2551,6 +2551,174 @@ func TestManifestAPI_Get_OCIMatchingEtag(t *testing.T) {
 	}
 }
 
+func TestManifestAPI_Put_OCIImageIndexByTag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "ociindexhappypathtag"
+	repoPath := "ociindex/happypath"
+
+	// putRandomOCIImageIndex with putByTag tests that the manifest put happened without issue.
+	seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName))
+}
+
+func TestManifestAPI_Put_OCIImageIndexByDigest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	repoPath := "ociindex/happypath"
+
+	// putRandomOCIImageIndex with putByDigest tests that the manifest put happened without issue.
+	seedRandomOCIImageIndex(t, env, repoPath, putByDigest)
+}
+
+func TestManifestAPI_Get_OCIIndexNonMatchingEtag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "ociindexhappypathtag"
+	repoPath := "ociindex/happypath"
+
+	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName))
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+		etag        string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+		{
+			name:        "by tag non matching etag",
+			manifestURL: tagURL,
+			etag:        digest.FromString("no match").String(),
+		},
+		{
+			name:        "by digest non matching etag",
+			manifestURL: digestURL,
+			etag:        digest.FromString("no match").String(),
+		},
+		{
+			name:        "by tag malformed etag",
+			manifestURL: tagURL,
+			etag:        "bad etag",
+		},
+		{
+			name:        "by digest malformed etag",
+			manifestURL: digestURL,
+			etag:        "bad etag",
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", test.manifestURL, nil)
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", v1.MediaTypeImageIndex)
+			if test.etag != "" {
+				req.Header.Set("If-None-Match", test.etag)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+			require.Equal(t, fmt.Sprintf(`"%s"`, dgst), resp.Header.Get("ETag"))
+
+			var fetchedManifest *manifestlist.DeserializedManifestList
+			dec := json.NewDecoder(resp.Body)
+
+			err = dec.Decode(&fetchedManifest)
+			require.NoError(t, err)
+
+			require.EqualValues(t, deserializedManifest, fetchedManifest)
+		})
+	}
+}
+
+func TestManifestAPI_Get_OCIIndexMatchingEtag(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "ociindexhappypathtag"
+	repoPath := "ociindex/happypath"
+
+	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName))
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+		etag        string
+	}{
+		{
+			name:        "by tag quoted etag",
+			manifestURL: tagURL,
+			etag:        fmt.Sprintf("%q", dgst),
+		},
+		{
+			name:        "by digest quoted etag",
+			manifestURL: digestURL,
+			etag:        fmt.Sprintf("%q", dgst),
+		},
+		{
+			name:        "by tag non quoted etag",
+			manifestURL: tagURL,
+			etag:        dgst.String(),
+		},
+		{
+			name:        "by digest non quoted etag",
+			manifestURL: digestURL,
+			etag:        dgst.String(),
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", test.manifestURL, nil)
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", v1.MediaTypeImageIndex)
+			req.Header.Set("If-None-Match", test.etag)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusNotModified, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			require.Equal(t, http.NoBody, resp.Body)
+		})
+	}
+}
+
 func buildManifestTagURL(t *testing.T, env *testEnv, repoPath, tagName string) string {
 	t.Helper()
 
@@ -2882,8 +3050,16 @@ func randomPlatformSpec() manifestlist.PlatformSpec {
 }
 
 // seedRandomOCIImageIndex generates a random oci image index and puts its images.
-func seedRandomOCIImageIndex(t *testing.T, env *testEnv, repoPath string) *manifestlist.DeserializedManifestList {
+func seedRandomOCIImageIndex(t *testing.T, env *testEnv, repoPath string, opts ...manifestOptsFunc) *manifestlist.DeserializedManifestList {
 	t.Helper()
+
+	config := &manifestOpts{
+		repoPath: repoPath,
+	}
+
+	for _, o := range opts {
+		o(t, env, config)
+	}
 
 	ociImageIndex := &manifestlist.ManifestList{
 		Versioned: manifest.Versioned{
@@ -2916,31 +3092,24 @@ func seedRandomOCIImageIndex(t *testing.T, env *testEnv, repoPath string) *manif
 	deserializedManifest, err := manifestlist.FromDescriptors(ociImageIndex.Manifests)
 	require.NoError(t, err)
 
-	return deserializedManifest
-}
+	if config.putManifest {
+		manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
 
-// putRandomOCIImageIndexByTag creates a random valid oci image index and its
-// manifests and puts them by tag.
-func putRandomOCIImageIndexByTag(t *testing.T, env *testEnv, repoPath, tagName string) *manifestlist.DeserializedManifestList {
-	t.Helper()
+		if config.manifestURL == "" {
+			config.manifestURL = manifestDigestURL
+		}
 
-	// Push up a random manifest by tag.
-	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath)
+		resp := putManifest(t, "putting oci image index no error", config.manifestURL, v1.MediaTypeImageIndex, deserializedManifest)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+		require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
 
-	manifestURL := buildManifestTagURL(t, env, repoPath, tagName)
-
-	resp := putManifest(t, "putting manifest by tag no error", manifestURL, v1.MediaTypeImageIndex, deserializedManifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-
-	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+		_, payload, err := deserializedManifest.Payload()
+		require.NoError(t, err)
+		dgst := digest.FromBytes(payload)
+		require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+	}
 
 	return deserializedManifest
 }
