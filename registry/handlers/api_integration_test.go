@@ -2404,6 +2404,16 @@ func TestManifestAPI_Put_OCIByTag(t *testing.T) {
 	seedRandomOCIManifest(t, env, repoPath, putByTag(tagName))
 }
 
+func TestManifestAPI_Put_OCIByDigest(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	repoPath := "oci/happypath"
+
+	// seedRandomOCIManifest with putByDigest tests that the manifest put happened without issue.
+	seedRandomOCIManifest(t, env, repoPath, putByDigest)
+}
+
 func TestManifestAPI_Get_OCINonMatchingEtag(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
