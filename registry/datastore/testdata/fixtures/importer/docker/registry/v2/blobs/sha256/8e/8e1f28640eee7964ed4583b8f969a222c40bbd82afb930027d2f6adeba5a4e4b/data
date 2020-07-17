@@ -18,21 +18,5 @@
       {
          "v1Compatibility": "{\"id\":\"bd4f6324ef6faaa275ef12c5ba3e48fc0fdf8974230d141b8c0bfcc6ef077a28\",\"created\":\"2020-04-14T19:19:53.444488372Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) ADD file:09a89925137e1b768ef1f0e7d1d7325eb2b4f1a0895b3aa8dfc98b0c75f3f507 in / \"]}}"
       }
-   ],
-   "signatures": [
-      {
-         "header": {
-            "jwk": {
-               "crv": "P-256",
-               "kid": "IT5E:YCCD:VMKR:CZXD:4BTR:RHWJ:CGRD:HIGM:TZNS:6UNG:6O6U:3YHV",
-               "kty": "EC",
-               "x": "0vAFlZaXfWcvIAt2oKVhnN6kY7jCCD05Ee25ZjCOh4Q",
-               "y": "cuNGRA9cCpkxjD9H7Kc5l-Xs_EGMbmjDTM9fP5psuq4"
-            },
-            "alg": "ES256"
-         },
-         "signature": "PNU-1NBR5iqAI4xT8OEaASdlkHWQFLgI1JEuNvN47hgLlkYYlCEK1LmQEXRK9qUdnTAUttWUUhwmHMCU3bLG4Q",
-         "protected": "eyJmb3JtYXRMZW5ndGgiOjIxMjIsImZvcm1hdFRhaWwiOiJDbjAiLCJ0aW1lIjoiMjAyMC0wNC0xNVQxNToyNDoxMloifQ"
-      }
    ]
 }

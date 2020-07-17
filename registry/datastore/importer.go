@@ -186,18 +186,12 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 }
 
 func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *schema1.SignedManifest, dgst digest.Digest) (*models.Manifest, error) {
-	// parse manifest payload
-	_, payload, err := m.Payload()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
-	}
-
 	// find or create DB manifest
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
 		SchemaVersion: m.SchemaVersion,
-		MediaType:     schema1.MediaTypeSignedManifest,
+		MediaType:     schema1.MediaTypeManifest,
 		Digest:        dgst,
-		Payload:       payload,
+		Payload:       m.Canonical,
 	})
 	if err != nil {
 		return nil, err
