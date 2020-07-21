@@ -24,6 +24,10 @@ type Logger interface {
 	Panicln(args ...interface{})
 
 	// Leveled methods, from logrus
+	Trace(args ...interface{})
+	Tracef(format string, args ...interface{})
+	Traceln(args ...interface{})
+
 	Debug(args ...interface{})
 	Debugf(format string, args ...interface{})
 	Debugln(args ...interface{})
@@ -41,6 +45,7 @@ type Logger interface {
 	Warnln(args ...interface{})
 
 	WithError(err error) *logrus.Entry
+	WithFields(fields logrus.Fields) *logrus.Entry
 }
 
 type loggerKey struct{}
