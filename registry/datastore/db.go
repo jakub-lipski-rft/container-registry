@@ -58,50 +58,9 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 	return db.DB.ExecContext(ctx, query, args...)
 }
 
-// BeginTx wraps sql.Tx from the innner sql.DB within a datastore.Tx.
-func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	tx, err := db.DB.BeginTx(ctx, opts)
-
-	return &Tx{tx, db.log}, err
-}
-
-// Begin wraps sql.Tx from the inner sql.DB within a datastore.Tx.
-func (db *DB) Begin() (*Tx, error) {
-	return db.BeginTx(context.Background(), nil)
-}
-
 // Tx is a database transaction that implements Querier.
 type Tx struct {
 	*sql.Tx
-	log *statementLogger
-}
-
-func (tx *Tx) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	reportTime := tx.log.statement(query, args...)
-	defer reportTime()
-
-	return tx.Tx.QueryContext(ctx, query, args...)
-}
-
-func (tx *Tx) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	reportTime := tx.log.statement(query, args...)
-	defer reportTime()
-
-	return tx.Tx.QueryRowContext(ctx, query, args...)
-}
-
-func (tx *Tx) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
-	reportTime := tx.log.statement(query)
-	defer reportTime()
-
-	return tx.Tx.PrepareContext(ctx, query)
-}
-
-func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	reportTime := tx.log.statement(query, args...)
-	defer reportTime()
-
-	return tx.Tx.ExecContext(ctx, query, args...)
 }
 
 // DSN represents the Data Source Name parameters for a DB connection.
