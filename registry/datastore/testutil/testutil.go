@@ -3,6 +3,7 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -126,7 +128,28 @@ func NewDB() (*datastore.DB, error) {
 		return nil, err
 	}
 
-	db, err := datastore.Open(dsn)
+	logLevel, err := logrus.ParseLevel(os.Getenv("REGISTRY_LOG_LEVEL"))
+	if err != nil {
+		logLevel = logrus.InfoLevel
+	}
+
+	var logOut io.Writer
+	switch os.Getenv("REGISTRY_LOG_OUTPUT") {
+	case "stdout":
+		logOut = os.Stdout
+	case "stderr":
+		logOut = os.Stderr
+	case "discard":
+		logOut = ioutil.Discard
+	default:
+		logOut = os.Stdout
+	}
+
+	log := logrus.New()
+	log.SetLevel(logLevel)
+	log.SetOutput(logOut)
+
+	db, err := datastore.Open(dsn, logrus.NewEntry(log))
 	if err != nil {
 		return nil, fmt.Errorf("error opening database connection: %w", err)
 	}
