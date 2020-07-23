@@ -130,28 +130,6 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		panic(err)
 	}
 
-	// Connect to the metadata database, if enabled.
-	if config.Database.Enabled {
-		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
-		})
-		if err != nil {
-			panic(fmt.Sprintf("failed to construct database connection: %v", err))
-		}
-
-		m := migrations.NewMigrator(db.DB)
-		if _, err := m.Up(); err != nil {
-			panic(fmt.Sprintf("failed to run database migrations: %v", err))
-		}
-
-		app.db = db
-	}
-
 	purgeConfig := uploadPurgeDefaultConfig()
 	if mc, ok := config.Storage["maintenance"]; ok {
 		if v, ok := mc["uploadpurging"]; ok {
