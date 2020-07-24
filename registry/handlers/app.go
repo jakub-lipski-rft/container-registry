@@ -270,7 +270,9 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			Password: config.Database.Password,
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
-		})
+		},
+			dcontext.GetLogger(app).WithFields(logrus.Fields{"database": config.Database.DBName}),
+		)
 		if err != nil {
 			panic(fmt.Sprintf("failed to construct database connection: %v", err))
 		}

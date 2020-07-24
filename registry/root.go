@@ -202,7 +202,9 @@ var MigrateUpCmd = &cobra.Command{
 			Password: config.Database.Password,
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
-		})
+		},
+			logrus.WithField("database", config.Database.DBName),
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -250,7 +252,9 @@ var MigrateDownCmd = &cobra.Command{
 			Password: config.Database.Password,
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
-		})
+		},
+			logrus.WithField("database", config.Database.DBName),
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -304,7 +308,9 @@ var MigrateVersionCmd = &cobra.Command{
 			Password: config.Database.Password,
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
-		})
+		},
+			logrus.WithField("database", config.Database.DBName),
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -344,7 +350,9 @@ var MigrateStatusCmd = &cobra.Command{
 			Password: config.Database.Password,
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
-		})
+		},
+			logrus.WithField("database", config.Database.DBName),
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -440,7 +448,9 @@ var ImportCmd = &cobra.Command{
 			Password: config.Database.Password,
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
-		})
+		},
+			dcontext.GetLogger(ctx).WithFields(logrus.Fields{"database": config.Database.DBName}),
+		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
