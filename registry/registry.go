@@ -12,26 +12,25 @@ import (
 	"syscall"
 	"time"
 
-	prometheus "github.com/docker/distribution/metrics"
-
 	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
 	logstash "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/bugsnag/bugsnag-go"
+	"github.com/docker/distribution/configuration"
+	dcontext "github.com/docker/distribution/context"
+	"github.com/docker/distribution/health"
+	prometheus "github.com/docker/distribution/metrics"
+	"github.com/docker/distribution/registry/handlers"
+	"github.com/docker/distribution/registry/listener"
+	"github.com/docker/distribution/uuid"
+	"github.com/docker/distribution/version"
 	"github.com/docker/go-metrics"
 	gorhandlers "github.com/gorilla/handlers"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/yvasiyarov/gorelic"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
-
-	"github.com/docker/distribution/configuration"
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/health"
-	"github.com/docker/distribution/registry/handlers"
-	"github.com/docker/distribution/registry/listener"
-	"github.com/docker/distribution/uuid"
-	"github.com/docker/distribution/version"
 )
 
 // this channel gets notified when process receives signal. It is global to ease unit testing
@@ -82,7 +81,7 @@ var ServeCmd = &cobra.Command{
 				path = "/metrics"
 			}
 			log.Info("providing prometheus metrics on ", path)
-			http.Handle(path, metrics.Handler())
+			http.Handle(path, promhttp.Handler())
 		}
 
 		if err = registry.ListenAndServe(); err != nil {

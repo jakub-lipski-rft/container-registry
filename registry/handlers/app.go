@@ -38,11 +38,11 @@ import (
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	storagemiddleware "github.com/docker/distribution/registry/storage/driver/middleware"
 	"github.com/docker/distribution/version"
-	"github.com/docker/go-metrics"
 	"github.com/docker/libtrust"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	metricskit "gitlab.com/gitlab-org/labkit/metrics"
 )
 
 // randomSecretSize is the number of random bytes to generate if no secret
@@ -449,6 +449,11 @@ func (app *App) RegisterHealthChecks(healthRegistries ...*health.Registry) {
 	}
 }
 
+var routeMetricsMiddleware = metricskit.NewHandlerFactory(
+	metricskit.WithNamespace(prometheus.NamespacePrefix),
+	metricskit.WithLabels("route"),
+)
+
 // register a handler with the application, by route name. The handler will be
 // passed through the application filters and context will be constructed at
 // request time.
@@ -457,10 +462,10 @@ func (app *App) register(routeName string, dispatch dispatchFunc) {
 
 	// Chain the handler with prometheus instrumented handler
 	if app.Config.HTTP.Debug.Prometheus.Enabled {
-		namespace := metrics.NewNamespace(prometheus.NamespacePrefix, "http", nil)
-		httpMetrics := namespace.NewDefaultHttpMetrics(strings.Replace(routeName, "-", "_", -1))
-		metrics.Register(namespace)
-		handler = metrics.InstrumentHandler(httpMetrics, handler)
+		handler = routeMetricsMiddleware(
+			handler,
+			metricskit.WithLabelValues(map[string]string{"route": v2.RoutePath(routeName)}),
+		)
 	}
 
 	// TODO(stevvooe): This odd dispatcher/route registration is by-product of
