@@ -69,8 +69,10 @@ version: 0.1
 log:
   accesslog:
     disabled: true
+    formatter: json
   level: debug
   formatter: text
+  output: stderr
   fields:
     service: registry
     environment: staging
@@ -334,15 +336,17 @@ check before parsing the remainder of the configuration file.
 ## `log`
 
 The `log` subsection configures the behavior of the logging system. The logging
-system outputs everything to stdout. You can adjust the granularity and format
-with this configuration section.
+system outputs everything to stdout by default. You can adjust the granularity,
+output and format with this configuration section.
 
 ```none
 log:
   accesslog:
     disabled: true
+    formatter: json
   level: debug
   formatter: text
+  output: stderr
   fields:
     service: registry
     environment: staging
@@ -350,8 +354,9 @@ log:
 
 | Parameter   | Required | Description |
 |-------------|----------|-------------|
-| `level`     | no       | Sets the sensitivity of logging output. Permitted values are `error`, `warn`, `info`, and `debug`. The default is `info`. |
+| `level`     | no       | Sets the sensitivity of logging output. Permitted values are `error`, `warn`, `info`, `debug` and `trace`. The default is `info`. |
 | `formatter` | no       | This selects the format of logging output. The format primarily affects how keyed attributes for a log line are encoded. Options are `text`, `json`, and `logstash`. The default is `text`. |
+| `output`    | no       | This sets the output destination. Options are `stdout` and `stderr`. The default is `stdout`. |
 | `fields`    | no       | A map of field names to values. These are added to every log line for the context. This is useful for identifying log messages source after being mixed in other systems. |
 
 ### `accesslog`
@@ -359,12 +364,17 @@ log:
 ```none
 accesslog:
   disabled: true
+  formatter: json
 ```
 
 Within `log`, `accesslog` configures the behavior of the access logging
 system. By default, the access logging system outputs to stdout in
 [Combined Log Format](https://httpd.apache.org/docs/2.4/logs.html#combined).
-Access logging can be disabled by setting the boolean flag `disabled` to `true`.
+
+| Parameter   | Required | Description |
+|-------------|----------|-------------|
+| `disabled`  | no       | Set to `true` to disable access logging. The default is `false`. |
+| `formatter` | no       | This selects the format of logging output. Options are `text`, `json`, and `combined`. The default is `combined`. |
 
 ## `hooks`
 

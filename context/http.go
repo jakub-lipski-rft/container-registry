@@ -12,6 +12,7 @@ import (
 	"github.com/docker/distribution/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/gitlab-org/labkit/correlation"
 )
 
 // Common errors used with this package.
@@ -101,6 +102,11 @@ func GetRequestID(ctx context.Context) string {
 	return GetStringValue(ctx, "http.request.id")
 }
 
+// GetRequestCorrelationID attempts to resolve the current request correlation id, if any.
+func GetRequestCorrelationID(ctx context.Context) string {
+	return correlation.ExtractFromContext(ctx)
+}
+
 // WithResponseWriter returns a new context and response writer that makes
 // interesting response statistics available within the context.
 func WithResponseWriter(ctx context.Context, w http.ResponseWriter) (context.Context, http.ResponseWriter) {
@@ -156,6 +162,12 @@ func GetRequestLogger(ctx context.Context) Logger {
 		"http.request.contenttype")
 }
 
+// GetRequestCorrelationLogger returns a logger that contains a correlation ID, if available in ctx. Request loggers
+// can safely be pushed onto the context.
+func GetRequestCorrelationLogger(ctx context.Context) Logger {
+	return GetLogger(ctx).WithField(correlation.FieldName, GetRequestCorrelationID(ctx))
+}
+
 // GetResponseLogger reads the current response stats and builds a logger.
 // Because the values are read at call time, pushing a logger returned from
 // this function on the context will lead to missing or invalid data. Only
@@ -169,7 +181,7 @@ func GetResponseLogger(ctx context.Context) Logger {
 	duration := Since(ctx, "http.request.startedat")
 
 	if duration > 0 {
-		l = l.WithField("http.response.duration", duration.String())
+		l = l.WithField("http_response_duration", duration.String())
 	}
 
 	return l

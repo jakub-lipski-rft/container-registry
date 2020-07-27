@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -27,14 +28,24 @@ type Configuration struct {
 		AccessLog struct {
 			// Disabled disables access logging.
 			Disabled bool `yaml:"disabled,omitempty"`
+
+			// Formatter overrides the default formatter with another. Options
+			// include "text", "json" and "combined". The default is "combined".
+			Formatter accessLogFormat `yaml:"formatter,omitempty"`
 		} `yaml:"accesslog,omitempty"`
 
 		// Level is the granularity at which registry operations are logged.
+		// Options include "error", "warn", "info", "debug" and "trace". The
+		// default is "info".
 		Level Loglevel `yaml:"level,omitempty"`
 
-		// Formatter overrides the default formatter with another. Options
-		// include "text", "json" and "logstash".
-		Formatter string `yaml:"formatter,omitempty"`
+		// Formatter sets the format of logging output. Options include "text",
+		// "json" and "logstash".
+		Formatter logFormat `yaml:"formatter,omitempty"`
+
+		// Output sets the output destination. Options include "stderr" and
+		// "stdout". The default is "stdout".
+		Output logOutput `yaml:"output,omitempty"`
 
 		// Fields allows users to specify static string fields to include in
 		// the logger context.
@@ -397,28 +408,201 @@ func (version *Version) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // CurrentVersion is the most recent Version that can be parsed
 var CurrentVersion = MajorMinorVersion(0, 1)
 
-// Loglevel is the level at which operations are logged
-// This can be error, warn, info, or debug
+// Loglevel is the level at which operations are logged. This can be "error", "warn", "info", "debug" or "trace".
 type Loglevel string
 
-// UnmarshalYAML implements the yaml.Umarshaler interface
-// Unmarshals a string into a Loglevel, lowercasing the string and validating that it represents a
-// valid loglevel
-func (loglevel *Loglevel) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var loglevelString string
-	err := unmarshal(&loglevelString)
+const (
+	LogLevelError   Loglevel = "error"
+	LogLevelWarn    Loglevel = "warn"
+	LogLevelInfo    Loglevel = "info"
+	LogLevelDebug   Loglevel = "debug"
+	LogLevelTrace   Loglevel = "trace"
+	defaultLogLevel          = LogLevelInfo
+)
+
+var logLevels = []Loglevel{
+	LogLevelError,
+	LogLevelWarn,
+	LogLevelInfo,
+	LogLevelDebug,
+	LogLevelTrace,
+}
+
+// String implements the Stringer interface for Loglevel.
+func (l Loglevel) String() string {
+	return string(l)
+}
+
+func (l Loglevel) isValid() bool {
+	for _, lvl := range logLevels {
+		if l == lvl {
+			return true
+		}
+	}
+	return false
+}
+
+// UnmarshalYAML implements the yaml.Umarshaler interface for Loglevel, parsing it and validating that it represents a
+// valid log level.
+func (l *Loglevel) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var val string
+	err := unmarshal(&val)
 	if err != nil {
 		return err
 	}
 
-	loglevelString = strings.ToLower(loglevelString)
-	switch loglevelString {
-	case "error", "warn", "info", "debug":
-	default:
-		return fmt.Errorf("invalid loglevel %s Must be one of [error, warn, info, debug]", loglevelString)
+	lvl := Loglevel(strings.ToLower(val))
+	if !lvl.isValid() {
+		return fmt.Errorf("invalid log level %q, must be one of %q", val, logLevels)
 	}
 
-	*loglevel = Loglevel(loglevelString)
+	*l = lvl
+	return nil
+}
+
+// logOutput is the output destination for logs. This can be either "stdout" or "stderr".
+type logOutput string
+
+const (
+	LogOutputStdout  logOutput = "stdout"
+	LogOutputStderr  logOutput = "stderr"
+	defaultLogOutput           = LogOutputStdout
+)
+
+var logOutputs = []logOutput{LogOutputStdout, LogOutputStderr}
+
+// String implements the Stringer interface for logOutput.
+func (out logOutput) String() string {
+	return string(out)
+}
+
+// Descriptor returns the os file descriptor of a log output.
+func (out logOutput) Descriptor() io.Writer {
+	switch out {
+	case LogOutputStderr:
+		return os.Stderr
+	default:
+		return os.Stdout
+	}
+}
+
+func (out logOutput) isValid() bool {
+	for _, output := range logOutputs {
+		if out == output {
+			return true
+		}
+	}
+	return false
+}
+
+// UnmarshalYAML implements the yaml.Umarshaler interface for logOutput, parsing it and validating that it represents a
+// valid log output destination.
+func (out *logOutput) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var val string
+	if err := unmarshal(&val); err != nil {
+		return err
+	}
+
+	lo := logOutput(strings.ToLower(val))
+	if !lo.isValid() {
+		return fmt.Errorf("invalid log output %q, must be one of %q", lo, logOutputs)
+	}
+
+	*out = lo
+	return nil
+}
+
+// logFormat is the format of the application logs output. This can be either "text", "json" or "logstash".
+type logFormat string
+
+const (
+	LogFormatText     logFormat = "text"
+	LogFormatJSON     logFormat = "json"
+	LogFormatLogstash logFormat = "logstash"
+	defaultLogFormat            = LogFormatText
+)
+
+var logFormats = []logFormat{
+	LogFormatText,
+	LogFormatJSON,
+	LogFormatLogstash,
+}
+
+// String implements the Stringer interface for logFormat.
+func (ft logFormat) String() string {
+	return string(ft)
+}
+
+func (ft logFormat) isValid() bool {
+	for _, formatter := range logFormats {
+		if ft == formatter {
+			return true
+		}
+	}
+	return false
+}
+
+// UnmarshalYAML implements the yaml.Umarshaler interface for logFormat, parsing it and validating that it
+// represents a valid application log output format.
+func (ft *logFormat) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var val string
+	if err := unmarshal(&val); err != nil {
+		return err
+	}
+
+	format := logFormat(strings.ToLower(val))
+	if !format.isValid() {
+		return fmt.Errorf("invalid log format %q, must be one of %q", format, logFormats)
+	}
+
+	*ft = format
+	return nil
+}
+
+// accessLogFormat is the format of the access logs output. This can be either "text", "json" or "combined".
+type accessLogFormat string
+
+const (
+	AccessLogFormatText     accessLogFormat = "text"
+	AccessLogFormatJSON     accessLogFormat = "json"
+	AccessLogFormatCombined accessLogFormat = "combined"
+	defaultAccessLogFormat                  = AccessLogFormatCombined
+)
+
+var accessLogFormats = []accessLogFormat{
+	AccessLogFormatText,
+	AccessLogFormatJSON,
+	AccessLogFormatCombined,
+}
+
+// String implements the Stringer interface for accessLogFormat.
+func (ft accessLogFormat) String() string {
+	return string(ft)
+}
+
+func (ft accessLogFormat) isValid() bool {
+	for _, formatter := range accessLogFormats {
+		if ft == formatter {
+			return true
+		}
+	}
+	return false
+}
+
+// UnmarshalYAML implements the yaml.Umarshaler interface for accessLogFormat, parsing it and validating that it
+// represents a valid access log output format.
+func (ft *accessLogFormat) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var val string
+	if err := unmarshal(&val); err != nil {
+		return err
+	}
+
+	format := accessLogFormat(strings.ToLower(val))
+	if !format.isValid() {
+		return fmt.Errorf("invalid access log format %q, must be one of %q", format, accessLogFormats)
+	}
+
+	*ft = format
 	return nil
 }
 
@@ -683,8 +867,6 @@ func Parse(rd io.Reader) (*Configuration, error) {
 					if v0_1.Log.Level == Loglevel("") {
 						if v0_1.Loglevel != Loglevel("") {
 							v0_1.Log.Level = v0_1.Loglevel
-						} else {
-							v0_1.Log.Level = Loglevel("info")
 						}
 					}
 					if v0_1.Loglevel != Loglevel("") {
@@ -706,5 +888,22 @@ func Parse(rd io.Reader) (*Configuration, error) {
 		return nil, err
 	}
 
+	ApplyDefaults(config)
+
 	return config, nil
+}
+
+func ApplyDefaults(config *Configuration) {
+	if config.Log.Level == "" {
+		config.Log.Level = defaultLogLevel
+	}
+	if config.Log.Output == "" {
+		config.Log.Output = defaultLogOutput
+	}
+	if config.Log.Formatter == "" {
+		config.Log.Formatter = defaultLogFormat
+	}
+	if !config.Log.AccessLog.Disabled && config.Log.AccessLog.Formatter == "" {
+		config.Log.AccessLog.Formatter = defaultAccessLogFormat
+	}
 }

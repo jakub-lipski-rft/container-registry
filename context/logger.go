@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -45,6 +46,7 @@ type Logger interface {
 	Warnln(args ...interface{})
 
 	WithError(err error) *logrus.Entry
+	WithField(key string, value interface{}) *logrus.Entry
 	WithFields(fields logrus.Fields) *logrus.Entry
 }
 
@@ -106,10 +108,10 @@ func getLogrusLogger(ctx context.Context, keys ...interface{}) *logrus.Entry {
 		// Fill in the instance id, if we have it.
 		instanceID := ctx.Value("instance.id")
 		if instanceID != nil {
-			fields["instance.id"] = instanceID
+			fields["instance_id"] = instanceID
 		}
 
-		fields["go.version"] = runtime.Version()
+		fields["go_version"] = runtime.Version()
 		// If no logger is found, just return the standard logger.
 		logger = logrus.StandardLogger().WithFields(fields)
 	}
@@ -118,9 +120,16 @@ func getLogrusLogger(ctx context.Context, keys ...interface{}) *logrus.Entry {
 	for _, key := range keys {
 		v := ctx.Value(key)
 		if v != nil {
-			fields[fmt.Sprint(key)] = v
+			fields[standardizedKey(fmt.Sprint(key))] = v
 		}
 	}
 
 	return logger.WithFields(fields)
+}
+
+// standardizedKey converts all dots to underscores in key names in order to enforce a consistent naming convention
+// across application and access logs. This is run only once per logger and key names are static and short, so there are
+// no performance concerns.
+func standardizedKey(key string) string {
+	return strings.ReplaceAll(key, ".", "_")
 }
