@@ -21,7 +21,7 @@ require (
 	github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7
 	github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
 	github.com/gorilla/mux v1.7.3
-	github.com/lib/pq v1.7.0
+	github.com/lib/pq v1.7.1
 	github.com/marstr/guid v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f // indirect

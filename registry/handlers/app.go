@@ -659,15 +659,17 @@ func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx = dcontext.WithRequest(ctx, r)
 	ctx, w = dcontext.WithResponseWriter(ctx, w)
-	ctx = dcontext.WithLogger(ctx, dcontext.GetRequestLogger(ctx))
+	ctx = dcontext.WithLogger(ctx, dcontext.GetRequestCorrelationLogger(ctx))
 	r = r.WithContext(ctx)
 
-	defer func() {
-		status, ok := ctx.Value("http.response.status").(int)
-		if ok && status >= 200 && status <= 399 {
-			dcontext.GetResponseLogger(r.Context()).Infof("response completed")
-		}
-	}()
+	if app.Config.Log.AccessLog.Disabled {
+		defer func() {
+			status, ok := ctx.Value("http.response.status").(int)
+			if ok && status >= 200 && status <= 399 {
+				dcontext.GetResponseLogger(r.Context()).Infof("response completed")
+			}
+		}()
+	}
 
 	// Set a header with the Docker Distribution API Version for all responses.
 	w.Header().Add("Docker-Distribution-API-Version", "registry/2.0")
@@ -771,46 +773,30 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 	})
 }
 
-type errCodeKey struct{}
-
-func (errCodeKey) String() string { return "err.code" }
-
-type errMessageKey struct{}
-
-func (errMessageKey) String() string { return "err.message" }
-
-type errDetailKey struct{}
-
-func (errDetailKey) String() string { return "err.detail" }
-
 func (app *App) logError(ctx context.Context, errors errcode.Errors) {
-	for _, e1 := range errors {
-		var c context.Context
+	for _, e := range errors {
+		var code, message, detail string
 
-		switch e1.(type) {
+		switch ex := e.(type) {
 		case errcode.Error:
-			e, _ := e1.(errcode.Error)
-			c = context.WithValue(ctx, errCodeKey{}, e.Code)
-			c = context.WithValue(c, errMessageKey{}, e.Message)
-			// workaround for https://gitlab.com/gitlab-org/container-registry/-/issues/40 until logging can be
-			// refactored in https://gitlab.com/gitlab-org/container-registry/-/issues/31
-			d := map[string]interface{}{"data": e.Detail}
-			c = context.WithValue(c, errDetailKey{}, d)
+			code = ex.Code.String()
+			message = ex.Message
+			detail = fmt.Sprintf("%+v", ex.Detail)
 		case errcode.ErrorCode:
-			e, _ := e1.(errcode.ErrorCode)
-			c = context.WithValue(ctx, errCodeKey{}, e)
-			c = context.WithValue(c, errMessageKey{}, e.Message())
+			code = ex.String()
+			message = ex.Message()
 		default:
 			// just normal go 'error'
-			c = context.WithValue(ctx, errCodeKey{}, errcode.ErrorCodeUnknown)
-			c = context.WithValue(c, errMessageKey{}, e1.Error())
+			code = errcode.ErrorCodeUnknown.String()
+			message = ex.Error()
 		}
 
-		c = dcontext.WithLogger(c, dcontext.GetLogger(c,
-			errCodeKey{},
-			errMessageKey{},
-			errDetailKey{}))
-		dcontext.GetResponseLogger(c).Errorf("response completed with error")
+		l := dcontext.GetLogger(ctx).WithField("code", code)
+		if detail != "" {
+			l = l.WithField("detail", detail)
+		}
+
+		l.WithError(e).Error(message)
 	}
 }
 

@@ -40,6 +40,7 @@ func TestNextProtos(t *testing.T) {
 
 func setupRegistry() (*Registry, error) {
 	config := &configuration.Configuration{}
+	configuration.ApplyDefaults(config)
 	// probe free port where the server can listen
 	ln, err := net.Listen("tcp", ":")
 	if err != nil {

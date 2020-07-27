@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"os"
 	"reflect"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	. "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
@@ -22,15 +25,25 @@ var configStruct = Configuration{
 	Version: "0.1",
 	Log: struct {
 		AccessLog struct {
-			Disabled bool `yaml:"disabled,omitempty"`
+			Disabled  bool            `yaml:"disabled,omitempty"`
+			Formatter accessLogFormat `yaml:"formatter,omitempty"`
 		} `yaml:"accesslog,omitempty"`
 		Level     Loglevel               `yaml:"level,omitempty"`
-		Formatter string                 `yaml:"formatter,omitempty"`
+		Formatter logFormat              `yaml:"formatter,omitempty"`
+		Output    logOutput              `yaml:"output,omitempty"`
 		Fields    map[string]interface{} `yaml:"fields,omitempty"`
 		Hooks     []LogHook              `yaml:"hooks,omitempty"`
 	}{
-		Level:  "info",
-		Fields: map[string]interface{}{"environment": "test"},
+		AccessLog: struct {
+			Disabled  bool            `yaml:"disabled,omitempty"`
+			Formatter accessLogFormat `yaml:"formatter,omitempty"`
+		}{
+			Formatter: "combined",
+		},
+		Level:     "info",
+		Formatter: "text",
+		Output:    "stdout",
+		Fields:    map[string]interface{}{"environment": "test"},
 	},
 	Storage: Storage{
 		"s3": Parameters{
@@ -382,6 +395,235 @@ func (suite *ConfigSuite) TestParseInvalidLoglevel(c *C) {
 
 	_, err = Parse(bytes.NewReader([]byte(configYamlV0_1)))
 	c.Assert(err, NotNil)
+}
+
+type parameterTest struct {
+	name    string
+	value   string
+	want    string
+	wantErr bool
+	err     string
+}
+
+type parameterValidator func(t *testing.T, want interface{}, got *Configuration)
+
+func testParameter(t *testing.T, yml string, envVar string, tests []parameterTest, fn parameterValidator) {
+	t.Helper()
+
+	testCases := []string{"yaml", "env"}
+
+	for _, testCase := range testCases {
+		t.Run(testCase, func(t *testing.T) {
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					var input string
+
+					if testCase == "env" {
+						// if testing with an environment variable we need to set it and defer the unset
+						require.NoError(t, os.Setenv(envVar, test.value))
+						defer func() { require.NoError(t, os.Unsetenv(envVar)) }()
+						// we also need to make sure to clean the YAML parameter
+						input = fmt.Sprintf(yml, "")
+					} else {
+						input = fmt.Sprintf(yml, test.value)
+					}
+
+					got, err := Parse(bytes.NewReader([]byte(input)))
+
+					if test.wantErr {
+						require.Error(t, err)
+						require.EqualError(t, err, test.err)
+						require.Nil(t, got)
+					} else {
+						require.NoError(t, err)
+						fn(t, test.want, got)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestParseLogLevel(t *testing.T) {
+	yml := `
+version: 0.1
+log:
+  level: %s
+storage: inmemory
+`
+	errTemplate := `invalid log level "%s", must be one of ` + fmt.Sprintf("%q", logLevels)
+
+	tt := []parameterTest{
+		{
+			name:  "error",
+			value: "error",
+			want:  "error",
+		},
+		{
+			name:  "warn",
+			value: "warn",
+			want:  "warn",
+		},
+		{
+			name:  "info",
+			value: "info",
+			want:  "info",
+		},
+		{
+			name:  "debug",
+			value: "debug",
+			want:  "debug",
+		},
+		{
+			name:  "trace",
+			value: "trace",
+			want:  "trace",
+		},
+		{
+			name: "default",
+			want: "info",
+		},
+		{
+			name:    "unknown",
+			value:   "foo",
+			wantErr: true,
+			err:     fmt.Sprintf(errTemplate, "foo"),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Log.Level.String())
+	}
+
+	testParameter(t, yml, "REGISTRY_LOG_LEVEL", tt, validator)
+}
+
+func TestParseLogOutput(t *testing.T) {
+	yml := `
+version: 0.1
+log:
+  output: %s
+storage: inmemory
+`
+	errTemplate := `invalid log output "%s", must be one of ` + fmt.Sprintf("%q", logOutputs)
+
+	tt := []parameterTest{
+		{
+			name:  "stdout",
+			value: "stdout",
+			want:  "stdout",
+		},
+		{
+			name:  "stderr",
+			value: "stderr",
+			want:  "stderr",
+		},
+		{
+			name: "default",
+			want: "stdout",
+		},
+		{
+			name:    "unknown",
+			value:   "foo",
+			wantErr: true,
+			err:     fmt.Sprintf(errTemplate, "foo"),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Log.Output.String())
+	}
+
+	testParameter(t, yml, "REGISTRY_LOG_OUTPUT", tt, validator)
+}
+
+func TestParseLogFormatter(t *testing.T) {
+	yml := `
+version: 0.1
+log:
+  formatter: %s
+storage: inmemory
+`
+	errTemplate := `invalid log format "%s", must be one of ` + fmt.Sprintf("%q", logFormats)
+
+	tt := []parameterTest{
+		{
+			name:  "text",
+			value: "text",
+			want:  "text",
+		},
+		{
+			name:  "json",
+			value: "json",
+			want:  "json",
+		},
+		{
+			name:  "logstash",
+			value: "logstash",
+			want:  "logstash",
+		},
+		{
+			name: "default",
+			want: "text",
+		},
+		{
+			name:    "unknown",
+			value:   "foo",
+			wantErr: true,
+			err:     fmt.Sprintf(errTemplate, "foo"),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Log.Formatter.String())
+	}
+
+	testParameter(t, yml, "REGISTRY_LOG_FORMATTER", tt, validator)
+}
+
+func TestParseAccessLogFormatter(t *testing.T) {
+	yml := `
+version: 0.1
+log:
+  accesslog:
+    formatter: %s
+storage: inmemory
+`
+	errTemplate := `invalid access log format "%s", must be one of ` + fmt.Sprintf("%q", accessLogFormats)
+
+	tt := []parameterTest{
+		{
+			name:  "text",
+			value: "text",
+			want:  "text",
+		},
+		{
+			name:  "json",
+			value: "json",
+			want:  "json",
+		},
+		{
+			name:  "combined",
+			value: "combined",
+			want:  "combined",
+		},
+		{
+			name: "default",
+			want: "combined",
+		},
+		{
+			name:    "unknown",
+			value:   "foo",
+			wantErr: true,
+			err:     fmt.Sprintf(errTemplate, "foo"),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Log.AccessLog.Formatter.String())
+	}
+
+	testParameter(t, yml, "REGISTRY_LOG_ACCESSLOG_FORMATTER", tt, validator)
 }
 
 // TestParseWithDifferentEnvReporting validates that environment variables
