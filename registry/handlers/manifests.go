@@ -211,11 +211,13 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	} else if imh.Tag != "" && manifestType == manifestlistSchema && !supports[manifestlistSchema] {
-		// Rewrite manifest in schema1 format
-		dcontext.GetLogger(imh).Infof("rewriting manifest list %s in schema1 format to support old client", imh.Digest.String())
+		log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
+			"manifest_list_digest": imh.Digest.String(),
+			"default_arch":         defaultArch,
+			"default_os":           defaultOS})
+		log.Info("client does not advertise support for manifest lists, selecting a manifest image for the default arch and os")
 
-		// Find the image manifest corresponding to the default
-		// platform
+		// Find the image manifest corresponding to the default platform.
 		var manifestDigest digest.Digest
 		for _, manifestDescriptor := range manifestList.Manifests {
 			if manifestDescriptor.Platform.Architecture == defaultArch && manifestDescriptor.Platform.OS == defaultOS {
@@ -225,7 +227,9 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		}
 
 		if manifestDigest == "" {
-			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown)
+			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(
+				fmt.Errorf("manifest list %s does not contain a manifest image for the platform %s/%s",
+					imh.Digest, defaultOS, defaultArch)))
 			return
 		}
 
@@ -243,8 +247,9 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		// If necessary, convert the image manifest
+		// If necessary, convert the image manifest into schema1
 		if schema2Manifest, isSchema2 := manifest.(*schema2.DeserializedManifest); isSchema2 && !supports[manifestSchema2] {
+			log.Warn("client does not advertise support for schema2 manifests, rewriting manifest in schema1 format")
 			manifest, err = imh.convertSchema2Manifest(schema2Manifest)
 			if err != nil {
 				return
