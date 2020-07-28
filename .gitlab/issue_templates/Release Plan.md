@@ -53,7 +53,7 @@ Please mention this issue in the description of the changelog merge request.
 See [release instructions](https://gitlab.com/gitlab-org/container-registry/tree/release/2.8-gitlab/docs-gitlab#releases) for additional information.
 </details>
 
-### 3. Deploy
+### 3. Update
 
 1. [ ] Version bump in [CNG](https://gitlab.com/gitlab-org/build/CNG):
     - [ ] Update `GITLAB_CONTAINER_REGISTRY_VERSION` in [`ci_files/variables.yml`](https://gitlab.com/gitlab-org/build/CNG/blob/master/ci_files/variables.yml)
