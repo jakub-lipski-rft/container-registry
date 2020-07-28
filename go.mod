@@ -18,7 +18,7 @@ require (
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/docker/go-metrics v0.0.0-20180209012529-399ea8c73916
 	github.com/docker/libtrust v0.0.0-20150114040149-fa567046d9b1
-	github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7
+	github.com/gomodule/redigo v1.8.2
 	github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
 	github.com/gorilla/mux v1.7.3
 	github.com/lib/pq v1.7.1
