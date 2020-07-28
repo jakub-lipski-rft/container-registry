@@ -24,12 +24,13 @@ import (
 	"github.com/docker/distribution/uuid"
 	"github.com/docker/distribution/version"
 	"github.com/docker/go-metrics"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/yvasiyarov/gorelic"
 	"gitlab.com/gitlab-org/labkit/correlation"
 	logkit "gitlab.com/gitlab-org/labkit/log"
+	"gitlab.com/gitlab-org/labkit/monitoring"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -62,28 +63,17 @@ var ServeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if config.HTTP.Debug.Addr != "" {
-			go func(addr string) {
-				log.Infof("debug server listening %v", addr)
-				if err := http.ListenAndServe(addr, nil); err != nil {
-					log.Fatalf("error listening on debug interface: %v", err)
-				}
-			}(config.HTTP.Debug.Addr)
-		}
-
 		registry, err := NewRegistry(ctx, config)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		if config.HTTP.Debug.Prometheus.Enabled {
-			path := config.HTTP.Debug.Prometheus.Path
-			if path == "" {
-				path = "/metrics"
+		go func() {
+			opts := configureMonitoring(config)
+			if err := monitoring.Start(opts...); err != nil {
+				log.WithError(err).Error("unable to start monitoring service")
 			}
-			log.Info("providing prometheus metrics on ", path)
-			http.Handle(path, promhttp.Handler())
-		}
+		}()
 
 		if err = registry.ListenAndServe(); err != nil {
 			log.Fatalln(err)
@@ -360,6 +350,30 @@ func configureBugsnag(config *configuration.Configuration) {
 	}
 
 	log.AddHook(hook)
+}
+
+func configureMonitoring(config *configuration.Configuration) []monitoring.Option {
+	debugAddr := config.HTTP.Debug.Addr
+	metricsPath := config.HTTP.Debug.Prometheus.Path
+
+	opts := []monitoring.Option{
+		monitoring.WithListenerAddress(debugAddr),
+		monitoring.WithMetricsHandlerPattern(metricsPath),
+	}
+
+	if !config.HTTP.Debug.Prometheus.Enabled {
+		opts = append(opts, monitoring.WithoutMetrics())
+	} else {
+		log.WithFields(logrus.Fields{"address": debugAddr, "path": metricsPath}).Info("starting Prometheus listener")
+	}
+
+	if !config.HTTP.Debug.Pprof.Enabled {
+		opts = append(opts, monitoring.WithoutPprof())
+	} else {
+		log.WithFields(logrus.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
+	}
+
+	return opts
 }
 
 // panicHandler add an HTTP handler to web app. The handler recover the happening

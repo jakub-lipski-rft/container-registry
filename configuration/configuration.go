@@ -160,6 +160,10 @@ type Configuration struct {
 				Enabled bool   `yaml:"enabled,omitempty"`
 				Path    string `yaml:"path,omitempty"`
 			} `yaml:"prometheus,omitempty"`
+			// Pprof configures a pprof server, which listens at `/debug/pprof`.
+			Pprof struct {
+				Enabled bool `yaml:"enabled,omitempty"`
+			} `yaml:"pprof,omitempty"`
 		} `yaml:"debug,omitempty"`
 
 		// HTTP2 configuration options
@@ -905,5 +909,9 @@ func ApplyDefaults(config *Configuration) {
 	}
 	if !config.Log.AccessLog.Disabled && config.Log.AccessLog.Formatter == "" {
 		config.Log.AccessLog.Formatter = defaultAccessLogFormat
+	}
+
+	if config.HTTP.Debug.Prometheus.Enabled && config.HTTP.Debug.Prometheus.Path == "" {
+		config.HTTP.Debug.Prometheus.Path = "/metrics"
 	}
 }
