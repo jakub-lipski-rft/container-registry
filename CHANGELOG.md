@@ -5,6 +5,7 @@
 - registry: Add new configuration for changing the output for logs and the access logs format
 - registry: Use GitLab LabKit for correlation and logging
 - registry: Normalize log messages
+- registry/storage/cache/redis: Add Prometheus metrics for Redis cache store
 
 ## [v2.9.1-gitlab] - 2020-05-05
 ## Added
