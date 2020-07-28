@@ -29,7 +29,6 @@ require (
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/opencontainers/image-spec v1.0.0
-	github.com/prometheus/client_golang v1.3.0
 	github.com/rubenv/sql-migrate v0.0.0-20200616145509-8d140a17f351
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.4.2
@@ -38,7 +37,7 @@ require (
 	github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43 // indirect
 	github.com/yvasiyarov/gorelic v0.0.7-0.20141212073537-a9bba5b9ab50
 	github.com/yvasiyarov/newrelic_platform_go v0.0.0-20140908184405-b21fdbd4370f // indirect
-	gitlab.com/gitlab-org/labkit v0.0.0-20200723144723-c48864aca733
+	gitlab.com/gitlab-org/labkit v0.0.0-20200728123508-886c482d483c
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0

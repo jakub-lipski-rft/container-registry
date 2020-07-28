@@ -247,6 +247,8 @@ http:
     prometheus:
       enabled: true
       path: /metrics
+    pprof:
+      enabled: true
   headers:
     X-Content-Type-Options: [nosniff]
   http2:
@@ -901,7 +903,7 @@ access to the debug endpoint is locked down in a production environment.
 The `debug` section takes a single required `addr` parameter, which specifies
 the `HOST:PORT` on which the debug server should accept connections.
 
-## `prometheus`
+#### `prometheus`
 
 The `prometheus` option defines whether the prometheus metrics is enable, as well
 as the path to access the metrics.
@@ -913,6 +915,17 @@ as the path to access the metrics.
 
 The url to access the metrics is `HOST:PORT/path`, where `HOST:PORT` is defined
 in `addr` under `debug`.
+
+#### `pprof`
+
+The `pprof` section configures a pprof server, which listens at `/debug/pprof/`.
+
+| Parameter | Required | Description                                           |
+|-----------|----------|-------------------------------------------------------|
+| `enabled` | no       | Set `true` to enable the pprof server                 |
+
+The url to access the pprof server is `HOST:PORT/debug/pprof/`, where `HOST:PORT`
+is defined in `addr` under `debug`.
 
 ### `headers`
 

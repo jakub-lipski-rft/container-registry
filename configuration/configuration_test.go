@@ -121,6 +121,9 @@ var configStruct = Configuration{
 				Enabled bool   `yaml:"enabled,omitempty"`
 				Path    string `yaml:"path,omitempty"`
 			} `yaml:"prometheus,omitempty"`
+			Pprof struct {
+				Enabled bool `yaml:"enabled,omitempty"`
+			} `yaml:"pprof,omitempty"`
 		} `yaml:"debug,omitempty"`
 		HTTP2 struct {
 			Disabled bool `yaml:"disabled,omitempty"`
@@ -764,6 +767,43 @@ func (suite *ConfigSuite) TestParseEnvMany(c *C) {
 
 	_, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
 	c.Assert(err, IsNil)
+}
+
+func boolParameterTests(defaultValue bool) []parameterTest {
+	return []parameterTest{
+		{
+			name:  "true",
+			value: "true",
+			want:  "true",
+		},
+		{
+			name:  "false",
+			value: "false",
+			want:  "false",
+		},
+		{
+			name: "default",
+			want: strconv.FormatBool(defaultValue),
+		},
+	}
+}
+
+func TestParseHTTPDebugPprofEnabled(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+http:
+  debug:
+    pprof:
+      enabled: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.HTTP.Debug.Pprof.Enabled))
+	}
+
+	testParameter(t, yml, "REGISTRY_HTTP_DEBUG_PPROF_ENABLED", tt, validator)
 }
 
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
