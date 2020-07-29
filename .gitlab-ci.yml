@@ -17,7 +17,7 @@ default:
       - $GOPATH/pkg/mod/
 
 variables:
-  BUILDTAGS: "include_gcs include_oss"
+  BUILDTAGS: "include_gcs include_oss continuous_profiler_stackdriver"
   CGO_ENABLED: "1"
 
 stages:

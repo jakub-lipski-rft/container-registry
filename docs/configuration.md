@@ -225,6 +225,12 @@ reporting:
     licensekey: newreliclicensekey
     name: newrelicname
     verbose: true
+monitoring:
+  stackdriver:
+    service: registry
+    serviceversion: 1.0.0
+    projectid: tBXV4hFr4QJM6oGkqzhC
+    keyfile: /path/to/credentials.json
 http:
   addr: localhost:5000
   prefix: /my/nested/registry/
@@ -811,6 +817,38 @@ A valid configuration may contain both.
 | `licensekey` | yes   | License key provided by New Relic.                    |
 | `name`    | no       | New Relic application name.                           |
 |  `verbose`| no       | Set to `true` to enable New Relic debugging output on `stdout`. |
+
+## `monitoring`
+
+```
+monitoring:
+  stackdriver:
+    service: registry
+    serviceversion: 1.0.0
+    projectid: tBXV4hFr4QJM6oGkqzhC
+    keyfile: /path/to/credentials.json
+```
+
+The `monitoring` option is **optional** and configures external monitoring
+services. At the moment only the Google Stackdriver Profiler is supported.
+
+- [Stackdriver](#stackdriver)
+
+### `stackdriver`
+
+Please note that according to Google Cloud, the Stackdriver Profiler adds a 5%
+performance overhead to processes when it is enabled ([source](https://medium.com/google-cloud/continuous-profiling-of-go-programs-96d4416af77b)).
+
+| Parameter        | Required | Description                                                                                                                                                               |
+|------------------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `enabled`        | no       | Set `true` to enable the Stackdriver profiler.                                                                                                                            |
+| `service`        | no       | The name of the service under which the profiled data will be recorded and exposed. Defaults to the value of the `GAE_SERVICE` environment variable or instance metadata.                      |
+| `serviceversion` | no       | The version of the service. Defaults to the `GAE_VERSION` environment variable if that is set, or to empty string otherwise.                                              |
+| `projectid`      | no       | The project ID. Defaults to the `GOOGLE_CLOUD_PROJECT` environment variable or instance metadata.                                                                                              |
+| `keyfile`        | no       | Path of a private service account key file in JSON format used for [Service Account Authentication](https://cloud.google.com/storage/docs/authentication#service_accounts). Defaults to the `GOOGLE_APPLICATION_CREDENTIALS` environment variable or instance metadata. Please note that if using the GCS storage driver as well, the same service account credentials are used for both clients. |
+
+See the Stackdriver Profiler [API docs](https://pkg.go.dev/cloud.google.com/go/profiler?tab=doc#Config)
+for more details about configuration options.
 
 ## `http`
 

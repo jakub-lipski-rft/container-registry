@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -363,7 +364,76 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 		log.WithFields(log.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
 	}
 
+	if !config.Monitoring.Stackdriver.Enabled {
+		opts = append(opts, monitoring.WithoutContinuousProfiling())
+		return opts
+	}
+	if err := configureStackdriver(config); err != nil {
+		log.WithError(err).Error("failed to configure Stackdriver profiler")
+	}
+
 	return opts
+}
+
+func configureStackdriver(config *configuration.Configuration) error {
+	if !config.Monitoring.Stackdriver.Enabled {
+		return nil
+	}
+
+	log.Info("starting Stackdriver profiler")
+
+	// if config.Monitoring.Stackdriver.KeyFile is set, we need to set the `GOOGLE_APPLICATION_CREDENTIALS` environment
+	// variable with its value if it's not present.
+	envVar := "GOOGLE_APPLICATION_CREDENTIALS"
+
+	if config.Monitoring.Stackdriver.KeyFile != "" {
+		if _, ok := os.LookupEnv(envVar); !ok {
+			keyFile := config.Monitoring.Stackdriver.KeyFile
+
+			log.WithFields(log.Fields{"name": envVar, "value": keyFile}).Debug("setting environment variable")
+			if err := os.Setenv(envVar, keyFile); err != nil {
+				return fmt.Errorf("unable to set environment variable %q: %w", envVar, err)
+			}
+		}
+	}
+
+	// the GITLAB_CONTINUOUS_PROFILING env var (as per the LabKit spec) takes precedence over any application
+	// configuration settings and is required to configure the Stackdriver service.
+	envVar = "GITLAB_CONTINUOUS_PROFILING"
+	var service, serviceVersion, projectID string
+
+	// if it's not set then we must set it based on the registry settings, with URL encoded settings for Stackdriver,
+	// see https://pkg.go.dev/gitlab.com/gitlab-org/labkit/monitoring?tab=doc for details.
+	if _, ok := os.LookupEnv(envVar); !ok {
+		service = config.Monitoring.Stackdriver.Service
+		serviceVersion = config.Monitoring.Stackdriver.ServiceVersion
+		projectID = config.Monitoring.Stackdriver.ProjectID
+
+		u, err := url.Parse("stackdriver")
+		if err != nil {
+			// this should never happen
+			return fmt.Errorf("failed to parse base URL: %w", err)
+		}
+
+		q := u.Query()
+		if service != "" {
+			q.Add("service", service)
+		}
+		if serviceVersion != "" {
+			q.Add("service_version", serviceVersion)
+		}
+		if projectID != "" {
+			q.Add("project_id", projectID)
+		}
+		u.RawQuery = q.Encode()
+
+		log.WithFields(log.Fields{"name": envVar, "value": u.String()}).Debug("setting environment variable")
+		if err := os.Setenv(envVar, u.String()); err != nil {
+			return fmt.Errorf("unable to set environment variable %q: %w", envVar, err)
+		}
+	}
+
+	return nil
 }
 
 // panicHandler add an HTTP handler to web app. The handler recover the happening
