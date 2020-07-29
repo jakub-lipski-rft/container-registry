@@ -458,6 +458,50 @@ func TestBlobAPI_Get(t *testing.T) {
 	require.True(t, v.Verified())
 }
 
+func TestBlobAPI_Get_FilesystemFallback(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Disable the database so writes only go to the filesytem.
+	env.config.Database.Enabled = false
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Enable the database again so that reads first check the database.
+	env.config.Database.Enabled = true
+
+	// fetch layer
+	res, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	// verify response headers
+	_, err = args.layerFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(args.layerFile)
+	require.NoError(t, err)
+
+	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
+	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
+	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
+	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
+	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
+
+	// verify response body
+	v := args.layerDigest.Verifier()
+	_, err = io.Copy(v, res.Body)
+	require.NoError(t, err)
+	require.True(t, v.Verified())
+}
+
 func TestBlobAPI_Get_RepositoryNotFound(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -4254,7 +4298,7 @@ func TestTagsAPITagDeleteWithSameImageID(t *testing.T) {
 type testEnv struct {
 	pk      libtrust.PrivateKey
 	ctx     context.Context
-	config  configuration.Configuration
+	config  *configuration.Configuration
 	app     *registryhandlers.App
 	server  *httptest.Server
 	builder *v2.URLBuilder
@@ -4311,7 +4355,7 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 	return &testEnv{
 		pk:      pk,
 		ctx:     ctx,
-		config:  *config,
+		config:  config,
 		app:     app,
 		server:  server,
 		builder: builder,
