@@ -152,7 +152,9 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		}
 	}
 
-	startUploadPurger(app, app.driver, dcontext.GetLogger(app), purgeConfig)
+	log := dcontext.GetLogger(app)
+
+	startUploadPurger(app, app.driver, log, purgeConfig)
 
 	app.driver, err = applyStorageMiddleware(app.driver, config.Middleware["storage"])
 	if err != nil {
@@ -219,7 +221,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		}
 	}
 	if redirectDisabled {
-		dcontext.GetLogger(app).Infof("backend redirection disabled")
+		log.Info("backend redirection disabled")
 	} else {
 		options = append(options, storage.EnableRedirect)
 	}
@@ -263,6 +265,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 
 	// Connect to the metadata database, if enabled.
 	if config.Database.Enabled {
+		log.Warn("the metadata database is an experimental feature, please do not enable it in production")
+
 		db, err := datastore.Open(&datastore.DSN{
 			Host:     config.Database.Host,
 			Port:     config.Database.Port,
@@ -271,7 +275,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			DBName:   config.Database.DBName,
 			SSLMode:  config.Database.SSLMode,
 		},
-			dcontext.GetLogger(app).WithFields(logrus.Fields{"database": config.Database.DBName}),
+			log.WithFields(logrus.Fields{"database": config.Database.DBName}),
 		)
 		if err != nil {
 			panic(fmt.Sprintf("failed to construct database connection: %v", err))
@@ -305,7 +309,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			if err != nil {
 				panic("could not create registry: " + err.Error())
 			}
-			dcontext.GetLogger(app).Infof("using redis blob descriptor cache")
+			log.Info("using redis blob descriptor cache")
 		case "inmemory":
 			cacheProvider := memorycache.NewInMemoryBlobDescriptorCacheProvider()
 			localOptions := append(options, storage.BlobDescriptorCacheProvider(cacheProvider))
@@ -313,10 +317,10 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			if err != nil {
 				panic("could not create registry: " + err.Error())
 			}
-			dcontext.GetLogger(app).Infof("using inmemory blob descriptor cache")
+			log.Info("using inmemory blob descriptor cache")
 		default:
 			if v != "" {
-				dcontext.GetLogger(app).Warnf("unknown cache type %q, caching disabled", config.Storage["cache"])
+				log.WithField("type", config.Storage["cache"]).Warn("unknown cache type, caching disabled")
 			}
 		}
 	}
@@ -342,7 +346,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			panic(fmt.Sprintf("unable to configure authorization (%s): %v", authType, err))
 		}
 		app.accessController = accessController
-		dcontext.GetLogger(app).Debugf("configured %q access controller", authType)
+		log.WithField("auth_type", authType).Debug("configured access controller")
 	}
 
 	// configure as a pull through cache
@@ -352,12 +356,12 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			panic(err.Error())
 		}
 		app.isCache = true
-		dcontext.GetLogger(app).Info("Registry configured as a proxy cache to ", config.Proxy.RemoteURL)
+		log.WithField("remote", config.Proxy.RemoteURL).Info("registry configured as a proxy cache")
 	}
 	var ok bool
 	app.repoRemover, ok = app.registry.(distribution.RepositoryRemover)
 	if !ok {
-		dcontext.GetLogger(app).Warnf("Registry does not implement RempositoryRemover. Will not be able to delete repos and tags")
+		log.Warn("registry does not implement RepositoryRemover. Will not be able to delete repos and tags")
 	}
 
 	return app
