@@ -18,13 +18,10 @@ import (
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/health"
-	prometheus "github.com/docker/distribution/metrics"
 	"github.com/docker/distribution/registry/handlers"
 	"github.com/docker/distribution/registry/listener"
 	"github.com/docker/distribution/uuid"
 	"github.com/docker/distribution/version"
-	"github.com/docker/go-metrics"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/yvasiyarov/gorelic"
@@ -115,18 +112,6 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 		return nil, fmt.Errorf("error configuring access logger: %v", err)
 	}
 	handler = correlation.InjectCorrelationID(handler)
-
-	// expose build info through Prometheus (`registry_build_info` gauge)
-	if app.Config.HTTP.Debug.Prometheus.Enabled {
-		ns := metrics.NewNamespace(prometheus.NamespacePrefix, "", nil)
-		registryInfo := ns.NewLabeledGauge(
-			"build",
-			"Information about the registry.", metrics.Unit("info"),
-			"version", "revision", "package",
-		)
-		metrics.Register(ns)
-		registryInfo.WithValues(version.Version, version.Revision, version.Package).Set(1)
-	}
 
 	server := &http.Server{
 		Handler: handler,
@@ -359,18 +344,23 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 	opts := []monitoring.Option{
 		monitoring.WithListenerAddress(debugAddr),
 		monitoring.WithMetricsHandlerPattern(metricsPath),
+		monitoring.WithBuildInformation(version.Version, version.BuildTime),
+		monitoring.WithBuildExtraLabels(map[string]string{
+			"package":  version.Package,
+			"revision": version.Revision,
+		}),
 	}
 
 	if !config.HTTP.Debug.Prometheus.Enabled {
 		opts = append(opts, monitoring.WithoutMetrics())
 	} else {
-		log.WithFields(logrus.Fields{"address": debugAddr, "path": metricsPath}).Info("starting Prometheus listener")
+		log.WithFields(log.Fields{"address": debugAddr, "path": metricsPath}).Info("starting Prometheus listener")
 	}
 
 	if !config.HTTP.Debug.Pprof.Enabled {
 		opts = append(opts, monitoring.WithoutPprof())
 	} else {
-		log.WithFields(logrus.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
+		log.WithFields(log.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
 	}
 
 	return opts

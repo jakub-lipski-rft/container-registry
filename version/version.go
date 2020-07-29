@@ -14,6 +14,9 @@ var Version = "v2.7.1+unknown"
 // the program at linking time.
 var Revision = ""
 
+// BuildTime is filled with the UTC datetime when the binary was built.
+var BuildTime = ""
+
 // ExtFeatures is a comma separated list of extensions/features supported by the GitLab Container Registry that are
 // not part of the Docker Distribution spec.
 const ExtFeatures = "tag_delete"

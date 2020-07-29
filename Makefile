@@ -4,6 +4,7 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION=$(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
+BUILD_TIME=$(shell date -u +"%Y-%m-%dT%H:%M:%S")
 
 # Build with go modules.
 GOPROXY ?= https://proxy.golang.org
@@ -33,7 +34,7 @@ WHALE = "+"
 TESTFLAGS_RACE=
 GOFILES=$(shell find . -type f -name '*.go')
 GO_TAGS=$(if $(BUILDTAGS),-tags "$(BUILDTAGS)",)
-GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) $(EXTRA_LDFLAGS)'
+GO_LDFLAGS=-ldflags '-s -w -X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PKG) -X $(PKG)/version.BuildTime=$(BUILD_TIME) $(EXTRA_LDFLAGS)'
 
 BINARIES=$(addprefix bin/,$(COMMANDS))
 
