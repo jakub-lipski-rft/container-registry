@@ -13,6 +13,7 @@ import (
 
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
+	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/manifest/schema1"
@@ -640,7 +641,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 
-			if err = dbPutManifestOCI(imh, tx, imh.Digest, reqManifest, jsonBuf.Bytes(), cfgPayload, imh.Repository.Named()); err != nil {
+			if err = dbPutManifestOCI(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, jsonBuf.Bytes(), cfgPayload, imh.Repository.Named()); err != nil {
 				imh.Errors = append(imh.Errors,
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
@@ -774,102 +775,33 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 	})
 }
 
-func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, dgst digest.Digest, manifest *ocischema.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
-	log.Debug("putting manifest")
-
-	// Find or create the configuration.
-	cfgStore := datastore.NewConfigurationStore(db)
-	blobStore := datastore.NewBlobStore(db)
-
-	dbCfg, err := cfgStore.FindByDigest(ctx, manifest.Config.Digest)
-	if err != nil {
-		return err
-	}
-
-	if dbCfg == nil {
-		log.Debug("manifest config not found in database")
-
-		dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
-		if err != nil {
-			return err
-		}
-		if dbCfgBlob == nil {
-			return fmt.Errorf("config blob %s not found in database", manifest.Config.Digest)
-		}
-
-		dbCfg = &models.Configuration{BlobID: dbCfgBlob.ID, Payload: cfgPayload}
-		if err := cfgStore.Create(ctx, dbCfg); err != nil {
-			return err
-		}
-	}
-	// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
-	// 		 but now we know its concrete type (manifest.Config.MediaType).
-
-	mStore := datastore.NewManifestStore(db)
-	dbManifest, err := mStore.FindByDigest(ctx, dgst)
-	if err != nil {
-		return err
-	}
-	if dbManifest == nil {
-		log.Debug("manifest not found in database")
-
-		m := &models.Manifest{
-			ConfigurationID: sql.NullInt64{Int64: dbCfg.ID, Valid: true},
-			SchemaVersion:   manifest.SchemaVersion,
-			MediaType:       manifest.MediaType,
-			Digest:          dgst,
-			Payload:         payload,
-		}
-
-		if err := mStore.Create(ctx, m); err != nil {
-			return err
-		}
-
-		dbManifest = m
-
-		// find and associate manifest layer blobs
-		for _, reqLayer := range manifest.Layers {
-			dbBlob, err := blobStore.FindByDigest(ctx, reqLayer.Digest)
-			if err != nil {
-				return err
-			}
-
-			if dbBlob == nil {
-				return fmt.Errorf("layer blob %s not found in database", reqLayer.Digest)
-			}
-
-			// TODO: update the layer blob media_type here, it was set to "application/octect-stream" during the upload
-			// 		 but now we know its concrete type (reqLayer.MediaType).
-
-			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Associate manifest and repository.
-	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path.Name())
-	if err != nil {
-		return err
-	}
-
-	if err := repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
-		return err
-	}
-	return nil
+func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, blobService distribution.BlobService, dgst digest.Digest, manifest *ocischema.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
+	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, cfgPayload, path.Name())
 }
 
 func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService distribution.BlobService, dgst digest.Digest, manifest *schema2.DeserializedManifest, payload, cfgPayload []byte, path reference.Named) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
+	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, cfgPayload, path.Name())
+}
+
+func dbPutManifestOCIOrSchema2(
+	ctx context.Context,
+	db datastore.Queryer,
+	blobService distribution.BlobService,
+	dgst digest.Digest,
+	versioned manifest.Versioned,
+	layers []distribution.Descriptor,
+	cfgDesc distribution.Descriptor,
+	payload, cfgPayload []byte,
+	path string) error {
+
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "manifest_digest": dgst, "schema_version": versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
 	// Find or create the configuration.
 	cfgStore := datastore.NewConfigurationStore(db)
 	blobStore := datastore.NewBlobStore(db)
 
-	dbCfg, err := cfgStore.FindByDigest(ctx, manifest.Config.Digest)
+	dbCfg, err := cfgStore.FindByDigest(ctx, cfgDesc.Digest)
 	if err != nil {
 		return err
 	}
@@ -877,19 +809,19 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService
 	if dbCfg == nil {
 		log.Debug("manifest config not found in database")
 
-		dbCfgBlob, err := blobStore.FindByDigest(ctx, manifest.Config.Digest)
+		dbCfgBlob, err := blobStore.FindByDigest(ctx, cfgDesc.Digest)
 		if err != nil {
 			return err
 		}
 		if dbCfgBlob == nil {
-			log.WithField("digest", manifest.Config.Digest).Warn("config blob not found in database, falling back to filesystem")
+			log.WithField("digest", cfgDesc.Digest).Warn("config blob not found in database, falling back to filesystem")
 
-			fsBlobDesc, err := blobService.Stat(ctx, manifest.Config.Digest)
+			fsBlobDesc, err := blobService.Stat(ctx, cfgDesc.Digest)
 			if err != nil {
 				return err
 			}
 
-			dbCfgBlob, err = dbCreateRepositoryBlob(ctx, db, fsBlobDesc, path.Name())
+			dbCfgBlob, err = dbCreateRepositoryBlob(ctx, db, fsBlobDesc, path)
 			if err != nil {
 				return err
 			}
@@ -901,7 +833,7 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService
 		}
 	}
 	// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
-	// 		 but now we know its concrete type (manifest.Config.MediaType).
+	// 		 but now we know its concrete type (cfgDesc.MediaType).
 
 	mStore := datastore.NewManifestStore(db)
 	dbManifest, err := mStore.FindByDigest(ctx, dgst)
@@ -913,8 +845,8 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService
 
 		m := &models.Manifest{
 			ConfigurationID: sql.NullInt64{Int64: dbCfg.ID, Valid: true},
-			SchemaVersion:   manifest.SchemaVersion,
-			MediaType:       manifest.MediaType,
+			SchemaVersion:   versioned.SchemaVersion,
+			MediaType:       versioned.MediaType,
 			Digest:          dgst,
 			Payload:         payload,
 		}
@@ -926,7 +858,7 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService
 		dbManifest = m
 
 		// find and associate manifest layer blobs
-		for _, reqLayer := range manifest.Layers {
+		for _, reqLayer := range layers {
 			dbBlob, err := blobStore.FindByDigest(ctx, reqLayer.Digest)
 			if err != nil {
 				return err
@@ -940,7 +872,7 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService
 					return err
 				}
 
-				dbBlob, err = dbCreateRepositoryBlob(ctx, db, fsBlobDesc, path.Name())
+				dbBlob, err = dbCreateRepositoryBlob(ctx, db, fsBlobDesc, path)
 				if err != nil {
 					return err
 				}
@@ -957,7 +889,7 @@ func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService
 
 	// Associate manifest and repository.
 	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path.Name())
+	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, path)
 	if err != nil {
 		return err
 	}
