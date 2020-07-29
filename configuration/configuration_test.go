@@ -806,6 +806,131 @@ http:
 	testParameter(t, yml, "REGISTRY_HTTP_DEBUG_PPROF_ENABLED", tt, validator)
 }
 
+func TestParseHTTPMonitoringStackdriverEnabled(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+monitoring:
+  stackdriver:
+    enabled: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Monitoring.Stackdriver.Enabled))
+	}
+
+	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_ENABLED", tt, validator)
+}
+
+func TestParseMonitoringStackdriver_Service(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+monitoring:
+  stackdriver:
+    service: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "registry",
+			want:  "registry",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Monitoring.Stackdriver.Service)
+	}
+
+	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_SERVICE", tt, validator)
+}
+
+func TestParseMonitoringStackdriver_ServiceVersion(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+monitoring:
+  stackdriver:
+    serviceversion: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "1.0.0",
+			want:  "1.0.0",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Monitoring.Stackdriver.ServiceVersion)
+	}
+
+	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_SERVICEVERSION", tt, validator)
+}
+
+func TestParseMonitoringStackdriver_ProjectID(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+monitoring:
+  stackdriver:
+    projectid: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "tBXV4hFr4QJM6oGkqzhC",
+			want:  "tBXV4hFr4QJM6oGkqzhC",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Monitoring.Stackdriver.ProjectID)
+	}
+
+	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_PROJECTID", tt, validator)
+}
+
+func TestParseMonitoringStackdriver_KeyFile(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+monitoring:
+  stackdriver:
+    keyfile: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "/foo/bar.json",
+			want:  "/foo/bar.json",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Monitoring.Stackdriver.KeyFile)
+	}
+
+	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_KEYFILE", tt, validator)
+}
+
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice {
 		t = t.Elem()

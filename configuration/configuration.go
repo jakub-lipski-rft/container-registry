@@ -77,6 +77,9 @@ type Configuration struct {
 	// Reporting is the configuration for error reporting
 	Reporting Reporting `yaml:"reporting,omitempty"`
 
+	// Monitoring configures external monitoring services.
+	Monitoring Monitoring `yaml:"monitoring,omitempty"`
+
 	// HTTP contains configuration parameters for the registry's http
 	// interface.
 	HTTP struct {
@@ -257,6 +260,31 @@ type Configuration struct {
 			Classes []string `yaml:"classes"`
 		} `yaml:"repository,omitempty"`
 	} `yaml:"policy,omitempty"`
+}
+
+// Monitoring configures external monitoring services.
+type Monitoring struct {
+	Stackdriver StackdriverProfiler `yaml:"stackdriver,omitempty"`
+}
+
+// StackdriverProfiler configures the integration with the Google Stackdriver Profiler.
+// See https://pkg.go.dev/cloud.google.com/go/profiler?tab=doc#Config for more details about configuration
+// options.
+type StackdriverProfiler struct {
+	// Enabled can be set to `true` to enable the Stackdriver profiler.
+	Enabled bool `yaml:"enabled,omitempty"`
+	// Service is the name of the service under which the profiled data will be recorded and exposed. Defaults to the
+	// value of the `GAE_SERVICE` environment variable or instance metadata.
+	Service string `yaml:"service,omitempty"`
+	// ServiceVersion is the version of the service. Defaults to the `GAE_VERSION` environment variable if that is set,
+	// or to empty string otherwise.
+	ServiceVersion string `yaml:"serviceversion,omitempty"`
+	// ProjectID is the project ID. Defaults to the `GOOGLE_CLOUD_PROJECT` environment variable or instance metadata.
+	ProjectID string `yaml:"projectid,omitempty"`
+	// KeyFile is the path of a private service account key file in JSON format used for Service Account Authentication.
+	// Defaults to the `GOOGLE_APPLICATION_CREDENTIALS` environment variable or instance metadata. Please note that if
+	// using the GCS storage driver as well, the same service account credentials are used for both clients.
+	KeyFile string `yaml:"keyfile,omitempty"`
 }
 
 // Database is the configuration for the registry's metadata database
