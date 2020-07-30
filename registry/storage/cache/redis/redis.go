@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
@@ -10,7 +11,60 @@ import (
 	"github.com/docker/distribution/registry/storage/cache/metrics"
 	"github.com/gomodule/redigo/redis"
 	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
 )
+
+type PoolOpts struct {
+	Addr            string
+	Password        string
+	DB              int
+	DialTimeout     time.Duration
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
+	PoolMaxIdle     int
+	PoolMaxActive   int
+	PoolIdleTimeout time.Duration
+}
+
+func NewPool(opts *PoolOpts) *redis.Pool {
+	dialOpts := []redis.DialOption{
+		redis.DialPassword(opts.Password),
+		redis.DialDatabase(opts.DB),
+		redis.DialConnectTimeout(opts.DialTimeout),
+		redis.DialReadTimeout(opts.ReadTimeout),
+		redis.DialWriteTimeout(opts.WriteTimeout),
+	}
+
+	pool := &redis.Pool{
+		Dial: func() (redis.Conn, error) {
+			addr := opts.Addr
+			log := logrus.WithField("address", addr)
+
+			log.Debug("connecting to redis instance")
+			conn, err := redis.Dial("tcp", addr, dialOpts...)
+			if err != nil {
+				log.WithError(err).Error("failed to connect to redis instance")
+				return nil, err
+			}
+
+			return conn, nil
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			logrus.Debug("checking health of redis connection")
+			if _, err := c.Do("PING"); err != nil {
+				logrus.Error("redis instance connection health check failed")
+				return err
+			}
+
+			return nil
+		},
+		MaxIdle:     opts.PoolMaxIdle,
+		MaxActive:   opts.PoolMaxActive,
+		IdleTimeout: opts.PoolIdleTimeout,
+	}
+
+	return pool
+}
 
 // redisBlobStatService provides an implementation of
 // BlobDescriptorCacheProvider based on redis. Blob descriptors are stored in
