@@ -3,12 +3,72 @@
 package handlers
 
 import (
+	"context"
+	"os"
 	"testing"
 
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
+	dbtestutil "github.com/docker/distribution/registry/datastore/testutil"
 	"github.com/stretchr/testify/require"
 )
+
+type env struct {
+	ctx context.Context
+	db  *datastore.DB
+
+	// isShutdown helps ensure that tests do not try to access the db after the
+	// connection has been closed.
+	isShutdown bool
+}
+
+func (e *env) isDatabaseEnabled() bool {
+	return !e.isShutdown && os.Getenv("REGISTRY_DATABASE_ENABLED") == "true"
+}
+
+func (e *env) shutdown(t *testing.T) {
+	t.Helper()
+
+	if !e.isDatabaseEnabled() {
+		return
+	}
+
+	err := dbtestutil.TruncateAllTables(e.db)
+	require.NoError(t, err)
+
+	err = e.db.Close()
+	require.NoError(t, err)
+
+	e.isShutdown = true
+}
+
+func initDatabase(t *testing.T, env *env) {
+	t.Helper()
+
+	if !env.isDatabaseEnabled() {
+		t.Skip("database connection is required for this test")
+	}
+
+	db, err := dbtestutil.NewDB()
+	require.NoError(t, err)
+
+	env.db = db
+
+	m := migrations.NewMigrator(db.DB)
+	_, err = m.Up()
+	require.NoError(t, err)
+}
+
+func newEnv(t *testing.T) *env {
+	t.Helper()
+
+	env := &env{ctx: context.Background()}
+
+	initDatabase(t, env)
+
+	return env
+}
 
 func TestDeleteBlobDB(t *testing.T) {
 	env := newEnv(t)
