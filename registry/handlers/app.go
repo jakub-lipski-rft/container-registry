@@ -536,68 +536,17 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
 		return
 	}
 
-	pool := &redis.Pool{
-		Dial: func() (redis.Conn, error) {
-			// TODO(stevvooe): Yet another use case for contextual timing.
-			ctx := context.WithValue(app, redisStartAtKey{}, time.Now())
-
-			done := func(err error) {
-				logger := dcontext.GetLoggerWithField(ctx, "redis.connect.duration",
-					dcontext.Since(ctx, redisStartAtKey{}))
-				if err != nil {
-					logger.Errorf("redis: error connecting: %v", err)
-				} else {
-					logger.Infof("redis: connect %v", configuration.Redis.Addr)
-				}
-			}
-
-			conn, err := redis.Dial("tcp",
-				configuration.Redis.Addr,
-				redis.DialConnectTimeout(configuration.Redis.DialTimeout),
-				redis.DialReadTimeout(configuration.Redis.ReadTimeout),
-				redis.DialWriteTimeout(configuration.Redis.WriteTimeout),
-			)
-			if err != nil {
-				dcontext.GetLogger(app).Errorf("error connecting to redis instance %s: %v",
-					configuration.Redis.Addr, err)
-				done(err)
-				return nil, err
-			}
-
-			// authorize the connection
-			if configuration.Redis.Password != "" {
-				if _, err = conn.Do("AUTH", configuration.Redis.Password); err != nil {
-					defer conn.Close()
-					done(err)
-					return nil, err
-				}
-			}
-
-			// select the database to use
-			if configuration.Redis.DB != 0 {
-				if _, err = conn.Do("SELECT", configuration.Redis.DB); err != nil {
-					defer conn.Close()
-					done(err)
-					return nil, err
-				}
-			}
-
-			done(nil)
-			return conn, nil
-		},
-		MaxIdle:     configuration.Redis.Pool.MaxIdle,
-		MaxActive:   configuration.Redis.Pool.MaxActive,
-		IdleTimeout: configuration.Redis.Pool.IdleTimeout,
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			// TODO(stevvooe): We can probably do something more interesting
-			// here with the health package.
-			_, err := c.Do("PING")
-			return err
-		},
-		Wait: false, // if a connection is not available, proceed without cache.
-	}
-
-	app.redis = pool
+	app.redis = rediscache.NewPool(&rediscache.PoolOpts{
+		Addr:            configuration.Redis.Addr,
+		Password:        configuration.Redis.Password,
+		DB:              configuration.Redis.DB,
+		DialTimeout:     configuration.Redis.DialTimeout,
+		ReadTimeout:     configuration.Redis.ReadTimeout,
+		WriteTimeout:    configuration.Redis.WriteTimeout,
+		PoolMaxIdle:     configuration.Redis.Pool.MaxActive,
+		PoolMaxActive:   configuration.Redis.Pool.MaxActive,
+		PoolIdleTimeout: configuration.Redis.Pool.IdleTimeout,
+	})
 
 	// setup expvar
 	registry := expvar.Get("registry")

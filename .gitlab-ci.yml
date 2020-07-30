@@ -205,3 +205,21 @@ verify Go 1.13:
 verify Go 1.14:
   extends: .verify
   image: golang:1.14-buster
+
+.cache:redis:
+  stage: integration
+  needs: []
+  variables:
+    REDIS_ADDR: "redis:6379"
+  services:
+    - name: redis:alpine
+      alias: "redis"
+  script: go test -v -tags=integration github.com/docker/distribution/registry/storage/cache/redis
+
+cache:redis Go 1.13:
+  extends: .cache:redis
+  image: golang:1.13-buster
+
+cache:redis Go 1.14:
+  extends: .cache:redis
+  image: golang:1.14-buster
