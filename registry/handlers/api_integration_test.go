@@ -2598,6 +2598,41 @@ func TestManifestAPI_Put_OCIByDigest(t *testing.T) {
 	seedRandomOCIManifest(t, env, repoPath, putByDigest)
 }
 
+func TestManifestAPI_Put_OCIFilesystemFallbackLayersNotInDatabase(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "ocifallbacktag"
+	repoPath := "oci/fallback"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Disable the database so writes only go to the filesytem.
+	env.config.Database.Enabled = false
+
+	deserializedManifest := seedRandomOCIManifest(t, env, repoPath)
+
+	// Enable the database again so that reads first check the database.
+	env.config.Database.Enabled = true
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp := putManifest(t, "putting manifest no error", tagURL, v1.MediaTypeImageManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, digestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
 func TestManifestAPI_Get_OCINonMatchingEtag(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
