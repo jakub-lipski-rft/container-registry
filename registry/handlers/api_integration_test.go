@@ -2146,6 +2146,41 @@ func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
 	}
 }
 
+func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotInDatabase(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2fallbacktag"
+	repoPath := "schema2/fallback"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Disable the database so writes only go to the filesytem.
+	env.config.Database.Enabled = false
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
+
+	// Enable the database again so that reads first check the database.
+	env.config.Database.Enabled = true
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp := putManifest(t, "putting manifest no error", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, digestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
 func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
