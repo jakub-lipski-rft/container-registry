@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -132,7 +131,8 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		return err
 	}
 	if r == nil {
-		return errors.New("repository not found in database")
+		log.Warn("repository not found in database, no need to unlink from the blob")
+		return nil
 	}
 
 	bb, err := rStore.Blobs(ctx, r)
@@ -148,7 +148,8 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		}
 	}
 	if b == nil {
-		return errors.New("blob not found in database")
+		log.Warn("blob not found in database, no need to unlink it from the repository")
+		return nil
 	}
 
 	return rStore.UnlinkBlob(ctx, r, b)
