@@ -124,7 +124,7 @@ func TestDeleteBlobDB_RepositoryNotFound(t *testing.T) {
 	defer env.shutdown(t)
 
 	err := dbDeleteBlob(env.ctx, env.db, "foo", "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
-	require.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestDeleteBlobDB_BlobNotFound(t *testing.T) {
@@ -138,5 +138,5 @@ func TestDeleteBlobDB_BlobNotFound(t *testing.T) {
 	require.NotNil(t, r)
 
 	err = dbDeleteBlob(env.ctx, env.db, r.Path, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
-	require.Error(t, err)
+	require.NoError(t, err)
 }

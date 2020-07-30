@@ -609,6 +609,38 @@ func TestBlobAPI_Head_BlobNotFound(t *testing.T) {
 	require.Equal(t, http.NoBody, res.Body)
 }
 
+func TestBlobAPI_Delete_FilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Disable the database so writes only go to the filesytem.
+	env.config.Database.Enabled = false
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Enable the database again so that reads first check the database.
+	env.config.Database.Enabled = true
+
+	// delete blob link from repository, should work even though the blob
+	// was never present in the database.
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+}
+
 func TestBlobDelete(t *testing.T) {
 	env := newTestEnv(t, withDelete)
 	defer env.Shutdown()
