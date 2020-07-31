@@ -196,6 +196,14 @@ type Configuration struct {
 		ReadTimeout  time.Duration `yaml:"readtimeout,omitempty"`  // timeout for reads of data
 		WriteTimeout time.Duration `yaml:"writetimeout,omitempty"` // timeout for writes of data
 
+		// TLS specifies settings for TLS connections.
+		TLS struct {
+			// Enabled enables TLS when connecting to the server.
+			Enabled bool `yaml:"enabled,omitempty"`
+			// Insecure disables server name verification when connecting over TLS.
+			Insecure bool `yaml:"insecure,omitempty"`
+		} `yaml:"tls,omitempty"`
+
 		// Pool configures the behavior of the redis connection pool.
 		Pool struct {
 			// MaxIdle sets the maximum number of idle connections.

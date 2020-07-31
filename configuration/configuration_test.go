@@ -931,6 +931,40 @@ monitoring:
 	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_KEYFILE", tt, validator)
 }
 
+func TestParseRedisTLS_Enabled(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+redis:
+  tls:
+    enabled: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Redis.TLS.Enabled))
+	}
+
+	testParameter(t, yml, "REGISTRY_REDIS_TLS_ENABLED", tt, validator)
+}
+
+func TestParseRedisTLS_Insecure(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+redis:
+  tls:
+    insecure: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Redis.TLS.Insecure))
+	}
+
+	testParameter(t, yml, "REGISTRY_REDIS_TLS_INSECURE", tt, validator)
+}
+
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice {
 		t = t.Elem()

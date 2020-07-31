@@ -284,6 +284,9 @@ redis:
   dialtimeout: 10ms
   readtimeout: 10ms
   writetimeout: 10ms
+  tls:
+    enabled: true
+    insecure: true
   pool:
     maxidle: 16
     maxactive: 64
@@ -1055,6 +1058,9 @@ redis:
   dialtimeout: 10ms
   readtimeout: 10ms
   writetimeout: 10ms
+  tls:
+    enabled: true
+    insecure: true
   pool:
     maxidle: 16
     maxactive: 64
@@ -1078,6 +1084,21 @@ registry does not set an expiration value on keys.
 | `dialtimeout` | no   | The timeout for connecting to the Redis instance.     |
 | `readtimeout` | no   | The timeout for reading from the Redis instance.      |
 | `writetimeout` | no  | The timeout for writing to the Redis instance.        |
+
+### `tls`
+
+```none
+tls:
+  enabled: true
+  insecure: true
+```
+
+Use these settings to configure TLS connections.
+
+| Parameter  | Required | Description                                                                                      |
+|------------|----------|--------------------------------------------------------------------------------------------------|
+| `enabled`  | no       | Set to `true` to enable TLS. Defaults to `false`.                                                |
+| `insecure` | no       | Set to `true` to disable server name verification when connecting over TLS. Defaults to `false`. |
 
 ### `pool`
 

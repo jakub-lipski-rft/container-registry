@@ -543,6 +543,8 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
 		DialTimeout:     configuration.Redis.DialTimeout,
 		ReadTimeout:     configuration.Redis.ReadTimeout,
 		WriteTimeout:    configuration.Redis.WriteTimeout,
+		TLSEnabled:      configuration.Redis.TLS.Enabled,
+		TLSSkipVerify:   configuration.Redis.TLS.Insecure,
 		PoolMaxIdle:     configuration.Redis.Pool.MaxActive,
 		PoolMaxActive:   configuration.Redis.Pool.MaxActive,
 		PoolIdleTimeout: configuration.Redis.Pool.IdleTimeout,
