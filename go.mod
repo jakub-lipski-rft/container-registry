@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/storage v1.2.1
 	github.com/Azure/azure-sdk-for-go v16.2.1+incompatible
 	github.com/Azure/go-autorest v10.8.1+incompatible // indirect
+	github.com/FZambia/sentinel v1.1.0
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d
 	github.com/aws/aws-sdk-go v1.27.0
 	github.com/bitly/go-simplejson v0.5.0 // indirect

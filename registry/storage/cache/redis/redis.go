@@ -2,9 +2,12 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/FZambia/sentinel"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/storage/cache"
@@ -16,6 +19,7 @@ import (
 
 type PoolOpts struct {
 	Addr            string
+	MainName        string
 	Password        string
 	DB              int
 	DialTimeout     time.Duration
@@ -39,12 +43,44 @@ func NewPool(opts *PoolOpts) *redis.Pool {
 		redis.DialTLSSkipVerify(opts.TLSSkipVerify),
 	}
 
+	var sntnl *sentinel.Sentinel
+	if opts.MainName != "" {
+		addrs := strings.Split(opts.Addr, ",")
+		log := logrus.WithField("addresses", addrs)
+
+		sntnl = &sentinel.Sentinel{
+			Addrs:      addrs,
+			MasterName: opts.MainName,
+			Dial: func(addr string) (redis.Conn, error) {
+				log.Info("connecting to redis sentinel")
+				conn, err := redis.Dial("tcp", addr, dialOpts...)
+				if err != nil {
+					log.WithError(err).Error("failed to connect to redis sentinel")
+					return nil, err
+				}
+				return conn, nil
+			},
+		}
+	}
+
 	pool := &redis.Pool{
 		Dial: func() (redis.Conn, error) {
+			var err error
 			addr := opts.Addr
 			log := logrus.WithField("address", addr)
 
-			log.Debug("connecting to redis instance")
+			if sntnl != nil {
+				addr, err = sntnl.MasterAddr()
+				if err != nil {
+					log.WithError(err).Error("failed to obtain redis main server address from sentinel")
+					return nil, err
+				}
+
+				log.WithField("address", addr).Debug("redis main server address obtained from sentinel")
+			}
+
+			log = logrus.WithField("address", addr)
+			log.Info("connecting to redis instance")
 			conn, err := redis.Dial("tcp", addr, dialOpts...)
 			if err != nil {
 				log.WithError(err).Error("failed to connect to redis instance")
@@ -54,10 +90,17 @@ func NewPool(opts *PoolOpts) *redis.Pool {
 			return conn, nil
 		},
 		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			logrus.Debug("checking health of redis connection")
-			if _, err := c.Do("PING"); err != nil {
-				logrus.Error("redis instance connection health check failed")
-				return err
+			logrus.Info("checking health of redis connection")
+			if sntnl != nil {
+				if !sentinel.TestRole(c, "master") {
+					logrus.Error("redis sentinel connection health check failed")
+					return errors.New("sentinel role check failed")
+				}
+			} else {
+				if _, err := c.Do("PING"); err != nil {
+					logrus.Error("redis instance connection health check failed")
+					return err
+				}
 			}
 
 			return nil

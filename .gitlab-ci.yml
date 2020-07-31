@@ -206,7 +206,7 @@ verify Go 1.14:
   extends: .verify
   image: golang:1.14-buster
 
-.cache:redis:
+.cache:redis: &cache-redis
   stage: integration
   needs: []
   variables:
@@ -223,3 +223,28 @@ cache:redis Go 1.13:
 cache:redis Go 1.14:
   extends: .cache:redis
   image: golang:1.14-buster
+
+.cache:redis-sentinel:
+  <<: *cache-redis
+  variables:
+    # create a Docker network per build so that services can talk with each other
+    FF_NETWORK_PER_BUILD: 1
+    # config for redis-sentinel
+    REDIS_MASTER_HOST: "redis"
+    REDIS_MASTER_SET: "main-redis"
+    # config for app
+    REDIS_ADDR: "redis-sentinel:26379"
+    REDIS_MAIN_NAME: "main-redis"
+  services:
+    - name: redis:alpine
+      alias: "redis"
+    - name: bitnami/redis-sentinel
+      alias: "redis-sentinel"
+
+cache:redis-sentinel Go 1.13:
+  extends: .cache:redis-sentinel
+  image: golang:1.13-buster
+
+cache:redis-sentinel Go 1.14:
+  extends: .cache:redis-sentinel
+  image: golang:1.13-buster

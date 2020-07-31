@@ -9,6 +9,7 @@
 - registry: Add support for a pprof monitoring server
 - registry: Add support for continuous profiling with Google Stackdriver
 - registry: Add TLS support for Redis
+- registry: Add support for Redis Sentinel
 
 ## [v2.9.1-gitlab] - 2020-05-05
 ## Added

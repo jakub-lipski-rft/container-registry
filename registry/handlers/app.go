@@ -538,6 +538,7 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
 
 	app.redis = rediscache.NewPool(&rediscache.PoolOpts{
 		Addr:            configuration.Redis.Addr,
+		MainName:        configuration.Redis.MainName,
 		Password:        configuration.Redis.Password,
 		DB:              configuration.Redis.DB,
 		DialTimeout:     configuration.Redis.DialTimeout,
