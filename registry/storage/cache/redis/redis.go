@@ -21,6 +21,8 @@ type PoolOpts struct {
 	DialTimeout     time.Duration
 	ReadTimeout     time.Duration
 	WriteTimeout    time.Duration
+	TLSEnabled      bool
+	TLSSkipVerify   bool
 	PoolMaxIdle     int
 	PoolMaxActive   int
 	PoolIdleTimeout time.Duration
@@ -33,6 +35,8 @@ func NewPool(opts *PoolOpts) *redis.Pool {
 		redis.DialConnectTimeout(opts.DialTimeout),
 		redis.DialReadTimeout(opts.ReadTimeout),
 		redis.DialWriteTimeout(opts.WriteTimeout),
+		redis.DialUseTLS(opts.TLSEnabled),
+		redis.DialTLSSkipVerify(opts.TLSSkipVerify),
 	}
 
 	pool := &redis.Pool{
