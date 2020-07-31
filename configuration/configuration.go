@@ -183,8 +183,12 @@ type Configuration struct {
 
 	// Redis configures the redis pool available to the registry webapp.
 	Redis struct {
-		// Addr specifies the the redis instance available to the application.
+		// Addr specifies the redis instance available to the application. For Sentinel it should be a list of
+		// addresses separated by commas.
 		Addr string `yaml:"addr,omitempty"`
+
+		// MainName specifies the main server name. Only for Sentinel connections.
+		MainName string `yaml:"mainname,omitempty"`
 
 		// Password string to use when making a connection.
 		Password string `yaml:"password,omitempty"`

@@ -16,6 +16,7 @@ import (
 
 var (
 	addr            string
+	mainName        string
 	password        string
 	db              int
 	dialTimeout     time.Duration
@@ -28,6 +29,7 @@ var (
 
 func init() {
 	addr = os.Getenv("REDIS_ADDR")
+	mainName = os.Getenv("REDIS_MAIN_NAME")
 	password = os.Getenv("REDIS_PASSWORD")
 	db = mustParseEnvVarAsInt("REDIS_DB")
 	dialTimeout = mustParseEnvVarAsDuration("REDIS_DIAL_TIMEOUT")
@@ -77,6 +79,7 @@ func isEligible(t *testing.T) {
 func poolOptsFromEnv() *rediscache.PoolOpts {
 	return &rediscache.PoolOpts{
 		Addr:            addr,
+		MainName:        mainName,
 		Password:        password,
 		DB:              db,
 		DialTimeout:     dialTimeout,
