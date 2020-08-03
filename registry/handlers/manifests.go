@@ -681,16 +681,10 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			}
 			defer tx.Rollback()
 
-			switch reqManifest := manifest.(type) {
-			case *schema2.DeserializedManifest, *schema1.SignedManifest, *ocischema.DeserializedManifest, *manifestlist.DeserializedManifestList:
-				if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
-					e := fmt.Errorf("failed to create tag in database: %v", err)
-					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
-					return
-				}
-			default:
-				dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).
-					Warn("database does not support manifest class")
+			if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
+				e := fmt.Errorf("failed to create tag in database: %v", err)
+				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				return
 			}
 			if err := tx.Commit(); err != nil {
 				e := fmt.Errorf("failed to commit tag to database: %v", err)
