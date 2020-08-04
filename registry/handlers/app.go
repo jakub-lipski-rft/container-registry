@@ -268,12 +268,15 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		log.Warn("the metadata database is an experimental feature, please do not enable it in production")
 
 		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
+			Host:        config.Database.Host,
+			Port:        config.Database.Port,
+			User:        config.Database.User,
+			Password:    config.Database.Password,
+			DBName:      config.Database.DBName,
+			SSLMode:     config.Database.SSLMode,
+			SSLCert:     config.Database.SSLCert,
+			SSLKey:      config.Database.SSLKey,
+			SSLRootCert: config.Database.SSLRootCert,
 		},
 			log.WithFields(logrus.Fields{"database": config.Database.DBName}),
 		)

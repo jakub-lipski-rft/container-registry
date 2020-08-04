@@ -318,6 +318,12 @@ type Database struct {
 	// SSLMode is the SSL mode:
 	// http://www.postgresql.cn/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS
 	SSLMode string `yaml:"sslmode"`
+	// SSLCert is the PEM encoded certificate file path.
+	SSLCert string `yaml:"sslcert"`
+	// SSLKey is the PEM encoded key file path.
+	SSLKey string `yaml:"sslkey"`
+	// SSLRootCert is the PEM encoded root certificate file path.
+	SSLRootCert string `yaml:"sslrootcert"`
 }
 
 // LogHook is composed of hook Level and Type.
