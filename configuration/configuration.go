@@ -324,6 +324,18 @@ type Database struct {
 	SSLKey string `yaml:"sslkey"`
 	// SSLRootCert is the PEM encoded root certificate file path.
 	SSLRootCert string `yaml:"sslrootcert"`
+	// Pool configures the behavior of the database connection pool.
+	Pool struct {
+		// MaxIdle sets the maximum number of connections in the idle connection pool. If MaxOpen is less than MaxIdle,
+		// then MaxIdle is reduced to match the MaxOpen limit. Defaults to 0 (no idle connections).
+		MaxIdle int `yaml:"maxidle,omitempty"`
+		// MaxOpen sets the maximum number of open connections to the database. If MaxOpen is less than MaxIdle, then
+		// MaxIdle is reduced to match the MaxOpen limit. Defaults to 0 (unlimited).
+		MaxOpen int `yaml:"maxopen,omitempty"`
+		// MaxLifetime sets the maximum amount of time a connection may be reused. Expired connections may be closed
+		// lazily before reuse. Defaults to 0 (unlimited).
+		MaxLifetime time.Duration `yaml:"maxlifetime,omitempty"`
+	} `yaml:"pool,omitempty"`
 }
 
 // LogHook is composed of hook Level and Type.

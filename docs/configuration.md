@@ -182,6 +182,10 @@ database:
   sslcert: /path/to/client.crt
   sslkey: /path/to/client.key
   sslrootcert: /path/to/root.crt
+  pool:
+    maxidle: 25
+    maxopen: 25
+    maxlifetime: 5m
 auth:
   silly:
     realm: silly-realm
@@ -626,6 +630,10 @@ database:
   sslcert: /path/to/client.crt
   sslkey: /path/to/client.key
   sslrootcert: /path/to/root.crt
+  pool:
+    maxidle: 25
+    maxopen: 25
+    maxlifetime: 5m
 ```
 
 | Parameter  | Required | Description                                                                                                                                                                                                                                          |
@@ -641,6 +649,23 @@ database:
 | `sslcert`  | no       | The PEM encoded certificate file path. |
 | `sslkey`   | no       | The PEM encoded key file path. |
 | `sslrootcert`  | no       | The PEM encoded root certificate file path. |
+
+### `pool`
+
+```none
+pool:
+  maxidle: 25
+  maxopen: 25
+  maxlifetime: 5m
+```
+
+Use these settings to configure the behavior of the database connection pool.
+
+| Parameter | Required | Description                                           |
+|-----------|----------|-------------------------------------------------------|
+| `maxidle` | no       | The maximum number of connections in the idle connection pool. If `maxopen` is less than `maxidle`, then `maxidle` is reduced to match the `maxopen` limit. Defaults to 0 (no idle connections).   |
+| `maxopen`| no      | The maximum number of open connections to the database. If `maxopen` is less than `maxidle`, then `maxidle` is reduced to match the `maxopen` limit. Defaults to 0 (unlimited). |
+| `maxlifetime`| no    | The maximum amount of time a connection may be reused. Expired connections may be closed lazily before reuse. Defaults to 0 (unlimited). |
 
 ## `auth`
 

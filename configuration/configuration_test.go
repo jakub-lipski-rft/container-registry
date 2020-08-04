@@ -403,7 +403,7 @@ func (suite *ConfigSuite) TestParseInvalidLoglevel(c *C) {
 type parameterTest struct {
 	name    string
 	value   string
-	want    string
+	want    interface{}
 	wantErr bool
 	err     string
 }
@@ -1124,6 +1124,87 @@ database:
 	}
 
 	testParameter(t, yml, "REGISTRY_DATABASE_SSLROOTCERT", tt, validator)
+}
+
+func TestParseDatabasePool_MaxIdle(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  pool:
+    maxidle: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "10",
+			want:  10,
+		},
+		{
+			name: "default",
+			want: 0,
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.Pool.MaxIdle)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_POOL_MAXIDLE", tt, validator)
+}
+
+func TestParseDatabasePool_MaxOpen(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  pool:
+    maxopen: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "10",
+			want:  10,
+		},
+		{
+			name: "default",
+			want: 0,
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.Pool.MaxOpen)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_POOL_MAXOPEN", tt, validator)
+}
+
+func TestParseDatabasePool_MaxLifetime(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  pool:
+    maxlifetime: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "10s",
+			want:  10 * time.Second,
+		},
+		{
+			name: "default",
+			want: time.Duration(0),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.Pool.MaxLifetime)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_POOL_MAXLIFETIME", tt, validator)
 }
 
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {

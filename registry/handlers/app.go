@@ -278,7 +278,12 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			SSLKey:      config.Database.SSLKey,
 			SSLRootCert: config.Database.SSLRootCert,
 		},
-			log.WithFields(logrus.Fields{"database": config.Database.DBName}),
+			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithPoolConfig(&datastore.PoolConfig{
+				MaxIdle:     config.Database.Pool.MaxIdle,
+				MaxOpen:     config.Database.Pool.MaxOpen,
+				MaxLifetime: config.Database.Pool.MaxLifetime,
+			}),
 		)
 		if err != nil {
 			panic(fmt.Sprintf("failed to construct database connection: %v", err))

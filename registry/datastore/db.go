@@ -174,26 +174,68 @@ func (sl *statementLogger) statement(statement string, args ...interface{}) func
 	}
 }
 
-// Open opens a database.
-func Open(dsn *DSN, log ...*logrus.Entry) (*DB, error) {
+type openOpts struct {
+	logger *logrus.Entry
+	pool   *PoolConfig
+}
+
+type PoolConfig struct {
+	MaxIdle     int
+	MaxOpen     int
+	MaxLifetime time.Duration
+}
+
+// OpenOption is used to pass options to Open.
+type OpenOption func(*openOpts)
+
+// WithLogger configures the logger for the database connection handler.
+func WithLogger(l *logrus.Entry) OpenOption {
+	return func(opts *openOpts) {
+		opts.logger = l
+	}
+}
+
+// WithPoolConfig configures the settings for the database connection pool.
+func WithPoolConfig(c *PoolConfig) OpenOption {
+	return func(opts *openOpts) {
+		opts.pool = c
+	}
+}
+
+var defaultLogger = logrus.New()
+
+func applyOptions(opts []OpenOption) openOpts {
+	log := logrus.New()
+	log.SetOutput(ioutil.Discard)
+
+	config := openOpts{
+		logger: logrus.NewEntry(log),
+		pool:   &PoolConfig{},
+	}
+
+	for _, v := range opts {
+		v(&config)
+	}
+
+	return config
+}
+
+// Open creates a database connection handler.
+func Open(dsn *DSN, opts ...OpenOption) (*DB, error) {
+	config := applyOptions(opts)
+
 	db, err := sql.Open(driverName, dsn.String())
 	if err != nil {
 		return nil, err
 	}
 
+	db.SetMaxOpenConns(config.pool.MaxOpen)
+	db.SetMaxIdleConns(config.pool.MaxIdle)
+	db.SetConnMaxLifetime(config.pool.MaxLifetime)
+
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
-	var l *logrus.Entry
-
-	if len(log) != 0 && log[0] != nil {
-		l = log[0]
-	} else {
-		lg := logrus.New()
-		lg.SetOutput(ioutil.Discard)
-		l = logrus.NewEntry(lg)
-	}
-
-	return &DB{db, dsn, &statementLogger{l}}, nil
+	return &DB{db, dsn, &statementLogger{config.logger}}, nil
 }
