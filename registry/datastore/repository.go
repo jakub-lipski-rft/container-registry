@@ -156,7 +156,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 // for the GET /v2/_catalog API route, where pagination is done with a marker (lastPath). Empty repositories (which do
 // not have at least a manifest) are ignored. Also, even if there is no repository with a path of lastPath, the returned
 // repositories will always be those with a path lexicographically after lastPath. Finally, repositories are
-// lexicographically sorted. These constraints exists to preserve the existing API behaviour (when doing a filesystem
+// lexicographically sorted. These constraints exists to preserve the existing API behavior (when doing a filesystem
 // walk based pagination).
 func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
 	q := `SELECT
@@ -318,7 +318,7 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 // TagsPaginated finds up to limit tags of a given repository with name lexicographically after lastName. This is used
 // exclusively for the GET /v2/<name>/tags/list API route, where pagination is done with a marker (lastName). Even if
 // there is no tag with a name of lastName, the returned tags will always be those with a path lexicographically after
-// lastName. Finally, tags are lexicographically sorted. These constraints exists to preserve the existing API behaviour
+// lastName. Finally, tags are lexicographically sorted. These constraints exists to preserve the existing API behavior
 // (when doing a filesystem walk based pagination).
 func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error) {
 	q := `SELECT
@@ -347,7 +347,7 @@ func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repositor
 // TagsCountAfterName counts all tags of a given repository with name lexicographically after lastName. This is used
 // exclusively for the GET /v2/<name>/tags/list API route, where pagination is done with a marker (lastName). Even if
 // there is no tag with a name of lastName, the counted tags will always be those with a path lexicographically after
-// lastName. This constraint exists to preserve the existing API behaviour (when doing a filesystem walk based
+// lastName. This constraint exists to preserve the existing API behavior (when doing a filesystem walk based
 // pagination).
 func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repository, lastName string) (int, error) {
 	q := `SELECT
@@ -405,7 +405,7 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 // for the GET /v2/_catalog API route, where pagination is done with a marker (lastPath). Empty repositories (which do
 // not have at least a manifest) are ignored. Also, even if there is no repository with a path of lastPath, the counted
 // repositories will always be those with a path lexicographically after lastPath. These constraints exists to preserve
-// the existing API behaviour (when doing a filesystem walk based pagination).
+// the existing API behavior (when doing a filesystem walk based pagination).
 func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int, error) {
 	q := `SELECT
 			COUNT(*)

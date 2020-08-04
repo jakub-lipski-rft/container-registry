@@ -58,7 +58,7 @@ func (t table) seedFileName() string {
 }
 
 // DumpAsJSON dumps the table contents in JSON format using the PostgresSQL `json_agg` function. `bytea` columns are
-// automatically decoded for easy visualization/comparision.
+// automatically decoded for easy visualization/comparison.
 func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, error) {
 	var query string
 	switch t {
