@@ -106,12 +106,15 @@ func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}
 
 // DSN represents the Data Source Name parameters for a DB connection.
 type DSN struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host        string
+	Port        int
+	User        string
+	Password    string
+	DBName      string
+	SSLMode     string
+	SSLCert     string
+	SSLKey      string
+	SSLRootCert string
 }
 
 // String builds the string representation of a DSN.
@@ -130,6 +133,9 @@ func (dsn *DSN) String() string {
 		{"password", dsn.Password},
 		{"dbname", dsn.DBName},
 		{"sslmode", dsn.SSLMode},
+		{"sslcert", dsn.SSLCert},
+		{"sslkey", dsn.SSLKey},
+		{"sslrootcert", dsn.SSLRootCert},
 	} {
 		if len(param.v) == 0 {
 			continue

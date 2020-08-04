@@ -196,12 +196,15 @@ var MigrateUpCmd = &cobra.Command{
 		}
 
 		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
+			Host:        config.Database.Host,
+			Port:        config.Database.Port,
+			User:        config.Database.User,
+			Password:    config.Database.Password,
+			DBName:      config.Database.DBName,
+			SSLMode:     config.Database.SSLMode,
+			SSLCert:     config.Database.SSLCert,
+			SSLKey:      config.Database.SSLKey,
+			SSLRootCert: config.Database.SSLRootCert,
 		},
 			logrus.WithField("database", config.Database.DBName),
 		)
@@ -246,12 +249,15 @@ var MigrateDownCmd = &cobra.Command{
 		}
 
 		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
+			Host:        config.Database.Host,
+			Port:        config.Database.Port,
+			User:        config.Database.User,
+			Password:    config.Database.Password,
+			DBName:      config.Database.DBName,
+			SSLMode:     config.Database.SSLMode,
+			SSLCert:     config.Database.SSLCert,
+			SSLKey:      config.Database.SSLKey,
+			SSLRootCert: config.Database.SSLRootCert,
 		},
 			logrus.WithField("database", config.Database.DBName),
 		)
@@ -302,12 +308,15 @@ var MigrateVersionCmd = &cobra.Command{
 		}
 
 		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
+			Host:        config.Database.Host,
+			Port:        config.Database.Port,
+			User:        config.Database.User,
+			Password:    config.Database.Password,
+			DBName:      config.Database.DBName,
+			SSLMode:     config.Database.SSLMode,
+			SSLCert:     config.Database.SSLCert,
+			SSLKey:      config.Database.SSLKey,
+			SSLRootCert: config.Database.SSLRootCert,
 		},
 			logrus.WithField("database", config.Database.DBName),
 		)
@@ -344,12 +353,15 @@ var MigrateStatusCmd = &cobra.Command{
 		}
 
 		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
+			Host:        config.Database.Host,
+			Port:        config.Database.Port,
+			User:        config.Database.User,
+			Password:    config.Database.Password,
+			DBName:      config.Database.DBName,
+			SSLMode:     config.Database.SSLMode,
+			SSLCert:     config.Database.SSLCert,
+			SSLKey:      config.Database.SSLKey,
+			SSLRootCert: config.Database.SSLRootCert,
 		},
 			logrus.WithField("database", config.Database.DBName),
 		)
@@ -442,12 +454,15 @@ var ImportCmd = &cobra.Command{
 		}
 
 		db, err := datastore.Open(&datastore.DSN{
-			Host:     config.Database.Host,
-			Port:     config.Database.Port,
-			User:     config.Database.User,
-			Password: config.Database.Password,
-			DBName:   config.Database.DBName,
-			SSLMode:  config.Database.SSLMode,
+			Host:        config.Database.Host,
+			Port:        config.Database.Port,
+			User:        config.Database.User,
+			Password:    config.Database.Password,
+			DBName:      config.Database.DBName,
+			SSLMode:     config.Database.SSLMode,
+			SSLCert:     config.Database.SSLCert,
+			SSLKey:      config.Database.SSLKey,
+			SSLRootCert: config.Database.SSLRootCert,
 		},
 			dcontext.GetLogger(ctx).WithFields(logrus.Fields{"database": config.Database.DBName}),
 		)

@@ -110,12 +110,15 @@ func NewDSN() (*datastore.DSN, error) {
 		return nil, fmt.Errorf("error parsing DSN port: %w", err)
 	}
 	dsn := &datastore.DSN{
-		Host:     os.Getenv("REGISTRY_DATABASE_HOST"),
-		Port:     port,
-		User:     os.Getenv("REGISTRY_DATABASE_USER"),
-		Password: os.Getenv("REGISTRY_DATABASE_PASSWORD"),
-		DBName:   "registry_test",
-		SSLMode:  os.Getenv("REGISTRY_DATABASE_SSLMODE"),
+		Host:        os.Getenv("REGISTRY_DATABASE_HOST"),
+		Port:        port,
+		User:        os.Getenv("REGISTRY_DATABASE_USER"),
+		Password:    os.Getenv("REGISTRY_DATABASE_PASSWORD"),
+		DBName:      "registry_test",
+		SSLMode:     os.Getenv("REGISTRY_DATABASE_SSLMODE"),
+		SSLCert:     os.Getenv("REGISTRY_DATABASE_SSLCERT"),
+		SSLKey:      os.Getenv("REGISTRY_DATABASE_SSLKEY"),
+		SSLRootCert: os.Getenv("REGISTRY_DATABASE_SSLROOTCERT"),
 	}
 
 	return dsn, nil

@@ -178,7 +178,10 @@ database:
   password:
   dbname: registry
   schema: public
-  sslmode: disable
+  sslmode: verify-full
+  sslcert: /path/to/client.crt
+  sslkey: /path/to/client.key
+  sslrootcert: /path/to/root.crt
 auth:
   silly:
     realm: silly-realm
@@ -619,7 +622,10 @@ database:
   password:
   dbname: registry
   schema: public
-  sslmode: disable
+  sslmode: verify-full
+  sslcert: /path/to/client.crt
+  sslkey: /path/to/client.key
+  sslrootcert: /path/to/root.crt
 ```
 
 | Parameter  | Required | Description                                                                                                                                                                                                                                          |
@@ -632,6 +638,9 @@ database:
 | `dbname`   | yes      | The database name.                                                                                                                                                                                                                                   |
 | `schema`   | yes      | The database schema.                                                                                                                                                                                                                                 |
 | `sslmode`  | yes      | The SSL mode. Can be one of `disable`, `allow`, `prefer`, `require`, `verify-ca` or `verify-full`. See the [PostgreSQL documentation](http://www.postgresql.cn/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS) for additional information. |
+| `sslcert`  | no       | The PEM encoded certificate file path. |
+| `sslkey`   | no       | The PEM encoded key file path. |
+| `sslrootcert`  | no       | The PEM encoded root certificate file path. |
 
 ## `auth`
 

@@ -1022,6 +1022,110 @@ redis:
 	testParameter(t, yml, "REGISTRY_REDIS_MAINNAME", tt, validator)
 }
 
+func TestDatabase_SSLMode(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  sslmode: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "disable",
+			want:  "disable",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.SSLMode)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_SSLMODE", tt, validator)
+}
+
+func TestDatabase_SSLCert(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  sslcert: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "/path/to/client.crt",
+			want:  "/path/to/client.crt",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.SSLCert)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_SSLCERT", tt, validator)
+}
+
+func TestDatabase_SSLKey(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  sslkey: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "/path/to/client.key",
+			want:  "/path/to/client.key",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.SSLKey)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_SSLKEY", tt, validator)
+}
+
+func TestDatabase_SSLRootCert(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  sslrootcert: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "/path/to/root.crt",
+			want:  "/path/to/root.crt",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.SSLRootCert)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_SSLROOTCERT", tt, validator)
+}
+
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice {
 		t = t.Elem()

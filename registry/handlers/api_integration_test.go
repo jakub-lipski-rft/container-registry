@@ -313,13 +313,16 @@ func newConfig(opts ...configOpt) configuration.Configuration {
 		}
 
 		config.Database = configuration.Database{
-			Enabled:  true,
-			Host:     dsn.Host,
-			Port:     dsn.Port,
-			User:     dsn.User,
-			Password: dsn.Password,
-			DBName:   dsn.DBName,
-			SSLMode:  dsn.SSLMode,
+			Enabled:     true,
+			Host:        dsn.Host,
+			Port:        dsn.Port,
+			User:        dsn.User,
+			Password:    dsn.Password,
+			DBName:      dsn.DBName,
+			SSLMode:     dsn.SSLMode,
+			SSLCert:     dsn.SSLCert,
+			SSLKey:      dsn.SSLKey,
+			SSLRootCert: dsn.SSLRootCert,
 		}
 	}
 
