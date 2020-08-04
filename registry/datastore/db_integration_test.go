@@ -4,9 +4,11 @@ package datastore_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/testutil"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,12 +18,21 @@ func TestOpen(t *testing.T) {
 	tests := []struct {
 		name       string
 		dsnFactory func() (*datastore.DSN, error)
+		opts       []datastore.OpenOption
 		wantErr    bool
 	}{
 		{
 			name:       "success",
 			dsnFactory: testutil.NewDSN,
-			wantErr:    false,
+			opts: []datastore.OpenOption{
+				datastore.WithLogger(logrus.NewEntry(logrus.New())),
+				datastore.WithPoolConfig(&datastore.PoolConfig{
+					MaxIdle:     1,
+					MaxOpen:     1,
+					MaxLifetime: 1 * time.Minute,
+				}),
+			},
+			wantErr: false,
 		},
 		{
 			name: "error",

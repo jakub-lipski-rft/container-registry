@@ -152,7 +152,7 @@ func NewDB() (*datastore.DB, error) {
 	log.SetLevel(logLevel)
 	log.SetOutput(logOut)
 
-	db, err := datastore.Open(dsn, logrus.NewEntry(log))
+	db, err := datastore.Open(dsn, datastore.WithLogger(logrus.NewEntry(log)))
 	if err != nil {
 		return nil, fmt.Errorf("error opening database connection: %w", err)
 	}

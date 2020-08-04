@@ -17,6 +17,7 @@ import (
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	"github.com/docker/distribution/version"
+	"gitlab.com/gitlab-org/labkit/log"
 
 	"github.com/docker/libtrust"
 	"github.com/olekukonko/tablewriter"
@@ -206,7 +207,12 @@ var MigrateUpCmd = &cobra.Command{
 			SSLKey:      config.Database.SSLKey,
 			SSLRootCert: config.Database.SSLRootCert,
 		},
-			logrus.WithField("database", config.Database.DBName),
+			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithPoolConfig(&datastore.PoolConfig{
+				MaxIdle:     config.Database.Pool.MaxIdle,
+				MaxOpen:     config.Database.Pool.MaxOpen,
+				MaxLifetime: config.Database.Pool.MaxLifetime,
+			}),
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
@@ -259,7 +265,12 @@ var MigrateDownCmd = &cobra.Command{
 			SSLKey:      config.Database.SSLKey,
 			SSLRootCert: config.Database.SSLRootCert,
 		},
-			logrus.WithField("database", config.Database.DBName),
+			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithPoolConfig(&datastore.PoolConfig{
+				MaxIdle:     config.Database.Pool.MaxIdle,
+				MaxOpen:     config.Database.Pool.MaxOpen,
+				MaxLifetime: config.Database.Pool.MaxLifetime,
+			}),
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
@@ -318,7 +329,12 @@ var MigrateVersionCmd = &cobra.Command{
 			SSLKey:      config.Database.SSLKey,
 			SSLRootCert: config.Database.SSLRootCert,
 		},
-			logrus.WithField("database", config.Database.DBName),
+			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithPoolConfig(&datastore.PoolConfig{
+				MaxIdle:     config.Database.Pool.MaxIdle,
+				MaxOpen:     config.Database.Pool.MaxOpen,
+				MaxLifetime: config.Database.Pool.MaxLifetime,
+			}),
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
@@ -363,7 +379,12 @@ var MigrateStatusCmd = &cobra.Command{
 			SSLKey:      config.Database.SSLKey,
 			SSLRootCert: config.Database.SSLRootCert,
 		},
-			logrus.WithField("database", config.Database.DBName),
+			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithPoolConfig(&datastore.PoolConfig{
+				MaxIdle:     config.Database.Pool.MaxIdle,
+				MaxOpen:     config.Database.Pool.MaxOpen,
+				MaxLifetime: config.Database.Pool.MaxLifetime,
+			}),
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
@@ -464,7 +485,12 @@ var ImportCmd = &cobra.Command{
 			SSLKey:      config.Database.SSLKey,
 			SSLRootCert: config.Database.SSLRootCert,
 		},
-			dcontext.GetLogger(ctx).WithFields(logrus.Fields{"database": config.Database.DBName}),
+			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithPoolConfig(&datastore.PoolConfig{
+				MaxIdle:     config.Database.Pool.MaxIdle,
+				MaxOpen:     config.Database.Pool.MaxOpen,
+				MaxLifetime: config.Database.Pool.MaxLifetime,
+			}),
 		)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
