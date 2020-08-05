@@ -2216,6 +2216,88 @@ func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotInDatabase(t *testing
 	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 }
 
+func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotAssociatedWithRepositoryButArePresentInDatabase(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2fallbackmissinglayerstag"
+	repoPath := "schema2/fallbackmissinglayers"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoRef)
+	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers to an unrelated repo so that they are
+	// present within the database, but not associated with the manifest's repository.
+	// Then push them to the normal repository with the database disabled.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	fakeRepoRef, err := reference.WithName("fakerepo")
+	require.NoError(t, err)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		// Save the layer content as pushLayer exhausts the io.ReadSeeker
+		layerBytes, err := ioutil.ReadAll(rs)
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, fakeRepoRef)
+		pushLayer(t, env.builder, fakeRepoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
+
+		// Disable the database so writes only go to the filesytem.
+		env.config.Database.Enabled = false
+
+		uploadURLBase, _ = startPushLayer(t, env, repoRef)
+		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
+
+		// Enable the database again so that reads first check the database.
+		env.config.Database.Enabled = true
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp := putManifest(t, "putting manifest no error", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, digestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
 func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -2384,6 +2466,114 @@ func TestManifestAPI_Get_Schema2ByTagNotAssociatedWithRepository(t *testing.T) {
 
 	checkResponse(t, "getting non-existent manifest", resp, http.StatusNotFound)
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func TestManifestAPI_Put_Schema2ByDigestLayersNotAssociatedWithRepository(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	repoPath1 := "schema2/layersnotassociated1"
+	repoPath2 := "schema2/layersnotassociated2"
+
+	repoRef1, err := reference.WithName(repoPath1)
+	require.NoError(t, err)
+
+	repoRef2, err := reference.WithName(repoPath2)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoRef1)
+	pushLayer(t, env.builder, repoRef1, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, repoRef2)
+		pushLayer(t, env.builder, repoRef2, dgst, uploadURLBase, rs)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath1, deserializedManifest)
+
+	resp := putManifest(t, "putting manifest whose layers are not present in the repository", manifestDigestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestManifestAPI_Put_Schema2ByDigestConfigNotAssociatedWithRepository(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	repoPath1 := "schema2/layersnotassociated1"
+	repoPath2 := "schema2/layersnotassociated2"
+
+	repoRef1, err := reference.WithName(repoPath1)
+	require.NoError(t, err)
+
+	repoRef2, err := reference.WithName(repoPath2)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoRef2)
+	pushLayer(t, env.builder, repoRef2, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, repoRef1)
+		pushLayer(t, env.builder, repoRef1, dgst, uploadURLBase, rs)
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath1, deserializedManifest)
+
+	resp := putManifest(t, "putting manifest whose config is not present in the repository", manifestDigestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestManifestAPI_Head_Schema2(t *testing.T) {
