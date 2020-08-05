@@ -77,7 +77,7 @@ func TestImporter_Import(t *testing.T) {
 	driver := newFilesystemStorageDriver(t)
 	registry := newRegistry(t, driver)
 
-	tx, err := suite.db.Begin()
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
 	require.NoError(t, err, "error starting transaction")
 	defer func() {
 		require.NoError(t, tx.Rollback(), "error rolling back transaction")

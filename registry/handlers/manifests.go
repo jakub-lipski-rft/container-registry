@@ -603,7 +603,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	// a transaction so we can revert any changes to the database in case that
 	// any part of this multi-phase database operation fails.
 	if imh.Config.Database.Enabled {
-		tx, err := imh.App.db.Begin()
+		tx, err := imh.App.db.BeginTx(imh, nil)
 		if err != nil {
 			imh.Errors = append(imh.Errors,
 				errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to create database transaction: %v", err)))
@@ -657,7 +657,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 		// Associate tag with manifest in database.
 		if imh.Config.Database.Enabled {
-			tx, err := imh.App.db.Begin()
+			tx, err := imh.App.db.BeginTx(imh, nil)
 			if err != nil {
 				e := fmt.Errorf("failed to create database transaction: %v", err)
 				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
