@@ -294,8 +294,7 @@ type StackdriverProfiler struct {
 	// ProjectID is the project ID. Defaults to the `GOOGLE_CLOUD_PROJECT` environment variable or instance metadata.
 	ProjectID string `yaml:"projectid,omitempty"`
 	// KeyFile is the path of a private service account key file in JSON format used for Service Account Authentication.
-	// Defaults to the `GOOGLE_APPLICATION_CREDENTIALS` environment variable or instance metadata. Please note that if
-	// using the GCS storage driver as well, the same service account credentials are used for both clients.
+	// Defaults to the `GOOGLE_APPLICATION_CREDENTIALS` environment variable or instance metadata.
 	KeyFile string `yaml:"keyfile,omitempty"`
 }
 

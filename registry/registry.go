@@ -345,6 +345,7 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 	opts := []monitoring.Option{
 		monitoring.WithListenerAddress(debugAddr),
 		monitoring.WithMetricsHandlerPattern(metricsPath),
+		monitoring.WithProfilerCredentialsFile(config.Monitoring.Stackdriver.KeyFile),
 		monitoring.WithBuildInformation(version.Version, version.BuildTime),
 		monitoring.WithBuildExtraLabels(map[string]string{
 			"package":  version.Package,
@@ -366,10 +367,12 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 
 	if !config.Monitoring.Stackdriver.Enabled {
 		opts = append(opts, monitoring.WithoutContinuousProfiling())
-		return opts
-	}
-	if err := configureStackdriver(config); err != nil {
-		log.WithError(err).Error("failed to configure Stackdriver profiler")
+	} else {
+		if err := configureStackdriver(config); err != nil {
+			log.WithError(err).Error("failed to configure Stackdriver profiler")
+			return opts
+		}
+		log.Info("starting Stackdriver profiler")
 	}
 
 	return opts
@@ -380,26 +383,9 @@ func configureStackdriver(config *configuration.Configuration) error {
 		return nil
 	}
 
-	log.Info("starting Stackdriver profiler")
-
-	// if config.Monitoring.Stackdriver.KeyFile is set, we need to set the `GOOGLE_APPLICATION_CREDENTIALS` environment
-	// variable with its value if it's not present.
-	envVar := "GOOGLE_APPLICATION_CREDENTIALS"
-
-	if config.Monitoring.Stackdriver.KeyFile != "" {
-		if _, ok := os.LookupEnv(envVar); !ok {
-			keyFile := config.Monitoring.Stackdriver.KeyFile
-
-			log.WithFields(log.Fields{"name": envVar, "value": keyFile}).Debug("setting environment variable")
-			if err := os.Setenv(envVar, keyFile); err != nil {
-				return fmt.Errorf("unable to set environment variable %q: %w", envVar, err)
-			}
-		}
-	}
-
 	// the GITLAB_CONTINUOUS_PROFILING env var (as per the LabKit spec) takes precedence over any application
 	// configuration settings and is required to configure the Stackdriver service.
-	envVar = "GITLAB_CONTINUOUS_PROFILING"
+	envVar := "GITLAB_CONTINUOUS_PROFILING"
 	var service, serviceVersion, projectID string
 
 	// if it's not set then we must set it based on the registry settings, with URL encoded settings for Stackdriver,

@@ -123,9 +123,9 @@ func requireEnvSet(t *testing.T, name, value string) {
 func TestConfigureStackDriver_Disabled(t *testing.T) {
 	config := &configuration.Configuration{}
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "GITLAB_CONTINUOUS_PROFILING")
+	requireEnvNotSet(t, "GITLAB_CONTINUOUS_PROFILING")
 	require.NoError(t, configureStackdriver(config))
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "GITLAB_CONTINUOUS_PROFILING")
+	requireEnvNotSet(t, "GITLAB_CONTINUOUS_PROFILING")
 }
 
 func TestConfigureStackDriver_Enabled(t *testing.T) {
@@ -137,9 +137,8 @@ func TestConfigureStackDriver_Enabled(t *testing.T) {
 		},
 	}
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "GITLAB_CONTINUOUS_PROFILING")
+	requireEnvNotSet(t, "GITLAB_CONTINUOUS_PROFILING")
 	require.NoError(t, configureStackdriver(config))
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS")
 	requireEnvSet(t, "GITLAB_CONTINUOUS_PROFILING", "stackdriver")
 	require.NoError(t, os.Unsetenv("GITLAB_CONTINUOUS_PROFILING"))
 }
@@ -156,11 +155,10 @@ func TestConfigureStackDriver_WithParams(t *testing.T) {
 		},
 	}
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "GITLAB_CONTINUOUS_PROFILING")
+	requireEnvNotSet(t, "GITLAB_CONTINUOUS_PROFILING")
 	require.NoError(t, configureStackdriver(config))
 	defer os.Unsetenv("GITLAB_CONTINUOUS_PROFILING")
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS")
 	requireEnvSet(t, "GITLAB_CONTINUOUS_PROFILING", "stackdriver?project_id=internal&service=registry&service_version=2.9.1")
 
 }
@@ -175,34 +173,10 @@ func TestConfigureStackDriver_WithKeyFile(t *testing.T) {
 		},
 	}
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "GITLAB_CONTINUOUS_PROFILING")
-	require.NoError(t, configureStackdriver(config))
-	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
-	defer os.Unsetenv("GITLAB_CONTINUOUS_PROFILING")
-
-	requireEnvSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "/path/to/credentials.json")
-	requireEnvSet(t, "GITLAB_CONTINUOUS_PROFILING", "stackdriver")
-
-}
-
-func TestConfigureStackDriver_DoesNotOverrideGoogleApplicationCredentialsEnvVar(t *testing.T) {
-	require.NoError(t, os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/foo/bar.json"))
-
-	config := &configuration.Configuration{
-		Monitoring: configuration.Monitoring{
-			Stackdriver: configuration.StackdriverProfiler{
-				Enabled: true,
-				KeyFile: "/path/to/credentials.json",
-			},
-		},
-	}
-
 	requireEnvNotSet(t, "GITLAB_CONTINUOUS_PROFILING")
 	require.NoError(t, configureStackdriver(config))
-	defer os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
 	defer os.Unsetenv("GITLAB_CONTINUOUS_PROFILING")
 
-	requireEnvSet(t, "GOOGLE_APPLICATION_CREDENTIALS", "/foo/bar.json")
 	requireEnvSet(t, "GITLAB_CONTINUOUS_PROFILING", "stackdriver")
 }
 
@@ -221,10 +195,8 @@ func TestConfigureStackDriver_DoesNotOverrideGitlabContinuousProfilingEnvVar(t *
 		},
 	}
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS")
 	require.NoError(t, configureStackdriver(config))
 	defer os.Unsetenv("GITLAB_CONTINUOUS_PROFILING")
 
-	requireEnvNotSet(t, "GOOGLE_APPLICATION_CREDENTIALS")
 	requireEnvSet(t, "GITLAB_CONTINUOUS_PROFILING", value)
 }
