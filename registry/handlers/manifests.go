@@ -867,9 +867,9 @@ func dbFindOrCreateRepositoryConfig(ctx context.Context, db datastore.Queryer, b
 	return dbCfg, nil
 }
 
-// dbFindOrCreateRepositoryBlob finds the source blob which must be linked in
-// the source repository. Precedence is given to retrieving the blob from the
-// database, then the filesytem.
+// dbFindOrCreateRepositoryBlob finds or creates a blob which is linked to
+// the repository. Precedence is given to retrieving the blob from the database,
+// then the filesytem.
 func dbFindOrCreateRepositoryBlob(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, desc distribution.Descriptor, repoPath string) (*models.Blob, error) {
 	rStore := datastore.NewRepositoryStore(db)
 	r, err := rStore.CreateOrFindByPath(ctx, repoPath)

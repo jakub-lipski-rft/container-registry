@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -106,7 +105,7 @@ type blobUploadHandler struct {
 	State blobUploadState
 }
 
-func dbMountBlob(ctx context.Context, db datastore.Queryer, fromRepoPath, toRepoPath string, d digest.Digest) error {
+func dbMountBlob(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, fromRepoPath, toRepoPath string, d digest.Digest) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
 		"source":      fromRepoPath,
 		"destination": toRepoPath,
@@ -114,33 +113,13 @@ func dbMountBlob(ctx context.Context, db datastore.Queryer, fromRepoPath, toRepo
 	})
 	log.Debug("cross repository blob mounting")
 
-	// find source repository
+	// find source blob from source repository
+	b, err := dbFindOrCreateRepositoryBlob(ctx, db, blobStatter, distribution.Descriptor{Digest: d}, fromRepoPath)
+	if err != nil {
+		return err
+	}
+
 	rStore := datastore.NewRepositoryStore(db)
-	srcRepo, err := rStore.FindByPath(ctx, fromRepoPath)
-	if err != nil {
-		return err
-	}
-	if srcRepo == nil {
-		return errors.New("source repository not found in database")
-	}
-
-	// find source blob which must be linked in the source repository
-	srcBlobs, err := rStore.Blobs(ctx, srcRepo)
-	if err != nil {
-		return err
-	}
-	var b *models.Blob
-	for _, blob := range srcBlobs {
-		if blob.Digest == d {
-			b = blob
-			break
-		}
-	}
-	if b == nil {
-		return errors.New("blob not found in database")
-	}
-
-	// create or find destination repository
 	destRepo, err := rStore.CreateOrFindByPath(ctx, toRepoPath)
 	if err != nil {
 		return err
@@ -171,12 +150,12 @@ func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		if ebm, ok := err.(distribution.ErrBlobMounted); ok {
 			if buh.Config.Database.Enabled {
-				if err := dbMountBlob(buh, buh.db, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
+				if err = dbMountBlob(buh, buh.db, blobs, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
 					e := fmt.Errorf("failed to mount blob in database: %v", err)
 					buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 				}
 			}
-			if err := buh.writeBlobCreatedHeaders(w, ebm.Descriptor); err != nil {
+			if err = buh.writeBlobCreatedHeaders(w, ebm.Descriptor); err != nil {
 				buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 			}
 		} else if err == distribution.ErrUnsupported {
