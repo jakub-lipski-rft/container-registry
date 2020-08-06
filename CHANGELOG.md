@@ -13,6 +13,7 @@
 
 ### Fixed
 - registry/api/v2: Text-charset selector removed from `application/json` content-type
+- registry/storage: Swift path generation now generates multiple directories as intended
 
 ## [v2.9.1-gitlab] - 2020-05-05
 ## Added
