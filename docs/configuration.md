@@ -232,7 +232,7 @@ reporting:
     licensekey: newreliclicensekey
     name: newrelicname
     verbose: true
-monitoring:
+profiling:
   stackdriver:
     service: registry
     serviceversion: 1.0.0
@@ -856,10 +856,10 @@ A valid configuration may contain both.
 | `name`    | no       | New Relic application name.                           |
 |  `verbose`| no       | Set to `true` to enable New Relic debugging output on `stdout`. |
 
-## `monitoring`
+## `profiling`
 
 ```
-monitoring:
+profiling:
   stackdriver:
     service: registry
     serviceversion: 1.0.0
@@ -867,7 +867,7 @@ monitoring:
     keyfile: /path/to/credentials.json
 ```
 
-The `monitoring` option is **optional** and configures external monitoring
+The `profiling` option is **optional** and configures external profiling
 services. At the moment only the Google Stackdriver Profiler is supported.
 
 - [Stackdriver](#stackdriver)

@@ -810,24 +810,24 @@ func TestParseHTTPMonitoringStackdriverEnabled(t *testing.T) {
 	yml := `
 version: 0.1
 storage: inmemory
-monitoring:
+profiling:
   stackdriver:
     enabled: %s
 `
 	tt := boolParameterTests(false)
 
 	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, strconv.FormatBool(got.Monitoring.Stackdriver.Enabled))
+		require.Equal(t, want, strconv.FormatBool(got.Profiling.Stackdriver.Enabled))
 	}
 
-	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_ENABLED", tt, validator)
+	testParameter(t, yml, "REGISTRY_PROFILING_STACKDRIVER_ENABLED", tt, validator)
 }
 
 func TestParseMonitoringStackdriver_Service(t *testing.T) {
 	yml := `
 version: 0.1
 storage: inmemory
-monitoring:
+profiling:
   stackdriver:
     service: %s
 `
@@ -844,17 +844,17 @@ monitoring:
 	}
 
 	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, got.Monitoring.Stackdriver.Service)
+		require.Equal(t, want, got.Profiling.Stackdriver.Service)
 	}
 
-	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_SERVICE", tt, validator)
+	testParameter(t, yml, "REGISTRY_PROFILING_STACKDRIVER_SERVICE", tt, validator)
 }
 
 func TestParseMonitoringStackdriver_ServiceVersion(t *testing.T) {
 	yml := `
 version: 0.1
 storage: inmemory
-monitoring:
+profiling:
   stackdriver:
     serviceversion: %s
 `
@@ -871,17 +871,17 @@ monitoring:
 	}
 
 	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, got.Monitoring.Stackdriver.ServiceVersion)
+		require.Equal(t, want, got.Profiling.Stackdriver.ServiceVersion)
 	}
 
-	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_SERVICEVERSION", tt, validator)
+	testParameter(t, yml, "REGISTRY_PROFILING_STACKDRIVER_SERVICEVERSION", tt, validator)
 }
 
 func TestParseMonitoringStackdriver_ProjectID(t *testing.T) {
 	yml := `
 version: 0.1
 storage: inmemory
-monitoring:
+profiling:
   stackdriver:
     projectid: %s
 `
@@ -898,17 +898,17 @@ monitoring:
 	}
 
 	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, got.Monitoring.Stackdriver.ProjectID)
+		require.Equal(t, want, got.Profiling.Stackdriver.ProjectID)
 	}
 
-	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_PROJECTID", tt, validator)
+	testParameter(t, yml, "REGISTRY_PROFILING_STACKDRIVER_PROJECTID", tt, validator)
 }
 
 func TestParseMonitoringStackdriver_KeyFile(t *testing.T) {
 	yml := `
 version: 0.1
 storage: inmemory
-monitoring:
+profiling:
   stackdriver:
     keyfile: %s
 `
@@ -925,10 +925,10 @@ monitoring:
 	}
 
 	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, got.Monitoring.Stackdriver.KeyFile)
+		require.Equal(t, want, got.Profiling.Stackdriver.KeyFile)
 	}
 
-	testParameter(t, yml, "REGISTRY_MONITORING_STACKDRIVER_KEYFILE", tt, validator)
+	testParameter(t, yml, "REGISTRY_PROFILING_STACKDRIVER_KEYFILE", tt, validator)
 }
 
 func TestParseRedisTLS_Enabled(t *testing.T) {
