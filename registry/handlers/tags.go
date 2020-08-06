@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -42,7 +41,7 @@ type tagsAPIResponse struct {
 func dbGetTags(ctx context.Context, db datastore.Queryer, repoPath string, n int, last string) ([]string, bool, error) {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "limit": n, "marker": last})
 	log.Debug("finding tags in database")
-	
+
 	rStore := datastore.NewRepositoryStore(db)
 	r, err := rStore.FindByPath(ctx, repoPath)
 	if err != nil {
@@ -163,13 +162,17 @@ type tagHandler struct {
 }
 
 func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tagName string) error {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "tag": tagName})
+	log.Debug("deleting tag from repository in database")
+
 	rStore := datastore.NewRepositoryStore(db)
 	r, err := rStore.FindByPath(ctx, repoPath)
 	if err != nil {
 		return err
 	}
 	if r == nil {
-		return errors.New("repository not found in database")
+		log.Warn("repository not found in database, no need to delete tag")
+		return nil
 	}
 
 	t, err := rStore.FindTagByName(ctx, r, tagName)
@@ -177,7 +180,8 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if t == nil {
-		return errors.New("tag not found in database")
+		log.Warn("tag not found in database, no need to delete tag")
+		return nil
 	}
 
 	tStore := datastore.NewTagStore(db)
