@@ -497,7 +497,7 @@ var ImportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		tx, err := db.Begin()
+		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create database transaction: %v", err)
 			os.Exit(1)
