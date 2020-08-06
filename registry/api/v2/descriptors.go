@@ -134,7 +134,7 @@ var (
 			},
 		},
 		Body: BodyDescriptor{
-			ContentType: "application/json; charset=utf-8",
+			ContentType: "application/json",
 			Format:      errorsBody,
 		},
 		ErrorCodes: []errcode.ErrorCode{
@@ -155,7 +155,7 @@ var (
 			},
 		},
 		Body: BodyDescriptor{
-			ContentType: "application/json; charset=utf-8",
+			ContentType: "application/json",
 			Format:      errorsBody,
 		},
 		ErrorCodes: []errcode.ErrorCode{
@@ -176,7 +176,7 @@ var (
 			},
 		},
 		Body: BodyDescriptor{
-			ContentType: "application/json; charset=utf-8",
+			ContentType: "application/json",
 			Format:      errorsBody,
 		},
 		ErrorCodes: []errcode.ErrorCode{
@@ -197,7 +197,7 @@ var (
 			},
 		},
 		Body: BodyDescriptor{
-			ContentType: "application/json; charset=utf-8",
+			ContentType: "application/json",
 			Format:      errorsBody,
 		},
 		ErrorCodes: []errcode.ErrorCode{
@@ -463,7 +463,7 @@ var routeDescriptors = []RouteDescriptor{
 									},
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format: `{
     "name": <name>,
     "tags": [
@@ -500,7 +500,7 @@ var routeDescriptors = []RouteDescriptor{
 									linkHeader,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format: `{
     "name": <name>,
     "tags": [
@@ -632,7 +632,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeTagInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -683,7 +683,7 @@ var routeDescriptors = []RouteDescriptor{
 								Description: "The received manifest was invalid in some way, as described by the error codes. The client should resolve the issue and retry the request.",
 								StatusCode:  http.StatusBadRequest,
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
@@ -706,7 +706,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format: `{
     "errors:" [{
             "code": "BLOB_UNKNOWN",
@@ -760,7 +760,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeTagInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -777,7 +777,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeManifestUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -857,7 +857,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeDigestInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -865,7 +865,7 @@ var routeDescriptors = []RouteDescriptor{
 								Description: "The blob, identified by `name` and `digest`, is unknown to the registry.",
 								StatusCode:  http.StatusNotFound,
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
@@ -929,7 +929,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeDigestInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -940,7 +940,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -996,7 +996,7 @@ var routeDescriptors = []RouteDescriptor{
 								Description: "The blob, identified by `name` and `digest`, is unknown to the registry.",
 								StatusCode:  http.StatusNotFound,
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
@@ -1008,7 +1008,7 @@ var routeDescriptors = []RouteDescriptor{
 								Description: "Blob delete is not allowed because the registry is configured as a pull-through cache or `delete` has been disabled",
 								StatusCode:  http.StatusMethodNotAllowed,
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 								ErrorCodes: []errcode.ErrorCode{
@@ -1270,7 +1270,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1281,7 +1281,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1345,7 +1345,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1356,7 +1356,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1427,7 +1427,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1438,7 +1438,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1522,7 +1522,7 @@ var routeDescriptors = []RouteDescriptor{
 									errcode.ErrorCodeUnsupported,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1533,7 +1533,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1579,7 +1579,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadInvalid,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1590,7 +1590,7 @@ var routeDescriptors = []RouteDescriptor{
 									ErrorCodeBlobUploadUnknown,
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format:      errorsBody,
 								},
 							},
@@ -1630,7 +1630,7 @@ var routeDescriptors = []RouteDescriptor{
 									},
 								},
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format: `{
 	"repositories": [
 		<name>,
@@ -1649,7 +1649,7 @@ var routeDescriptors = []RouteDescriptor{
 							{
 								StatusCode: http.StatusOK,
 								Body: BodyDescriptor{
-									ContentType: "application/json; charset=utf-8",
+									ContentType: "application/json",
 									Format: `{
 	"repositories": [
 		<name>,

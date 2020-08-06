@@ -11,6 +11,9 @@
 - registry: Add TLS support for Redis
 - registry: Add support for Redis Sentinel
 
+### Fixed
+- registry/api/v2: Text-charset selector removed from `application/json` content-type
+
 ## [v2.9.1-gitlab] - 2020-05-05
 ## Added
 - registry/api/v2: Show version and supported extra features in custom headers
