@@ -66,7 +66,7 @@ func TestDeleteTagDB_RepositoryNotFound(t *testing.T) {
 	defer env.shutdown(t)
 
 	err := dbDeleteTag(env.ctx, env.db, "foo", "bar")
-	require.Error(t, err, "repository not found in database")
+	require.NoError(t, err)
 }
 
 func TestDeleteTagDB_TagNotFound(t *testing.T) {
@@ -80,5 +80,5 @@ func TestDeleteTagDB_TagNotFound(t *testing.T) {
 	require.NotNil(t, r)
 
 	err = dbDeleteTag(env.ctx, env.db, r.Path, "bar")
-	require.Error(t, err, "tag not found in database")
+	require.NoError(t, err)
 }
