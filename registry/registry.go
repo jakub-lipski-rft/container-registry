@@ -345,7 +345,7 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 	opts := []monitoring.Option{
 		monitoring.WithListenerAddress(debugAddr),
 		monitoring.WithMetricsHandlerPattern(metricsPath),
-		monitoring.WithProfilerCredentialsFile(config.Monitoring.Stackdriver.KeyFile),
+		monitoring.WithProfilerCredentialsFile(config.Profiling.Stackdriver.KeyFile),
 		monitoring.WithBuildInformation(version.Version, version.BuildTime),
 		monitoring.WithBuildExtraLabels(map[string]string{
 			"package":  version.Package,
@@ -365,7 +365,7 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 		log.WithFields(log.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
 	}
 
-	if !config.Monitoring.Stackdriver.Enabled {
+	if !config.Profiling.Stackdriver.Enabled {
 		opts = append(opts, monitoring.WithoutContinuousProfiling())
 	} else {
 		if err := configureStackdriver(config); err != nil {
@@ -379,7 +379,7 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 }
 
 func configureStackdriver(config *configuration.Configuration) error {
-	if !config.Monitoring.Stackdriver.Enabled {
+	if !config.Profiling.Stackdriver.Enabled {
 		return nil
 	}
 
@@ -391,9 +391,9 @@ func configureStackdriver(config *configuration.Configuration) error {
 	// if it's not set then we must set it based on the registry settings, with URL encoded settings for Stackdriver,
 	// see https://pkg.go.dev/gitlab.com/gitlab-org/labkit/monitoring?tab=doc for details.
 	if _, ok := os.LookupEnv(envVar); !ok {
-		service = config.Monitoring.Stackdriver.Service
-		serviceVersion = config.Monitoring.Stackdriver.ServiceVersion
-		projectID = config.Monitoring.Stackdriver.ProjectID
+		service = config.Profiling.Stackdriver.Service
+		serviceVersion = config.Profiling.Stackdriver.ServiceVersion
+		projectID = config.Profiling.Stackdriver.ProjectID
 
 		u, err := url.Parse("stackdriver")
 		if err != nil {

@@ -130,7 +130,7 @@ func TestConfigureStackDriver_Disabled(t *testing.T) {
 
 func TestConfigureStackDriver_Enabled(t *testing.T) {
 	config := &configuration.Configuration{
-		Monitoring: configuration.Monitoring{
+		Profiling: configuration.Profiling{
 			Stackdriver: configuration.StackdriverProfiler{
 				Enabled: true,
 			},
@@ -145,7 +145,7 @@ func TestConfigureStackDriver_Enabled(t *testing.T) {
 
 func TestConfigureStackDriver_WithParams(t *testing.T) {
 	config := &configuration.Configuration{
-		Monitoring: configuration.Monitoring{
+		Profiling: configuration.Profiling{
 			Stackdriver: configuration.StackdriverProfiler{
 				Enabled:        true,
 				Service:        "registry",
@@ -165,7 +165,7 @@ func TestConfigureStackDriver_WithParams(t *testing.T) {
 
 func TestConfigureStackDriver_WithKeyFile(t *testing.T) {
 	config := &configuration.Configuration{
-		Monitoring: configuration.Monitoring{
+		Profiling: configuration.Profiling{
 			Stackdriver: configuration.StackdriverProfiler{
 				Enabled: true,
 				KeyFile: "/path/to/credentials.json",
@@ -185,7 +185,7 @@ func TestConfigureStackDriver_DoesNotOverrideGitlabContinuousProfilingEnvVar(t *
 	require.NoError(t, os.Setenv("GITLAB_CONTINUOUS_PROFILING", value))
 
 	config := &configuration.Configuration{
-		Monitoring: configuration.Monitoring{
+		Profiling: configuration.Profiling{
 			Stackdriver: configuration.StackdriverProfiler{
 				Enabled:        true,
 				Service:        "registry",

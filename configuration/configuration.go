@@ -77,8 +77,8 @@ type Configuration struct {
 	// Reporting is the configuration for error reporting
 	Reporting Reporting `yaml:"reporting,omitempty"`
 
-	// Monitoring configures external monitoring services.
-	Monitoring Monitoring `yaml:"monitoring,omitempty"`
+	// Profiling configures external profiling services.
+	Profiling Profiling `yaml:"profiling,omitempty"`
 
 	// HTTP contains configuration parameters for the registry's http
 	// interface.
@@ -274,8 +274,8 @@ type Configuration struct {
 	} `yaml:"policy,omitempty"`
 }
 
-// Monitoring configures external monitoring services.
-type Monitoring struct {
+// Profiling configures external profiling services.
+type Profiling struct {
 	Stackdriver StackdriverProfiler `yaml:"stackdriver,omitempty"`
 }
 
