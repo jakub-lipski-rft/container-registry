@@ -1100,6 +1100,7 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 // within the repository are also deleted.
 func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
+	log.Debug("deleting manifest from repository in database")
 
 	rStore := datastore.NewRepositoryStore(db)
 	r, err := rStore.FindByPath(ctx, repoPath)
@@ -1107,7 +1108,8 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return err
 	}
 	if r == nil {
-		return fmt.Errorf("repository not found in database: %w", err)
+		log.Warn("repository not found in database, no need to unlink from the manifest")
+		return nil
 	}
 
 	m, err := rStore.FindManifestByDigest(ctx, r, d)
@@ -1115,7 +1117,8 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return err
 	}
 	if m == nil {
-		return errors.New("no manifest found in database")
+		log.Warn("manifest not found in database, no need to unlink it from the repository")
+		return nil
 	}
 
 	log.Debug("manifest found in database")
@@ -1163,7 +1166,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 	}
 
 	for _, tag := range referencedTags {
-		if err := tagService.Untag(imh, tag); err != nil {
+		if err = tagService.Untag(imh, tag); err != nil {
 			imh.Errors = append(imh.Errors, err)
 			return
 		}
@@ -1184,7 +1187,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		if err := tx.Commit(); err != nil {
+		if err = tx.Commit(); err != nil {
 			e := fmt.Errorf("failed to commit database transaction: %v", err)
 			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return

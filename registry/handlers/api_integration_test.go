@@ -1892,13 +1892,7 @@ func TestManifestAPI_Get_Schema2FilesystemFallback(t *testing.T) {
 		t.Skip("skipping test because the metadata database is not enabled")
 	}
 
-	// Disable the database so writes only go to the filesytem.
-	env.config.Database.Enabled = false
-
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
-
-	// Enable the database again so that reads first check the database.
-	env.config.Database.Enabled = true
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -2195,13 +2189,7 @@ func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotInDatabase(t *testing
 		t.Skip("skipping test because the metadata database is not enabled")
 	}
 
-	// Disable the database so writes only go to the filesytem.
-	env.config.Database.Enabled = false
-
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath)
-
-	// Enable the database again so that reads first check the database.
-	env.config.Database.Enabled = true
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, writeToFilesystemOnly)
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -2773,6 +2761,72 @@ func TestManifestAPI_Get_Schema2ByDigestNoAcceptHeaders(t *testing.T) {
 	require.EqualValues(t, deserializedManifest, fetchedManifest)
 }
 
+func TestManifestAPI_Delete_Schema2(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	tagName := "schema2deletetag"
+	repoPath := "schema2/delete"
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+}
+
+func TestManifestAPI_Delete_Schema2FilesystemFallbackRepositoryNotInDatabase(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	tagName := "schema2deletefallbacktag"
+	repoPath := "schema2/deletefallback"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+}
+
+func TestManifestAPI_Delete_Schema2FilesystemFallbackManifestNotInDatabase(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	tagName := "schema2deletefallbacktag"
+	repoPath := "schema2/deletefallback"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Push a random schema 2 manifest to the repository so that it is present in
+	// the database, so only the manifest is not present in the database.
+	seedRandomSchema2Manifest(t, env, repoPath, putByDigest)
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+}
+
 func TestManifestAPI_Put_OCIByTag(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -2805,13 +2859,7 @@ func TestManifestAPI_Put_OCIFilesystemFallbackLayersNotInDatabase(t *testing.T) 
 		t.Skip("skipping test because the metadata database is not enabled")
 	}
 
-	// Disable the database so writes only go to the filesytem.
-	env.config.Database.Enabled = false
-
-	deserializedManifest := seedRandomOCIManifest(t, env, repoPath)
-
-	// Enable the database again so that reads first check the database.
-	env.config.Database.Enabled = true
+	deserializedManifest := seedRandomOCIManifest(t, env, repoPath, writeToFilesystemOnly)
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -3155,13 +3203,7 @@ func TestManifestAPI_Get_OCIIndexFilesystemFallback(t *testing.T) {
 	tagName := "ociindexfallbacktag"
 	repoPath := "ociindex/fallback"
 
-	// Disable the database so writes only go to the filesytem.
-	env.config.Database.Enabled = false
-
-	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName))
-
-	// Enable the database again so that reads first check the database.
-	env.config.Database.Enabled = true
+	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
 
 	// Build URLs.
 	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
@@ -3269,15 +3311,15 @@ func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
 
 // TODO: Break out logic from testManifestDelete into these tests.
 // https://gitlab.com/gitlab-org/container-registry/-/issues/144
-func TestManifestAPI_Delete_Schema2(t *testing.T)                  {}
 func TestManifestAPI_Delete_Schema2PreviouslyDeleted(t *testing.T) {}
 func TestManifestAPI_Delete_Schema2UnknownManifest(t *testing.T)   {}
 func TestManifestAPI_Delete_Schema2Reupload(t *testing.T)          {}
 func TestManifestAPI_Delete_Schema2ClearsTags(t *testing.T)        {}
 
 type manifestOpts struct {
-	manifestURL string
-	putManifest bool
+	manifestURL           string
+	putManifest           bool
+	writeToFilesystemOnly bool
 
 	// Non-optional values which be passed through by the testing func for ease of use.
 	repoPath string
@@ -3294,6 +3336,12 @@ func putByTag(tagName string) manifestOptsFunc {
 
 func putByDigest(t *testing.T, env *testEnv, opts *manifestOpts) {
 	opts.putManifest = true
+}
+
+func writeToFilesystemOnly(t *testing.T, env *testEnv, opts *manifestOpts) {
+	require.True(t, env.config.Database.Enabled, "this option is only available when the database is enabled")
+
+	opts.writeToFilesystemOnly = true
 }
 
 func schema2Config() ([]byte, distribution.Descriptor) {
@@ -3335,6 +3383,11 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string, opts
 
 	for _, o := range opts {
 		o(t, env, config)
+	}
+
+	if config.writeToFilesystemOnly {
+		env.config.Database.Enabled = false
+		defer func() { env.config.Database.Enabled = true }()
 	}
 
 	repoRef, err := reference.WithName(repoPath)
