@@ -3,6 +3,7 @@ package datastore
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"io/ioutil"
 	"regexp"
 	"strconv"
@@ -163,14 +164,24 @@ func (sl *statementLogger) statement(statement string, args ...interface{}) func
 		return func() {}
 	}
 
-	s := regexp.MustCompile(`\s+|\t+|\n+`).ReplaceAllString(statement, " ")
+	a := make([]interface{}, len(args))
+	whitespace := regexp.MustCompile(`\s+|\t+|\n+`)
 
-	l := sl.WithFields(logrus.Fields{"statement": s, "args": args})
-	l.Debug("begin query")
+	// Copy args to prevent mutating the real payload as it is formatted.
+	for i := range args {
+		a[i] = args[i]
 
+		if payload, ok := a[i].(json.RawMessage); ok {
+			a[i] = whitespace.ReplaceAllString(string(payload), " ")
+		}
+	}
+
+	s := whitespace.ReplaceAllString(statement, " ")
+	l := sl.WithFields(logrus.Fields{"statement": s, "args": a})
 	start := time.Now()
+
 	return func() {
-		l.WithFields(logrus.Fields{"duration_us": time.Since(start).Microseconds()}).Debug("end query")
+		l.WithFields(logrus.Fields{"duration_us": time.Since(start).Microseconds()}).Debug("query")
 	}
 }
 
