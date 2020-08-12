@@ -142,6 +142,10 @@ database:migrations Go 1.14:
   extends: .database:migrations
   image: golang:1.14-buster
 
+database:migrations Go 1.15:
+  extends: .database:migrations
+  image: golang:1.15-buster
+
 database:datastore Go 1.13:
   extends: .database:datastore
   image: golang:1.13-buster
@@ -149,6 +153,10 @@ database:datastore Go 1.13:
 database:datastore Go 1.14:
   extends: .database:datastore
   image: golang:1.14-buster
+
+database:datastore Go 1.15:
+  extends: .database:datastore
+  image: golang:1.15-buster
 
 database:api Go 1.13:
   extends: .database:api
@@ -158,6 +166,10 @@ database:api Go 1.14:
   extends: .database:api
   image: golang:1.14-buster
 
+database:api Go 1.15:
+  extends: .database:api
+  image: golang:1.15-buster
+
 api Go 1.13:
   extends: .api
   image: golang:1.13-buster
@@ -165,6 +177,10 @@ api Go 1.13:
 api Go 1.14:
   extends: .api
   image: golang:1.14-buster
+
+api Go 1.15:
+  extends: .api
+  image: golang:1.15-buster
 
 filesystem storage driver Go 1.13:
   extends: .filesystem
@@ -174,6 +190,10 @@ filesystem storage driver Go 1.14:
   extends: .filesystem
   image: golang:1.14-buster
 
+filesystem storage driver Go 1.15:
+  extends: .filesystem
+  image: golang:1.15-buster
+
 inmemory storage driver Go 1.13:
   extends: .inmemory
   image: golang:1.13-buster
@@ -181,6 +201,10 @@ inmemory storage driver Go 1.13:
 inmemory storage driver Go 1.14:
   extends: .inmemory
   image: golang:1.14-buster
+
+inmemory storage driver Go 1.15:
+  extends: .inmemory
+  image: golang:1.15-buster
 
 swift storage driver Go 1.13:
   extends: .swift
@@ -190,6 +214,10 @@ swift storage driver Go 1.14:
   extends: .swift
   image: golang:1.14-buster
 
+swift storage driver Go 1.15:
+  extends: .swift
+  image: golang:1.15-buster
+
 s3 storage driver Go 1.13:
   extends: .s3-aws
   image: golang:1.13-buster
@@ -198,6 +226,10 @@ s3 storage driver Go 1.14:
   extends: .s3-aws
   image: golang:1.14-buster
 
+s3 storage driver Go 1.15:
+  extends: .s3-aws
+  image: golang:1.15-buster
+
 verify Go 1.13:
   extends: .verify
   image: golang:1.13-buster
@@ -205,6 +237,10 @@ verify Go 1.13:
 verify Go 1.14:
   extends: .verify
   image: golang:1.14-buster
+
+verify Go 1.15:
+  extends: .verify
+  image: golang:1.15-buster
 
 .cache:redis: &cache-redis
   stage: integration
@@ -223,6 +259,10 @@ cache:redis Go 1.13:
 cache:redis Go 1.14:
   extends: .cache:redis
   image: golang:1.14-buster
+
+cache:redis Go 1.15:
+  extends: .cache:redis
+  image: golang:1.15-buster
 
 .cache:redis-sentinel:
   <<: *cache-redis
@@ -247,4 +287,8 @@ cache:redis-sentinel Go 1.13:
 
 cache:redis-sentinel Go 1.14:
   extends: .cache:redis-sentinel
-  image: golang:1.13-buster
+  image: golang:1.14-buster
+
+cache:redis-sentinel Go 1.15:
+  extends: .cache:redis-sentinel
+  image: golang:1.15-buster

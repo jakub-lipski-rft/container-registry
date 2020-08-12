@@ -462,7 +462,7 @@ func testDeleteFilesError(t *testing.T, mock s3iface.S3API, numFiles int) (int, 
 	// simulate deleting numFiles files
 	paths := make([]string, 0, numFiles)
 	for i := 0; i < numFiles; i++ {
-		paths = append(paths, string(rand.Int()))
+		paths = append(paths, strconv.Itoa(rand.Int()))
 	}
 
 	return d.DeleteFiles(context.Background(), paths)
