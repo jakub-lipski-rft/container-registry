@@ -1098,7 +1098,7 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 // a manifest from the database (that's a task for GC, if a manifest is unreferenced), it only deletes the record that
 // associates the manifest with a digest d with the repository with path repoPath. Any tags that reference the manifest
 // within the repository are also deleted.
-func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
+func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest, fallback bool) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
 	log.Debug("deleting manifest from repository in database")
 
@@ -1108,8 +1108,12 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return err
 	}
 	if r == nil {
-		log.Warn("repository not found in database, no need to unlink from the manifest")
-		return nil
+		if fallback {
+			log.Warn("repository not found in database, no need to unlink from the manifest")
+			return nil
+		}
+
+		return fmt.Errorf("repository not found in database: %w", err)
 	}
 
 	m, err := rStore.FindManifestByDigest(ctx, r, d)
@@ -1117,8 +1121,12 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return err
 	}
 	if m == nil {
-		log.Warn("manifest not found in database, no need to unlink it from the repository")
-		return nil
+		if fallback {
+			log.Warn("manifest not found in database, no need to unlink it from the repository")
+			return nil
+		}
+
+		return fmt.Errorf("manifest not found in database: %w", err)
 	}
 
 	log.Debug("manifest found in database")
@@ -1181,7 +1189,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 		}
 		defer tx.Rollback()
 
-		if err = dbDeleteManifest(imh, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
+		if err = dbDeleteManifest(imh, tx, imh.Repository.Named().String(), imh.Digest, imh.App.Config.Database.Experimental.Fallback); err != nil {
 			e := fmt.Errorf("failed to delete manifest in database: %v", err)
 			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return

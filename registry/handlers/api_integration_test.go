@@ -1907,7 +1907,7 @@ func TestManifestAPI_Get_Schema2MatchingEtag(t *testing.T) {
 }
 
 func TestManifestAPI_Get_Schema2FilesystemFallback(t *testing.T) {
-	env := newTestEnv(t)
+	env := newTestEnv(t, withFilesystemFallback)
 	defer env.Shutdown()
 
 	tagName := "schema2fallbacktag"
@@ -2804,8 +2804,8 @@ func TestManifestAPI_Delete_Schema2(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 }
 
-func TestManifestAPI_Delete_Schema2FilesystemFallbackRepositoryNotInDatabase(t *testing.T) {
-	env := newTestEnv(t, withDelete)
+func TestManifestAPI_Delete_Schema2RepositoryNotInDatabaseFilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withDelete, withFilesystemFallback)
 	defer env.Shutdown()
 
 	tagName := "schema2deletefallbacktag"
@@ -2826,8 +2826,34 @@ func TestManifestAPI_Delete_Schema2FilesystemFallbackRepositoryNotInDatabase(t *
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 }
 
-func TestManifestAPI_Delete_Schema2FilesystemFallbackManifestNotInDatabase(t *testing.T) {
+func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
 	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	tagName := "schema2deletetag"
+	repoPath := "schema2/delete"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Push a random schema 2 manifest to the repository so that it is present in
+	// the database, so only the manifest is not present in the database.
+	seedRandomSchema2Manifest(t, env, repoPath, putByDigest)
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+}
+
+func TestManifestAPI_Delete_Schema2ManifestNotInDatabaseFilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withDelete, withFilesystemFallback)
 	defer env.Shutdown()
 
 	tagName := "schema2deletefallbacktag"
