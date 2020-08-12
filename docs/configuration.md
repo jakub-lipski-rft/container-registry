@@ -186,6 +186,8 @@ database:
     maxidle: 25
     maxopen: 25
     maxlifetime: 5m
+  experimental:
+    fallback: true
 auth:
   silly:
     realm: silly-realm
@@ -634,6 +636,8 @@ database:
     maxidle: 25
     maxopen: 25
     maxlifetime: 5m
+  experimental:
+    fallback: true
 ```
 
 | Parameter  | Required | Description                                                                                                                                                                                                                                          |
@@ -666,6 +670,19 @@ Use these settings to configure the behavior of the database connection pool.
 | `maxidle` | no       | The maximum number of connections in the idle connection pool. If `maxopen` is less than `maxidle`, then `maxidle` is reduced to match the `maxopen` limit. Defaults to 0 (no idle connections).   |
 | `maxopen`| no      | The maximum number of open connections to the database. If `maxopen` is less than `maxidle`, then `maxidle` is reduced to match the `maxopen` limit. Defaults to 0 (unlimited). |
 | `maxlifetime`| no    | The maximum amount of time a connection may be reused. Expired connections may be closed lazily before reuse. Defaults to 0 (unlimited). |
+
+### `experimental`
+
+```none
+experimental:
+  fallback: true
+```
+
+Use these settings to configure experimental behavior of the database. Please note that these settings are unstable and may be removed at any time.
+
+| Parameter | Required | Description                                           |
+|-----------|----------|-------------------------------------------------------|
+| `fallback` | no      | Enable trying to read data from the filesystem if the metadata is not found in the database. New manifests which reference layers that only exist in the filesystem will add those layers to the database. |
 
 ## `auth`
 
