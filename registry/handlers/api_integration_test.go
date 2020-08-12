@@ -86,6 +86,10 @@ func withSharedInMemoryDriver(name string) configOpt {
 	}
 }
 
+func withFilesystemFallback(config *configuration.Configuration) {
+	config.Database.Experimental.Fallback = true
+}
+
 var headerConfig = http.Header{
 	"X-Content-Type-Options": []string{"nosniff"},
 }
@@ -615,8 +619,29 @@ func TestBlobAPI_Head_BlobNotFound(t *testing.T) {
 	require.Equal(t, http.NoBody, res.Body)
 }
 
-func TestBlobAPI_Delete_FilesystemFallback(t *testing.T) {
+func TestBlobAPI_Delete(t *testing.T) {
 	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_Delete_FilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withDelete, withFilesystemFallback)
 	defer env.Shutdown()
 
 	if !env.config.Database.Enabled {

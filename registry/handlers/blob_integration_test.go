@@ -105,7 +105,7 @@ func TestDeleteBlobDB(t *testing.T) {
 
 	// Test
 
-	err = dbDeleteBlob(env.ctx, env.db, r.Path, b.Digest)
+	err = dbDeleteBlob(env.ctx, env.db, r.Path, b.Digest, false)
 	require.NoError(t, err)
 
 	// the layer blob should still be there
@@ -123,8 +123,8 @@ func TestDeleteBlobDB_RepositoryNotFound(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
-	err := dbDeleteBlob(env.ctx, env.db, "foo", "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
-	require.NoError(t, err)
+	err := dbDeleteBlob(env.ctx, env.db, "foo", "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9", false)
+	require.Error(t, err)
 }
 
 func TestDeleteBlobDB_BlobNotFound(t *testing.T) {
@@ -137,6 +137,28 @@ func TestDeleteBlobDB_BlobNotFound(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	err = dbDeleteBlob(env.ctx, env.db, r.Path, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	err = dbDeleteBlob(env.ctx, env.db, r.Path, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9", false)
+	require.Error(t, err)
+}
+
+func TestDeleteBlobDB_RepositoryNotFoundFallback(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	err := dbDeleteBlob(env.ctx, env.db, "foo", "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9", true)
+	require.NoError(t, err)
+}
+
+func TestDeleteBlobDB_BlobNotFoundFallback(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	// build test repository
+	rStore := datastore.NewRepositoryStore(env.db)
+	r, err := rStore.CreateByPath(env.ctx, "foo")
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	err = dbDeleteBlob(env.ctx, env.db, r.Path, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9", true)
 	require.NoError(t, err)
 }

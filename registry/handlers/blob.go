@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -121,7 +122,7 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 
 // dbDeleteBlob does not actually delete a blob from the database (that's GC's responsibility), it only unlinks it from
 // a repository.
-func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
+func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest, fallback bool) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
 	log.Debug("deleting blob from repository in database")
 
@@ -131,8 +132,12 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		return err
 	}
 	if r == nil {
-		log.Warn("repository not found in database, no need to unlink from the blob")
-		return nil
+		if fallback {
+			log.Warn("repository not found in database, no need to unlink from the blob")
+			return nil
+		}
+
+		return errors.New("repository not found in database")
 	}
 
 	bb, err := rStore.Blobs(ctx, r)
@@ -148,8 +153,12 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		}
 	}
 	if b == nil {
-		log.Warn("blob not found in database, no need to unlink it from the repository")
-		return nil
+		if fallback {
+			log.Warn("blob not found in database, no need to unlink it from the repository")
+			return nil
+		}
+
+		return errors.New("blob not found in database")
 	}
 
 	return rStore.UnlinkBlob(ctx, r, b)
@@ -177,7 +186,7 @@ func (bh *blobHandler) DeleteBlob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if bh.App.Config.Database.Enabled {
-		if err := dbDeleteBlob(bh, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
+		if err := dbDeleteBlob(bh, bh.db, bh.Repository.Named().Name(), bh.Digest, bh.App.Config.Database.Experimental.Fallback); err != nil {
 			e := fmt.Errorf("failed to delete blob in database: %v", err)
 			bh.Errors = append(bh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return
