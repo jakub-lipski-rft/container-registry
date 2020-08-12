@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -161,7 +162,7 @@ type tagHandler struct {
 	Tag string
 }
 
-func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tagName string) error {
+func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tagName string, fallback bool) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "tag": tagName})
 	log.Debug("deleting tag from repository in database")
 
@@ -171,8 +172,12 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if r == nil {
-		log.Warn("repository not found in database, no need to delete tag")
-		return nil
+		if fallback {
+			log.Warn("repository not found in database, no need to delete tag")
+			return nil
+		}
+
+		return errors.New("repository not found in database")
 	}
 
 	t, err := rStore.FindTagByName(ctx, r, tagName)
@@ -180,8 +185,12 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if t == nil {
-		log.Warn("tag not found in database, no need to delete tag")
-		return nil
+		if fallback {
+			log.Warn("tag not found in database, no need to delete tag")
+			return nil
+		}
+
+		return errors.New("tag not found in database")
 	}
 
 	tStore := datastore.NewTagStore(db)
@@ -210,7 +219,7 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if th.App.Config.Database.Enabled {
-		if err := dbDeleteTag(th, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
+		if err := dbDeleteTag(th, th.db, th.Repository.Named().Name(), th.Tag, th.App.Config.Database.Experimental.Fallback); err != nil {
 			e := fmt.Errorf("failed to delete tag in database: %v", err)
 			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return
