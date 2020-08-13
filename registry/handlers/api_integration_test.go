@@ -468,8 +468,33 @@ func TestBlobAPI_Get(t *testing.T) {
 	require.True(t, v.Verified())
 }
 
-func TestBlobAPI_Get_FilesystemFallback(t *testing.T) {
+func TestBlobAPI_Get_BlobNotInDatabase(t *testing.T) {
 	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Disable the database so writes only go to the filesytem.
+	env.config.Database.Enabled = false
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Enable the database again so that reads first check the database.
+	env.config.Database.Enabled = true
+
+	// fetch layer
+	res, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestBlobAPI_Get_BlobNotInDatabaseFilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withFilesystemFallback)
 	defer env.Shutdown()
 
 	if !env.config.Database.Enabled {

@@ -109,7 +109,12 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 
 	if bh.Config.Database.Enabled {
 		if err := dbGetBlob(bh.Context, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
-			dcontext.GetLogger(bh).WithError(err).Warn("unable to fetch blob from database, falling back to filesystem")
+			if bh.App.Config.Database.Experimental.Fallback {
+				dcontext.GetLogger(bh).WithError(err).Warn("unable to fetch blob from database, falling back to filesystem")
+			} else {
+				bh.Errors = append(bh.Errors, err)
+				return
+			}
 		}
 	}
 
