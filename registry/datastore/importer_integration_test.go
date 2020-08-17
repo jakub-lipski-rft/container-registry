@@ -71,33 +71,65 @@ func overrideDynamicData(tb testing.TB, actual []byte) []byte {
 	return actual
 }
 
-func TestImporter_Import(t *testing.T) {
-	require.NoError(t, testutil.TruncateAllTables(suite.db))
+func newImporter(t *testing.T, tx *datastore.Tx) *datastore.Importer {
+	t.Helper()
 
 	driver := newFilesystemStorageDriver(t)
 	registry := newRegistry(t, driver)
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err, "error starting transaction")
-	defer func() {
-		require.NoError(t, tx.Rollback(), "error rolling back transaction")
-	}()
+	return datastore.NewImporter(tx, driver, registry)
+}
 
-	imp := datastore.NewImporter(tx, driver, registry)
-	require.NoError(t, imp.Import(suite.ctx))
+// Dump each table as JSON and compare the output against reference snapshots (.golden files)
+func validateImport(t *testing.T, tx *datastore.Tx) {
+	t.Helper()
 
-	// dump each table as JSON and compare the output against reference snapshots (.golden files)
 	for _, tt := range testutil.AllTables {
 		t.Run(string(tt), func(t *testing.T) {
 			actual, err := tt.DumpAsJSON(suite.ctx, tx)
 			require.NoError(t, err, "error dumping table")
 
-			// see testdata/golden/TestImporter_Import/<table>.golden
+			// see testdata/golden/<test name>/<table>.golden
 			p := filepath.Join(suite.goldenPath, t.Name()+".golden")
 			actual = overrideDynamicData(t, actual)
 			testutil.CompareWithGoldenFile(t, p, actual, *create, *update)
 		})
 	}
+}
+
+func TestImporter_ImportAll(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	imp := newImporter(t, tx)
+	require.NoError(t, imp.ImportAll(suite.ctx))
+	validateImport(t, tx)
+}
+
+func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
+	driver := newFilesystemStorageDriver(t)
+	registry := newRegistry(t, driver)
+
+	// load some fixtures
+	reloadRepositoryFixtures(t)
+
+	imp := datastore.NewImporter(suite.db, driver, registry)
+	require.Error(t, imp.ImportAll(suite.ctx))
+}
+
+func TestImporter_Import(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	imp := newImporter(t, tx)
+	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
+	validateImport(t, tx)
 }
 
 func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
@@ -108,5 +140,5 @@ func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
 	imp := datastore.NewImporter(suite.db, driver, registry)
-	require.Error(t, imp.Import(suite.ctx), "non-empty database")
+	require.Error(t, imp.Import(suite.ctx, "a-simple"))
 }

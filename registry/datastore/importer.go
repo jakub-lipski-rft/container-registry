@@ -505,11 +505,11 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	numManifestConfigs, err := imp.configurationStore.Count(ctx)
+	numConfigs, err := imp.configurationStore.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
-	numLayers, err := imp.blobStore.Count(ctx)
+	numBlobs, err := imp.blobStore.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -521,8 +521,8 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	count := map[string]int{
 		"repositories":   numRepositories,
 		"manifests":      numManifests,
-		"configurations": numManifestConfigs,
-		"layers":         numLayers,
+		"configurations": numConfigs,
+		"blobs":          numBlobs,
 		"tags":           numTags,
 	}
 
@@ -544,8 +544,8 @@ func (imp *Importer) isDatabaseEmpty(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// Import populates the registry database based on the metadata from the storage backend.
-func (imp *Importer) Import(ctx context.Context) error {
+// ImportAll populates the registry database with metadata from all repositories in the storage backend.
+func (imp *Importer) ImportAll(ctx context.Context) error {
 	start := time.Now()
 	logrus.Info("starting metadata import")
 
@@ -583,6 +583,43 @@ func (imp *Importer) Import(ctx context.Context) error {
 		return nil
 	})
 	if err != nil {
+		return err
+	}
+
+	counters, err := imp.countRows(ctx)
+	if err != nil {
+		logrus.WithError(err).Error("error counting table rows")
+	}
+
+	logCounters := make(map[string]interface{}, len(counters))
+	for t, n := range counters {
+		logCounters[t] = n
+	}
+
+	t := time.Since(start).Seconds()
+	logrus.WithField("duration_s", t).WithFields(logCounters).Info("metadata import complete")
+
+	return err
+}
+
+// Import populates the registry database with metadata from a specific repository in the storage backend.
+func (imp *Importer) Import(ctx context.Context, path string) error {
+	start := time.Now()
+	logrus.Info("starting metadata import")
+
+	empty, err := imp.isDatabaseEmpty(ctx)
+	if err != nil {
+		return fmt.Errorf("error checking if database is empty: %w", err)
+	}
+	if !empty {
+		return errors.New("non-empty database")
+	}
+
+	log := logrus.WithField("path", path)
+	log.Info("importing repository")
+
+	if err := imp.importRepository(ctx, path); err != nil {
+		log.WithError(err).Error("error importing repository")
 		return err
 	}
 

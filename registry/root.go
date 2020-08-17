@@ -51,6 +51,7 @@ func init() {
 	DBCmd.AddCommand(MigrateCmd)
 
 	DBCmd.AddCommand(ImportCmd)
+	ImportCmd.Flags().StringVarP(&repoPath, "repository", "r", "", "import a specific repository (all by default)")
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 }
 
@@ -427,6 +428,8 @@ var MigrateStatusCmd = &cobra.Command{
 	},
 }
 
+var repoPath string
+
 // ImportCmd is the `import` sub-command of `database` that imports metadata from the filesystem into the database.
 var ImportCmd = &cobra.Command{
 	Use:   "import",
@@ -515,7 +518,12 @@ var ImportCmd = &cobra.Command{
 		}()
 
 		p := datastore.NewImporter(tx, driver, registry)
-		if err := p.Import(ctx); err != nil {
+		if repoPath == "" {
+			err = p.ImportAll(ctx)
+		} else {
+			err = p.Import(ctx, repoPath)
+		}
+		if err != nil {
 			tx.Rollback()
 			fmt.Fprintf(os.Stderr, "failed to import metadata: %v", err)
 			os.Exit(1)
