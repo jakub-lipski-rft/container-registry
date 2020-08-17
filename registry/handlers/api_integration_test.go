@@ -1931,7 +1931,58 @@ func TestManifestAPI_Get_Schema2MatchingEtag(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Get_Schema2FilesystemFallback(t *testing.T) {
+func TestManifestAPI_Get_Schema2LayersAndConfigNotInDatabase(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2fallbacktag"
+	repoPath := "schema2/fallback"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+		etag        string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+	}
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", test.manifestURL, nil)
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", schema2.MediaTypeManifest)
+			if test.etag != "" {
+				req.Header.Set("If-None-Match", test.etag)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusNotFound, resp.StatusCode)
+		})
+	}
+}
+
+func TestManifestAPI_Get_Schema2LayersAndConfigNotInDatabaseFilesystemFallback(t *testing.T) {
 	env := newTestEnv(t, withFilesystemFallback)
 	defer env.Shutdown()
 

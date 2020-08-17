@@ -134,7 +134,12 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		if imh.Config.Database.Enabled {
 			manifest, dgst, dbErr = dbGetManifestByTag(imh, imh.App.db, imh.Tag, imh.App.trustKey, imh.Repository.Named().Name())
 			if dbErr != nil {
-				dcontext.GetLogger(imh).WithError(dbErr).Warn("unable to fetch manifest by tag from database, falling back to filesystem")
+				if imh.App.Config.Database.Experimental.Fallback {
+					dcontext.GetLogger(imh).WithError(dbErr).Warn("unable to fetch manifest by tag from database, falling back to filesystem")
+				} else {
+					// Use the common error handling code below.
+					err = dbErr
+				}
 			}
 		}
 
@@ -168,7 +173,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	// The manifest will be nil if we retrieved the tag from the filesystem or
 	// the manifest is being referenced by digest.
 	if manifest == nil {
-		manifest, err = dbGetManifestFilesystemFallback(imh, imh.App.db, manifestService, imh.Digest, imh.App.trustKey, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+		manifest, err = dbGetManifestFilesystemFallback(imh, imh.App.db, manifestService, imh.Digest, imh.App.trustKey, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled, imh.App.Config.Database.Experimental.Fallback)
 		if err != nil {
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -237,7 +242,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		manifest, err = dbGetManifestFilesystemFallback(imh, imh.App.db, manifestService, manifestDigest, imh.App.trustKey, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+		manifest, err = dbGetManifestFilesystemFallback(imh, imh.App.db, manifestService, manifestDigest, imh.App.trustKey, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled, imh.Config.Database.Experimental.Fallback)
 		if err != nil {
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -275,13 +280,24 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 // for the given repository. Reads from the database are preferred, but the
 // manifest will be retrieved from the filesytem if either the database is
 // disabled or there was an error in retrieving the manifest from the database.
-func dbGetManifestFilesystemFallback(ctx context.Context, db datastore.Queryer, fsManifests distribution.ManifestService, dgst digest.Digest, schema1SigningKey libtrust.PrivateKey, tag, path string, dbEnabled bool) (distribution.Manifest, error) {
+func dbGetManifestFilesystemFallback(
+	ctx context.Context,
+	db datastore.Queryer,
+	fsManifests distribution.ManifestService,
+	dgst digest.Digest,
+	schema1SigningKey libtrust.PrivateKey,
+	tag, path string,
+	dbEnabled, fallback bool) (distribution.Manifest, error) {
 	var manifest distribution.Manifest
 	var err error
 
 	if dbEnabled {
 		manifest, err = dbGetManifest(ctx, db, dgst, schema1SigningKey, path)
 		if err != nil {
+			if !fallback {
+				return nil, err
+			}
+
 			dcontext.GetLogger(ctx).WithError(err).Warn("unable to fetch manifest by digest from database, falling back to filesystem")
 		}
 	}
