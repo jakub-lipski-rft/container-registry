@@ -863,10 +863,22 @@ type Ignore struct {
 
 // Reporting defines error reporting methods.
 type Reporting struct {
+	// Sentry configures error reporting for Sentry (sentry.io).
+	Sentry SentryReporting `yaml:"sentry,omitempty"`
 	// Bugsnag configures error reporting for Bugsnag (bugsnag.com).
 	Bugsnag BugsnagReporting `yaml:"bugsnag,omitempty"`
 	// NewRelic configures error reporting for NewRelic (newrelic.com)
 	NewRelic NewRelicReporting `yaml:"newrelic,omitempty"`
+}
+
+// SentryReporting configures error reporting for Sentry (sentry.io).
+type SentryReporting struct {
+	// Enabled can be set to `true` to enable the Sentry error reporting.
+	Enabled bool `yaml:"enabled,omitempty"`
+	// DSN is the Sentry DSN.
+	DSN string `yaml:"dsn,omitempty"`
+	// Environment is the Sentry environment.
+	Environment string `yaml:"environment,omitempty"`
 }
 
 // BugsnagReporting configures error reporting for Bugsnag (bugsnag.com).

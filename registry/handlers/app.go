@@ -42,6 +42,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"gitlab.com/gitlab-org/labkit/errortracking"
 	metricskit "gitlab.com/gitlab-org/labkit/metrics"
 )
 
@@ -740,28 +741,42 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 
 func (app *App) logError(ctx context.Context, errors errcode.Errors) {
 	for _, e := range errors {
-		var code, message, detail string
+		var code errcode.ErrorCode
+		var message, detail string
 
 		switch ex := e.(type) {
 		case errcode.Error:
-			code = ex.Code.String()
+			code = ex.Code
 			message = ex.Message
 			detail = fmt.Sprintf("%+v", ex.Detail)
 		case errcode.ErrorCode:
-			code = ex.String()
+			code = ex
 			message = ex.Message()
 		default:
 			// just normal go 'error'
-			code = errcode.ErrorCodeUnknown.String()
+			code = errcode.ErrorCodeUnknown
 			message = ex.Error()
 		}
 
-		l := dcontext.GetLogger(ctx).WithField("code", code)
+		l := dcontext.GetLogger(ctx).WithField("code", code.String())
 		if detail != "" {
 			l = l.WithField("detail", detail)
 		}
 
 		l.WithError(e).Error(message)
+
+		// only report 500 errors to Sentry
+		if code == errcode.ErrorCodeUnknown {
+			// Encode detail in error message so that it shows up in Sentry. This is a hack until we refactor error
+			// handling across the whole application to enforce consistent behaviour and formatting.
+			// see https://gitlab.com/gitlab-org/container-registry/-/issues/198
+			detailSuffix := ""
+			if detail != "" {
+				detailSuffix = fmt.Sprintf(": %s", detail)
+			}
+			err := errcode.ErrorCodeUnknown.WithMessage(fmt.Sprintf("%s%s", message, detailSuffix))
+			errortracking.Capture(err, errortracking.WithContext(ctx))
+		}
 	}
 }
 
