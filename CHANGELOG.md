@@ -7,13 +7,17 @@
 - registry: Normalize log messages
 - registry/storage/cache/redis: Add Prometheus metrics for Redis cache store
 - registry: Add support for a pprof monitoring server
-- registry: Add support for continuous profiling with Google Stackdriver
 - registry: Add TLS support for Redis
 - registry: Add support for Redis Sentinel
+- registry: Add support for error reporting with Sentry
 
 ### Fixed
 - registry/api/v2: Text-charset selector removed from `application/json` content-type
 - registry/storage: Swift path generation now generates multiple directories as intended
+
+## [v2.10.0-gitlab] - 2020-08-05
+## Added
+- registry: Add support for continuous profiling with Google Stackdriver
 
 ## [v2.9.1-gitlab] - 2020-05-05
 ## Added

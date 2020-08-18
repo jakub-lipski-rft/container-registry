@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/yvasiyarov/gorelic"
 	"gitlab.com/gitlab-org/labkit/correlation"
+	"gitlab.com/gitlab-org/labkit/errortracking"
 	logkit "gitlab.com/gitlab-org/labkit/log"
 	"gitlab.com/gitlab-org/labkit/monitoring"
 	"golang.org/x/crypto/acme"
@@ -105,10 +106,12 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 	// TODO(aaronl): The global scope of the health checks means NewRegistry
 	// can only be called once per process.
 	app.RegisterHealthChecks()
-	handler := configureReporting(app)
+	handler := panicHandler(app)
+	if handler, err = configureReporting(config, handler); err != nil {
+		return nil, fmt.Errorf("error configuring reporting services: %w", err)
+	}
 	handler = alive("/", handler)
 	handler = health.Handler(handler)
-	handler = panicHandler(handler)
 	if handler, err = configureAccessLogging(config, handler); err != nil {
 		return nil, fmt.Errorf("error configuring access logger: %v", err)
 	}
@@ -232,27 +235,39 @@ func (registry *Registry) ListenAndServe() error {
 	}
 }
 
-func configureReporting(app *handlers.App) http.Handler {
-	var handler http.Handler = app
+func configureReporting(config *configuration.Configuration, h http.Handler) (http.Handler, error) {
+	handler := h
 
-	if app.Config.Reporting.Bugsnag.APIKey != "" {
+	if config.Reporting.Bugsnag.APIKey != "" {
 		handler = bugsnag.Handler(handler)
 	}
 
-	if app.Config.Reporting.NewRelic.LicenseKey != "" {
+	if config.Reporting.NewRelic.LicenseKey != "" {
 		agent := gorelic.NewAgent()
-		agent.NewrelicLicense = app.Config.Reporting.NewRelic.LicenseKey
-		if app.Config.Reporting.NewRelic.Name != "" {
-			agent.NewrelicName = app.Config.Reporting.NewRelic.Name
+		agent.NewrelicLicense = config.Reporting.NewRelic.LicenseKey
+		if config.Reporting.NewRelic.Name != "" {
+			agent.NewrelicName = config.Reporting.NewRelic.Name
 		}
 		agent.CollectHTTPStat = true
-		agent.Verbose = app.Config.Reporting.NewRelic.Verbose
+		agent.Verbose = config.Reporting.NewRelic.Verbose
 		agent.Run()
 
 		handler = agent.WrapHTTPHandler(handler)
 	}
 
-	return handler
+	if config.Reporting.Sentry.Enabled {
+		if err := errortracking.Initialize(
+			errortracking.WithSentryDSN(config.Reporting.Sentry.DSN),
+			errortracking.WithSentryEnvironment(config.Reporting.Sentry.Environment),
+			errortracking.WithVersion(version.Version),
+		); err != nil {
+			return nil, fmt.Errorf("failed to configure Sentry: %w", err)
+		}
+
+		handler = errortracking.NewHandler(handler)
+	}
+
+	return handler, nil
 }
 
 // configureLogging prepares the context with a logger using the configuration.

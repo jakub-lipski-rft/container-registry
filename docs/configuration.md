@@ -226,6 +226,10 @@ middleware:
       options:
         baseurl: https://example.com/
 reporting:
+  sentry:
+    enabled: true
+    dsn: https://examplePublicKey@o0.ingest.sentry.io/0
+    environment: production
   bugsnag:
     apikey: bugsnagapikey
     releasestage: bugsnagreleasestage
@@ -839,6 +843,10 @@ location of a proxy for the layer stored by the S3 storage driver.
 
 ```
 reporting:
+  sentry:
+    enabled: true
+    dsn: https://examplePublicKey@o0.ingest.sentry.io/0
+    environment: production
   bugsnag:
     apikey: bugsnagapikey
     releasestage: bugsnagreleasestage
@@ -850,12 +858,21 @@ reporting:
 ```
 
 The `reporting` option is **optional** and configures error and metrics
-reporting tools. At the moment only two services are supported:
+reporting tools. At the moment only three services are supported:
 
+- [Sentry](#sentry)
 - [Bugsnag](#bugsnag)
 - [New Relic](#new-relic)
 
-A valid configuration may contain both.
+A valid configuration may contain multiple.
+
+### `sentry`
+
+| Parameter     | Required | Description                                                                           |
+|---------------|----------|---------------------------------------------------------------------------------------|
+| `enabled`     | no       | Set `true` to enable error reporting with Sentry. Defaults to `false`.                |
+| `dsn`         | yes      | The Sentry DSN.                                                                       |
+| `environment` | no       | The Sentry [environment](https://docs.sentry.io/product/sentry-basics/environments/). |
 
 ### `bugsnag`
 

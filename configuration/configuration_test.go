@@ -1224,6 +1224,77 @@ database:
 	testParameter(t, yml, "REGISTRY_DATABASE_EXPERIMENTAL_FALLBACK", tt, validator)
 }
 
+func TestParseReportingSentry_Enabled(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+reporting:
+  sentry:
+    enabled: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Reporting.Sentry.Enabled))
+	}
+
+	testParameter(t, yml, "REGISTRY_REPORTING_SENTRY_ENABLED", tt, validator)
+}
+
+func TestParseReportingSentry_DSN(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+reporting:
+  sentry:
+    dsn: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "https://examplePublicKey@o0.ingest.sentry.io/0",
+			want:  "https://examplePublicKey@o0.ingest.sentry.io/0",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Reporting.Sentry.DSN)
+	}
+
+	testParameter(t, yml, "REGISTRY_REPORTING_SENTRY_DSN", tt, validator)
+}
+
+func TestParseReportingSentry_Environment(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+reporting:
+  sentry:
+    environment: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "development",
+			want:  "development",
+		},
+		{
+			name: "default",
+			want: "",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Reporting.Sentry.Environment)
+	}
+
+	testParameter(t, yml, "REGISTRY_REPORTING_SENTRY_ENVIRONMENT", tt, validator)
+}
+
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice {
 		t = t.Elem()
