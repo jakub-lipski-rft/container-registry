@@ -576,6 +576,11 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
 
 // configureLogHook prepares logging hook parameters.
 func (app *App) configureLogHook(configuration *configuration.Configuration) {
+	if len(configuration.Log.Hooks) > 0 {
+		dcontext.GetLogger(app).Warn("DEPRECATION WARNING: Log hooks are deprecated and will be removed by " +
+			"January 22nd, 2021. See https://gitlab.com/gitlab-org/container-registry/-/issues/182 for more details.")
+	}
+
 	entry, ok := dcontext.GetLogger(app).(*logrus.Entry)
 	if !ok {
 		// somehow, we are not using logrus
