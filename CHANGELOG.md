@@ -1,4 +1,7 @@
 ## [Unreleased]
+## Deprecated
+- configuration: Deprecate log hooks, to be removed by January 22nd, 2021
+
 ## Added
 - registry: Experimental PostgreSQL metadata database (incomplete, in progress)
 - registry: Use GitLab LabKit for HTTP metrics collection

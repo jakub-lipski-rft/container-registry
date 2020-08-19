@@ -53,6 +53,8 @@ type Configuration struct {
 
 		// Hooks allows users to configure the log hooks, to enabling the
 		// sequent handling behavior, when defined levels of log message emit.
+		// NOTE: This is deprecated (https://gitlab.com/gitlab-org/container-registry/-/issues/182) and will be
+		// removed by January 22nd, 2021.
 		Hooks []LogHook `yaml:"hooks,omitempty"`
 	}
 

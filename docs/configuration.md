@@ -403,6 +403,9 @@ system. By default, the access logging system outputs to stdout in
 
 ## `hooks`
 
+**DEPRECATED:** Log hooks are deprecated and will be removed by January 22nd, 2021.
+See https://gitlab.com/gitlab-org/container-registry/-/issues/182 for more details.
+
 ```none
 hooks:
   - type: mail
