@@ -333,6 +333,10 @@ func configureBugsnag(config *configuration.Configuration) {
 		return
 	}
 
+	log.Warn("DEPRECATION WARNING: Bugsnag support is deprecated and will be removed by January 22nd, 2021. " +
+		"Please use Sentry instead for error reporting. See " +
+		"https://gitlab.com/gitlab-org/container-registry/-/issues/179 for more details.")
+
 	bugsnagConfig := bugsnag.Configuration{
 		APIKey: config.Reporting.Bugsnag.APIKey,
 	}
