@@ -879,6 +879,9 @@ A valid configuration may contain multiple.
 
 ### `bugsnag`
 
+**DEPRECATED:** Bugsnag support is deprecated and will be removed by January 22nd, 2021. Please use [Sentry](#sentry)
+instead for error reporting. See https://gitlab.com/gitlab-org/container-registry/-/issues/179 for more details.
+
 | Parameter | Required | Description                                           |
 |-----------|----------|-------------------------------------------------------|
 | `apikey`  | yes      | The API Key provided by Bugsnag.                      |
