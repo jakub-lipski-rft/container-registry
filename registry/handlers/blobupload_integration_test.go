@@ -140,7 +140,21 @@ func TestDBMountBlob_NonExistentSourceRepo(t *testing.T) {
 
 	b := buildRandomBlob(t, env)
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{b.Digest}, "from", "to", b.Digest)
+	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{b.Digest}, "from", "to", b.Digest, false)
+	require.Error(t, err)
+	require.Equal(t, "source repository not found in database", err.Error())
+}
+
+func TestDBMountBlob_NonExistentSourceRepoFilesystemFallback(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	// Test for cases where only the source repo does not exist.
+	buildRepository(t, env, "to")
+
+	b := buildRandomBlob(t, env)
+
+	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{b.Digest}, "from", "to", b.Digest, true)
 	require.NoError(t, err)
 
 	srcRepo := findRepository(t, env, "from")
@@ -156,7 +170,18 @@ func TestDBMountBlob_NonExistentBlob(t *testing.T) {
 
 	fromRepo := buildRepository(t, env, "from")
 
-	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", randomDigest(t))
+	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", randomDigest(t), false)
+	require.Error(t, err)
+	require.Equal(t, "blob not found in database", err.Error())
+}
+
+func TestDBMountBlob_NonExistentBlobFilesystemFallback(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	fromRepo := buildRepository(t, env, "from")
+
+	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", randomDigest(t), true)
 	require.Error(t, err)
 	require.Equal(t, "unknown blob", err.Error())
 }
@@ -168,7 +193,19 @@ func TestDBMountBlob_NonExistentBlobLinkInSourceRepo(t *testing.T) {
 	fromRepo := buildRepository(t, env, "from")
 	b := buildRandomBlob(t, env) // not linked in fromRepo
 
-	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", b.Digest)
+	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", b.Digest, false)
+	require.Error(t, err)
+	require.Equal(t, "blob not found in database", err.Error())
+}
+
+func TestDBMountBlob_NonExistentBlobLinkInSourceRepoFilesystemFallback(t *testing.T) {
+	env := newEnv(t)
+	defer env.shutdown(t)
+
+	fromRepo := buildRepository(t, env, "from")
+	b := buildRandomBlob(t, env) // not linked in fromRepo
+
+	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", b.Digest, true)
 	require.Error(t, err)
 	require.Equal(t, "unknown blob", err.Error())
 }
@@ -181,7 +218,7 @@ func TestDBMountBlob_NonExistentDestinationRepo(t *testing.T) {
 	b := buildRandomBlob(t, env)
 	linkBlob(t, env, fromRepo, b)
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, "to", b.Digest)
+	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, "to", b.Digest, false)
 	require.NoError(t, err)
 
 	destRepo := findRepository(t, env, "to")
@@ -200,13 +237,13 @@ func TestDBMountBlob_AlreadyLinked(t *testing.T) {
 	destRepo := buildRepository(t, env, "to")
 	linkBlob(t, env, destRepo, b)
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, destRepo.Path, b.Digest)
+	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, destRepo.Path, b.Digest, false)
 	require.NoError(t, err)
 
 	require.True(t, isBlobLinked(t, env, destRepo, b))
 }
 
-func TestDBMountBlob_SourceBlobOnlyInFileSystem(t *testing.T) {
+func TestDBMountBlob_SourceBlobOnlyInFileSystemFilesystemFallback(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
@@ -215,7 +252,7 @@ func TestDBMountBlob_SourceBlobOnlyInFileSystem(t *testing.T) {
 	fromRepo := buildRepository(t, env, "from")
 	destRepo := buildRepository(t, env, "to")
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, destRepo.Path, b.Digest)
+	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, destRepo.Path, b.Digest, true)
 	require.NoError(t, err)
 
 	require.True(t, isBlobLinked(t, env, fromRepo, b))
