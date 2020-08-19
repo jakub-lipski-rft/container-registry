@@ -629,19 +629,19 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 		switch reqManifest := manifest.(type) {
 		case *schema1.SignedManifest:
-			if err = dbPutManifestSchema1(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, imh.Repository.Named()); err != nil {
+			if err = dbPutManifestSchema1(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, imh.Repository.Named(), imh.App.Config.Database.Experimental.Fallback); err != nil {
 				imh.Errors = append(imh.Errors,
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
 			}
 		case *schema2.DeserializedManifest:
-			if err = dbPutManifestSchema2(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, jsonBuf.Bytes(), imh.Repository.Named()); err != nil {
+			if err = dbPutManifestSchema2(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, jsonBuf.Bytes(), imh.Repository.Named(), imh.App.Config.Database.Experimental.Fallback); err != nil {
 				imh.Errors = append(imh.Errors,
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
 			}
 		case *ocischema.DeserializedManifest:
-			if err = dbPutManifestOCI(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, jsonBuf.Bytes(), imh.Repository.Named()); err != nil {
+			if err = dbPutManifestOCI(imh, tx, imh.Repository.Blobs(imh), imh.Digest, reqManifest, jsonBuf.Bytes(), imh.Repository.Named(), imh.App.Config.Database.Experimental.Fallback); err != nil {
 				imh.Errors = append(imh.Errors,
 					errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to write manifest to database: %v", err)))
 				return
@@ -769,12 +769,28 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 	})
 }
 
-func dbPutManifestOCI(ctx context.Context, db datastore.Queryer, blobService distribution.BlobService, dgst digest.Digest, manifest *ocischema.DeserializedManifest, payload []byte, path reference.Named) error {
-	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, path.Name())
+func dbPutManifestOCI(
+	ctx context.Context,
+	db datastore.Queryer,
+	blobService distribution.BlobService,
+	dgst digest.Digest,
+	manifest *ocischema.DeserializedManifest,
+	payload []byte,
+	path reference.Named,
+	fallback bool) error {
+	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, path.Name(), fallback)
 }
 
-func dbPutManifestSchema2(ctx context.Context, db datastore.Queryer, blobService distribution.BlobService, dgst digest.Digest, manifest *schema2.DeserializedManifest, payload []byte, path reference.Named) error {
-	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, path.Name())
+func dbPutManifestSchema2(
+	ctx context.Context,
+	db datastore.Queryer,
+	blobService distribution.BlobService,
+	dgst digest.Digest,
+	manifest *schema2.DeserializedManifest,
+	payload []byte,
+	path reference.Named,
+	fallback bool) error {
+	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, path.Name(), fallback)
 }
 
 func dbPutManifestOCIOrSchema2(
@@ -786,13 +802,14 @@ func dbPutManifestOCIOrSchema2(
 	layers []distribution.Descriptor,
 	cfgDesc distribution.Descriptor,
 	payload []byte,
-	path string) error {
+	path string,
+	fallback bool) error {
 
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "manifest_digest": dgst, "schema_version": versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
 	// Find the config now to ensure that the config's blob is associated with the repository.
-	dbCfg, err := dbFindOrCreateRepositoryConfig(ctx, db, blobService, cfgDesc, path)
+	dbCfg, err := dbFindOrCreateRepositoryConfig(ctx, db, blobService, cfgDesc, path, fallback)
 	if err != nil {
 		return err
 	}
@@ -821,7 +838,7 @@ func dbPutManifestOCIOrSchema2(
 
 		// find and associate manifest layer blobs
 		for _, reqLayer := range layers {
-			dbBlob, err := dbFindOrCreateRepositoryBlob(ctx, db, blobService, reqLayer, path)
+			dbBlob, err := dbFindRepositoryBlob(ctx, db, blobService, reqLayer, path, fallback)
 			if err != nil {
 				return err
 			}
@@ -849,12 +866,15 @@ func dbPutManifestOCIOrSchema2(
 }
 
 // dbFindOrCreateRepositoryConfig finds the manifiest config, ensuring its blob
-// is in the database and linked in the repository.
-func dbFindOrCreateRepositoryConfig(ctx context.Context, db datastore.Queryer, blobService distribution.BlobService, desc distribution.Descriptor, repoPath string) (*models.Configuration, error) {
+// is in the database and linked in the repository. Optionally, the search for
+// the config blob can fallback to the filesystem if it is not found in the
+// database. If found, the blob will be backfilled into the database and
+// associated with the repository.
+func dbFindOrCreateRepositoryConfig(ctx context.Context, db datastore.Queryer, blobService distribution.BlobService, desc distribution.Descriptor, repoPath string, fallback bool) (*models.Configuration, error) {
 	cfgStore := datastore.NewConfigurationStore(db)
 
 	// Check for the blob now, to ensure that the config blob is associated with the repository.
-	dbCfgBlob, err := dbFindOrCreateRepositoryBlob(ctx, db, blobService, desc, repoPath)
+	dbCfgBlob, err := dbFindRepositoryBlob(ctx, db, blobService, desc, repoPath, fallback)
 	if err != nil {
 		return nil, err
 	}
@@ -883,14 +903,26 @@ func dbFindOrCreateRepositoryConfig(ctx context.Context, db datastore.Queryer, b
 	return dbCfg, nil
 }
 
-// dbFindOrCreateRepositoryBlob finds or creates a blob which is linked to
-// the repository. Precedence is given to retrieving the blob from the database,
-// then the filesytem.
-func dbFindOrCreateRepositoryBlob(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, desc distribution.Descriptor, repoPath string) (*models.Blob, error) {
+// dbFindRepositoryBlob finds a blob which is linked to the repository.
+// Optionally, the search for the blob can fallback to the filesystem, if the
+// blob is not found in the database. If found, the blob will be backfilled into
+// the database and associated with the repository.
+func dbFindRepositoryBlob(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, desc distribution.Descriptor, repoPath string, fallback bool) (*models.Blob, error) {
 	rStore := datastore.NewRepositoryStore(db)
-	r, err := rStore.CreateOrFindByPath(ctx, repoPath)
+
+	r, err := rStore.FindByPath(ctx, repoPath)
 	if err != nil {
 		return nil, err
+	}
+	if r == nil {
+		if !fallback {
+			return nil, errors.New("source repository not found in database")
+		}
+
+		r, err = rStore.CreateByPath(ctx, repoPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	repoBlobs, err := rStore.Blobs(ctx, r)
@@ -903,6 +935,10 @@ func dbFindOrCreateRepositoryBlob(ctx context.Context, db datastore.Queryer, blo
 			// Blob is both in the database and linked to the repository, exit now.
 			return blob, nil
 		}
+	}
+
+	if !fallback {
+		return nil, fmt.Errorf("blob not found in database")
 	}
 
 	dcontext.GetLogger(ctx).WithField("digest", desc.Digest).Warn("blob not found in database, falling back to filesystem")
@@ -931,7 +967,14 @@ func dbFindOrCreateRepositoryBlob(ctx context.Context, db datastore.Queryer, blo
 	return b, nil
 }
 
-func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, dgst digest.Digest, manifest *schema1.SignedManifest, path reference.Named) error {
+func dbPutManifestSchema1(
+	ctx context.Context,
+	db datastore.Queryer,
+	blobStatter distribution.BlobStatter,
+	dgst digest.Digest,
+	manifest *schema1.SignedManifest,
+	path reference.Named,
+	fallback bool) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path.Name(), "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
@@ -958,7 +1001,7 @@ func dbPutManifestSchema1(ctx context.Context, db datastore.Queryer, blobStatter
 
 		// find and associate manifest layer blobs
 		for _, layer := range manifest.FSLayers {
-			dbBlob, err := dbFindOrCreateRepositoryBlob(ctx, db, blobStatter, distribution.Descriptor{Digest: layer.BlobSum}, path.Name())
+			dbBlob, err := dbFindRepositoryBlob(ctx, db, blobStatter, distribution.Descriptor{Digest: layer.BlobSum}, path.Name(), fallback)
 			if err != nil {
 				return err
 			}

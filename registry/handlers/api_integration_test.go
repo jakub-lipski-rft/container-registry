@@ -2279,8 +2279,8 @@ func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotInDatabase(t *testing.T) {
-	env := newTestEnv(t)
+func TestManifestAPI_Put_Schema2LayersNotInDatabaseFilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withFilesystemFallback)
 	defer env.Shutdown()
 
 	tagName := "schema2fallbacktag"
@@ -2308,8 +2308,82 @@ func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotInDatabase(t *testing
 	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 }
 
-func TestManifestAPI_Put_Schema2FilesystemFallbackLayersNotAssociatedWithRepositoryButArePresentInDatabase(t *testing.T) {
+func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentInDatabase(t *testing.T) {
 	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	tagName := "schema2missinglayerstag"
+	repoPath := "schema2/missinglayers"
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	manifest := &schema2.Manifest{
+		Versioned: manifest.Versioned{
+			SchemaVersion: 2,
+			MediaType:     schema2.MediaTypeManifest,
+		},
+	}
+
+	// Create a manifest config and push up its content.
+	cfgPayload, cfgDesc := schema2Config()
+	uploadURLBase, _ := startPushLayer(t, env, repoRef)
+	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
+	manifest.Config = cfgDesc
+
+	// Create and push up 2 random layers to an unrelated repo so that they are
+	// present within the database, but not associated with the manifest's repository.
+	// Then push them to the normal repository with the database disabled.
+	manifest.Layers = make([]distribution.Descriptor, 2)
+
+	fakeRepoRef, err := reference.WithName("fakerepo")
+	require.NoError(t, err)
+
+	for i := range manifest.Layers {
+		rs, dgstStr, err := testutil.CreateRandomTarFile()
+		require.NoError(t, err)
+
+		// Save the layer content as pushLayer exhausts the io.ReadSeeker
+		layerBytes, err := ioutil.ReadAll(rs)
+		require.NoError(t, err)
+
+		dgst := digest.Digest(dgstStr)
+
+		uploadURLBase, _ := startPushLayer(t, env, fakeRepoRef)
+		pushLayer(t, env.builder, fakeRepoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
+
+		// Disable the database so writes only go to the filesytem.
+		env.config.Database.Enabled = false
+
+		uploadURLBase, _ = startPushLayer(t, env, repoRef)
+		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
+
+		// Enable the database again so that reads first check the database.
+		env.config.Database.Enabled = true
+
+		manifest.Layers[i] = distribution.Descriptor{
+			Digest:    dgst,
+			MediaType: schema2.MediaTypeLayer,
+		}
+	}
+
+	deserializedManifest, err := schema2.FromStruct(*manifest)
+	require.NoError(t, err)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+
+	resp := putManifest(t, "putting manifest, layers not associated with repository", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+}
+
+func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentInDatabaseFilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withFilesystemFallback)
 	defer env.Shutdown()
 
 	tagName := "schema2fallbackmissinglayerstag"
