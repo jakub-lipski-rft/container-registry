@@ -2,6 +2,7 @@
 ## Deprecated
 - configuration: Deprecate log hooks, to be removed by January 22nd, 2021
 - configuration: Deprecate Bugsnag support, to be removed by January 22nd, 2021
+- configuration: Deprecate NewRelic support, to be removed by January 22nd, 2021
 
 ## Added
 - registry: Experimental PostgreSQL metadata database (incomplete, in progress)

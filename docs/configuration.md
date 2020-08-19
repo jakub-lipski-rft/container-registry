@@ -890,6 +890,9 @@ instead for error reporting. See https://gitlab.com/gitlab-org/container-registr
 
 ### `newrelic`
 
+**DEPRECATED:** NewRelic support is deprecated and will be removed by January 22nd, 2021. Please use [Sentry](#sentry)
+instead for error reporting. See https://gitlab.com/gitlab-org/container-registry/-/issues/180 for more details.
+
 | Parameter | Required | Description                                           |
 |-----------|----------|-------------------------------------------------------|
 | `licensekey` | yes   | License key provided by New Relic.                    |
