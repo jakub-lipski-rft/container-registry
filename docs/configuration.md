@@ -360,6 +360,9 @@ check before parsing the remainder of the configuration file.
 
 ## `log`
 
+**DEPRECATED:** The `logstash` log formatter is deprecated and will be removed by January 22nd, 2021. Please use `text`
+or `json` instead. See https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.
+
 The `log` subsection configures the behavior of the logging system. The logging
 system outputs everything to stdout by default. You can adjust the granularity,
 output and format with this configuration section.
@@ -385,6 +388,9 @@ log:
 | `fields`    | no       | A map of field names to values. These are added to every log line for the context. This is useful for identifying log messages source after being mixed in other systems. |
 
 ### `accesslog`
+
+**DEPRECATED:** The `combined` log formatter is deprecated and will be removed by January 22nd, 2021. Please use `text`
+or `json` instead. See https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.
 
 ```none
 accesslog:
