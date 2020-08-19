@@ -243,6 +243,10 @@ func configureReporting(config *configuration.Configuration, h http.Handler) (ht
 	}
 
 	if config.Reporting.NewRelic.LicenseKey != "" {
+		log.Warn("DEPRECATION WARNING: NewRelic support is deprecated and will be removed by January 22nd, 2021. " +
+			"Please use Sentry instead for error reporting. See " +
+			"https://gitlab.com/gitlab-org/container-registry/-/issues/180 for more details.")
+
 		agent := gorelic.NewAgent()
 		agent.NewrelicLicense = config.Reporting.NewRelic.LicenseKey
 		if config.Reporting.NewRelic.Name != "" {

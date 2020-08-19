@@ -897,6 +897,8 @@ type BugsnagReporting struct {
 }
 
 // NewRelicReporting configures error reporting for NewRelic (newrelic.com)
+// NOTE: This is deprecated (https://gitlab.com/gitlab-org/container-registry/-/issues/180) and will be removed by
+// January 22nd, 2021.
 type NewRelicReporting struct {
 	// LicenseKey is the NewRelic user license key
 	LicenseKey string `yaml:"licensekey,omitempty"`
