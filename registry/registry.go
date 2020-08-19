@@ -278,6 +278,10 @@ func configureReporting(config *configuration.Configuration, h http.Handler) (ht
 func configureLogging(ctx context.Context, config *configuration.Configuration) (context.Context, error) {
 	switch config.Log.Formatter {
 	case configuration.LogFormatLogstash:
+		log.Warn("DEPRECATION WARNING: The 'logstash' log formatter is deprecated and will be removed by " +
+			"January 22nd, 2021. Please use 'text' or 'json' instead. See " +
+			"https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.")
+
 		// we don't use logstash at GitLab, so we don't initialize the global logger through LabKit
 		l, err := log.ParseLevel(config.Log.Level.String())
 		if err != nil {
@@ -315,6 +319,12 @@ func configureLogging(ctx context.Context, config *configuration.Configuration) 
 func configureAccessLogging(config *configuration.Configuration, h http.Handler) (http.Handler, error) {
 	if config.Log.AccessLog.Disabled {
 		return h, nil
+	}
+
+	if config.Log.AccessLog.Formatter == configuration.AccessLogFormatCombined {
+		log.Warn("DEPRECATION WARNING: The 'combined' log formatter is deprecated and will be removed by " +
+			"January 22nd, 2021. Please use 'text' or 'json' instead. See " +
+			"https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.")
 	}
 
 	logger := log.New()
