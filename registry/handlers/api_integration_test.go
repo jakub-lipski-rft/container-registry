@@ -3243,6 +3243,58 @@ func TestManifestAPI_Put_OCIImageIndexByDigest(t *testing.T) {
 	seedRandomOCIImageIndex(t, env, repoPath, putByDigest)
 }
 
+func TestManifestAPI_Put_OCIImageIndexByTagManifestsNotPresentInDatabase(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	tagName := "ociindexmissingmanifeststag"
+	repoPath := "ociindex/missingmanifests"
+
+	// putRandomOCIImageIndex with putByTag tests that the manifest put happened without issue.
+	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, writeToFilesystemOnly)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+
+	resp := putManifest(t, "putting OCI image index missing manifests", tagURL, v1.MediaTypeImageIndex, deserializedManifest.ManifestList)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+}
+
+func TestManifestAPI_Put_OCIImageIndexByTagManifestsNotPresentInDatabaseFilesystemFilesystemFallback(t *testing.T) {
+	env := newTestEnv(t, withFilesystemFallback)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	tagName := "ociindexmissingmanifeststag"
+	repoPath := "ociindex/missingmanifests"
+
+	// putRandomOCIImageIndex with putByTag tests that the manifest put happened without issue.
+	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, writeToFilesystemOnly)
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp := putManifest(t, "putting oci image index no error", tagURL, v1.MediaTypeImageIndex, deserializedManifest.ManifestList)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, digestURL, resp.Header.Get("Location"))
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+}
+
 func TestManifestAPI_Get_OCIIndexNonMatchingEtag(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -3391,7 +3443,7 @@ func TestManifestAPI_Get_OCIIndexMatchingEtag(t *testing.T) {
 }
 
 func TestManifestAPI_Get_OCIIndexFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t)
+	env := newTestEnv(t, withFilesystemFallback)
 	defer env.Shutdown()
 
 	if !env.config.Database.Enabled {
@@ -3808,6 +3860,11 @@ func seedRandomOCIImageIndex(t *testing.T, env *testEnv, repoPath string, opts .
 
 	for _, o := range opts {
 		o(t, env, config)
+	}
+
+	if config.writeToFilesystemOnly {
+		env.config.Database.Enabled = false
+		defer func() { env.config.Database.Enabled = true }()
 	}
 
 	ociImageIndex := &manifestlist.ManifestList{
