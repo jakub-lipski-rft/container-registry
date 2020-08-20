@@ -360,6 +360,9 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 
 	// configure as a pull through cache
 	if config.Proxy.RemoteURL != "" {
+		log.Warn("DEPRECATION WARNING: Proxy support is deprecated and will be removed by January 22nd, 2021. " +
+			"See https://gitlab.com/gitlab-org/container-registry/-/issues/193 for more details.")
+
 		app.registry, err = proxy.NewRegistryPullThroughCache(ctx, app.registry, app.driver, config.Proxy)
 		if err != nil {
 			panic(err.Error())
