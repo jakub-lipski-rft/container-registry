@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/docker/distribution/version"
@@ -54,8 +53,6 @@ import (
 
 func init() {
 	factory.Register("sharedinmemorydriver", &sharedInMemoryDriverFactory{make(map[string]*inmemory.Driver)})
-
-	logrus.SetLevel(logrus.DebugLevel)
 }
 
 type configOpt func(*configuration.Configuration)
