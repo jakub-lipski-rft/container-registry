@@ -53,6 +53,7 @@ func init() {
 	DBCmd.AddCommand(ImportCmd)
 	ImportCmd.Flags().StringVarP(&repoPath, "repository", "r", "", "import a specific repository (all by default)")
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
+	ImportCmd.Flags().BoolVarP(&importDanglingBlobs, "dangling-blobs", "b", false, "import all blobs, regardless of whether they are referenced by a manifest or not")
 }
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
@@ -97,6 +98,7 @@ var RootCmd = &cobra.Command{
 
 var dryRun bool
 var removeUntagged bool
+var importDanglingBlobs bool
 var debugAddr string
 
 // GCCmd is the cobra command that corresponds to the garbage-collect subcommand
@@ -436,7 +438,7 @@ var ImportCmd = &cobra.Command{
 	Short: "Import filesystem metadata into the database",
 	Long: "Import filesystem metadata into the database. This should only be\n" +
 		"used for an one-off migration, starting with an empty database.\n" +
-		"Dangling blobs are not imported. This tool can not be used with\n" +
+		"By default, dangling blobs are not imported. This tool can not be used with\n" +
 		"the parallelwalk storage configuration enabled.",
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := resolveConfiguration(args)
@@ -519,7 +521,7 @@ var ImportCmd = &cobra.Command{
 
 		p := datastore.NewImporter(tx, driver, registry)
 		if repoPath == "" {
-			err = p.ImportAll(ctx)
+			err = p.ImportAll(ctx, importDanglingBlobs)
 		} else {
 			err = p.Import(ctx, repoPath)
 		}

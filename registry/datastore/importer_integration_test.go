@@ -105,7 +105,19 @@ func TestImporter_ImportAll(t *testing.T) {
 	defer tx.Rollback()
 
 	imp := newImporter(t, tx)
-	require.NoError(t, imp.ImportAll(suite.ctx))
+	require.NoError(t, imp.ImportAll(suite.ctx, false))
+	validateImport(t, tx)
+}
+
+func TestImporter_ImportAll_DanglingBlobs(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	imp := newImporter(t, tx)
+	require.NoError(t, imp.ImportAll(suite.ctx, true))
 	validateImport(t, tx)
 }
 
@@ -117,7 +129,7 @@ func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	reloadRepositoryFixtures(t)
 
 	imp := datastore.NewImporter(suite.db, driver, registry)
-	require.Error(t, imp.ImportAll(suite.ctx))
+	require.Error(t, imp.ImportAll(suite.ctx, false))
 }
 
 func TestImporter_Import(t *testing.T) {

@@ -545,9 +545,10 @@ func (imp *Importer) isDatabaseEmpty(ctx context.Context) (bool, error) {
 }
 
 // ImportAll populates the registry database with metadata from all repositories in the storage backend.
-func (imp *Importer) ImportAll(ctx context.Context) error {
+func (imp *Importer) ImportAll(ctx context.Context, importDanglingBlobs bool) error {
 	start := time.Now()
-	logrus.Info("starting metadata import")
+	log := logrus.New()
+	log.Info("starting metadata import")
 
 	empty, err := imp.isDatabaseEmpty(ctx)
 	if err != nil {
@@ -555,6 +556,28 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 	}
 	if !empty {
 		return errors.New("non-empty database")
+	}
+
+	if importDanglingBlobs {
+		var index int
+		blobStart := time.Now()
+		log.Info("importing all blobs")
+		err = imp.registry.Blobs().Enumerate(ctx, func(desc distribution.Descriptor) error {
+			index++
+			log := log.WithFields(logrus.Fields{"digest": desc.Digest, "count": index, "size": desc.Size})
+			log.Info("importing blob")
+
+			if err := imp.blobStore.Create(ctx, &models.Blob{MediaType: "application/octet-stream", Digest: desc.Digest, Size: desc.Size}); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("error importing blobs: %w", err)
+		}
+
+		blobEnd := time.Since(blobStart).Seconds()
+		log.WithField("duration_s", blobEnd).Info("blob import complete")
 	}
 
 	repositoryEnumerator, ok := imp.registry.(distribution.RepositoryEnumerator)
