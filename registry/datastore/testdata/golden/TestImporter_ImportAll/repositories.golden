@@ -4,4 +4,5 @@
  {"id":7,"parent_id":4,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"older","path":"b-nested/older/older"}, 
  {"id":8,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"c-manifest-list","path":"c-manifest-list"}, 
  {"id":9,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"d-schema1","path":"d-schema1"}, 
- {"id":10,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"e-helm","path":"e-helm"}]
+ {"id":10,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"e-helm","path":"e-helm"}, 
+ {"id":11,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"f-dangling-manifests","path":"f-dangling-manifests"}]
