@@ -932,7 +932,7 @@ performance overhead to processes when it is enabled ([source](https://medium.co
 | `service`        | no       | The name of the service under which the profiled data will be recorded and exposed. Defaults to the value of the `GAE_SERVICE` environment variable or instance metadata.                      |
 | `serviceversion` | no       | The version of the service. Defaults to the `GAE_VERSION` environment variable if that is set, or to empty string otherwise.                                              |
 | `projectid`      | no       | The project ID. Defaults to the `GOOGLE_CLOUD_PROJECT` environment variable or instance metadata.                                                                                              |
-| `keyfile`        | no       | Path of a private service account key file in JSON format used for [Service Account Authentication](https://cloud.google.com/storage/docs/authentication#service_accounts). Defaults to the `GOOGLE_APPLICATION_CREDENTIALS` environment variable or instance metadata. |
+| `keyfile`        | no       | Path of a private service account key file in JSON format used for [Service Account Authentication](https://cloud.google.com/storage/docs/authentication#service_accounts). The service account must have the `roles/cloudprofiler.agent` role or manually specified permissions as described at https://cloud.google.com/profiler/docs/iam#roles for the agent role. Defaults to the `GOOGLE_APPLICATION_CREDENTIALS` environment variable or instance metadata. |
 
 See the Stackdriver Profiler [API docs](https://pkg.go.dev/cloud.google.com/go/profiler?tab=doc#Config)
 for more details about configuration options.
