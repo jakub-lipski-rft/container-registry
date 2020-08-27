@@ -17,7 +17,6 @@ import (
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	"github.com/docker/distribution/version"
-	"gitlab.com/gitlab-org/labkit/log"
 
 	"github.com/docker/libtrust"
 	"github.com/olekukonko/tablewriter"
@@ -199,24 +198,7 @@ var MigrateUpCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		db, err := datastore.Open(&datastore.DSN{
-			Host:        config.Database.Host,
-			Port:        config.Database.Port,
-			User:        config.Database.User,
-			Password:    config.Database.Password,
-			DBName:      config.Database.DBName,
-			SSLMode:     config.Database.SSLMode,
-			SSLCert:     config.Database.SSLCert,
-			SSLKey:      config.Database.SSLKey,
-			SSLRootCert: config.Database.SSLRootCert,
-		},
-			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
-			datastore.WithPoolConfig(&datastore.PoolConfig{
-				MaxIdle:     config.Database.Pool.MaxIdle,
-				MaxOpen:     config.Database.Pool.MaxOpen,
-				MaxLifetime: config.Database.Pool.MaxLifetime,
-			}),
-		)
+		db, err := dbFromConfig(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -257,24 +239,7 @@ var MigrateDownCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		db, err := datastore.Open(&datastore.DSN{
-			Host:        config.Database.Host,
-			Port:        config.Database.Port,
-			User:        config.Database.User,
-			Password:    config.Database.Password,
-			DBName:      config.Database.DBName,
-			SSLMode:     config.Database.SSLMode,
-			SSLCert:     config.Database.SSLCert,
-			SSLKey:      config.Database.SSLKey,
-			SSLRootCert: config.Database.SSLRootCert,
-		},
-			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
-			datastore.WithPoolConfig(&datastore.PoolConfig{
-				MaxIdle:     config.Database.Pool.MaxIdle,
-				MaxOpen:     config.Database.Pool.MaxOpen,
-				MaxLifetime: config.Database.Pool.MaxLifetime,
-			}),
-		)
+		db, err := dbFromConfig(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -321,24 +286,7 @@ var MigrateVersionCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		db, err := datastore.Open(&datastore.DSN{
-			Host:        config.Database.Host,
-			Port:        config.Database.Port,
-			User:        config.Database.User,
-			Password:    config.Database.Password,
-			DBName:      config.Database.DBName,
-			SSLMode:     config.Database.SSLMode,
-			SSLCert:     config.Database.SSLCert,
-			SSLKey:      config.Database.SSLKey,
-			SSLRootCert: config.Database.SSLRootCert,
-		},
-			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
-			datastore.WithPoolConfig(&datastore.PoolConfig{
-				MaxIdle:     config.Database.Pool.MaxIdle,
-				MaxOpen:     config.Database.Pool.MaxOpen,
-				MaxLifetime: config.Database.Pool.MaxLifetime,
-			}),
-		)
+		db, err := dbFromConfig(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -371,24 +319,7 @@ var MigrateStatusCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		db, err := datastore.Open(&datastore.DSN{
-			Host:        config.Database.Host,
-			Port:        config.Database.Port,
-			User:        config.Database.User,
-			Password:    config.Database.Password,
-			DBName:      config.Database.DBName,
-			SSLMode:     config.Database.SSLMode,
-			SSLCert:     config.Database.SSLCert,
-			SSLKey:      config.Database.SSLKey,
-			SSLRootCert: config.Database.SSLRootCert,
-		},
-			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
-			datastore.WithPoolConfig(&datastore.PoolConfig{
-				MaxIdle:     config.Database.Pool.MaxIdle,
-				MaxOpen:     config.Database.Pool.MaxOpen,
-				MaxLifetime: config.Database.Pool.MaxLifetime,
-			}),
-		)
+		db, err := dbFromConfig(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
@@ -479,24 +410,7 @@ var ImportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		db, err := datastore.Open(&datastore.DSN{
-			Host:        config.Database.Host,
-			Port:        config.Database.Port,
-			User:        config.Database.User,
-			Password:    config.Database.Password,
-			DBName:      config.Database.DBName,
-			SSLMode:     config.Database.SSLMode,
-			SSLCert:     config.Database.SSLCert,
-			SSLKey:      config.Database.SSLKey,
-			SSLRootCert: config.Database.SSLRootCert,
-		},
-			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
-			datastore.WithPoolConfig(&datastore.PoolConfig{
-				MaxIdle:     config.Database.Pool.MaxIdle,
-				MaxOpen:     config.Database.Pool.MaxOpen,
-				MaxLifetime: config.Database.Pool.MaxLifetime,
-			}),
-		)
+		db, err := dbFromConfig(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct database connection: %v", err)
 			os.Exit(1)
