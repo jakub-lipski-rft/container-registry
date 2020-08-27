@@ -19,6 +19,7 @@ import (
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/health"
+	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/handlers"
 	"github.com/docker/distribution/registry/listener"
 	"github.com/docker/distribution/uuid"
@@ -521,4 +522,25 @@ func nextProtos(config *configuration.Configuration) []string {
 	default:
 		return []string{"h2", "http/1.1"}
 	}
+}
+
+func dbFromConfig(config *configuration.Configuration) (*datastore.DB, error) {
+	return datastore.Open(&datastore.DSN{
+		Host:        config.Database.Host,
+		Port:        config.Database.Port,
+		User:        config.Database.User,
+		Password:    config.Database.Password,
+		DBName:      config.Database.DBName,
+		SSLMode:     config.Database.SSLMode,
+		SSLCert:     config.Database.SSLCert,
+		SSLKey:      config.Database.SSLKey,
+		SSLRootCert: config.Database.SSLRootCert,
+	},
+		datastore.WithLogger(log.WithFields(log.Fields{"database": config.Database.DBName})),
+		datastore.WithPoolConfig(&datastore.PoolConfig{
+			MaxIdle:     config.Database.Pool.MaxIdle,
+			MaxOpen:     config.Database.Pool.MaxOpen,
+			MaxLifetime: config.Database.Pool.MaxLifetime,
+		}),
+	)
 }
