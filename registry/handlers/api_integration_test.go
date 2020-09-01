@@ -2933,6 +2933,72 @@ func TestManifestAPI_Get_Schema2ByDigestNoAcceptHeaders(t *testing.T) {
 	require.EqualValues(t, deserializedManifest, fetchedManifest)
 }
 
+func TestManifestAPI_Get_Schema2FromFilesystemAfterDatabaseWrites(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	tagName := "schema2consistentfstag"
+	repoPath := "schema2/consistentfs"
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
+	// Build URLs.
+	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
+	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	_, payload, err := deserializedManifest.Payload()
+	require.NoError(t, err)
+
+	dgst := digest.FromBytes(payload)
+
+	tt := []struct {
+		name        string
+		manifestURL string
+	}{
+		{
+			name:        "by tag",
+			manifestURL: tagURL,
+		},
+		{
+			name:        "by digest",
+			manifestURL: digestURL,
+		},
+	}
+
+	// Disable the database to check that the filesystem mirroring worked correctly.
+	env.config.Database.Enabled = false
+
+	for _, test := range tt {
+		t.Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", test.manifestURL, nil)
+			require.NoError(t, err)
+
+			req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+			require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
+			require.Equal(t, fmt.Sprintf(`"%s"`, dgst), resp.Header.Get("ETag"))
+
+			var fetchedManifest *schema2.DeserializedManifest
+			dec := json.NewDecoder(resp.Body)
+
+			err = dec.Decode(&fetchedManifest)
+			require.NoError(t, err)
+
+			require.EqualValues(t, deserializedManifest, fetchedManifest)
+		})
+	}
+}
+
 func TestManifestAPI_Delete_Schema2(t *testing.T) {
 	env := newTestEnv(t, withDelete)
 	defer env.Shutdown()
