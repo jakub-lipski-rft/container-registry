@@ -53,6 +53,7 @@ func init() {
 	ImportCmd.Flags().StringVarP(&repoPath, "repository", "r", "", "import a specific repository (all by default)")
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	ImportCmd.Flags().BoolVarP(&importDanglingBlobs, "dangling-blobs", "b", false, "import all blobs, regardless of whether they are referenced by a manifest or not")
+	ImportCmd.Flags().BoolVarP(&importDanglingManifests, "dangling-manifests", "m", false, "import all manifests, regardless of whether they are tagged or not")
 }
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
@@ -98,6 +99,7 @@ var RootCmd = &cobra.Command{
 var dryRun bool
 var removeUntagged bool
 var importDanglingBlobs bool
+var importDanglingManifests bool
 var debugAddr string
 
 // GCCmd is the cobra command that corresponds to the garbage-collect subcommand
@@ -369,8 +371,8 @@ var ImportCmd = &cobra.Command{
 	Short: "Import filesystem metadata into the database",
 	Long: "Import filesystem metadata into the database. This should only be\n" +
 		"used for an one-off migration, starting with an empty database.\n" +
-		"By default, dangling blobs are not imported. This tool can not be used with\n" +
-		"the parallelwalk storage configuration enabled.",
+		"By default, dangling blobs and untagged manifests are not imported.\n " +
+		"This tool can not be used with the parallelwalk storage configuration enabled.",
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := resolveConfiguration(args)
 		if err != nil {
@@ -433,9 +435,18 @@ var ImportCmd = &cobra.Command{
 			}
 		}()
 
-		p := datastore.NewImporter(tx, driver, registry)
+		var opts []datastore.ImporterOption
+		if importDanglingBlobs {
+			opts = append(opts, datastore.WithImportDanglingBlobs)
+		}
+		if importDanglingManifests {
+			opts = append(opts, datastore.WithImportDanglingManifests)
+		}
+
+		p := datastore.NewImporter(tx, driver, registry, opts...)
+
 		if repoPath == "" {
-			err = p.ImportAll(ctx, importDanglingBlobs)
+			err = p.ImportAll(ctx)
 		} else {
 			err = p.Import(ctx, repoPath)
 		}

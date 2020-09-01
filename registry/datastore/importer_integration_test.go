@@ -71,13 +71,13 @@ func overrideDynamicData(tb testing.TB, actual []byte) []byte {
 	return actual
 }
 
-func newImporter(t *testing.T, tx *datastore.Tx) *datastore.Importer {
+func newImporter(t *testing.T, tx *datastore.Tx, opts ...datastore.ImporterOption) *datastore.Importer {
 	t.Helper()
 
 	driver := newFilesystemStorageDriver(t)
 	registry := newRegistry(t, driver)
 
-	return datastore.NewImporter(tx, driver, registry)
+	return datastore.NewImporter(tx, driver, registry, opts...)
 }
 
 // Dump each table as JSON and compare the output against reference snapshots (.golden files)
@@ -104,8 +104,8 @@ func TestImporter_ImportAll(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	imp := newImporter(t, tx)
-	require.NoError(t, imp.ImportAll(suite.ctx, false))
+	imp := newImporter(t, tx, datastore.WithImportDanglingManifests)
+	require.NoError(t, imp.ImportAll(suite.ctx))
 	validateImport(t, tx)
 }
 
@@ -116,8 +116,8 @@ func TestImporter_ImportAll_DanglingBlobs(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	imp := newImporter(t, tx)
-	require.NoError(t, imp.ImportAll(suite.ctx, true))
+	imp := newImporter(t, tx, datastore.WithImportDanglingManifests, datastore.WithImportDanglingBlobs)
+	require.NoError(t, imp.ImportAll(suite.ctx))
 	validateImport(t, tx)
 }
 
@@ -128,8 +128,8 @@ func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	// load some fixtures
 	reloadRepositoryFixtures(t)
 
-	imp := datastore.NewImporter(suite.db, driver, registry)
-	require.Error(t, imp.ImportAll(suite.ctx, false))
+	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests)
+	require.Error(t, imp.ImportAll(suite.ctx))
 }
 
 func TestImporter_Import(t *testing.T) {
@@ -139,8 +139,20 @@ func TestImporter_Import(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	imp := newImporter(t, tx)
+	imp := newImporter(t, tx, datastore.WithImportDanglingManifests)
 	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
+	validateImport(t, tx)
+}
+
+func TestImporter_Import_TaggedOnly(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	imp := newImporter(t, tx)
+	require.NoError(t, imp.Import(suite.ctx, "f-dangling-manifests"))
 	validateImport(t, tx)
 }
 
@@ -151,6 +163,6 @@ func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	// load some fixtures
 	reloadRepositoryFixtures(t)
 
-	imp := datastore.NewImporter(suite.db, driver, registry)
+	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests)
 	require.Error(t, imp.Import(suite.ctx, "a-simple"))
 }

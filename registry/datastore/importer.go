@@ -32,11 +32,29 @@ type Importer struct {
 	manifestStore      *manifestStore
 	tagStore           *tagStore
 	blobStore          *blobStore
+
+	importDanglingManifests bool
+	importDanglingBlobs     bool
+}
+
+// ImporterOption provides functional options for the Importer.
+type ImporterOption func(*Importer)
+
+// WithImportDanglingManifests configures the Importer to import all manifests
+// rather than only tagged manifests.
+func WithImportDanglingManifests(imp *Importer) {
+	imp.importDanglingManifests = true
+}
+
+// WithImportDanglingBlobs configures the Importer to import all blobs
+// rather than only blobs referenced by manifests.
+func WithImportDanglingBlobs(imp *Importer) {
+	imp.importDanglingBlobs = true
 }
 
 // NewImporter creates a new Importer.
-func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distribution.Namespace) *Importer {
-	return &Importer{
+func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distribution.Namespace, opts ...ImporterOption) *Importer {
+	imp := &Importer{
 		storageDriver:      storageDriver,
 		registry:           registry,
 		configurationStore: NewConfigurationStore(db),
@@ -45,6 +63,12 @@ func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distri
 		repositoryStore:    NewRepositoryStore(db),
 		tagStore:           NewTagStore(db),
 	}
+
+	for _, o := range opts {
+		o(imp)
+	}
+
+	return imp
 }
 
 func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manifest) (*models.Manifest, error) {
@@ -421,6 +445,11 @@ func (imp *Importer) importManifests(ctx context.Context, fsRepo distribution.Re
 }
 
 func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository) error {
+	manifestService, err := fsRepo.Manifests(ctx)
+	if err != nil {
+		return fmt.Errorf("error constructing manifest service: %w", err)
+	}
+
 	tagService := fsRepo.Tags(ctx)
 	fsTags, err := tagService.All(ctx)
 	if err != nil {
@@ -447,15 +476,34 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 
 		dbTag := &models.Tag{Name: fsTag, RepositoryID: dbRepo.ID}
 
-		// find corresponding manifest in DB
-		dbManifest, err := imp.manifestStore.FindByDigest(ctx, desc.Digest)
+		// Find corresponding manifest in DB or filesystem.
+		var dbManifest *models.Manifest
+		dbManifest, err = imp.manifestStore.FindByDigest(ctx, desc.Digest)
 		if err != nil {
-			return fmt.Errorf("error finding target manifest: %w", err)
-		}
-		if dbManifest == nil {
-			log.WithError(err).Errorf("no manifest found for digest %q", desc.Digest)
+			log.WithError(err).Error("error finding tag manifest")
 			continue
 		}
+		if dbManifest == nil {
+			m, err := manifestService.Get(ctx, desc.Digest)
+			if err != nil {
+				log.WithError(err).Errorf("error retrieving manifest %q", desc.Digest)
+				continue
+			}
+
+			switch fsManifest := m.(type) {
+			case *manifestlist.DeserializedManifestList:
+				log.Info("importing manifest list")
+				dbManifest, err = imp.importManifestList(ctx, fsRepo, dbRepo, fsManifest, desc.Digest)
+			default:
+				log.Info("importing manifest")
+				dbManifest, err = imp.importManifest(ctx, fsRepo, dbRepo, fsManifest, desc.Digest)
+			}
+			if err != nil {
+				log.WithError(err).Error("error importing manifest")
+				continue
+			}
+		}
+
 		dbTag.ManifestID = dbManifest.ID
 
 		// create tag
@@ -484,11 +532,14 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 		return fmt.Errorf("error creating repository: %w", err)
 	}
 
-	// import repository manifests
-	if err := imp.importManifests(ctx, fsRepo, dbRepo); err != nil {
-		return fmt.Errorf("error importing manifests: %w", err)
+	if imp.importDanglingManifests {
+		// import all repository manifests
+		if err := imp.importManifests(ctx, fsRepo, dbRepo); err != nil {
+			return fmt.Errorf("error importing manifests: %w", err)
+		}
 	}
-	//import repository tags
+
+	// import repository tags and associated manifests
 	if err := imp.importTags(ctx, fsRepo, dbRepo); err != nil {
 		return fmt.Errorf("error importing tags: %w", err)
 	}
@@ -545,7 +596,7 @@ func (imp *Importer) isDatabaseEmpty(ctx context.Context) (bool, error) {
 }
 
 // ImportAll populates the registry database with metadata from all repositories in the storage backend.
-func (imp *Importer) ImportAll(ctx context.Context, importDanglingBlobs bool) error {
+func (imp *Importer) ImportAll(ctx context.Context) error {
 	start := time.Now()
 	log := logrus.New()
 	log.Info("starting metadata import")
@@ -558,7 +609,7 @@ func (imp *Importer) ImportAll(ctx context.Context, importDanglingBlobs bool) er
 		return errors.New("non-empty database")
 	}
 
-	if importDanglingBlobs {
+	if imp.importDanglingBlobs {
 		var index int
 		blobStart := time.Now()
 		log.Info("importing all blobs")
@@ -596,7 +647,7 @@ func (imp *Importer) ImportAll(ctx context.Context, importDanglingBlobs bool) er
 			log.WithError(err).Error("error importing repository")
 			// if the storage driver failed to find a repository path (usually due to missing `_manifests/revisions`
 			// or `_manifests/tags` folders) continue to the next one, otherwise stop as the error is unknown.
-			if !errors.As(err, &driver.PathNotFoundError{}) {
+			if !(errors.As(err, &driver.PathNotFoundError{}) || errors.As(err, &distribution.ErrRepositoryUnknown{})) {
 				return err
 			}
 		}
