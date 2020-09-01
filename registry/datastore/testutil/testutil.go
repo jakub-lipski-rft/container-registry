@@ -47,7 +47,7 @@ var AllTables = []table{
 // truncate truncates t in the test database.
 func (t table) truncate(db *datastore.DB) error {
 	if _, err := db.Exec(fmt.Sprintf("TRUNCATE %s RESTART IDENTITY CASCADE", t)); err != nil {
-		return fmt.Errorf("error truncating table %q: %w", t, err)
+		return fmt.Errorf("truncating table %q: %w", t, err)
 	}
 	return nil
 }
@@ -107,7 +107,7 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 func NewDSN() (*datastore.DSN, error) {
 	port, err := strconv.Atoi(os.Getenv("REGISTRY_DATABASE_PORT"))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing DSN port: %w", err)
+		return nil, fmt.Errorf("parsing DSN port: %w", err)
 	}
 	dsn := &datastore.DSN{
 		Host:        os.Getenv("REGISTRY_DATABASE_HOST"),
@@ -154,7 +154,7 @@ func NewDB() (*datastore.DB, error) {
 
 	db, err := datastore.Open(dsn, datastore.WithLogger(logrus.NewEntry(log)))
 	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
+		return nil, fmt.Errorf("opening database connection: %w", err)
 	}
 
 	return db, nil
@@ -164,7 +164,7 @@ func NewDB() (*datastore.DB, error) {
 func TruncateTables(db *datastore.DB, tables ...table) error {
 	for _, table := range tables {
 		if err := table.truncate(db); err != nil {
-			return fmt.Errorf("error truncating tables: %w", err)
+			return fmt.Errorf("truncating tables: %w", err)
 		}
 	}
 	return nil

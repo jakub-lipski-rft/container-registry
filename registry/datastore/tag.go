@@ -45,7 +45,7 @@ func scanFullTag(row *sql.Row) (*models.Tag, error) {
 
 	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if err != sql.ErrNoRows {
-			return nil, fmt.Errorf("error scaning tag: %w", err)
+			return nil, fmt.Errorf("scaning tag: %w", err)
 		}
 		return nil, nil
 	}
@@ -60,12 +60,12 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 	for rows.Next() {
 		t := new(models.Tag)
 		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("error scanning tag: %w", err)
+			return nil, fmt.Errorf("scanning tag: %w", err)
 		}
 		tt = append(tt, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error scanning tags: %w", err)
+		return nil, fmt.Errorf("scanning tags: %w", err)
 	}
 
 	return tt, nil
@@ -102,7 +102,7 @@ func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
 			tags`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("error finding tags: %w", err)
+		return nil, fmt.Errorf("finding tags: %w", err)
 	}
 
 	return scanFullTags(rows)
@@ -114,7 +114,7 @@ func (s *tagStore) Count(ctx context.Context) (int, error) {
 	var count int
 
 	if err := s.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting tags: %w", err)
+		return count, fmt.Errorf("counting tags: %w", err)
 	}
 
 	return count, nil
@@ -168,7 +168,7 @@ func (s *tagStore) Create(ctx context.Context, t *models.Tag) error {
 
 	row := s.db.QueryRowContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID)
 	if err := row.Scan(&t.ID, &t.CreatedAt); err != nil {
-		return fmt.Errorf("error creating tag: %w", err)
+		return fmt.Errorf("creating tag: %w", err)
 	}
 
 	return nil
@@ -185,12 +185,12 @@ func (s *tagStore) Update(ctx context.Context, t *models.Tag) error {
 
 	res, err := s.db.ExecContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ID)
 	if err != nil {
-		return fmt.Errorf("error updating tag: %w", err)
+		return fmt.Errorf("updating tag: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error updating tag: %w", err)
+		return fmt.Errorf("updating tag: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("tag not found")
@@ -205,12 +205,12 @@ func (s *tagStore) Delete(ctx context.Context, id int64) error {
 
 	res, err := s.db.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("error deleting tag: %w", err)
+		return fmt.Errorf("deleting tag: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error deleting tag: %w", err)
+		return fmt.Errorf("deleting tag: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("tag not found")
