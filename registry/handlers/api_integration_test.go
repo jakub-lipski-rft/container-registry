@@ -276,6 +276,34 @@ func TestCatalogAPI(t *testing.T) {
 			require.Equal(t, test.expectedLinkHeader, resp.Header.Get("Link"))
 		})
 	}
+
+	// If the database is enabled, disable it and rerun the tests again with the
+	// database to check that the filesystem mirroring worked correctly.
+	if env.config.Database.Enabled {
+		env.config.Database.Enabled = false
+		defer func() { env.config.Database.Enabled = true }()
+
+		for _, test := range tt {
+			t.Run(fmt.Sprintf("%s filesystem mirroring", test.name), func(t *testing.T) {
+				catalogURL, err := env.builder.BuildCatalogURL(test.queryParams)
+				require.NoError(t, err)
+
+				resp, err := http.Get(catalogURL)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+
+				var body catalogAPIResponse
+				dec := json.NewDecoder(resp.Body)
+				err = dec.Decode(&body)
+				require.NoError(t, err)
+
+				require.Equal(t, test.expectedBody, body)
+				require.Equal(t, test.expectedLinkHeader, resp.Header.Get("Link"))
+			})
+		}
+	}
 }
 
 func TestCatalogAPI_Empty(t *testing.T) {
