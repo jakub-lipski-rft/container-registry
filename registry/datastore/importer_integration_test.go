@@ -121,6 +121,23 @@ func TestImporter_ImportAll_DanglingBlobs(t *testing.T) {
 	validateImport(t, tx)
 }
 
+func TestImporter_ImportAll_AllowIdempotent(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	// First, import a single repository, only tagged manifests and referenced blobs.
+	imp1 := newImporter(t, tx)
+	require.NoError(t, imp1.Import(suite.ctx, "f-dangling-manifests"))
+
+	// Now try to import the entire contents of the registry including what was previously imported.
+	imp2 := newImporter(t, tx, datastore.WithImportDanglingManifests, datastore.WithImportDanglingBlobs)
+	require.NoError(t, imp2.ImportAll(suite.ctx))
+	validateImport(t, tx)
+}
+
 func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	driver := newFilesystemStorageDriver(t)
 	registry := newRegistry(t, driver)
@@ -128,8 +145,9 @@ func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	// load some fixtures
 	reloadRepositoryFixtures(t)
 
-	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests)
-	require.Error(t, imp.ImportAll(suite.ctx))
+	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
+	err := imp.ImportAll(suite.ctx)
+	require.EqualError(t, err, "non-empty database")
 }
 
 func TestImporter_Import(t *testing.T) {
@@ -156,6 +174,20 @@ func TestImporter_Import_TaggedOnly(t *testing.T) {
 	validateImport(t, tx)
 }
 
+func TestImporter_Import_AllowIdempotent(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	// Import a single repository twice, should succeed.
+	imp := newImporter(t, tx, datastore.WithImportDanglingManifests)
+	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
+	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
+	validateImport(t, tx)
+}
+
 func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	driver := newFilesystemStorageDriver(t)
 	registry := newRegistry(t, driver)
@@ -163,6 +195,7 @@ func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	// load some fixtures
 	reloadRepositoryFixtures(t)
 
-	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests)
-	require.Error(t, imp.Import(suite.ctx, "a-simple"))
+	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
+	err := imp.Import(suite.ctx, "a-simple")
+	require.EqualError(t, err, "non-empty database")
 }

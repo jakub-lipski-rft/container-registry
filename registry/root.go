@@ -54,6 +54,7 @@ func init() {
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	ImportCmd.Flags().BoolVarP(&importDanglingBlobs, "dangling-blobs", "b", false, "import all blobs, regardless of whether they are referenced by a manifest or not")
 	ImportCmd.Flags().BoolVarP(&importDanglingManifests, "dangling-manifests", "m", false, "import all manifests, regardless of whether they are tagged or not")
+	ImportCmd.Flags().BoolVarP(&continueImport, "continue-import", "c", false, "allow import to be retried on a database which is already partially imported")
 }
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
@@ -100,6 +101,7 @@ var dryRun bool
 var removeUntagged bool
 var importDanglingBlobs bool
 var importDanglingManifests bool
+var continueImport bool
 var debugAddr string
 
 // GCCmd is the cobra command that corresponds to the garbage-collect subcommand
@@ -372,6 +374,7 @@ var ImportCmd = &cobra.Command{
 	Long: "Import filesystem metadata into the database. This should only be\n" +
 		"used for an one-off migration, starting with an empty database.\n" +
 		"By default, dangling blobs and untagged manifests are not imported.\n " +
+		"Imports may be retried with the --continue-import flag set to true.\n " +
 		"This tool can not be used with the parallelwalk storage configuration enabled.",
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := resolveConfiguration(args)
@@ -441,6 +444,9 @@ var ImportCmd = &cobra.Command{
 		}
 		if importDanglingManifests {
 			opts = append(opts, datastore.WithImportDanglingManifests)
+		}
+		if !continueImport {
+			opts = append(opts, datastore.WithRequireEmptyDatabase)
 		}
 
 		p := datastore.NewImporter(tx, driver, registry, opts...)
