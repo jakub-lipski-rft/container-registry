@@ -35,6 +35,7 @@ type Importer struct {
 
 	importDanglingManifests bool
 	importDanglingBlobs     bool
+	requireEmptyDatabase    bool
 }
 
 // ImporterOption provides functional options for the Importer.
@@ -50,6 +51,12 @@ func WithImportDanglingManifests(imp *Importer) {
 // rather than only blobs referenced by manifests.
 func WithImportDanglingBlobs(imp *Importer) {
 	imp.importDanglingBlobs = true
+}
+
+// WithRequireEmptyDatabase configures the Importer to stop import unless the
+// database being imported to is empty.
+func WithRequireEmptyDatabase(imp *Importer) {
+	imp.requireEmptyDatabase = true
 }
 
 // NewImporter creates a new Importer.
@@ -146,6 +153,26 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, d distrib
 	}
 
 	return dbConfig, nil
+}
+
+func (imp *Importer) findOrCreateDBTag(ctx context.Context, dbRepo *models.Repository, dbTag *models.Tag) {
+	log := logrus.WithField("tagName", dbTag.Name)
+
+	foundTag, err := imp.repositoryStore.FindTagByName(ctx, dbRepo, dbTag.Name)
+	if err != nil {
+		log.WithError(err).Error("finding repository tag")
+		return
+	}
+
+	if foundTag != nil {
+		log.Info("tag already present in database")
+		return
+	}
+
+	if err := imp.tagStore.Create(ctx, dbTag); err != nil {
+		log.WithError(err).Error("creating tag")
+		return
+	}
 }
 
 func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, l *models.Blob) error {
@@ -344,13 +371,13 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 	}
 
 	// create manifest list on DB
-	dbManifestList := &models.Manifest{
+	dbManifestList, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
 		SchemaVersion: ml.SchemaVersion,
 		MediaType:     mediaType,
 		Digest:        dgst,
 		Payload:       payload,
-	}
-	if err := imp.manifestStore.Create(ctx, dbManifestList); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("error creating manifest list: %w", err)
 	}
 
@@ -461,6 +488,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 	sort.Strings(fsTags)
 
 	total := len(fsTags)
+
 	for i, fsTag := range fsTags {
 		log := logrus.WithFields(logrus.Fields{"name": fsTag, "count": i + 0, "total": total})
 
@@ -506,11 +534,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 
 		dbTag.ManifestID = dbManifest.ID
 
-		// create tag
-		if err := imp.tagStore.Create(ctx, dbTag); err != nil {
-			log.WithError(err).Error("error creating tag")
-			continue
-		}
+		imp.findOrCreateDBTag(ctx, dbRepo, dbTag)
 	}
 
 	return nil
@@ -526,10 +550,18 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 		return fmt.Errorf("error constructing repository: %w", err)
 	}
 
-	// create repository
-	dbRepo, err := imp.repositoryStore.CreateByPath(ctx, path)
+	// Find or create repository.
+	var dbRepo *models.Repository
+
+	dbRepo, err = imp.repositoryStore.FindByPath(ctx, path)
 	if err != nil {
-		return fmt.Errorf("error creating repository: %w", err)
+		return fmt.Errorf("checking for existence of repository: %w", err)
+	}
+
+	if dbRepo == nil {
+		if dbRepo, err = imp.repositoryStore.CreateByPath(ctx, path); err != nil {
+			return fmt.Errorf("importing repository: %w", err)
+		}
 	}
 
 	if imp.importDanglingManifests {
@@ -601,26 +633,36 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 	log := logrus.New()
 	log.Info("starting metadata import")
 
-	empty, err := imp.isDatabaseEmpty(ctx)
-	if err != nil {
-		return fmt.Errorf("error checking if database is empty: %w", err)
-	}
-	if !empty {
-		return errors.New("non-empty database")
+	if imp.requireEmptyDatabase {
+		empty, err := imp.isDatabaseEmpty(ctx)
+		if err != nil {
+			return fmt.Errorf("checking if database is empty: %w", err)
+		}
+		if !empty {
+			return errors.New("non-empty database")
+		}
 	}
 
 	if imp.importDanglingBlobs {
 		var index int
 		blobStart := time.Now()
 		log.Info("importing all blobs")
-		err = imp.registry.Blobs().Enumerate(ctx, func(desc distribution.Descriptor) error {
+		err := imp.registry.Blobs().Enumerate(ctx, func(desc distribution.Descriptor) error {
 			index++
 			log := log.WithFields(logrus.Fields{"digest": desc.Digest, "count": index, "size": desc.Size})
 			log.Info("importing blob")
 
-			if err := imp.blobStore.Create(ctx, &models.Blob{MediaType: "application/octet-stream", Digest: desc.Digest, Size: desc.Size}); err != nil {
-				return err
+			dbBlob, err := imp.blobStore.FindByDigest(ctx, desc.Digest)
+			if err != nil {
+				return fmt.Errorf("checking for existence of blob: %w", err)
 			}
+
+			if dbBlob == nil {
+				if err := imp.blobStore.Create(ctx, &models.Blob{MediaType: "application/octet-stream", Digest: desc.Digest, Size: desc.Size}); err != nil {
+					return err
+				}
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -637,7 +679,7 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 	}
 
 	index := 0
-	err = repositoryEnumerator.Enumerate(ctx, func(path string) error {
+	err := repositoryEnumerator.Enumerate(ctx, func(path string) error {
 		index++
 		repoStart := time.Now()
 		log := logrus.WithFields(logrus.Fields{"path": path, "count": index})
@@ -681,12 +723,14 @@ func (imp *Importer) Import(ctx context.Context, path string) error {
 	start := time.Now()
 	logrus.Info("starting metadata import")
 
-	empty, err := imp.isDatabaseEmpty(ctx)
-	if err != nil {
-		return fmt.Errorf("error checking if database is empty: %w", err)
-	}
-	if !empty {
-		return errors.New("non-empty database")
+	if imp.requireEmptyDatabase {
+		empty, err := imp.isDatabaseEmpty(ctx)
+		if err != nil {
+			return fmt.Errorf("checking if database is empty: %w", err)
+		}
+		if !empty {
+			return errors.New("non-empty database")
+		}
 	}
 
 	log := logrus.WithField("path", path)
