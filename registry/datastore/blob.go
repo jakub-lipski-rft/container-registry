@@ -50,7 +50,7 @@ func scanFullBlob(row *sql.Row) (*models.Blob, error) {
 
 	if err := row.Scan(&b.ID, &b.MediaType, &digestAlgorithm, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt); err != nil {
 		if err != sql.ErrNoRows {
-			return nil, fmt.Errorf("error scanning blob: %w", err)
+			return nil, fmt.Errorf("scanning blob: %w", err)
 		}
 		return nil, nil
 	}
@@ -75,7 +75,7 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 
 		err := rows.Scan(&b.ID, &b.MediaType, &digestAlgorithm, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt)
 		if err != nil {
-			return nil, fmt.Errorf("error scanning blob: %w", err)
+			return nil, fmt.Errorf("scanning blob: %w", err)
 		}
 
 		alg, err := digestAlgorithm.Parse()
@@ -87,7 +87,7 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 		bb = append(bb, b)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error scanning blobs: %w", err)
+		return nil, fmt.Errorf("scanning blobs: %w", err)
 	}
 
 	return bb, nil
@@ -151,7 +151,7 @@ func (s *blobStore) FindAll(ctx context.Context) (models.Blobs, error) {
 			blobs`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("error finding blobs: %w", err)
+		return nil, fmt.Errorf("finding blobs: %w", err)
 	}
 
 	return scanFullBlobs(rows)
@@ -163,7 +163,7 @@ func (s *blobStore) Count(ctx context.Context) (int, error) {
 	var count int
 
 	if err := s.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting blobs: %w", err)
+		return count, fmt.Errorf("counting blobs: %w", err)
 	}
 
 	return count, nil
@@ -182,7 +182,7 @@ func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
 	}
 	row := s.db.QueryRowContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size)
 	if err := row.Scan(&b.ID, &b.CreatedAt); err != nil {
-		return fmt.Errorf("error creating blob: %w", err)
+		return fmt.Errorf("creating blob: %w", err)
 	}
 
 	return nil
@@ -228,12 +228,12 @@ func (s *blobStore) UpdateMediaType(ctx context.Context, b *models.Blob) error {
 
 	res, err := s.db.ExecContext(ctx, q, b.MediaType, b.ID)
 	if err != nil {
-		return fmt.Errorf("error updating blob media type: %w", err)
+		return fmt.Errorf("updating blob media type: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error updating blob media type: %w", err)
+		return fmt.Errorf("updating blob media type: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("blob not found")
@@ -257,7 +257,7 @@ func (s *blobStore) Mark(ctx context.Context, b *models.Blob) error {
 		if err == sql.ErrNoRows {
 			return errors.New("blob not found")
 		}
-		return fmt.Errorf("error soft deleting blobs: %w", err)
+		return fmt.Errorf("soft deleting blobs: %w", err)
 	}
 
 	return nil
@@ -269,12 +269,12 @@ func (s *blobStore) Delete(ctx context.Context, id int64) error {
 
 	res, err := s.db.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("error deleting blob: %w", err)
+		return fmt.Errorf("deleting blob: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error deleting blob: %w", err)
+		return fmt.Errorf("deleting blob: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("blob not found")

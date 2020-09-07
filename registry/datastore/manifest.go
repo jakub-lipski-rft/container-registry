@@ -57,7 +57,7 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 	err := row.Scan(&m.ID, &m.ConfigurationID, &m.SchemaVersion, &m.MediaType, &digestAlgorithm, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return nil, fmt.Errorf("error scaning manifest: %w", err)
+			return nil, fmt.Errorf("scaning manifest: %w", err)
 		}
 		return nil, nil
 	}
@@ -82,7 +82,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 
 		err := rows.Scan(&m.ID, &m.ConfigurationID, &m.SchemaVersion, &m.MediaType, &digestAlgorithm, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt)
 		if err != nil {
-			return nil, fmt.Errorf("error scanning manifest: %w", err)
+			return nil, fmt.Errorf("scanning manifest: %w", err)
 		}
 
 		alg, err := digestAlgorithm.Parse()
@@ -94,7 +94,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 		mm = append(mm, m)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error scanning manifests: %w", err)
+		return nil, fmt.Errorf("scanning manifests: %w", err)
 	}
 
 	return mm, nil
@@ -166,7 +166,7 @@ func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
 
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("error finding manifests: %w", err)
+		return nil, fmt.Errorf("finding manifests: %w", err)
 	}
 
 	return scanFullManifests(rows)
@@ -178,7 +178,7 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 	var count int
 
 	if err := s.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting manifests: %w", err)
+		return count, fmt.Errorf("counting manifests: %w", err)
 	}
 
 	return count, nil
@@ -225,7 +225,7 @@ func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (mod
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding blobs: %w", err)
+		return nil, fmt.Errorf("finding blobs: %w", err)
 	}
 
 	return scanFullBlobs(rows)
@@ -249,7 +249,7 @@ func (s *manifestStore) Repositories(ctx context.Context, m *models.Manifest) (m
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding repositories: %w", err)
+		return nil, fmt.Errorf("finding repositories: %w", err)
 	}
 
 	return scanFullRepositories(rows)
@@ -275,7 +275,7 @@ func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (mod
 
 	rows, err := s.db.QueryContext(ctx, q, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding referenced manifests: %w", err)
+		return nil, fmt.Errorf("finding referenced manifests: %w", err)
 	}
 
 	return scanFullManifests(rows)
@@ -294,7 +294,7 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 	}
 	row := s.db.QueryRowContext(ctx, q, m.ConfigurationID, m.SchemaVersion, m.MediaType, digestAlgorithm, m.Digest.Hex(), m.Payload)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
-		return fmt.Errorf("error creating manifest: %w", err)
+		return fmt.Errorf("creating manifest: %w", err)
 	}
 
 	return nil
@@ -315,7 +315,7 @@ func (s *manifestStore) Mark(ctx context.Context, m *models.Manifest) error {
 		if err == sql.ErrNoRows {
 			return errors.New("manifest not found")
 		}
-		return fmt.Errorf("error soft deleting manifest: %w", err)
+		return fmt.Errorf("soft deleting manifest: %w", err)
 	}
 
 	return nil
@@ -333,7 +333,7 @@ func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manife
 			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, ml.ID, m.ID); err != nil {
-		return fmt.Errorf("error associating manifest: %w", err)
+		return fmt.Errorf("associating manifest: %w", err)
 	}
 
 	return nil
@@ -345,11 +345,11 @@ func (s *manifestStore) DissociateManifest(ctx context.Context, ml *models.Manif
 
 	res, err := s.db.ExecContext(ctx, q, ml.ID, m.ID)
 	if err != nil {
-		return fmt.Errorf("error dissociating manifest: %w", err)
+		return fmt.Errorf("dissociating manifest: %w", err)
 	}
 
 	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error dissociating manifest: %w", err)
+		return fmt.Errorf("dissociating manifest: %w", err)
 	}
 
 	return nil
@@ -363,7 +363,7 @@ func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manife
 			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, m.ID, b.ID); err != nil {
-		return fmt.Errorf("error associating layer blob: %w", err)
+		return fmt.Errorf("associating layer blob: %w", err)
 	}
 
 	return nil
@@ -375,11 +375,11 @@ func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manif
 
 	res, err := s.db.ExecContext(ctx, q, m.ID, b.ID)
 	if err != nil {
-		return fmt.Errorf("error dissociating layer blob: %w", err)
+		return fmt.Errorf("dissociating layer blob: %w", err)
 	}
 
 	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error dissociating layer blob: %w", err)
+		return fmt.Errorf("dissociating layer blob: %w", err)
 	}
 
 	return nil
@@ -391,12 +391,12 @@ func (s *manifestStore) Delete(ctx context.Context, id int64) error {
 
 	res, err := s.db.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("error deleting manifest: %w", err)
+		return fmt.Errorf("deleting manifest: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error deleting manifest: %w", err)
+		return fmt.Errorf("deleting manifest: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("manifest not found")

@@ -94,7 +94,7 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 	var err error
 	ctx, err = configureLogging(ctx, config)
 	if err != nil {
-		return nil, fmt.Errorf("error configuring logger: %v", err)
+		return nil, fmt.Errorf("configuring logger: %w", err)
 	}
 
 	configureBugsnag(config)
@@ -109,12 +109,12 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 	app.RegisterHealthChecks()
 	handler := panicHandler(app)
 	if handler, err = configureReporting(config, handler); err != nil {
-		return nil, fmt.Errorf("error configuring reporting services: %w", err)
+		return nil, fmt.Errorf("configuring reporting services: %w", err)
 	}
 	handler = alive("/", handler)
 	handler = health.Handler(handler)
 	if handler, err = configureAccessLogging(config, handler); err != nil {
-		return nil, fmt.Errorf("error configuring access logger: %v", err)
+		return nil, fmt.Errorf("configuring access logger: %w", err)
 	}
 	handler = correlation.InjectCorrelationID(handler)
 
@@ -509,7 +509,7 @@ func resolveConfiguration(args []string) (*configuration.Configuration, error) {
 
 	config, err := configuration.Parse(fp)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing %s: %v", configurationPath, err)
+		return nil, fmt.Errorf("parsing %s: %w", configurationPath, err)
 	}
 
 	return config, nil

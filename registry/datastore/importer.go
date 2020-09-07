@@ -81,12 +81,12 @@ func NewImporter(db Queryer, storageDriver driver.StorageDriver, registry distri
 func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manifest) (*models.Manifest, error) {
 	dbManifest, err := imp.manifestStore.FindByDigest(ctx, m.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for manifest: %w", err)
+		return nil, fmt.Errorf("searching for manifest: %w", err)
 	}
 
 	if dbManifest == nil {
 		if err := imp.manifestStore.Create(ctx, m); err != nil {
-			return nil, fmt.Errorf("error creating manifest: %w", err)
+			return nil, fmt.Errorf("creating manifest: %w", err)
 		}
 		dbManifest = m
 	}
@@ -97,7 +97,7 @@ func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manif
 func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distribution.Repository, l *models.Blob) (*models.Blob, error) {
 	dbLayer, err := imp.blobStore.FindByDigest(ctx, l.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for layer blob: %w", err)
+		return nil, fmt.Errorf("searching for layer blob: %w", err)
 	}
 
 	if dbLayer == nil {
@@ -106,14 +106,14 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 			blobStore := fsRepo.Blobs(ctx)
 			desc, err := blobStore.Stat(ctx, digest.Digest(l.Digest))
 			if err != nil {
-				return nil, fmt.Errorf("error obtaining blob layer size: %w", err)
+				return nil, fmt.Errorf("obtaining blob layer size: %w", err)
 			}
 			l.Size = desc.Size
 			l.MediaType = desc.MediaType
 		}
 
 		if err := imp.blobStore.Create(ctx, l); err != nil {
-			return nil, fmt.Errorf("error creating layer blob: %w", err)
+			return nil, fmt.Errorf("creating layer blob: %w", err)
 		}
 		dbLayer = l
 	}
@@ -124,7 +124,7 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, d distribution.Descriptor, payload []byte) (*models.Configuration, error) {
 	dbBlob, err := imp.blobStore.FindByDigest(ctx, d.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for configuration blob: %w", err)
+		return nil, fmt.Errorf("searching for configuration blob: %w", err)
 	}
 	if dbBlob == nil {
 		dbBlob = &models.Blob{
@@ -139,7 +139,7 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, d distrib
 
 	dbConfig, err := imp.configurationStore.FindByDigest(ctx, d.Digest)
 	if err != nil {
-		return nil, fmt.Errorf("error searching for configuration: %w", err)
+		return nil, fmt.Errorf("searching for configuration: %w", err)
 	}
 
 	if dbConfig == nil {
@@ -148,7 +148,7 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, d distrib
 			Payload: payload,
 		}
 		if err := imp.configurationStore.Create(ctx, dbConfig); err != nil {
-			return nil, fmt.Errorf("error creating configuration: %w", err)
+			return nil, fmt.Errorf("creating configuration: %w", err)
 		}
 	}
 
@@ -181,11 +181,11 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 		return err
 	}
 	if err := imp.manifestStore.AssociateLayerBlob(ctx, dbManifest, dbLayer); err != nil {
-		return fmt.Errorf("error associating layer blob with manifest: %w", err)
+		return fmt.Errorf("associating layer blob with manifest: %w", err)
 	}
 
 	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbLayer); err != nil {
-		return fmt.Errorf("error linking layer blob to repository: %w", err)
+		return fmt.Errorf("linking layer blob to repository: %w", err)
 	}
 
 	return nil
@@ -202,7 +202,7 @@ func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distributio
 		log.Info("importing layer")
 
 		if err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Blob{Digest: fsLayer.BlobSum}); err != nil {
-			log.WithError(err).Error("error importing layer")
+			log.WithError(err).Error("importing layer")
 			continue
 		}
 	}
@@ -228,7 +228,7 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 			Size:      fsLayer.Size,
 		})
 		if err != nil {
-			log.WithError(err).Error("error importing layer")
+			log.WithError(err).Error("importing layer")
 			continue
 		}
 	}
@@ -378,12 +378,12 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 		Payload:       payload,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error creating manifest list: %w", err)
+		return nil, fmt.Errorf("creating manifest list: %w", err)
 	}
 
 	manifestService, err := fsRepo.Manifests(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error constructing manifest service: %w", err)
+		return nil, fmt.Errorf("constructing manifest service: %w", err)
 	}
 
 	// import manifests in list
@@ -391,7 +391,7 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 	for i, m := range ml.Manifests {
 		fsManifest, err := manifestService.Get(ctx, m.Digest)
 		if err != nil {
-			logrus.WithError(err).Error("error retrieving manifest")
+			logrus.WithError(err).Error("retrieving manifest")
 			continue
 		}
 
@@ -404,19 +404,19 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 
 		dbManifest, err := imp.importManifest(ctx, fsRepo, dbRepo, fsManifest, m.Digest)
 		if err != nil {
-			logrus.WithError(err).Error("error importing manifest")
+			logrus.WithError(err).Error("importing manifest")
 			continue
 		}
 
 		if err := imp.manifestStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
-			logrus.WithError(err).Error("error associating manifest and manifest list")
+			logrus.WithError(err).Error("associating manifest and manifest list")
 			continue
 		}
 	}
 
 	// associate repository and manifest list
 	if err := imp.repositoryStore.AssociateManifest(ctx, dbRepo, dbManifestList); err != nil {
-		return nil, fmt.Errorf("error associating repository and manifest list: %w", err)
+		return nil, fmt.Errorf("associating repository and manifest list: %w", err)
 	}
 
 	return dbManifestList, nil
@@ -438,11 +438,11 @@ func (imp *Importer) importManifest(ctx context.Context, fsRepo distribution.Rep
 func (imp *Importer) importManifests(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository) error {
 	manifestService, err := fsRepo.Manifests(ctx)
 	if err != nil {
-		return fmt.Errorf("error constructing manifest service: %w", err)
+		return fmt.Errorf("constructing manifest service: %w", err)
 	}
 	manifestEnumerator, ok := manifestService.(distribution.ManifestEnumerator)
 	if !ok {
-		return fmt.Errorf("error converting ManifestService into ManifestEnumerator")
+		return fmt.Errorf("converting ManifestService into ManifestEnumerator")
 	}
 
 	index := 0
@@ -451,7 +451,7 @@ func (imp *Importer) importManifests(ctx context.Context, fsRepo distribution.Re
 
 		m, err := manifestService.Get(ctx, dgst)
 		if err != nil {
-			return fmt.Errorf("error retrieving manifest %q: %w", dgst, err)
+			return fmt.Errorf("retrieving manifest %q: %w", dgst, err)
 		}
 
 		log := logrus.WithFields(logrus.Fields{"digest": dgst, "count": index, "type": fmt.Sprintf("%T", m)})
@@ -474,13 +474,13 @@ func (imp *Importer) importManifests(ctx context.Context, fsRepo distribution.Re
 func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository) error {
 	manifestService, err := fsRepo.Manifests(ctx)
 	if err != nil {
-		return fmt.Errorf("error constructing manifest service: %w", err)
+		return fmt.Errorf("constructing manifest service: %w", err)
 	}
 
 	tagService := fsRepo.Tags(ctx)
 	fsTags, err := tagService.All(ctx)
 	if err != nil {
-		return fmt.Errorf("error reading tags: %w", err)
+		return fmt.Errorf("reading tags: %w", err)
 	}
 
 	// sort tags to ensure reproducible imports across different OSs using the filesystem storage driver
@@ -495,7 +495,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 		// read tag details from the filesystem
 		desc, err := tagService.Get(ctx, fsTag)
 		if err != nil {
-			log.WithError(err).Error("error reading tag details")
+			log.WithError(err).Error("reading tag details")
 			continue
 		}
 
@@ -508,13 +508,13 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 		var dbManifest *models.Manifest
 		dbManifest, err = imp.manifestStore.FindByDigest(ctx, desc.Digest)
 		if err != nil {
-			log.WithError(err).Error("error finding tag manifest")
+			log.WithError(err).Error("finding tag manifest")
 			continue
 		}
 		if dbManifest == nil {
 			m, err := manifestService.Get(ctx, desc.Digest)
 			if err != nil {
-				log.WithError(err).Errorf("error retrieving manifest %q", desc.Digest)
+				log.WithError(err).Errorf("retrieving manifest %q", desc.Digest)
 				continue
 			}
 
@@ -527,7 +527,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 				dbManifest, err = imp.importManifest(ctx, fsRepo, dbRepo, fsManifest, desc.Digest)
 			}
 			if err != nil {
-				log.WithError(err).Error("error importing manifest")
+				log.WithError(err).Error("importing manifest")
 				continue
 			}
 		}
@@ -543,11 +543,11 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 func (imp *Importer) importRepository(ctx context.Context, path string) error {
 	named, err := reference.WithName(path)
 	if err != nil {
-		return fmt.Errorf("error parsing repository name: %w", err)
+		return fmt.Errorf("parsing repository name: %w", err)
 	}
 	fsRepo, err := imp.registry.Repository(ctx, named)
 	if err != nil {
-		return fmt.Errorf("error constructing repository: %w", err)
+		return fmt.Errorf("constructing repository: %w", err)
 	}
 
 	// Find or create repository.
@@ -567,13 +567,13 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 	if imp.importDanglingManifests {
 		// import all repository manifests
 		if err := imp.importManifests(ctx, fsRepo, dbRepo); err != nil {
-			return fmt.Errorf("error importing manifests: %w", err)
+			return fmt.Errorf("importing manifests: %w", err)
 		}
 	}
 
 	// import repository tags and associated manifests
 	if err := imp.importTags(ctx, fsRepo, dbRepo); err != nil {
-		return fmt.Errorf("error importing tags: %w", err)
+		return fmt.Errorf("importing tags: %w", err)
 	}
 
 	return nil
@@ -666,7 +666,7 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("error importing blobs: %w", err)
+			return fmt.Errorf("importing blobs: %w", err)
 		}
 
 		blobEnd := time.Since(blobStart).Seconds()
@@ -704,7 +704,7 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 
 	counters, err := imp.countRows(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("error counting table rows")
+		logrus.WithError(err).Error("counting table rows")
 	}
 
 	logCounters := make(map[string]interface{}, len(counters))

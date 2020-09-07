@@ -70,11 +70,11 @@ func TestMain(m *testing.M) {
 	suite = &testSuite{}
 
 	if err := suite.setup(); err != nil {
-		panic(fmt.Errorf("setup error: %w", err))
+		panic(fmt.Errorf("setup: %w", err))
 	}
 	code := m.Run()
 	if err := suite.teardown(); err != nil {
-		panic(fmt.Errorf("teardown error: %w", err))
+		panic(fmt.Errorf("teardown: %w", err))
 	}
 
 	os.Exit(code)

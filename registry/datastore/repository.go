@@ -71,7 +71,7 @@ func scanFullRepository(row *sql.Row) (*models.Repository, error) {
 
 	if err := row.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.UpdatedAt); err != nil {
 		if err != sql.ErrNoRows {
-			return nil, fmt.Errorf("error scanning repository: %w", err)
+			return nil, fmt.Errorf("scanning repository: %w", err)
 		}
 		return nil, nil
 	}
@@ -86,12 +86,12 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 	for rows.Next() {
 		r := new(models.Repository)
 		if err := rows.Scan(&r.ID, &r.Name, &r.Path, &r.ParentID, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("error scanning repository: %w", err)
+			return nil, fmt.Errorf("scanning repository: %w", err)
 		}
 		rr = append(rr, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error scanning repositories: %w", err)
+		return nil, fmt.Errorf("scanning repositories: %w", err)
 	}
 
 	return rr, nil
@@ -146,7 +146,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 			repositories`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("error finding repositories: %w", err)
+		return nil, fmt.Errorf("finding repositories: %w", err)
 	}
 
 	return scanFullRepositories(rows)
@@ -181,7 +181,7 @@ func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastP
 		LIMIT $2`
 	rows, err := s.db.QueryContext(ctx, q, lastPath, limit)
 	if err != nil {
-		return nil, fmt.Errorf("error finding repositories with pagination: %w", err)
+		return nil, fmt.Errorf("finding repositories with pagination: %w", err)
 	}
 
 	return scanFullRepositories(rows)
@@ -222,7 +222,7 @@ func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (mode
 
 	rows, err := s.db.QueryContext(ctx, q, id)
 	if err != nil {
-		return nil, fmt.Errorf("error finding descendants of repository: %w", err)
+		return nil, fmt.Errorf("finding descendants of repository: %w", err)
 	}
 
 	return scanFullRepositories(rows)
@@ -263,7 +263,7 @@ func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models
 
 	rows, err := s.db.QueryContext(ctx, q, id)
 	if err != nil {
-		return nil, fmt.Errorf("error finding ancestors of repository: %w", err)
+		return nil, fmt.Errorf("finding ancestors of repository: %w", err)
 	}
 
 	return scanFullRepositories(rows)
@@ -287,7 +287,7 @@ func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.
 
 	rows, err := s.db.QueryContext(ctx, q, id)
 	if err != nil {
-		return nil, fmt.Errorf("error finding siblings of repository: %w", err)
+		return nil, fmt.Errorf("finding siblings of repository: %w", err)
 	}
 
 	return scanFullRepositories(rows)
@@ -309,7 +309,7 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding tags: %w", err)
+		return nil, fmt.Errorf("finding tags: %w", err)
 	}
 
 	return scanFullTags(rows)
@@ -338,7 +338,7 @@ func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repositor
 		LIMIT $3`
 	rows, err := s.db.QueryContext(ctx, q, r.ID, lastName, limit)
 	if err != nil {
-		return nil, fmt.Errorf("error finding tags with pagination: %w", err)
+		return nil, fmt.Errorf("finding tags with pagination: %w", err)
 	}
 
 	return scanFullTags(rows)
@@ -360,7 +360,7 @@ func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repo
 
 	var count int
 	if err := s.db.QueryRowContext(ctx, q, r.ID, lastName).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting tags lexicographically after name: %w", err)
+		return count, fmt.Errorf("counting tags lexicographically after name: %w", err)
 	}
 
 	return count, nil
@@ -383,7 +383,7 @@ func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding tags: %w", err)
+		return nil, fmt.Errorf("finding tags: %w", err)
 	}
 
 	return scanFullTags(rows)
@@ -395,7 +395,7 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 	var count int
 
 	if err := s.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting repositories: %w", err)
+		return count, fmt.Errorf("counting repositories: %w", err)
 	}
 
 	return count, nil
@@ -422,7 +422,7 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 
 	var count int
 	if err := s.db.QueryRowContext(ctx, q, path).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting repositories lexicographically after path: %w", err)
+		return count, fmt.Errorf("counting repositories lexicographically after path: %w", err)
 	}
 
 	return count, nil
@@ -449,7 +449,7 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding manifests: %w", err)
+		return nil, fmt.Errorf("finding manifests: %w", err)
 	}
 
 	return scanFullManifests(rows)
@@ -504,7 +504,7 @@ func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (mode
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding blobs: %w", err)
+		return nil, fmt.Errorf("finding blobs: %w", err)
 	}
 
 	return scanFullBlobs(rows)
@@ -519,7 +519,7 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 
 	row := s.db.QueryRowContext(ctx, q, r.Name, r.Path, r.ParentID)
 	if err := row.Scan(&r.ID, &r.CreatedAt); err != nil {
-		return fmt.Errorf("error creating repository: %w", err)
+		return fmt.Errorf("creating repository: %w", err)
 	}
 
 	return nil
@@ -684,7 +684,7 @@ func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) erro
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("repository not found")
 		}
-		return fmt.Errorf("error updating repository: %w", err)
+		return fmt.Errorf("updating repository: %w", err)
 	}
 
 	return nil
@@ -698,7 +698,7 @@ func (s *repositoryStore) AssociateManifest(ctx context.Context, r *models.Repos
 			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, r.ID, m.ID); err != nil {
-		return fmt.Errorf("error associating manifest: %w", err)
+		return fmt.Errorf("associating manifest: %w", err)
 	}
 
 	return nil
@@ -710,11 +710,11 @@ func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repo
 
 	res, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
 	if err != nil {
-		return fmt.Errorf("error dissociating manifest: %w", err)
+		return fmt.Errorf("dissociating manifest: %w", err)
 	}
 
 	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error dissociating manifest: %w", err)
+		return fmt.Errorf("dissociating manifest: %w", err)
 	}
 
 	return nil
@@ -726,7 +726,7 @@ func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repositor
 
 	_, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
 	if err != nil {
-		return fmt.Errorf("error untagging manifest: %w", err)
+		return fmt.Errorf("untagging manifest: %w", err)
 	}
 
 	return nil
@@ -740,7 +740,7 @@ func (s *repositoryStore) LinkBlob(ctx context.Context, r *models.Repository, b 
 			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, r.ID, b.ID); err != nil {
-		return fmt.Errorf("error linking blob: %w", err)
+		return fmt.Errorf("linking blob: %w", err)
 	}
 
 	return nil
@@ -752,11 +752,11 @@ func (s *repositoryStore) UnlinkBlob(ctx context.Context, r *models.Repository, 
 
 	res, err := s.db.ExecContext(ctx, q, r.ID, b.ID)
 	if err != nil {
-		return fmt.Errorf("error linking blob: %w", err)
+		return fmt.Errorf("linking blob: %w", err)
 	}
 
 	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("error linking blob: %w", err)
+		return fmt.Errorf("linking blob: %w", err)
 	}
 
 	return nil
@@ -768,12 +768,12 @@ func (s *repositoryStore) Delete(ctx context.Context, id int64) error {
 
 	res, err := s.db.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("error deleting repository: %w", err)
+		return fmt.Errorf("deleting repository: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error deleting repository: %w", err)
+		return fmt.Errorf("deleting repository: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("repository not found")

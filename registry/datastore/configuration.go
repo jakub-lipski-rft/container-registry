@@ -47,7 +47,7 @@ func scanFullConfiguration(row *sql.Row) (*models.Configuration, error) {
 	err := row.Scan(&c.ID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
-			return nil, fmt.Errorf("error scaning configuration: %w", err)
+			return nil, fmt.Errorf("scaning configuration: %w", err)
 		}
 		return nil, nil
 	}
@@ -71,7 +71,7 @@ func scanFullConfigurations(rows *sql.Rows) (models.Configurations, error) {
 		c := new(models.Configuration)
 		err := rows.Scan(&c.ID, &c.BlobID, &c.MediaType, &digestAlgorithm, &digestHex, &c.Size, &c.Payload, &c.CreatedAt)
 		if err != nil {
-			return nil, fmt.Errorf("error scanning configuration: %w", err)
+			return nil, fmt.Errorf("scanning configuration: %w", err)
 		}
 
 		alg, err := digestAlgorithm.Parse()
@@ -83,7 +83,7 @@ func scanFullConfigurations(rows *sql.Rows) (models.Configurations, error) {
 		cc = append(cc, c)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error scanning configurations: %w", err)
+		return nil, fmt.Errorf("scanning configurations: %w", err)
 	}
 
 	return cc, nil
@@ -153,7 +153,7 @@ func (s *configurationStore) FindAll(ctx context.Context) (models.Configurations
 			JOIN blobs AS b ON c.blob_id = b.id`
 	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
-		return nil, fmt.Errorf("error finding configurations: %w", err)
+		return nil, fmt.Errorf("finding configurations: %w", err)
 	}
 
 	return scanFullConfigurations(rows)
@@ -165,7 +165,7 @@ func (s *configurationStore) Count(ctx context.Context) (int, error) {
 	var count int
 
 	if err := s.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
-		return count, fmt.Errorf("error counting configurations: %w", err)
+		return count, fmt.Errorf("counting configurations: %w", err)
 	}
 
 	return count, nil
@@ -190,7 +190,7 @@ func (s *configurationStore) Manifests(ctx context.Context, c *models.Configurat
 
 	rows, err := s.db.QueryContext(ctx, q, c.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error finding manifests: %w", err)
+		return nil, fmt.Errorf("finding manifests: %w", err)
 	}
 
 	return scanFullManifests(rows)
@@ -205,7 +205,7 @@ func (s *configurationStore) Create(ctx context.Context, c *models.Configuration
 
 	row := s.db.QueryRowContext(ctx, q, c.BlobID, c.Payload)
 	if err := row.Scan(&c.ID, &c.CreatedAt); err != nil {
-		return fmt.Errorf("error creating configuration: %w", err)
+		return fmt.Errorf("creating configuration: %w", err)
 	}
 
 	return nil
@@ -217,12 +217,12 @@ func (s *configurationStore) Delete(ctx context.Context, id int64) error {
 
 	res, err := s.db.ExecContext(ctx, q, id)
 	if err != nil {
-		return fmt.Errorf("error deleting configuration: %w", err)
+		return fmt.Errorf("deleting configuration: %w", err)
 	}
 
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("error deleting configuration: %w", err)
+		return fmt.Errorf("deleting configuration: %w", err)
 	}
 	if n == 0 {
 		return fmt.Errorf("configuration not found")
