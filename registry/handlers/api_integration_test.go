@@ -572,6 +572,47 @@ func TestBlobAPI_Get_BlobNotFound(t *testing.T) {
 	checkBodyHasErrorCodes(t, "blob not found", res, v2.ErrorCodeBlobUnknown)
 }
 
+func TestBlobAPI_GetBlobFromFilesystemAfterDatabaseWrites(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Disable the database to check that the filesystem mirroring worked correctly.
+	env.config.Database.Enabled = false
+
+	// fetch layer
+	res, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	// verify response headers
+	_, err = args.layerFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(args.layerFile)
+	require.NoError(t, err)
+
+	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
+	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
+	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
+	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
+	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
+
+	// verify response body
+	v := args.layerDigest.Verifier()
+	_, err = io.Copy(v, res.Body)
+	require.NoError(t, err)
+	require.True(t, v.Verified())
+}
+
 func TestBlobAPI_Head(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
