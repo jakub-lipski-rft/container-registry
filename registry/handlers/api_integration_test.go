@@ -5000,6 +5000,34 @@ func TestTagsAPI_Get(t *testing.T) {
 			require.Equal(t, test.expectedLinkHeader, resp.Header.Get("Link"))
 		})
 	}
+
+	// If the database is enabled, disable it and rerun the tests again with the
+	// database to check that the filesystem mirroring worked correctly.
+	// All results should be the full list as the filesytem does not support pagination.
+	if env.config.Database.Enabled {
+		env.config.Database.Enabled = false
+		defer func() { env.config.Database.Enabled = true }()
+
+		for _, test := range tt {
+			t.Run(fmt.Sprintf("%s filesystem mirroring", test.name), func(t *testing.T) {
+				tagsURL, err := env.builder.BuildTagsURL(imageName, test.queryParams)
+				require.NoError(t, err)
+
+				resp, err := http.Get(tagsURL)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+
+				var body tagsAPIResponse
+				dec := json.NewDecoder(resp.Body)
+				err = dec.Decode(&body)
+				require.NoError(t, err)
+
+				require.Equal(t, tagsAPIResponse{Name: imageName.Name(), Tags: sortedTags}, body)
+			})
+		}
+	}
 }
 
 func TestTagsAPI_Get_RepositoryNotFound(t *testing.T) {
