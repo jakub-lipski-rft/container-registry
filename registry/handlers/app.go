@@ -291,8 +291,13 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		}
 
 		m := migrations.NewMigrator(db.DB)
-		if _, err := m.Up(); err != nil {
-			panic(fmt.Sprintf("failed to run database migrations: %v", err))
+		pending, err := m.HasPending()
+		if err != nil {
+			panic(fmt.Sprintf("failed to check database migrations status: %v", err))
+		}
+		if pending {
+			log.Fatalf("there are pending database migrations, use the 'registry database migrate' CLI " +
+				"command to check and apply them")
 		}
 
 		app.db = db
