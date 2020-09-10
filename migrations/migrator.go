@@ -102,6 +102,9 @@ type migrationStatus struct {
 // Status returns the status of all migrations, indexed by migration ID.
 func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	applied, err := migrate.GetMigrationRecords(m.db, dialect)
+	if err != nil {
+		return nil, err
+	}
 	known, err := m.src.FindMigrations()
 	if err != nil {
 		return nil, err
@@ -119,6 +122,33 @@ func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	}
 
 	return statuses, nil
+}
+
+// Status returns the status of all migrations, indexed by migration ID.
+func (m *migrator) IsUpToDate() (bool, error) {
+	applied, err := migrate.GetMigrationRecords(m.db, dialect)
+	if err != nil {
+		return false, err
+	}
+	known, err := m.src.FindMigrations()
+	if err != nil {
+		return false, err
+	}
+
+	for _, k := range known {
+		var found bool
+		for _, a := range applied {
+			if a.Id == k.Id {
+				found = true
+			}
+		}
+
+		if !found {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
