@@ -345,3 +345,34 @@ func TestMigrator_Status_Unknown(t *testing.T) {
 	require.True(t, fakeStatus.Unknown)
 	require.Equal(t, fakeAppliedAt.Round(time.Millisecond).UTC(), fakeStatus.AppliedAt.Round(time.Millisecond).UTC())
 }
+
+func TestMigrator_HasPending_No(t *testing.T) {
+	db, err := testutil.NewDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	m := migrations.NewMigrator(db.DB)
+	_, err = m.Up()
+	require.NoError(t, err)
+
+	pending, err := m.HasPending()
+	require.NoError(t, err)
+	require.False(t, pending)
+}
+
+func TestMigrator_HasPending_Yes(t *testing.T) {
+	db, err := testutil.NewDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	m := migrations.NewMigrator(db.DB)
+	_, err = m.Up()
+	require.NoError(t, err)
+
+	_, err = m.DownN(1)
+	require.NoError(t, err)
+
+	pending, err := m.HasPending()
+	require.NoError(t, err)
+	require.True(t, pending)
+}

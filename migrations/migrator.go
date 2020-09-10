@@ -124,6 +124,33 @@ func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	return statuses, nil
 }
 
+// HasPending determines whether all known migrations are applied or not.
+func (m *migrator) HasPending() (bool, error) {
+	applied, err := migrate.GetMigrationRecords(m.db, dialect)
+	if err != nil {
+		return false, err
+	}
+	known, err := m.src.FindMigrations()
+	if err != nil {
+		return false, err
+	}
+
+	for _, k := range known {
+		var found bool
+		for _, a := range applied {
+			if a.Id == k.Id {
+				found = true
+			}
+		}
+
+		if !found {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
 	planned, _, err := migrate.PlanMigration(m.db, dialect, m.src, direction, limit)
 	if err != nil {
