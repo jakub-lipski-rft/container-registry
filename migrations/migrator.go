@@ -102,6 +102,9 @@ type migrationStatus struct {
 // Status returns the status of all migrations, indexed by migration ID.
 func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	applied, err := migrate.GetMigrationRecords(m.db, dialect)
+	if err != nil {
+		return nil, err
+	}
 	known, err := m.src.FindMigrations()
 	if err != nil {
 		return nil, err
