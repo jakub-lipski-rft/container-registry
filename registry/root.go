@@ -421,23 +421,6 @@ var ImportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create database transaction: %v", err)
-			os.Exit(1)
-		}
-
-		// recover from panic, to rollback transaction and re-panic
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Println("recovered from panic, rolling back changes", r)
-				if err := tx.Rollback(); err != nil {
-					fmt.Fprintf(os.Stderr, "failed to rollback changes: %v", err)
-				}
-				panic(r)
-			}
-		}()
-
 		var opts []datastore.ImporterOption
 		if importDanglingBlobs {
 			opts = append(opts, datastore.WithImportDanglingBlobs)
@@ -445,11 +428,14 @@ var ImportCmd = &cobra.Command{
 		if importDanglingManifests {
 			opts = append(opts, datastore.WithImportDanglingManifests)
 		}
+		if dryRun {
+			opts = append(opts, datastore.WithDryRun)
+		}
 		if !continueImport {
 			opts = append(opts, datastore.WithRequireEmptyDatabase)
 		}
 
-		p := datastore.NewImporter(tx, driver, registry, opts...)
+		p := datastore.NewImporter(db, driver, registry, opts...)
 
 		if repoPath == "" {
 			err = p.ImportAll(ctx)
@@ -457,21 +443,8 @@ var ImportCmd = &cobra.Command{
 			err = p.Import(ctx, repoPath)
 		}
 		if err != nil {
-			tx.Rollback()
 			fmt.Fprintf(os.Stderr, "failed to import metadata: %v", err)
 			os.Exit(1)
-		}
-
-		if dryRun {
-			if err := tx.Rollback(); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to rollback changes: %v", err)
-				os.Exit(1)
-			}
-		} else {
-			if err := tx.Commit(); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to commit changes: %v", err)
-				os.Exit(1)
-			}
 		}
 	},
 }

@@ -71,22 +71,22 @@ func overrideDynamicData(tb testing.TB, actual []byte) []byte {
 	return actual
 }
 
-func newImporter(t *testing.T, tx *datastore.Tx, opts ...datastore.ImporterOption) *datastore.Importer {
+func newImporter(t *testing.T, db *datastore.DB, opts ...datastore.ImporterOption) *datastore.Importer {
 	t.Helper()
 
 	driver := newFilesystemStorageDriver(t)
 	registry := newRegistry(t, driver)
 
-	return datastore.NewImporter(tx, driver, registry, opts...)
+	return datastore.NewImporter(db, driver, registry, opts...)
 }
 
 // Dump each table as JSON and compare the output against reference snapshots (.golden files)
-func validateImport(t *testing.T, tx *datastore.Tx) {
+func validateImport(t *testing.T, db *datastore.DB) {
 	t.Helper()
 
 	for _, tt := range testutil.AllTables {
 		t.Run(string(tt), func(t *testing.T) {
-			actual, err := tt.DumpAsJSON(suite.ctx, tx)
+			actual, err := tt.DumpAsJSON(suite.ctx, db)
 			require.NoError(t, err, "error dumping table")
 
 			// see testdata/golden/<test name>/<table>.golden
@@ -100,42 +100,46 @@ func validateImport(t *testing.T, tx *datastore.Tx) {
 func TestImporter_ImportAll(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	imp := newImporter(t, tx, datastore.WithImportDanglingManifests)
+	imp := newImporter(t, suite.db, datastore.WithImportDanglingManifests)
 	require.NoError(t, imp.ImportAll(suite.ctx))
-	validateImport(t, tx)
+	validateImport(t, suite.db)
 }
 
 func TestImporter_ImportAll_DanglingBlobs(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	imp := newImporter(t, tx, datastore.WithImportDanglingManifests, datastore.WithImportDanglingBlobs)
+	imp := newImporter(t, suite.db, datastore.WithImportDanglingManifests, datastore.WithImportDanglingBlobs)
 	require.NoError(t, imp.ImportAll(suite.ctx))
-	validateImport(t, tx)
+	validateImport(t, suite.db)
 }
 
 func TestImporter_ImportAll_AllowIdempotent(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
 	// First, import a single repository, only tagged manifests and referenced blobs.
-	imp1 := newImporter(t, tx)
+	imp1 := newImporter(t, suite.db)
 	require.NoError(t, imp1.Import(suite.ctx, "f-dangling-manifests"))
 
 	// Now try to import the entire contents of the registry including what was previously imported.
-	imp2 := newImporter(t, tx, datastore.WithImportDanglingManifests, datastore.WithImportDanglingBlobs)
+	imp2 := newImporter(t, suite.db, datastore.WithImportDanglingManifests, datastore.WithImportDanglingBlobs)
 	require.NoError(t, imp2.ImportAll(suite.ctx))
-	validateImport(t, tx)
+	validateImport(t, suite.db)
+}
+
+func TestImporter_ImportAll_DryRun(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporter(t, suite.db, datastore.WithDryRun)
+	require.NoError(t, imp.ImportAll(suite.ctx))
+	validateImport(t, suite.db)
+}
+
+func TestImporter_ImportAll_DryRunDanglingBlobs(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporter(t, suite.db, datastore.WithDryRun, datastore.WithImportDanglingBlobs)
+	require.NoError(t, imp.ImportAll(suite.ctx))
+	validateImport(t, suite.db)
 }
 
 func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
@@ -153,39 +157,35 @@ func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 func TestImporter_Import(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	imp := newImporter(t, tx, datastore.WithImportDanglingManifests)
+	imp := newImporter(t, suite.db, datastore.WithImportDanglingManifests)
 	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
-	validateImport(t, tx)
+	validateImport(t, suite.db)
 }
 
 func TestImporter_Import_TaggedOnly(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
-	imp := newImporter(t, tx)
+	imp := newImporter(t, suite.db)
 	require.NoError(t, imp.Import(suite.ctx, "f-dangling-manifests"))
-	validateImport(t, tx)
+	validateImport(t, suite.db)
 }
 
 func TestImporter_Import_AllowIdempotent(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
-	tx, err := suite.db.BeginTx(suite.ctx, nil)
-	require.NoError(t, err)
-	defer tx.Rollback()
-
 	// Import a single repository twice, should succeed.
-	imp := newImporter(t, tx, datastore.WithImportDanglingManifests)
+	imp := newImporter(t, suite.db, datastore.WithImportDanglingManifests)
 	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
 	require.NoError(t, imp.Import(suite.ctx, "b-nested/older"))
-	validateImport(t, tx)
+	validateImport(t, suite.db)
+}
+
+func TestImporter_Import_DryRun(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporter(t, suite.db, datastore.WithDryRun)
+	require.NoError(t, imp.Import(suite.ctx, "a-simple"))
+	validateImport(t, suite.db)
 }
 
 func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
