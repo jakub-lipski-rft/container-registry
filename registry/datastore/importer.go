@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/docker/distribution"
@@ -505,10 +504,6 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 	if err != nil {
 		return fmt.Errorf("reading tags: %w", err)
 	}
-
-	// sort tags to ensure reproducible imports across different OSs using the filesystem storage driver
-	// see https://gitlab.com/gitlab-org/container-registry/-/issues/88
-	sort.Strings(fsTags)
 
 	total := len(fsTags)
 

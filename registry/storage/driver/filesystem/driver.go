@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"time"
 
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -247,6 +248,9 @@ func (d *driver) List(ctx context.Context, subPath string) ([]string, error) {
 	for _, fileName := range fileNames {
 		keys = append(keys, path.Join(subPath, fileName))
 	}
+
+	// Ensure consistent sorting across platforms.
+	sort.Strings(keys)
 
 	return keys, nil
 }
