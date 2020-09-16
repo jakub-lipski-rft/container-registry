@@ -24,6 +24,7 @@
 ### Fixed
 - registry/api/v2: Text-charset selector removed from `application/json` content-type
 - registry/storage: Swift path generation now generates multiple directories as intended
+- registry/client/auth: OAuth token authentication now returns a `ErrNoToken` if a token is not found in the resposne
 
 ## [v2.10.0-gitlab] - 2020-08-05
 ## Added
