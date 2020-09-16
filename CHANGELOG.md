@@ -18,6 +18,9 @@
 - registry: Add support for Redis Sentinel
 - registry: Add support for error reporting with Sentry
 
+### Changed
+- configuration: Cloudfront middleware `ipfilteredby` setting is now optional
+
 ### Fixed
 - registry/api/v2: Text-charset selector removed from `application/json` content-type
 - registry/storage: Swift path generation now generates multiple directories as intended
