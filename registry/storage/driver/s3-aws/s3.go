@@ -21,6 +21,7 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,10 +44,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 
 	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/client/transport"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	"github.com/docker/distribution/registry/storage/driver/factory"
+	"github.com/docker/distribution/version"
 )
 
 const driverName = "s3aws"
@@ -120,7 +121,6 @@ type DriverParameters struct {
 	MultipartCopyThresholdSize  int64
 	RootDirectory               string
 	StorageClass                string
-	UserAgent                   string
 	ObjectACL                   string
 	SessionToken                string
 	PathStyle                   bool
@@ -379,11 +379,6 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		storageClass = storageClassString
 	}
 
-	userAgent := parameters["useragent"]
-	if userAgent == nil {
-		userAgent = ""
-	}
-
 	objectACL := s3.ObjectCannedACLPrivate
 	objectACLParam := parameters["objectacl"]
 	if objectACLParam != nil {
@@ -465,7 +460,6 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		multipartCopyThresholdSize,
 		fmt.Sprint(rootDirectory),
 		storageClass,
-		fmt.Sprint(userAgent),
 		objectACL,
 		fmt.Sprint(sessionToken),
 		pathStyleBool,
@@ -542,28 +536,25 @@ func New(params DriverParameters) (*Driver, error) {
 	awsConfig.WithRegion(params.Region)
 	awsConfig.WithDisableSSL(!params.Secure)
 
-	if params.UserAgent != "" || params.SkipVerify {
-		httpTransport := http.DefaultTransport
-		if params.SkipVerify {
-			httpTransport = &http.Transport{
+	if params.SkipVerify {
+		awsConfig.WithHTTPClient(&http.Client{
+			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-		}
-		if params.UserAgent != "" {
-			awsConfig.WithHTTPClient(&http.Client{
-				Transport: transport.NewTransport(httpTransport, transport.NewHeaderRequestModifier(http.Header{http.CanonicalHeaderKey("User-Agent"): []string{params.UserAgent}})),
-			})
-		} else {
-			awsConfig.WithHTTPClient(&http.Client{
-				Transport: transport.NewTransport(httpTransport),
-			})
-		}
+			},
+		})
 	}
 
 	sess, err = session.NewSession(awsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new session with aws config: %v", err)
 	}
+
+	userAgentHandler := request.NamedHandler{
+		Name: "user-agent",
+		Fn:   request.MakeAddToUserAgentHandler("docker-distribution", version.Version, runtime.Version()),
+	}
+	sess.Handlers.Build.PushFrontNamed(userAgentHandler)
+
 	s3obj := s3.New(sess)
 
 	// enable S3 compatible signature v2 signing instead
