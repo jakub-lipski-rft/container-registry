@@ -232,6 +232,8 @@ type Configuration struct {
 	// Compatibility is used for configurations of working with older or deprecated features.
 	Compatibility struct {
 		// Schema1 configures how schema1 manifests will be handled
+		// NOTE: This is deprecated (https://gitlab.com/gitlab-org/container-registry/-/issues/213) and will be removed by
+		// January 22nd, 2021.
 		Schema1 struct {
 			// TrustKey is the signing key to use for adding the signature to
 			// schema1 manifests.

@@ -1334,6 +1334,10 @@ features. Each subsection defines such a feature with configurable behavior.
 
 ### `schema1`
 
+**DEPRECATED:** Docker Schema v1 compatibility is deprecated and will be removed by January 22nd, 2021. Please update
+Docker Engine to 17.12 or later and rebuild and push any v1 images you might still have. See 
+https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.
+
 | Parameter | Required | Description                                           |
 |-----------|----------|-------------------------------------------------------|
 | `signingkeyfile` | no | The signing private key used to add signatures to `schema1` manifests. If no signing key is provided, a new ECDSA key is generated when the registry starts. |
