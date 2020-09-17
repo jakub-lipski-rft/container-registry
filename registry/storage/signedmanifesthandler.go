@@ -25,7 +25,11 @@ type signedManifestHandler struct {
 var _ ManifestHandler = &signedManifestHandler{}
 
 func (ms *signedManifestHandler) Unmarshal(ctx context.Context, dgst digest.Digest, content []byte) (distribution.Manifest, error) {
-	dcontext.GetLogger(ms.ctx).Debug("(*signedManifestHandler).Unmarshal")
+	log := dcontext.GetLogger(ms.ctx)
+	log.Debug("(*signedManifestHandler).Unmarshal")
+	log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
+		"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
+		"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
 
 	var (
 		signatures [][]byte
@@ -57,7 +61,11 @@ func (ms *signedManifestHandler) Unmarshal(ctx context.Context, dgst digest.Dige
 }
 
 func (ms *signedManifestHandler) Put(ctx context.Context, manifest distribution.Manifest, skipDependencyVerification bool) (digest.Digest, error) {
-	dcontext.GetLogger(ms.ctx).Debug("(*signedManifestHandler).Put")
+	log := dcontext.GetLogger(ms.ctx)
+	log.Debug("(*signedManifestHandler).Put")
+	log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
+		"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
+		"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
 
 	sm, ok := manifest.(*schema1.SignedManifest)
 	if !ok {

@@ -213,7 +213,11 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	// matching the digest.
 	if imh.Tag != "" && manifestType == manifestSchema2 && !supports[manifestSchema2] {
 		// Rewrite manifest in schema1 format
-		dcontext.GetLogger(imh).Infof("rewriting manifest %s in schema1 format to support old client", imh.Digest.String())
+		log := dcontext.GetLogger(imh)
+		log.Infof("rewriting manifest %s in schema1 format to support old client", imh.Digest.String())
+		log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
+			"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
+			"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
 
 		manifest, err = imh.convertSchema2Manifest(schema2Manifest)
 		if err != nil {
@@ -255,6 +259,10 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		// If necessary, convert the image manifest into schema1
 		if schema2Manifest, isSchema2 := manifest.(*schema2.DeserializedManifest); isSchema2 && !supports[manifestSchema2] {
 			log.Warn("client does not advertise support for schema2 manifests, rewriting manifest in schema1 format")
+			log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
+			"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
+			"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
+
 			manifest, err = imh.convertSchema2Manifest(schema2Manifest)
 			if err != nil {
 				return
