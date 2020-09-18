@@ -435,8 +435,7 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 			m.configuration_id,
 			m.schema_version,
 			m.media_type,
-			m.digest_algorithm,
-			m.digest_hex,
+			encode(m.digest, 'hex') as digest,
 			m.payload,
 			m.created_at,
 			m.marked_at
@@ -462,8 +461,7 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 			m.configuration_id,
 			m.schema_version,
 			m.media_type,
-			m.digest_algorithm,
-			m.digest_hex,
+			encode(m.digest, 'hex') as digest,
 			m.payload,
 			m.created_at,
 			m.marked_at
@@ -473,14 +471,13 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 			JOIN repositories AS r ON r.id = rm.repository_id
 		WHERE
 			r.id = $1
-			AND m.digest_algorithm = $2
-			AND m.digest_hex = decode($3, 'hex')`
+			AND m.digest = decode($2, 'hex')`
 
-	alg, err := NewDigestAlgorithm(d.Algorithm())
+	dgst, err := NewDigest(d)
 	if err != nil {
 		return nil, err
 	}
-	row := s.db.QueryRowContext(ctx, q, r.ID, alg, d.Hex())
+	row := s.db.QueryRowContext(ctx, q, r.ID, dgst)
 
 	return scanFullManifest(row)
 }
@@ -490,8 +487,7 @@ func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (mode
 	q := `SELECT
 			b.id,
 			b.media_type,
-			b.digest_algorithm,
-			b.digest_hex,
+			encode(b.digest, 'hex') as digest,
 			b.size,
 			b.created_at,
 			b.marked_at
