@@ -10,9 +10,6 @@
 ## Added
 - registry: Experimental PostgreSQL metadata database (incomplete, in progress)
 - registry: Use GitLab LabKit for HTTP metrics collection
-- registry: Add new configuration for changing the output for logs and the access logs format
-- registry: Use GitLab LabKit for correlation and logging
-- registry: Normalize log messages
 - registry/storage/cache/redis: Add Prometheus metrics for Redis cache store
 - registry: Add support for a pprof monitoring server
 - registry: Add TLS support for Redis
@@ -27,6 +24,14 @@
 - registry/storage: Swift path generation now generates multiple directories as intended
 - registry/client/auth: OAuth token authentication now returns a `ErrNoToken` if a token is not found in the response
 - registry/storage: Fix custom User-Agent header on S3 requests
+
+## [v2.11.0-gitlab] - 2020-09-08
+## Added
+- registry: Add new configuration for changing the output for logs and the access logs format
+
+## Changed
+- registry: Use GitLab LabKit for correlation and logging
+- registry: Normalize log messages
 
 ## [v2.10.0-gitlab] - 2020-08-05
 ## Added
