@@ -50,11 +50,10 @@ func NewManifestStore(db Queryer) *manifestStore {
 }
 
 func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
-	var digestAlgorithm DigestAlgorithm
-	var digestHex []byte
+	var dgst Digest
 	m := new(models.Manifest)
 
-	err := row.Scan(&m.ID, &m.ConfigurationID, &m.SchemaVersion, &m.MediaType, &digestAlgorithm, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt)
+	err := row.Scan(&m.ID, &m.ConfigurationID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &m.CreatedAt, &m.MarkedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("scaning manifest: %w", err)
@@ -62,11 +61,11 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 		return nil, nil
 	}
 
-	alg, err := digestAlgorithm.Parse()
+	d, err := dgst.Parse()
 	if err != nil {
 		return nil, err
 	}
-	m.Digest = digest.NewDigestFromBytes(alg, digestHex)
+	m.Digest = d
 
 	return m, nil
 }
@@ -76,20 +75,19 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var digestAlgorithm DigestAlgorithm
-		var digestHex []byte
+		var dgst Digest
 		m := new(models.Manifest)
 
-		err := rows.Scan(&m.ID, &m.ConfigurationID, &m.SchemaVersion, &m.MediaType, &digestAlgorithm, &digestHex, &m.Payload, &m.CreatedAt, &m.MarkedAt)
+		err := rows.Scan(&m.ID, &m.ConfigurationID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &m.CreatedAt, &m.MarkedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning manifest: %w", err)
 		}
 
-		alg, err := digestAlgorithm.Parse()
+		d, err := dgst.Parse()
 		if err != nil {
 			return nil, err
 		}
-		m.Digest = digest.NewDigestFromBytes(alg, digestHex)
+		m.Digest = d
 
 		mm = append(mm, m)
 	}
@@ -107,8 +105,7 @@ func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifes
 			configuration_id,
 			schema_version,
 			media_type,
-			digest_algorithm,
-			digest_hex,
+			encode(digest, 'hex') as digest,
 			payload,
 			created_at,
 			marked_at
@@ -129,22 +126,20 @@ func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*mod
 			configuration_id,
 			schema_version,
 			media_type,
-			digest_algorithm,
-			digest_hex,
+			encode(digest, 'hex') as digest,
 			payload,
 			created_at,
 			marked_at
 		FROM
 			manifests
 		WHERE
-			digest_algorithm = $1
-			AND digest_hex = decode($2, 'hex')`
+			digest = decode($1, 'hex')`
 
-	alg, err := NewDigestAlgorithm(d.Algorithm())
+	dgst, err := NewDigest(d)
 	if err != nil {
 		return nil, err
 	}
-	row := s.db.QueryRowContext(ctx, q, alg, d.Hex())
+	row := s.db.QueryRowContext(ctx, q, dgst)
 
 	return scanFullManifest(row)
 }
@@ -156,8 +151,7 @@ func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
 			configuration_id,
 			schema_version,
 			media_type,
-			digest_algorithm,
-			digest_hex,
+			encode(digest, 'hex') as digest,
 			payload,
 			created_at,
 			marked_at
@@ -190,8 +184,7 @@ func (s *manifestStore) Config(ctx context.Context, m *models.Manifest) (*models
 			c.id,
 			c.blob_id,
 			b.media_type,
-			b.digest_algorithm,
-			b.digest_hex,
+			encode(b.digest, 'hex') as digest,
 			b.size,
 			c.payload,
 			c.created_at
@@ -211,8 +204,7 @@ func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (mod
 	q := `SELECT
 			b.id,
 			b.media_type,
-			b.digest_algorithm,
-			b.digest_hex,
+			encode(b.digest, 'hex') as digest,
 			b.size,
 			b.created_at,
 			b.marked_at
@@ -262,8 +254,7 @@ func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (mod
 			m.configuration_id,
 			m.schema_version,
 			m.media_type,
-			m.digest_algorithm,
-			m.digest_hex,
+			encode(m.digest, 'hex') as digest,
 			m.payload,
 			m.created_at,
 			m.marked_at
@@ -283,16 +274,16 @@ func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (mod
 
 // Create saves a new Manifest.
 func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
-	q := `INSERT INTO manifests (configuration_id, schema_version, media_type, digest_algorithm, digest_hex, payload)
-			VALUES ($1, $2, $3, $4, decode($5, 'hex'), $6)
+	q := `INSERT INTO manifests (configuration_id, schema_version, media_type, digest, payload)
+			VALUES ($1, $2, $3, decode($4, 'hex'), $5)
 		RETURNING
 			id, created_at`
 
-	digestAlgorithm, err := NewDigestAlgorithm(m.Digest.Algorithm())
+	dgst, err := NewDigest(m.Digest)
 	if err != nil {
 		return err
 	}
-	row := s.db.QueryRowContext(ctx, q, m.ConfigurationID, m.SchemaVersion, m.MediaType, digestAlgorithm, m.Digest.Hex(), m.Payload)
+	row := s.db.QueryRowContext(ctx, q, m.ConfigurationID, m.SchemaVersion, m.MediaType, dgst, m.Payload)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
 		return fmt.Errorf("creating manifest: %w", err)
 	}

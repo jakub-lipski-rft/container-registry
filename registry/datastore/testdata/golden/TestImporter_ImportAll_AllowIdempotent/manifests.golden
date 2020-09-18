@@ -1,4 +1,4 @@
-[{"id":1,"configuration_id":1,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"efdb07f074a5cfb25547c0cf1ddac509a10ec9eb15e565584988c913ccaa344a","payload":{
+[{"id":1,"configuration_id":1,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01efdb07f074a5cfb25547c0cf1ddac509a10ec9eb15e565584988c913ccaa344a","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -29,7 +29,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":2,"configuration_id":2,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"a2490cec4484ee6c1068ba3a05f89934010c85242f736280b35343483b2264b6","payload":{
+ {"id":2,"configuration_id":2,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01a2490cec4484ee6c1068ba3a05f89934010c85242f736280b35343483b2264b6","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -45,7 +45,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":3,"configuration_id":3,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"cda5d02e4ea900a8d52e834bc3158e83b8a87a5b44ae081885aecf9b156dcff1","payload":{
+ {"id":3,"configuration_id":3,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01cda5d02e4ea900a8d52e834bc3158e83b8a87a5b44ae081885aecf9b156dcff1","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -86,7 +86,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":4,"configuration_id":4,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"18e31fe73a142c094fedbcdac27973233f82e5c9ef7b10386991deffd47caded","payload":{
+ {"id":4,"configuration_id":4,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"0118e31fe73a142c094fedbcdac27973233f82e5c9ef7b10386991deffd47caded","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -127,7 +127,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":5,"configuration_id":5,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"8205a681aa6eea2b0c27249894def02a14ff2cbe9fc78e83d62ad04d1180deb9","payload":{
+ {"id":5,"configuration_id":5,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"018205a681aa6eea2b0c27249894def02a14ff2cbe9fc78e83d62ad04d1180deb9","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -168,7 +168,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":6,"configuration_id":6,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"d2e931823751ff06f08f70b7603a20b9e8af7b0d9afcb493d934327d622d2a1e","payload":{
+ {"id":6,"configuration_id":6,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01d2e931823751ff06f08f70b7603a20b9e8af7b0d9afcb493d934327d622d2a1e","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -209,7 +209,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":7,"configuration_id":7,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"597bd5c319cc09d6bb295b4ef23cac50ec7c373fff5fe923cfd246ec09967b31","payload":{
+ {"id":7,"configuration_id":7,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01597bd5c319cc09d6bb295b4ef23cac50ec7c373fff5fe923cfd246ec09967b31","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -225,7 +225,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":8,"configuration_id":8,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"cb8a924afdf0229ef7515d9e5b3024e23b3eb03ddbba287f4a19c6ac90b8d221","payload":{
+ {"id":8,"configuration_id":8,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01cb8a924afdf0229ef7515d9e5b3024e23b3eb03ddbba287f4a19c6ac90b8d221","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -241,7 +241,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":9,"configuration_id":null,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"f8f5ca4728269ef4eecd49db2345a03f8ab9244e049fc2af96f7b422dd6df009","payload":{
+ {"id":9,"configuration_id":null,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01f8f5ca4728269ef4eecd49db2345a03f8ab9244e049fc2af96f7b422dd6df009","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
    "manifests": [
@@ -265,7 +265,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.list.v2+json"}, 
- {"id":10,"configuration_id":null,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":1,"digest_hex":"8e1f28640eee7964ed4583b8f969a222c40bbd82afb930027d2f6adeba5a4e4b","payload":{
+ {"id":10,"configuration_id":null,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":1,"digest":"018e1f28640eee7964ed4583b8f969a222c40bbd82afb930027d2f6adeba5a4e4b","payload":{
    "schemaVersion": 1,
    "name": "d-schema1",
    "tag": "latest",
@@ -288,8 +288,8 @@
    ]
 }
 ,"media_type":"application/vnd.docker.distribution.manifest.v1+json"}, 
- {"id":11,"configuration_id":9,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"cc2f7914532f430d4e5d75b5c855ec4b46feb893bbd2974456f0bf46015b7621","payload":{"schemaVersion":2,"config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"sha256:cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a","size":139},"layers":[{"mediaType":"application/tar+gzip","digest":"sha256:50723273cfd47a0e6222d64e993b1bd1bb97f84b4e0d1336bc0e24596c72b631","size":1371}]},"media_type":"application/vnd.oci.image.manifest.v1+json"}, 
- {"id":12,"configuration_id":10,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"673315e9c0cad797587b6bc0c1e2b9a1903c15b521f26acc5364fcf034c0cfbd","payload":{
+ {"id":11,"configuration_id":9,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01cc2f7914532f430d4e5d75b5c855ec4b46feb893bbd2974456f0bf46015b7621","payload":{"schemaVersion":2,"config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"sha256:cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a","size":139},"layers":[{"mediaType":"application/tar+gzip","digest":"sha256:50723273cfd47a0e6222d64e993b1bd1bb97f84b4e0d1336bc0e24596c72b631","size":1371}]},"media_type":"application/vnd.oci.image.manifest.v1+json"}, 
+ {"id":12,"configuration_id":10,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01673315e9c0cad797587b6bc0c1e2b9a1903c15b521f26acc5364fcf034c0cfbd","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -320,7 +320,7 @@
       }
    ]
 },"media_type":"application/vnd.docker.distribution.manifest.v2+json"}, 
- {"id":13,"configuration_id":11,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest_hex":"a848997f1caa7406fa148e184820f1ff55076eb3e5b33a8c09d1bb34cf335e7e","payload":{
+ {"id":13,"configuration_id":11,"created_at":"2020-04-15T12:04:28.95584","marked_at":null,"schema_version":2,"digest":"01a848997f1caa7406fa148e184820f1ff55076eb3e5b33a8c09d1bb34cf335e7e","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {

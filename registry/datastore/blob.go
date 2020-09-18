@@ -44,22 +44,21 @@ func NewBlobStore(db Queryer) *blobStore {
 }
 
 func scanFullBlob(row *sql.Row) (*models.Blob, error) {
-	var digestAlgorithm DigestAlgorithm
-	var digestHex []byte
+	var dgst Digest
 	b := new(models.Blob)
 
-	if err := row.Scan(&b.ID, &b.MediaType, &digestAlgorithm, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt); err != nil {
+	if err := row.Scan(&b.ID, &b.MediaType, &dgst, &b.Size, &b.CreatedAt, &b.MarkedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("scanning blob: %w", err)
 		}
 		return nil, nil
 	}
 
-	alg, err := digestAlgorithm.Parse()
+	d, err := dgst.Parse()
 	if err != nil {
 		return nil, err
 	}
-	b.Digest = digest.NewDigestFromBytes(alg, digestHex)
+	b.Digest = d
 
 	return b, nil
 }
@@ -69,20 +68,19 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var digestAlgorithm DigestAlgorithm
-		var digestHex []byte
+		var dgst Digest
 		b := new(models.Blob)
 
-		err := rows.Scan(&b.ID, &b.MediaType, &digestAlgorithm, &digestHex, &b.Size, &b.CreatedAt, &b.MarkedAt)
+		err := rows.Scan(&b.ID, &b.MediaType, &dgst, &b.Size, &b.CreatedAt, &b.MarkedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning blob: %w", err)
 		}
 
-		alg, err := digestAlgorithm.Parse()
+		d, err := dgst.Parse()
 		if err != nil {
 			return nil, err
 		}
-		b.Digest = digest.NewDigestFromBytes(alg, digestHex)
+		b.Digest = d
 
 		bb = append(bb, b)
 	}
@@ -98,8 +96,7 @@ func (s *blobStore) FindByID(ctx context.Context, id int64) (*models.Blob, error
 	q := `SELECT
 			id,
 			media_type,
-			digest_algorithm,
-			digest_hex,
+			encode(digest, 'hex') as digest,
 			size,
 			created_at,
 			marked_at
@@ -117,22 +114,20 @@ func (s *blobStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.
 	q := `SELECT
 			id,
 			media_type,
-			digest_algorithm,
-			digest_hex,
+			encode(digest, 'hex') as digest,
 			size,
 			created_at,
 			marked_at
 		FROM
 			blobs
 		WHERE
-			digest_algorithm = $1
-			AND digest_hex = decode($2, 'hex')`
+			digest = decode($1, 'hex')`
 
-	alg, err := NewDigestAlgorithm(d.Algorithm())
+	dgst, err := NewDigest(d)
 	if err != nil {
 		return nil, err
 	}
-	row := s.db.QueryRowContext(ctx, q, alg, d.Hex())
+	row := s.db.QueryRowContext(ctx, q, dgst)
 
 	return scanFullBlob(row)
 }
@@ -142,8 +137,7 @@ func (s *blobStore) FindAll(ctx context.Context) (models.Blobs, error) {
 	q := `SELECT
 			id,
 			media_type,
-			digest_algorithm,
-			digest_hex,
+			encode(digest, 'hex') as digest,
 			size,
 			created_at,
 			marked_at
@@ -171,16 +165,16 @@ func (s *blobStore) Count(ctx context.Context) (int, error) {
 
 // Create saves a new blob.
 func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
-	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size)
-			VALUES ($1, $2, decode($3, 'hex'), $4)
+	q := `INSERT INTO blobs (media_type, digest, size)
+			VALUES ($1, decode($2, 'hex'), $3)
 		RETURNING
 			id, created_at`
 
-	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
+	dgst, err := NewDigest(b.Digest)
 	if err != nil {
 		return err
 	}
-	row := s.db.QueryRowContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size)
+	row := s.db.QueryRowContext(ctx, q, b.MediaType, dgst, b.Size)
 	if err := row.Scan(&b.ID, &b.CreatedAt); err != nil {
 		return fmt.Errorf("creating blob: %w", err)
 	}
@@ -193,18 +187,18 @@ func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
 // on write operations between the corresponding read (FindByDigest) and write (Create) operations. Separate Find* and
 // Create method calls should be preferred to this when race conditions are not a concern.
 func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
-	q := `INSERT INTO blobs (media_type, digest_algorithm, digest_hex, size)
-			VALUES ($1, $2, decode($3, 'hex'), $4)
-		ON CONFLICT (digest_algorithm, digest_hex)
+	q := `INSERT INTO blobs (media_type, digest, size)
+			VALUES ($1, decode($2, 'hex'), $3)
+		ON CONFLICT (digest)
 			DO NOTHING
 		RETURNING
 			id, created_at`
 
-	digestAlgorithm, err := NewDigestAlgorithm(b.Digest.Algorithm())
+	dgst, err := NewDigest(b.Digest)
 	if err != nil {
 		return err
 	}
-	row := s.db.QueryRowContext(ctx, q, b.MediaType, digestAlgorithm, b.Digest.Hex(), b.Size)
+	row := s.db.QueryRowContext(ctx, q, b.MediaType, dgst, b.Size)
 
 	if err := row.Scan(&b.ID, &b.CreatedAt); err != nil {
 		if err != sql.ErrNoRows {

@@ -70,7 +70,7 @@ func TestBlobStore_FindByDigest(t *testing.T) {
 
 func TestBlobStore_FindByDigest_NotFound(t *testing.T) {
 	s := datastore.NewBlobStore(suite.db)
-	b, err := s.FindByDigest(suite.ctx, "sha256:78cc6e833591fb9d0ec5a0ac141571de42a6c3f23f042598810815b08417f2")
+	b, err := s.FindByDigest(suite.ctx, "sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e22")
 	require.Nil(t, b)
 	require.NoError(t, err)
 }

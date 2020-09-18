@@ -1,46 +1,73 @@
 package datastore
 
 import (
+	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/opencontainers/go-digest"
 )
 
-// DigestAlgorithm is the database representation of a digest algorithm, stored as a smallint.
-type DigestAlgorithm int
+// Digest is the database representation of a digest, stored in the format `<algorithm prefix><hex>`.
+type Digest string
 
 const (
-	Unknown DigestAlgorithm = iota // 0
-	SHA256                         // 1
-	SHA512                         // 2
+	// Algorithm prefixes are sequences of two digits. These should never change, only additions are allowed.
+	sha256DigestAlgorithmPrefix = "01"
+	sha512DigestAlgorithmPrefix = "02"
 )
 
 // String implements the Stringer interface.
-func (alg DigestAlgorithm) String() string {
-	return strconv.Itoa(int(alg))
+func (d Digest) String() string {
+	return string(d)
 }
 
-// NewDigestAlgorithm maps a digest.Digest to a DigestAlgorithm.
-func NewDigestAlgorithm(alg digest.Algorithm) (DigestAlgorithm, error) {
-	switch alg {
+// NewDigest builds a Digest based on a digest.Digest.
+func NewDigest(d digest.Digest) (Digest, error) {
+	if err := d.Validate(); err != nil {
+		return "", err
+	}
+
+	var algPrefix string
+	switch d.Algorithm() {
 	case digest.SHA256:
-		return SHA256, nil
+		algPrefix = sha256DigestAlgorithmPrefix
 	case digest.SHA512:
-		return SHA512, nil
+		algPrefix = sha512DigestAlgorithmPrefix
 	default:
-		return Unknown, fmt.Errorf("unknown digest algorithm %q", alg)
+		return "", fmt.Errorf("unknown algorithm %q", d.Algorithm())
 	}
+
+	return Digest(fmt.Sprintf("%s%s", algPrefix, d.Hex())), nil
 }
 
-// Parse maps a DigestAlgorithm to a digest.Digest.
-func (alg DigestAlgorithm) Parse() (digest.Algorithm, error) {
-	switch alg {
-	case SHA256:
-		return digest.SHA256, nil
-	case SHA512:
-		return digest.SHA512, nil
-	default:
-		return "", fmt.Errorf("unknown digest algorithm %q", alg)
+// Parse maps a Digest to a digest.Digest.
+func (d Digest) Parse() (digest.Digest, error) {
+	str := d.String()
+	if len(str) == 0 {
+		return "", errors.New("empty digest")
 	}
+	if len(str) < 2 {
+		return "", errors.New("invalid digest length")
+	}
+	algPrefix := str[:2]
+	if len(str) == 2 {
+		return "", errors.New("no checksum")
+	}
+
+	var alg digest.Algorithm
+	switch algPrefix {
+	case sha256DigestAlgorithmPrefix:
+		alg = digest.SHA256
+	case sha512DigestAlgorithmPrefix:
+		alg = digest.SHA512
+	default:
+		return "", fmt.Errorf("unknown algorithm prefix %q", algPrefix)
+	}
+
+	dgst := digest.NewDigestFromHex(alg.String(), str[2:])
+	if err := dgst.Validate(); err != nil {
+		return "", err
+	}
+
+	return dgst, nil
 }
