@@ -100,6 +100,41 @@ func (suite *DriverSuite) TearDownTest(c *check.C) {
 	}
 }
 
+type syncDigestSet struct {
+	sync.Mutex
+	members map[digest.Digest]struct{}
+}
+
+func newSyncDigestSet() syncDigestSet {
+	return syncDigestSet{sync.Mutex{}, make(map[digest.Digest]struct{})}
+}
+
+// idempotently adds a digest to the set.
+func (s *syncDigestSet) add(d digest.Digest) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.members[d] = struct{}{}
+}
+
+// contains reports the digest's membership within the set.
+func (s *syncDigestSet) contains(d digest.Digest) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	_, ok := s.members[d]
+
+	return ok
+}
+
+// len returns the number of members within the set.
+func (s *syncDigestSet) len() int {
+	s.Lock()
+	defer s.Unlock()
+
+	return len(s.members)
+}
+
 // TestRootExists ensures that all storage drivers have a root path by default.
 func (suite *DriverSuite) TestRootExists(c *check.C) {
 	_, err := suite.StorageDriver.List(suite.ctx, "/")
@@ -1588,17 +1623,17 @@ func (suite *DriverSuite) TestRemoveBlob(c *check.C) {
 	c.Assert(err, check.IsNil)
 
 	blobService := registry.Blobs()
-	blobsLeft := make(map[digest.Digest]struct{})
+	blobsLeft := newSyncDigestSet()
 	err = blobService.Enumerate(suite.ctx, func(desc distribution.Descriptor) error {
-		blobsLeft[desc.Digest] = struct{}{}
+		blobsLeft.add(desc.Digest)
 		return nil
 	})
 	if err != nil {
 		c.Fatalf("error getting all blobs: %v", err)
 	}
 
-	c.Assert(len(blobsLeft), check.Equals, 1)
-	if _, exists := blobsLeft[blob]; exists {
+	c.Assert(blobsLeft.len(), check.Equals, 1)
+	if blobsLeft.contains(blob) {
 		c.Errorf("blob %q was not deleted", blob.String())
 	}
 }
@@ -1655,18 +1690,18 @@ func (suite *DriverSuite) TestRemoveBlobs(c *check.C) {
 
 	// assert that blobs were deleted
 	blobService := registry.Blobs()
-	blobsLeft := make(map[digest.Digest]struct{})
+	blobsLeft := newSyncDigestSet()
 	err = blobService.Enumerate(suite.ctx, func(desc distribution.Descriptor) error {
-		blobsLeft[desc.Digest] = struct{}{}
+		blobsLeft.add(desc.Digest)
 		return nil
 	})
 	if err != nil {
 		c.Fatalf("error getting all blobs: %v", err)
 	}
 
-	c.Assert(len(blobsLeft), check.Equals, 2)
+	c.Assert(blobsLeft.len(), check.Equals, 2)
 	for _, b := range blobs {
-		if _, exists := blobsLeft[b]; exists {
+		if blobsLeft.contains(b) {
 			c.Errorf("blob %q was not deleted", b.String())
 		}
 	}
@@ -1765,7 +1800,7 @@ func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
 	c.Assert(err, check.IsNil)
 
 	// assert that toDelete manifests were actually deleted
-	manifestsLeft := make(map[digest.Digest]struct{})
+	manifestsLeft := newSyncDigestSet()
 	manifestService, err := repo.Manifests(suite.ctx)
 	if err != nil {
 		c.Fatalf("error building manifest service: %v", err)
@@ -1775,17 +1810,17 @@ func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
 		c.Fatalf("unable to convert ManifestService into ManifestEnumerator")
 	}
 	err = manifestEnumerator.Enumerate(suite.ctx, func(dgst digest.Digest) error {
-		manifestsLeft[dgst] = struct{}{}
+		manifestsLeft.add(dgst)
 		return nil
 	})
 	if err != nil {
 		c.Fatalf("error getting all manifests: %v", err)
 	}
 
-	c.Assert(len(manifestsLeft), check.Equals, len(manifests)-numToDelete)
+	c.Assert(manifestsLeft.len(), check.Equals, len(manifests)-numToDelete)
 
 	for _, m := range toDelete {
-		if _, exists := manifestsLeft[m.Digest]; exists {
+		if manifestsLeft.contains(m.Digest) {
 			c.Errorf("manifest %q was not deleted as expected", m.Digest)
 		}
 	}
