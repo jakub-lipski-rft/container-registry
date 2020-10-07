@@ -1291,9 +1291,6 @@ attempt fails, the health check will fail.
 
 ## `proxy`
 
-**DEPRECATED:** Proxy support is deprecated and will be removed by January 22nd, 2021. See
-https://gitlab.com/gitlab-org/container-registry/-/issues/193 for more details.
-
 ```
 proxy:
   remoteurl: https://registry-1.docker.io
