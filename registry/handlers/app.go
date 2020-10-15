@@ -308,7 +308,13 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	}
 
 	// configure storage caches
-	if cc, ok := config.Storage["cache"]; ok {
+	// It's possible that the metadata database will fill the same original need
+	// as the blob descriptor cache (avoiding slow and/or expensive calls to
+	// external storage) and enable the cache to be removed long term.
+	//
+	// For now, disabling concurrent use of the metadata database and cache
+	// decreases the surface area which we are testing during database development.
+	if cc, ok := config.Storage["cache"]; ok && !config.Database.Enabled {
 		v, ok := cc["blobdescriptor"]
 		if !ok {
 			// Backwards compatible: "layerinfo" == "blobdescriptor"
@@ -340,6 +346,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 				log.WithField("type", config.Storage["cache"]).Warn("unknown cache type, caching disabled")
 			}
 		}
+	} else if ok && config.Database.Enabled {
+		log.Warn("blob descriptor cache is not compatible with metadata database, caching disabled")
 	}
 
 	if app.registry == nil {
