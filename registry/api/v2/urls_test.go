@@ -218,18 +218,20 @@ type builderFromRequestTestCase struct {
 	base    string
 }
 
-func TestBuilderFromRequest(t *testing.T) {
+type testRequests struct {
+	name       string
+	request    *http.Request
+	base       string
+	configHost url.URL
+}
+
+func makeTestRequests(t testing.TB) []testRequests {
 	u, err := url.Parse("http://example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testRequests := []struct {
-		name       string
-		request    *http.Request
-		base       string
-		configHost url.URL
-	}{
+	return []testRequests{
 		{
 			name:    "no forwarded header",
 			request: &http.Request{URL: u, Host: u.Host},
@@ -430,6 +432,10 @@ func TestBuilderFromRequest(t *testing.T) {
 			base: "https://" + u.Host,
 		},
 	}
+}
+
+func TestBuilderFromRequest(t *testing.T) {
+	testRequests := makeTestRequests(t)
 
 	doTest := func(relative bool) {
 		for _, tr := range testRequests {
@@ -459,6 +465,68 @@ func TestBuilderFromRequest(t *testing.T) {
 					t.Errorf("[relative=%t, request=%q, case=%q]: %q != %q", relative, tr.name, testCase.description, buildURL, expectedURL)
 				}
 			}
+		}
+	}
+
+	doTest(true)
+	doTest(false)
+}
+
+// Prevent Compiler optimizations from altering benchmark results
+// https://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go
+var result string
+var builder *URLBuilder
+
+func BenchmarkBuilderFromRequest(b *testing.B) {
+	doTest := func(relative bool) {
+		var pathType string
+		if relative {
+			pathType = "relative"
+		} else {
+			pathType = "absolute"
+		}
+
+		b.Run(pathType, func(b *testing.B) {
+			b.ReportAllocs()
+
+			var ub *URLBuilder
+			request := makeTestRequests(b)[0].request
+
+			for i := 0; i < b.N; i++ {
+				ub = NewURLBuilderFromRequest(request, relative)
+			}
+			builder = ub
+		})
+	}
+
+	doTest(true)
+	doTest(false)
+}
+
+func BenchmarkBuilderFromRequestURLs(b *testing.B) {
+	doTest := func(relative bool) {
+		var builder *URLBuilder
+
+		var pathType string
+		if relative {
+			pathType = "relative"
+		} else {
+			pathType = "absolute"
+		}
+
+		request := makeTestRequests(b)[0].request
+		builder = NewURLBuilderFromRequest(request, relative)
+
+		for _, testCase := range makeURLBuilderTestCases(builder) {
+			b.Run(testCase.description+" "+pathType, func(b *testing.B) {
+				b.ReportAllocs()
+				var r string
+				for i := 0; i < b.N; i++ {
+					// This will occasionally throw expected error values, ignore them.
+					r, _ = testCase.build()
+				}
+				result = r
+			})
 		}
 	}
 
