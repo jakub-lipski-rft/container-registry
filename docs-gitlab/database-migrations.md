@@ -4,12 +4,49 @@ The PostgreSQL database schema migrations are managed through the `registry`
 CLI. Internally, the registry is currently using the
 [rubenv/sql-migrate](https://github.com/rubenv/sql-migrate) tool.
 
+## Best Practices
+
+The registry database migrations should adhere to the [GitLab database migrations
+style guide](https://docs.gitlab.com/ee/development/migration_style_guide.html)
+whenever possible, considering that these applications are written in different
+programming languages and use a different set of tools.
+
+### Idempotency
+
+All migrations must be idempotent. `IF EXISTS` and `IF NOT EXISTS` conditions
+must be used whenever possible. Suppose these do not apply to a given operation,
+such as adding a constraint to an existing table. In that case, a guard clause
+should be added to the migration SQL statement to guarantee idempotency.
+
+#### Examples
+
+##### Add Constraint to Existing Table
+
+```sql
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT
+            1
+        FROM
+            information_schema.constraint_column_usage
+        WHERE
+            table_name = 'repositories'
+            AND column_name = 'path'
+            AND constraint_name = 'uq_repositories_path') THEN
+        ALTER TABLE public.repositories
+            ADD CONSTRAINT uq_repositories_path UNIQUE (path);
+    END IF;
+END;
+$$;
+```
+
 ## Development
 
 ### Create Database
 
 Please make sure to create a `registry_dev` and `registry_test` (naming
-suggestion) database in your development PostgreSQL instance before running
+suggestion) database in your development PostgreSQL 12 instance before running
 migrations.
  
 #### Example
@@ -39,9 +76,7 @@ characters.
 
 New migrations are created based on a template, so we just need to fill in the
 list of `Up` and `Down` SQL statements. All `Up` and `Down` statements are
-executed within a transaction by default. To disable transactions you can set
-the migration `DisableTransactionUp` and/or `DisableTransactionDown` attributes
-to `true`.
+executed within a transaction by default.
 
 #### Example
 
@@ -49,6 +84,13 @@ to `true`.
 $ make new-migration create_users_table
 OK: ./migrations/20200713143615_create_users_table.go
 ```
+
+#### Disabling DDL Transactions
+
+By default all up and down SQL statements in a migration run within a transaction.
+Some operations, such as creating an index concurrently, cannot be executed inside
+a transaction. To disable transaction mode you can set the migration
+`DisableTransactionUp` and/or `DisableTransactionDown` attributes to `true`.
 
 ## Administration
 
@@ -75,7 +117,7 @@ Use "registry database migrate [command] --help" for more information about a co
 
 ### Pre-Requisites
 
-* A PostgreSQL 11 (or higher) database for the registry must already exist;
+* A PostgreSQL 12 database for the registry must already exist;
 * The database should be configured under the `database` section of the registry
   `config.yml` configuration file. Please see the [configuration
   docs](https://gitlab.com/gitlab-org/container-registry/-/blob/database/docs/configuration.md#database)

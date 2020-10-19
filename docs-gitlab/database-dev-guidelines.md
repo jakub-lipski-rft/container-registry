@@ -1,5 +1,9 @@
 # Database Development Guidelines
 
+The registry database development adheres to the same [rules and
+principles](https://docs.gitlab.com/ee/development/database/) defined for the
+GitLab database. We only detail what is specific to the registry in this document.
+
 ## Generic Interfaces
 
 Although we're using the standard library
