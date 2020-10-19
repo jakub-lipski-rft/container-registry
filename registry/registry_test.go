@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"syscall"
 	"testing"
 	"time"
 
@@ -55,6 +56,64 @@ func setupRegistry() (*Registry, error) {
 }
 
 func TestGracefulShutdown(t *testing.T) {
+	var tests = []struct {
+		name                string
+		cleanServerShutdown bool
+		httpDrainTimeout    int
+	}{
+		{
+			name:                "http draintimeout greater than 0 runs server.Shutdown",
+			cleanServerShutdown: true,
+			httpDrainTimeout:    1000,
+		},
+		{
+			name:                "http draintimeout less than 0 does not run server.Shutdown",
+			cleanServerShutdown: false,
+			httpDrainTimeout:    0,
+		},
+	}
+
+	for _, tt := range tests {
+		registry, err := setupRegistry()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		registry.config.HTTP.DrainTimeout = time.Duration(tt.httpDrainTimeout) * time.Second
+
+		// Register on shutdown fuction to dedect if server.Shutdown() was ran.
+		var cleanServerShutdown bool
+		registry.server.RegisterOnShutdown(func() {
+			cleanServerShutdown = true
+		})
+
+		// run registry server
+		var errchan chan error
+		go func() {
+			errchan <- registry.ListenAndServe()
+		}()
+		select {
+		case err = <-errchan:
+			t.Fatalf("Error listening: %v", err)
+		default:
+		}
+
+		// Wait for some unknown random time for server to start listening
+		time.Sleep(3 * time.Second)
+
+		// Send quit signal, this does not track to the signals that the registry
+		// is actually configured to listen to since we're interacting with the
+		// channel directly — any signal sent on this channel triggers the shutdown.
+		quit <- syscall.SIGTERM
+		time.Sleep(100 * time.Millisecond)
+
+		if cleanServerShutdown != tt.cleanServerShutdown {
+			t.Fatalf("expected clean shutdown to be %v, got %v", tt.cleanServerShutdown, cleanServerShutdown)
+		}
+	}
+}
+
+func TestGracefulShutdown_HTTPDrainTimeout(t *testing.T) {
 	registry, err := setupRegistry()
 	if err != nil {
 		t.Fatal(err)

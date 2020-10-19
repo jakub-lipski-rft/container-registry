@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -34,9 +35,6 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
-
-// this channel gets notified when process receives signal. It is global to ease unit testing
-var quit = make(chan os.Signal, 1)
 
 var tlsLookup = map[string]uint16{
 	"":       tls.VersionTLS10,
@@ -77,7 +75,10 @@ var ServeCmd = &cobra.Command{
 
 		if err = registry.ListenAndServe(); err != nil {
 			log.Fatalln(err)
+			os.Exit(1)
 		}
+
+		os.Exit(0)
 	},
 }
 
@@ -211,12 +212,15 @@ func (registry *Registry) ListenAndServe() error {
 		dcontext.GetLogger(registry.app).Infof("listening on %v", ln.Addr())
 	}
 
-	if config.HTTP.DrainTimeout == 0 {
-		return registry.server.Serve(ln)
-	}
+	return registry.serveWithGracefulShutdown(config, ln)
+}
 
-	// setup channel to get notified on SIGTERM signal
-	signal.Notify(quit, syscall.SIGTERM)
+// this channel gets notified when process receives signal. It is global to ease unit testing
+var quit = make(chan os.Signal, 1)
+
+func (registry *Registry) serveWithGracefulShutdown(c *configuration.Configuration, ln net.Listener) error {
+	// setup channel to get notified on SIGTERM, SIGINT, and SIGQUIT signals
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	serveErr := make(chan error)
 
 	// Start serving in goroutine and listen for stop signal in main thread
@@ -227,12 +231,31 @@ func (registry *Registry) ListenAndServe() error {
 	select {
 	case err := <-serveErr:
 		return err
-	case <-quit:
-		dcontext.GetLogger(registry.app).Info("stopping server gracefully. Draining connections for ", config.HTTP.DrainTimeout)
+	case s := <-quit:
+		log := log.WithFields(log.Fields{"quit_signal": s, "http_drain_timeout": c.HTTP.DrainTimeout})
+		log.Info("attempting to stop server gracefully...")
+
 		// shutdown the server with a grace period of configured timeout
-		c, cancel := context.WithTimeout(context.Background(), config.HTTP.DrainTimeout)
-		defer cancel()
-		return registry.server.Shutdown(c)
+		if c.HTTP.DrainTimeout != 0 {
+			log.Info("draining http connections")
+			ctx, cancel := context.WithTimeout(context.Background(), c.HTTP.DrainTimeout)
+			defer cancel()
+			if err := registry.server.Shutdown(ctx); err != nil {
+				return err
+			}
+		}
+
+		if c.Database.Enabled {
+			log.Info("closing database connections")
+
+			// TODO: Put database shutdown on a configurable timeout.
+			if err := registry.app.GracefulShutdown(context.Background()); err != nil {
+				return err
+			}
+		}
+
+		log.Info("graceful shutdown successful")
+		return nil
 	}
 }
 
