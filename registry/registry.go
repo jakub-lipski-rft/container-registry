@@ -218,7 +218,7 @@ func (registry *Registry) ListenAndServe() error {
 // this channel gets notified when process receives signal. It is global to ease unit testing
 var quit = make(chan os.Signal, 1)
 
-func (registry *Registry) serveWithGracefulShutdown(c *configuration.Configuration, ln net.Listener) error {
+func (registry *Registry) serveWithGracefulShutdown(ln net.Listener) error {
 	// setup channel to get notified on SIGTERM, SIGINT, and SIGQUIT signals
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	serveErr := make(chan error)
