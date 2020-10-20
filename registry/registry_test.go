@@ -59,17 +59,17 @@ func TestGracefulShutdown(t *testing.T) {
 	var tests = []struct {
 		name                string
 		cleanServerShutdown bool
-		httpDrainTimeout    int
+		httpDrainTimeout    time.Duration
 	}{
 		{
 			name:                "http draintimeout greater than 0 runs server.Shutdown",
 			cleanServerShutdown: true,
-			httpDrainTimeout:    1000,
+			httpDrainTimeout:    10 * time.Second,
 		},
 		{
-			name:                "http draintimeout less than 0 does not run server.Shutdown",
+			name:                "http draintimeout 0 or less does not run server.Shutdown",
 			cleanServerShutdown: false,
-			httpDrainTimeout:    0,
+			httpDrainTimeout:    0 * time.Second,
 		},
 	}
 
@@ -79,7 +79,7 @@ func TestGracefulShutdown(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		registry.config.HTTP.DrainTimeout = time.Duration(tt.httpDrainTimeout) * time.Second
+		registry.config.HTTP.DrainTimeout = tt.httpDrainTimeout
 
 		// Register on shutdown fuction to detect if server.Shutdown() was ran.
 		var cleanServerShutdown bool
