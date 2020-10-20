@@ -81,7 +81,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 		registry.config.HTTP.DrainTimeout = time.Duration(tt.httpDrainTimeout) * time.Second
 
-		// Register on shutdown fuction to dedect if server.Shutdown() was ran.
+		// Register on shutdown fuction to detect if server.Shutdown() was ran.
 		var cleanServerShutdown bool
 		registry.server.RegisterOnShutdown(func() {
 			cleanServerShutdown = true
