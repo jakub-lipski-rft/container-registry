@@ -260,8 +260,8 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		if schema2Manifest, isSchema2 := manifest.(*schema2.DeserializedManifest); isSchema2 && !supports[manifestSchema2] {
 			log.Warn("client does not advertise support for schema2 manifests, rewriting manifest in schema1 format")
 			log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
-			"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
-			"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
+				"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
+				"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
 
 			manifest, err = imh.convertSchema2Manifest(schema2Manifest)
 			if err != nil {
@@ -879,7 +879,7 @@ func dbPutManifestOCIOrSchema2(
 				return err
 			}
 
-			// TODO: update the layer blob media_type here, it was set to "application/octect-stream" during the upload
+			// TODO: update the layer blob media_type here, it was set to "application/octet-stream" during the upload
 			// 		 but now we know its concrete type (reqLayer.MediaType).
 
 			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
@@ -933,7 +933,7 @@ func dbFindOrCreateRepositoryConfig(ctx context.Context, db datastore.Queryer, b
 			return nil, err
 		}
 	}
-	// TODO: update the config blob media_type here, it was set to "application/octect-stream" during the upload
+	// TODO: update the config blob media_type here, it was set to "application/octet-stream" during the upload
 	// 		 but now we know its concrete type (cfgDesc.MediaType).
 
 	return dbCfg, nil
@@ -1098,7 +1098,7 @@ func dbPutManifestSchema1(
 				return err
 			}
 
-			// TODO: update the layer blob media_type here, it was set to "application/octect-stream" during the upload
+			// TODO: update the layer blob media_type here, it was set to "application/octet-stream" during the upload
 			// 		 but now we know its concrete type (reqLayer.MediaType).
 
 			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {

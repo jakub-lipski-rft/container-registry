@@ -55,7 +55,7 @@ func buildRandomBlob(t *testing.T, env *env) *models.Blob {
 	bStore := datastore.NewBlobStore(env.db)
 
 	b := &models.Blob{
-		MediaType: "application/octect-stream",
+		MediaType: "application/octet-stream",
 		Digest:    randomDigest(t),
 		Size:      rand.Int63n(10000),
 	}
@@ -69,7 +69,7 @@ func randomBlobDescriptor(t *testing.T) distribution.Descriptor {
 	t.Helper()
 
 	return distribution.Descriptor{
-		MediaType: "application/octect-stream",
+		MediaType: "application/octet-stream",
 		Digest:    randomDigest(t),
 		Size:      rand.Int63n(10000),
 	}
