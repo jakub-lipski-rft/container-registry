@@ -1080,7 +1080,7 @@ func dbPutManifestSchema1(
 
 		m := &models.Manifest{
 			SchemaVersion: manifest.SchemaVersion,
-			MediaType:     manifest.MediaType,
+			MediaType:     schema1.MediaTypeSignedManifest,
 			Digest:        dgst,
 			Payload:       manifest.Canonical,
 		}

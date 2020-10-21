@@ -25,7 +25,7 @@ type expectedBlobStatter struct {
 }
 
 func (bs *expectedBlobStatter) Stat(ctx context.Context, dgst digest.Digest) (distribution.Descriptor, error) {
-	return distribution.Descriptor{Digest: bs.digest}, nil
+	return distribution.Descriptor{Digest: bs.digest, MediaType: "application/octet-stream"}, nil
 }
 
 func buildRepository(t *testing.T, env *env, path string) *models.Repository {
