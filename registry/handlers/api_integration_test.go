@@ -1472,7 +1472,7 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 		},
 	}
 
-	resp = putManifest(t, "putting unsigned manifest", manifestURL, "", unsignedManifest)
+	resp = putManifest(t, "putting unsigned manifest", manifestURL, schema1.MediaTypeManifest, unsignedManifest)
 	defer resp.Body.Close()
 	checkResponse(t, "putting unsigned manifest", resp, http.StatusBadRequest)
 	_, p, counts := checkBodyHasErrorCodes(t, "putting unsigned manifest", resp, v2.ErrorCodeManifestInvalid)
@@ -1491,7 +1491,7 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 		t.Fatalf("error signing manifest: %v", err)
 	}
 
-	resp = putManifest(t, "putting signed manifest with errors", manifestURL, "", sm)
+	resp = putManifest(t, "putting signed manifest with errors", manifestURL, schema1.MediaTypeSignedManifest, sm)
 	defer resp.Body.Close()
 	checkResponse(t, "putting signed manifest with errors", resp, http.StatusBadRequest)
 	_, p, counts = checkBodyHasErrorCodes(t, "putting signed manifest with errors", resp,
@@ -1543,7 +1543,7 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
 	checkErr(t, err, "building manifest url")
 
-	resp = putManifest(t, "putting signed manifest no error", manifestURL, "", signedManifest)
+	resp = putManifest(t, "putting signed manifest no error", manifestURL, schema1.MediaTypeSignedManifest, signedManifest)
 	checkResponse(t, "putting signed manifest no error", resp, http.StatusCreated)
 	checkHeaders(t, resp, http.Header{
 		"Location":              []string{manifestDigestURL},
@@ -1552,7 +1552,7 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 
 	// --------------------
 	// Push by digest -- should get same result
-	resp = putManifest(t, "putting signed manifest", manifestDigestURL, "", signedManifest)
+	resp = putManifest(t, "putting signed manifest", manifestDigestURL, schema1.MediaTypeSignedManifest, signedManifest)
 	checkResponse(t, "putting signed manifest", resp, http.StatusCreated)
 	checkHeaders(t, resp, http.Header{
 		"Location":              []string{manifestDigestURL},
@@ -5752,7 +5752,7 @@ func createRepository(env *testEnv, t *testing.T, imageName string, tag string) 
 	location, err := env.builder.BuildManifestURL(digestRef)
 	checkErr(t, err, "building location URL")
 
-	resp := putManifest(t, "putting signed manifest", manifestDigestURL, "", signedManifest)
+	resp := putManifest(t, "putting signed manifest", manifestDigestURL, schema1.MediaTypeSignedManifest, signedManifest)
 	checkResponse(t, "putting signed manifest", resp, http.StatusCreated)
 	checkHeaders(t, resp, http.Header{
 		"Location":              []string{location},
@@ -5820,7 +5820,7 @@ func createRepositoryWithMultipleIdenticalTags(env *testEnv, t *testing.T, image
 		location, err := env.builder.BuildManifestURL(digestRef)
 		checkErr(t, err, "building location URL")
 
-		resp := putManifest(t, "putting signed manifest", manifestDigestURL, "", signedManifest)
+		resp := putManifest(t, "putting signed manifest", manifestDigestURL, schema1.MediaTypeSignedManifest, signedManifest)
 		checkResponse(t, "putting signed manifest", resp, http.StatusCreated)
 		checkHeaders(t, resp, http.Header{
 			"Location":              []string{location},
@@ -5862,7 +5862,7 @@ func TestRegistryAsCacheMutationAPIs(t *testing.T) {
 		t.Fatalf("error signing manifest: %v", err)
 	}
 
-	resp := putManifest(t, "putting unsigned manifest", manifestURL, "", sm)
+	resp := putManifest(t, "putting unsigned manifest", manifestURL, schema1.MediaTypeManifest, sm)
 	checkResponse(t, "putting signed manifest to cache", resp, errcode.ErrorCodeUnsupported.Descriptor().HTTPStatusCode)
 
 	// Manifest Delete
