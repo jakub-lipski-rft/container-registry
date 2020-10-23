@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"testing"
 
-	migrate "github.com/rubenv/sql-migrate"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +18,7 @@ func TestMigrator_LatestVersion(t *testing.T) {
 
 func TestMigrator_LatestVersion_NoMigrations(t *testing.T) {
 	// backup known migrations
-	bkp := make([]*migrate.Migration, len(allMigrations))
+	bkp := make([]*Migration, len(allMigrations))
 	for i, m := range allMigrations {
 		// create shallow copy and capture its address
 		v := *m
@@ -27,7 +26,7 @@ func TestMigrator_LatestVersion_NoMigrations(t *testing.T) {
 	}
 
 	// reset known migrations and defer restore from backup
-	allMigrations = []*migrate.Migration{}
+	allMigrations = []*Migration{}
 	defer func() { allMigrations = bkp }()
 
 	// test

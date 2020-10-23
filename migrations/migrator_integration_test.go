@@ -90,7 +90,7 @@ func TestMigrator_UpN(t *testing.T) {
 
 	v, err := m.Version()
 	require.NoError(t, err)
-	require.Equal(t, nth.ID, v)
+	require.Equal(t, nth.Id, v)
 
 	// resume and apply the remaining
 	count, err = m.UpN(0)
@@ -99,7 +99,7 @@ func TestMigrator_UpN(t *testing.T) {
 
 	v, err = m.Version()
 	require.NoError(t, err)
-	require.Equal(t, all[len(all)-1].ID, v)
+	require.Equal(t, all[len(all)-1].Id, v)
 
 	// make sure it's idempotent
 	count, err = m.UpN(100)
@@ -125,7 +125,7 @@ func TestMigrator_UpNPlan(t *testing.T) {
 
 	var allPlan []string
 	for _, migration := range all {
-		allPlan = append(allPlan, migration.ID)
+		allPlan = append(allPlan, migration.Id)
 	}
 
 	// plan all except the last two
@@ -193,7 +193,7 @@ func TestMigrator_DownN(t *testing.T) {
 
 	v, err := m.Version()
 	require.NoError(t, err)
-	require.Equal(t, second.ID, v)
+	require.Equal(t, second.Id, v)
 
 	// resume and rollback the remaining two
 	count, err = m.DownN(0)
@@ -228,7 +228,7 @@ func TestMigrator_DownNPlan(t *testing.T) {
 	var allPlan []string
 
 	for _, migration := range all {
-		allPlan = append(allPlan, migration.ID)
+		allPlan = append(allPlan, migration.Id)
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(allPlan))) // down migrations are applied in reverse order
 
@@ -275,7 +275,7 @@ func TestMigrator_Status_Empty(t *testing.T) {
 
 	var expectedIDs, actualIDs []string
 	for _, m := range all {
-		expectedIDs = append(expectedIDs, m.ID)
+		expectedIDs = append(expectedIDs, m.Id)
 	}
 	for id := range statuses {
 		actualIDs = append(actualIDs, id)
@@ -305,7 +305,7 @@ func TestMigrator_Status_Full(t *testing.T) {
 
 	var expectedIDs, actualIDs []string
 	for _, m := range all {
-		expectedIDs = append(expectedIDs, m.ID)
+		expectedIDs = append(expectedIDs, m.Id)
 	}
 	for id := range statuses {
 		actualIDs = append(actualIDs, id)
