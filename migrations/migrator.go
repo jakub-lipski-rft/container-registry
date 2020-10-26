@@ -17,14 +17,12 @@ func init() {
 }
 
 type migrator struct {
-	db  *sql.DB
-	src *migrate.MemoryMigrationSource
+	db *sql.DB
 }
 
 func NewMigrator(db *sql.DB) *migrator {
 	return &migrator{
-		db:  db,
-		src: &migrate.MemoryMigrationSource{Migrations: allMigrations},
+		db: db,
 	}
 }
 
@@ -43,7 +41,7 @@ func (m *migrator) Version() (string, error) {
 
 // LatestVersion identifies the version of the most recent migration in the repository (if any).
 func (m *migrator) LatestVersion() (string, error) {
-	all, err := m.src.FindMigrations()
+	all, err := m.allMigrations()
 	if err != nil {
 		return "", err
 	}
@@ -55,7 +53,7 @@ func (m *migrator) LatestVersion() (string, error) {
 }
 
 func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) (int, error) {
-	return migrate.ExecMax(m.db, dialect, m.src, direction, limit)
+	return migrate.ExecMax(m.db, dialect, m.allMigrationSource(), direction, limit)
 }
 
 // Up applies all pending up migrations. Returns the number of applied migrations.
@@ -105,7 +103,7 @@ func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	known, err := m.src.FindMigrations()
+	known, err := m.allMigrations()
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +128,7 @@ func (m *migrator) HasPending() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	known, err := m.src.FindMigrations()
+	known, err := m.allMigrations()
 	if err != nil {
 		return false, err
 	}
@@ -152,7 +150,7 @@ func (m *migrator) HasPending() (bool, error) {
 }
 
 func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
-	planned, _, err := migrate.PlanMigration(m.db, dialect, m.src, direction, limit)
+	planned, _, err := migrate.PlanMigration(m.db, dialect, m.allMigrationSource(), direction, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -163,4 +161,18 @@ func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]stri
 	}
 
 	return result, nil
+}
+
+func (m *migrator) allMigrations() ([]*migrate.Migration, error) {
+	return m.allMigrationSource().FindMigrations()
+}
+
+func (m *migrator) allMigrationSource() *migrate.MemoryMigrationSource {
+	src := &migrate.MemoryMigrationSource{}
+
+	for _, migration := range allMigrations {
+		src.Migrations = append(src.Migrations, migration.Migration)
+	}
+
+	return src
 }
