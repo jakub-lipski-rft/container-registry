@@ -17,12 +17,32 @@ func init() {
 }
 
 type migrator struct {
-	db *sql.DB
+	db         *sql.DB
+	migrations []*Migration
 }
 
-func NewMigrator(db *sql.DB) *migrator {
-	return &migrator{
-		db: db,
+func NewMigrator(db *sql.DB, opts ...MigratorOption) *migrator {
+	m := &migrator{
+		db:         db,
+		migrations: allMigrations,
+	}
+
+	for _, o := range opts {
+		o(m)
+	}
+
+	return m
+}
+
+// MigratorOption enables the creation of functional options for the
+// configuration of the migrator.
+type MigratorOption func(m *migrator)
+
+// Source allows the migrator to use an alternative source of migrations, used
+// for testing.
+func Source(a []*Migration) func(m *migrator) {
+	return func(m *migrator) {
+		m.migrations = a
 	}
 }
 
@@ -170,7 +190,7 @@ func (m *migrator) allMigrations() ([]*migrate.Migration, error) {
 func (m *migrator) allMigrationSource() *migrate.MemoryMigrationSource {
 	src := &migrate.MemoryMigrationSource{}
 
-	for _, migration := range allMigrations {
+	for _, migration := range m.migrations {
 		src.Migrations = append(src.Migrations, migration.Migration)
 	}
 

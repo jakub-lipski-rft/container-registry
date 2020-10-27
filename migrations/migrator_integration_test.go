@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution/migrations"
+	testmigrations "github.com/docker/distribution/migrations/testdata/fixtures"
 	"github.com/docker/distribution/registry/datastore/testutil"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestMigrator_Version(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
@@ -35,7 +36,7 @@ func TestMigrator_Version_NoMigrations(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Down()
 	require.NoError(t, err)
 	defer m.Up()
@@ -50,12 +51,12 @@ func TestMigrator_Up(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Down()
 	require.NoError(t, err)
 	defer m.Up()
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	count, err := m.Up()
 	require.NoError(t, err)
@@ -74,13 +75,13 @@ func TestMigrator_UpN(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Down()
 	require.NoError(t, err)
 	defer m.Up()
 
 	// apply all except the last two
-	all := migrations.All()
+	all := testmigrations.All()
 	n := len(all) - 1 - 2
 	nth := all[n-1]
 
@@ -116,12 +117,12 @@ func TestMigrator_UpNPlan(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Down()
 	require.NoError(t, err)
 	defer m.Up()
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	var allPlan []string
 	for _, migration := range all {
@@ -157,11 +158,11 @@ func TestMigrator_Down(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	count, err := m.Down()
 	require.NoError(t, err)
@@ -178,12 +179,12 @@ func TestMigrator_DownN(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
 	// rollback all except the first two
-	all := migrations.All()
+	all := testmigrations.All()
 	n := len(all) - 2
 	second := all[1]
 
@@ -219,11 +220,11 @@ func TestMigrator_DownNPlan(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	var allPlan []string
 
@@ -261,13 +262,13 @@ func TestMigrator_Status_Empty(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 
 	_, err = m.Down()
 	require.NoError(t, err)
 	defer m.Up()
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	statuses, err := m.Status()
 	require.NoError(t, err)
@@ -293,11 +294,11 @@ func TestMigrator_Status_Full(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	statuses, err := m.Status()
 	require.NoError(t, err)
@@ -323,11 +324,11 @@ func TestMigrator_Status_Unknown(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
-	all := migrations.All()
+	all := testmigrations.All()
 
 	// temporarily insert fake migration record
 	fakeID := "20060102150405_foo"
@@ -351,7 +352,7 @@ func TestMigrator_HasPending_No(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
@@ -365,7 +366,7 @@ func TestMigrator_HasPending_Yes(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	m := migrations.NewMigrator(db.DB)
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
 	_, err = m.Up()
 	require.NoError(t, err)
 
