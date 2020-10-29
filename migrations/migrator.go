@@ -19,6 +19,8 @@ func init() {
 type migrator struct {
 	db         *sql.DB
 	migrations []*Migration
+
+	skipPostDeployment bool
 }
 
 func NewMigrator(db *sql.DB, opts ...MigratorOption) *migrator {
@@ -46,6 +48,11 @@ func Source(a []*Migration) func(m *migrator) {
 	}
 }
 
+// SkipPostDeployment configures the migration to not apply postdeployment migrations.
+func SkipPostDeployment(m *migrator) {
+	m.skipPostDeployment = true
+}
+
 // Version returns the current applied migration version (if any).
 func (m *migrator) Version() (string, error) {
 	records, err := migrate.GetMigrationRecords(m.db, dialect)
@@ -61,7 +68,7 @@ func (m *migrator) Version() (string, error) {
 
 // LatestVersion identifies the version of the most recent migration in the repository (if any).
 func (m *migrator) LatestVersion() (string, error) {
-	all, err := m.allMigrations()
+	all, err := m.eligibleMigrations()
 	if err != nil {
 		return "", err
 	}
@@ -73,7 +80,12 @@ func (m *migrator) LatestVersion() (string, error) {
 }
 
 func (m *migrator) migrate(direction migrate.MigrationDirection, limit int) (int, error) {
-	return migrate.ExecMax(m.db, dialect, m.allMigrationSource(), direction, limit)
+	src, err := m.eligibleMigrationSource()
+	if err != nil {
+		return 0, err
+	}
+
+	return migrate.ExecMax(m.db, dialect, src, direction, limit)
 }
 
 // Up applies all pending up migrations. Returns the number of applied migrations.
@@ -144,24 +156,18 @@ func (m *migrator) Status() (map[string]*migrationStatus, error) {
 
 // HasPending determines whether all known migrations are applied or not.
 func (m *migrator) HasPending() (bool, error) {
-	applied, err := migrate.GetMigrationRecords(m.db, dialect)
-	if err != nil {
-		return false, err
-	}
-	known, err := m.allMigrations()
+	records, err := migrate.GetMigrationRecords(m.db, dialect)
 	if err != nil {
 		return false, err
 	}
 
-	for _, k := range known {
-		var found bool
-		for _, a := range applied {
-			if a.Id == k.Id {
-				found = true
-			}
-		}
+	eligible, err := m.eligibleMigrations()
+	if err != nil {
+		return false, err
+	}
 
-		if !found {
+	for _, k := range eligible {
+		if !migrationApplied(records, k) {
 			return true, nil
 		}
 	}
@@ -170,7 +176,12 @@ func (m *migrator) HasPending() (bool, error) {
 }
 
 func (m *migrator) plan(direction migrate.MigrationDirection, limit int) ([]string, error) {
-	planned, _, err := migrate.PlanMigration(m.db, dialect, m.allMigrationSource(), direction, limit)
+	src, err := m.eligibleMigrationSource()
+	if err != nil {
+		return nil, err
+	}
+
+	planned, _, err := migrate.PlanMigration(m.db, dialect, src, direction, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -195,4 +206,46 @@ func (m *migrator) allMigrationSource() *migrate.MemoryMigrationSource {
 	}
 
 	return src
+}
+
+func (m *migrator) eligibleMigrations() ([]*migrate.Migration, error) {
+	src, err := m.eligibleMigrationSource()
+	if err != nil {
+		return nil, err
+	}
+
+	return src.FindMigrations()
+}
+
+func (m *migrator) eligibleMigrationSource() (*migrate.MemoryMigrationSource, error) {
+	src := &migrate.MemoryMigrationSource{}
+
+	records, err := migrate.GetMigrationRecords(m.db, dialect)
+	if err != nil {
+		return src, err
+	}
+
+	for _, migration := range m.migrations {
+		if m.skipPostDeployment && migration.PostDeployment &&
+			// Do not skip already applied postdeployment migrations. The migration
+			// library expects to see applied migrations when it plans a migration,
+			// and we should ensure that down migrations affect all applied migrations.
+			!migrationApplied(records, migration.Migration) {
+			continue
+		}
+
+		src.Migrations = append(src.Migrations, migration.Migration)
+	}
+
+	return src, nil
+}
+
+func migrationApplied(records []*migrate.MigrationRecord, m *migrate.Migration) bool {
+	for _, r := range records {
+		if r.Id == m.Id {
+			return true
+		}
+	}
+
+	return false
 }
