@@ -66,17 +66,20 @@ make new-migration [name]
 
 A new migration file, named `[timestamp]_[name].go`, will be created under
 `migrations/`. Migration files are prefixed with the timestamp of the current
-system date formatted as `%Y%m%d%H%M%S`. 
+system date formatted as `%Y%m%d%H%M%S`.
 
 Make sure to use a descriptive name for the migration, preferably denoting the
-`action` and the object `name` and `type`. For example, to create a table `x`,
-use `create_x_table`. To drop a column `a` from table `x`, use
-`drop_x_a_column`. The name can only contain alphanumeric and underscore
-characters.
+`action` and the object `name` and `type`, and whether the migration may be ran
+as a post deployment migration. For example, to create a table `x`, use
+`create_x_table`. To drop a column `a` from table `x` in a post deployment
+migration, use `drop_x_a_column_post_deployment`. The name can only contain
+alphanumeric and underscore characters.
 
 New migrations are created based on a template, so we just need to fill in the
-list of `Up` and `Down` SQL statements. All `Up` and `Down` statements are
-executed within a transaction by default.
+list of `Up` and `Down` SQL statements, and if desired, flag the migration as a
+post deployment migrations by changing the boolean value of `PostDeployment` to
+`true`. All `Up` and `Down` statements are executed within a transaction by
+default.
 
 #### Example
 
@@ -140,12 +143,18 @@ Flags:
   -d, --dry-run     do not commit changes to the database
   -h, --help        help for up
   -n, --limit int   limit the number of migrations (all by default)
+  -s, --skip-post-deployment   do not apply post deployment migrations
 ```
 
 If using the `--dry-run` flag, a migration plan (an ordered list of migrations
 to apply) will be created and displayed but not executed. Additionally, it is
 possible to limit the number of pending migration to apply using the `--limit`
 flag. By default, all pending migrations are applied.
+
+If using the `--skip-post-deployment` flag, post deployment migrations will
+not be applied. Post deployment migrations can be applied after the registry
+service is active by running the `up` subcommand again without the
+`--skip-post-deployment` flag. By default, all pending migrations are applied.
 
 #### Example
 
