@@ -293,7 +293,9 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			panic(fmt.Sprintf("failed to construct database connection: %v", err))
 		}
 
-		m := migrations.NewMigrator(db.DB)
+		// Skip postdeployment migrations to prevent pending post deployment
+		// migrations from preventing the registry from starting.
+		m := migrations.NewMigrator(db.DB, migrations.SkipPostDeployment)
 		pending, err := m.HasPending()
 		if err != nil {
 			panic(fmt.Sprintf("failed to check database migrations status: %v", err))
