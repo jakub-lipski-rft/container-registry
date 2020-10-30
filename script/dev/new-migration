@@ -42,13 +42,16 @@ package migrations
 import migrate "github.com/rubenv/sql-migrate"
 
 func init() {
-    m := &migrate.Migration{
-        Id:   "$ID",
-        Up:   []string{},
-        Down: []string{},
-    }
+	m := &Migration{
+		Migration: &migrate.Migration{
+			Id:   "$ID",
+			Up:   []string{},
+			Down: []string{},
+		},
+		PostDeployment: false,
+	}
 
-    allMigrations = append(allMigrations, m)
+	allMigrations = append(allMigrations, m)
 }
 _EOF_
 
