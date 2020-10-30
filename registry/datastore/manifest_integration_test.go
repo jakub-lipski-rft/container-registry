@@ -307,6 +307,13 @@ func TestManifestStore_Repositories(t *testing.T) {
 			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
 			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
 		},
+		{
+			ID:        7,
+			Name:      "bar",
+			Path:      "a-test-group/bar",
+			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+		},
 	}
 	require.Equal(t, expected, rr)
 }
