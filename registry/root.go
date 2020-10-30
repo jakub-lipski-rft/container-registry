@@ -24,10 +24,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var showVersion bool
-var maxNumMigrations *int
-var force bool
-
 func init() {
 	RootCmd.AddCommand(ServeCmd)
 	RootCmd.AddCommand(GCCmd)
@@ -42,6 +38,7 @@ func init() {
 	MigrateCmd.AddCommand(MigrateStatusCmd)
 	MigrateUpCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	MigrateUpCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
+	MigrateUpCmd.Flags().BoolVarP(&skipPostDeployment, "skip-post-deployment", "s", false, "do not apply post deployment migrations")
 	MigrateCmd.AddCommand(MigrateUpCmd)
 	MigrateDownCmd.Flags().BoolVarP(&force, "force", "f", false, "no confirmation message")
 	MigrateDownCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
@@ -56,6 +53,20 @@ func init() {
 	ImportCmd.Flags().BoolVarP(&importDanglingManifests, "dangling-manifests", "m", false, "import all manifests, regardless of whether they are tagged or not")
 	ImportCmd.Flags().BoolVarP(&continueImport, "continue-import", "c", false, "allow import to be retried on a database which is already partially imported")
 }
+
+var (
+	continueImport          bool
+	debugAddr               string
+	dryRun                  bool
+	force                   bool
+	importDanglingBlobs     bool
+	importDanglingManifests bool
+	maxNumMigrations        *int
+	removeUntagged          bool
+	repoPath                string
+	showVersion             bool
+	skipPostDeployment      bool
+)
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
 // https://pkg.go.dev/github.com/spf13/pflag?tab=doc#Value
@@ -96,13 +107,6 @@ var RootCmd = &cobra.Command{
 		cmd.Usage()
 	},
 }
-
-var dryRun bool
-var removeUntagged bool
-var importDanglingBlobs bool
-var importDanglingManifests bool
-var continueImport bool
-var debugAddr string
 
 // GCCmd is the cobra command that corresponds to the garbage-collect subcommand
 var GCCmd = &cobra.Command{
@@ -209,6 +213,10 @@ var MigrateUpCmd = &cobra.Command{
 		}
 
 		m := migrations.NewMigrator(db.DB)
+		if skipPostDeployment {
+			migrations.SkipPostDeployment(m)
+		}
+
 		plan, err := m.UpNPlan(*maxNumMigrations)
 		fmt.Println(strings.Join(plan, "\n"))
 
@@ -364,8 +372,6 @@ var MigrateStatusCmd = &cobra.Command{
 		table.Render()
 	},
 }
-
-var repoPath string
 
 // ImportCmd is the `import` sub-command of `database` that imports metadata from the filesystem into the database.
 var ImportCmd = &cobra.Command{
