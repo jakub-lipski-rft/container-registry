@@ -125,8 +125,9 @@ func (m *migrator) DownNPlan(n int) ([]string, error) {
 // migrationStatus represents the status of a migration. Unknown will be set to true if a migration was applied but is
 // not known by the current build.
 type migrationStatus struct {
-	Unknown   bool
-	AppliedAt *time.Time
+	Unknown        bool
+	PostDeployment bool
+	AppliedAt      *time.Time
 }
 
 // Status returns the status of all migrations, indexed by migration ID.
@@ -141,13 +142,19 @@ func (m *migrator) Status() (map[string]*migrationStatus, error) {
 	}
 
 	statuses := make(map[string]*migrationStatus, len(applied))
-	for _, m := range known {
-		statuses[m.Id] = &migrationStatus{}
+	for _, k := range known {
+		statuses[k.Id] = &migrationStatus{}
+
+		if mig := m.findMigrationByID(k.Id); mig != nil && mig.PostDeployment {
+			statuses[k.Id].PostDeployment = true
+		}
 	}
+
 	for _, m := range applied {
 		if _, ok := statuses[m.Id]; !ok {
 			statuses[m.Id] = &migrationStatus{Unknown: true}
 		}
+
 		statuses[m.Id].AppliedAt = &m.AppliedAt
 	}
 
@@ -167,7 +174,7 @@ func (m *migrator) HasPending() (bool, error) {
 	}
 
 	for _, k := range eligible {
-		if !migrationApplied(records, k) {
+		if !migrationApplied(records, k.Id) {
 			return true, nil
 		}
 	}
@@ -230,7 +237,7 @@ func (m *migrator) eligibleMigrationSource() (*migrate.MemoryMigrationSource, er
 			// Do not skip already applied postdeployment migrations. The migration
 			// library expects to see applied migrations when it plans a migration,
 			// and we should ensure that down migrations affect all applied migrations.
-			!migrationApplied(records, migration.Migration) {
+			!migrationApplied(records, migration.Id) {
 			continue
 		}
 
@@ -240,12 +247,21 @@ func (m *migrator) eligibleMigrationSource() (*migrate.MemoryMigrationSource, er
 	return src, nil
 }
 
-func migrationApplied(records []*migrate.MigrationRecord, m *migrate.Migration) bool {
+func migrationApplied(records []*migrate.MigrationRecord, id string) bool {
 	for _, r := range records {
-		if r.Id == m.Id {
+		if r.Id == id {
 			return true
 		}
 	}
 
 	return false
+}
+
+func (m *migrator) findMigrationByID(id string) *Migration {
+	for _, mig := range m.migrations {
+		if mig.Id == id {
+			return mig
+		}
+	}
+	return nil
 }
