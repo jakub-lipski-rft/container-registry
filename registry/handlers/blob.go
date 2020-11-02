@@ -109,12 +109,8 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 
 	if bh.Config.Database.Enabled {
 		if err := dbGetBlob(bh.Context, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
-			if bh.App.Config.Database.Experimental.Fallback {
-				dcontext.GetLogger(bh).WithError(err).Warn("unable to fetch blob from database, falling back to filesystem")
-			} else {
-				bh.Errors = append(bh.Errors, err)
-				return
-			}
+			bh.Errors = append(bh.Errors, err)
+			return
 		}
 	}
 
@@ -127,7 +123,7 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 
 // dbDeleteBlob does not actually delete a blob from the database (that's GC's responsibility), it only unlinks it from
 // a repository.
-func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest, fallback bool) error {
+func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
 	log.Debug("deleting blob from repository in database")
 
@@ -137,11 +133,6 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		return err
 	}
 	if r == nil {
-		if fallback {
-			log.Warn("repository not found in database, no need to unlink from the blob")
-			return nil
-		}
-
 		return errors.New("repository not found in database")
 	}
 
@@ -158,11 +149,6 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		}
 	}
 	if b == nil {
-		if fallback {
-			log.Warn("blob not found in database, no need to unlink it from the repository")
-			return nil
-		}
-
 		return errors.New("blob not found in database")
 	}
 
@@ -191,7 +177,7 @@ func (bh *blobHandler) DeleteBlob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if bh.App.Config.Database.Enabled {
-		if err := dbDeleteBlob(bh, bh.db, bh.Repository.Named().Name(), bh.Digest, bh.App.Config.Database.Experimental.Fallback); err != nil {
+		if err := dbDeleteBlob(bh, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
 			e := fmt.Errorf("failed to delete blob in database: %v", err)
 			bh.Errors = append(bh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 			return

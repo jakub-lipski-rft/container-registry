@@ -52,7 +52,7 @@ func TestDeleteTagDB(t *testing.T) {
 
 	// Test
 
-	err = dbDeleteTag(env.ctx, env.db, r.Path, tag.Name, false)
+	err = dbDeleteTag(env.ctx, env.db, r.Path, tag.Name)
 	require.NoError(t, err)
 
 	// the tag shouldn't be there
@@ -65,17 +65,8 @@ func TestDeleteTagDB_RepositoryNotFound(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
-	err := dbDeleteTag(env.ctx, env.db, "foo", "bar", false)
+	err := dbDeleteTag(env.ctx, env.db, "foo", "bar")
 	require.Error(t, err, "repository not found in database")
-
-}
-
-func TestDeleteTagDB_RepositoryNotFoundFallback(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	err := dbDeleteTag(env.ctx, env.db, "foo", "bar", true)
-	require.NoError(t, err)
 
 }
 
@@ -89,20 +80,6 @@ func TestDeleteTagDB_TagNotFound(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	err = dbDeleteTag(env.ctx, env.db, r.Path, "bar", false)
+	err = dbDeleteTag(env.ctx, env.db, r.Path, "bar")
 	require.Error(t, err, "repository not found in database")
-}
-
-func TestDeleteTagDB_TagNotFoundFallback(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	// build test repository
-	rStore := datastore.NewRepositoryStore(env.db)
-	r, err := rStore.CreateByPath(env.ctx, "foo")
-	require.NoError(t, err)
-	require.NotNil(t, r)
-
-	err = dbDeleteTag(env.ctx, env.db, r.Path, "bar", true)
-	require.NoError(t, err)
 }

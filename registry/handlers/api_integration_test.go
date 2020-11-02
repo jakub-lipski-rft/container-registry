@@ -83,10 +83,6 @@ func withSharedInMemoryDriver(name string) configOpt {
 	}
 }
 
-func withFilesystemFallback(config *configuration.Configuration) {
-	config.Database.Experimental.Fallback = true
-}
-
 var headerConfig = http.Header{
 	"X-Content-Type-Options": []string{"nosniff"},
 }
@@ -518,50 +514,6 @@ func TestBlobAPI_Get_BlobNotInDatabase(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
-func TestBlobAPI_Get_BlobNotInDatabaseFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withFilesystemFallback)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// Disable the database so writes only go to the filesytem.
-	env.config.Database.Enabled = false
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// Enable the database again so that reads first check the database.
-	env.config.Database.Enabled = true
-
-	// fetch layer
-	res, err := http.Get(blobURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, res.StatusCode)
-
-	// verify response headers
-	_, err = args.layerFile.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(args.layerFile)
-	require.NoError(t, err)
-
-	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
-	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
-	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
-	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
-	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
-
-	// verify response body
-	v := args.layerDigest.Verifier()
-	_, err = io.Copy(v, res.Body)
-	require.NoError(t, err)
-	require.True(t, v.Verified())
-}
-
 func TestBlobAPI_Get_RepositoryNotFound(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -720,38 +672,6 @@ func TestBlobAPI_Delete(t *testing.T) {
 	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
 
 	// delete blob link from repository
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusAccepted, res.StatusCode)
-
-	// test
-	res, err = http.Head(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	require.Equal(t, http.NoBody, res.Body)
-}
-
-func TestBlobAPI_Delete_FilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withDelete, withFilesystemFallback)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// Disable the database so writes only go to the filesytem.
-	env.config.Database.Enabled = false
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// Enable the database again so that reads first check the database.
-	env.config.Database.Enabled = true
-
-	// delete blob link from repository, should work even though the blob
-	// was never present in the database.
 	res, err := httpDelete(location)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusAccepted, res.StatusCode)
@@ -2048,73 +1968,6 @@ func TestManifestAPI_Get_Schema2LayersAndConfigNotInDatabase(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Get_Schema2LayersAndConfigNotInDatabaseFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withFilesystemFallback)
-	defer env.Shutdown()
-
-	tagName := "schema2fallbacktag"
-	repoPath := "schema2/fallback"
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
-
-	// Build URLs.
-	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
-	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	tt := []struct {
-		name        string
-		manifestURL string
-		etag        string
-	}{
-		{
-			name:        "by tag",
-			manifestURL: tagURL,
-		},
-		{
-			name:        "by digest",
-			manifestURL: digestURL,
-		},
-	}
-
-	for _, test := range tt {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", test.manifestURL, nil)
-			require.NoError(t, err)
-
-			req.Header.Set("Accept", schema2.MediaTypeManifest)
-			if test.etag != "" {
-				req.Header.Set("If-None-Match", test.etag)
-			}
-
-			resp, err := http.DefaultClient.Do(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			require.Equal(t, http.StatusOK, resp.StatusCode)
-			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-			require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
-			require.Equal(t, fmt.Sprintf(`"%s"`, dgst), resp.Header.Get("ETag"))
-
-			var fetchedManifest *schema2.DeserializedManifest
-			dec := json.NewDecoder(resp.Body)
-
-			err = dec.Decode(&fetchedManifest)
-			require.NoError(t, err)
-
-			require.EqualValues(t, deserializedManifest, fetchedManifest)
-		})
-	}
-}
-
 func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -2345,35 +2198,6 @@ func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Put_Schema2LayersNotInDatabaseFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withFilesystemFallback)
-	defer env.Shutdown()
-
-	tagName := "schema2fallbacktag"
-	repoPath := "schema2/fallback"
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, writeToFilesystemOnly)
-
-	// Build URLs.
-	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
-	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp := putManifest(t, "putting manifest no error", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-	require.Equal(t, digestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
-}
-
 func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentInDatabase(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -2446,88 +2270,6 @@ func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentIn
 	resp := putManifest(t, "putting manifest, layers not associated with repository", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
-}
-
-func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentInDatabaseFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withFilesystemFallback)
-	defer env.Shutdown()
-
-	tagName := "schema2fallbackmissinglayerstag"
-	repoPath := "schema2/fallbackmissinglayers"
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	repoRef, err := reference.WithName(repoPath)
-	require.NoError(t, err)
-
-	manifest := &schema2.Manifest{
-		Versioned: manifest.Versioned{
-			SchemaVersion: 2,
-			MediaType:     schema2.MediaTypeManifest,
-		},
-	}
-
-	// Create a manifest config and push up its content.
-	cfgPayload, cfgDesc := schema2Config()
-	uploadURLBase, _ := startPushLayer(t, env, repoRef)
-	pushLayer(t, env.builder, repoRef, cfgDesc.Digest, uploadURLBase, bytes.NewReader(cfgPayload))
-	manifest.Config = cfgDesc
-
-	// Create and push up 2 random layers to an unrelated repo so that they are
-	// present within the database, but not associated with the manifest's repository.
-	// Then push them to the normal repository with the database disabled.
-	manifest.Layers = make([]distribution.Descriptor, 2)
-
-	fakeRepoRef, err := reference.WithName("fakerepo")
-	require.NoError(t, err)
-
-	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		// Save the layer content as pushLayer exhausts the io.ReadSeeker
-		layerBytes, err := ioutil.ReadAll(rs)
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
-
-		uploadURLBase, _ := startPushLayer(t, env, fakeRepoRef)
-		pushLayer(t, env.builder, fakeRepoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
-
-		// Disable the database so writes only go to the filesytem.
-		env.config.Database.Enabled = false
-
-		uploadURLBase, _ = startPushLayer(t, env, repoRef)
-		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
-
-		// Enable the database again so that reads first check the database.
-		env.config.Database.Enabled = true
-
-		manifest.Layers[i] = distribution.Descriptor{
-			Digest:    dgst,
-			MediaType: schema2.MediaTypeLayer,
-		}
-	}
-
-	deserializedManifest, err := schema2.FromStruct(*manifest)
-	require.NoError(t, err)
-
-	// Build URLs.
-	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
-	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp := putManifest(t, "putting manifest no error", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-	require.Equal(t, digestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 }
 
 func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
@@ -3086,28 +2828,6 @@ func TestManifestAPI_Delete_Schema2(t *testing.T) {
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 }
 
-func TestManifestAPI_Delete_Schema2RepositoryNotInDatabaseFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withDelete, withFilesystemFallback)
-	defer env.Shutdown()
-
-	tagName := "schema2deletefallbacktag"
-	repoPath := "schema2/deletefallback"
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
-
-	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp, err := httpDelete(manifestDigestURL)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	require.Equal(t, http.StatusAccepted, resp.StatusCode)
-}
-
 func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
 	env := newTestEnv(t, withDelete)
 	defer env.Shutdown()
@@ -3132,32 +2852,6 @@ func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
-}
-
-func TestManifestAPI_Delete_Schema2ManifestNotInDatabaseFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withDelete, withFilesystemFallback)
-	defer env.Shutdown()
-
-	tagName := "schema2deletefallbacktag"
-	repoPath := "schema2/deletefallback"
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// Push a random schema 2 manifest to the repository so that it is present in
-	// the database, so only the manifest is not present in the database.
-	seedRandomSchema2Manifest(t, env, repoPath, putByDigest)
-
-	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
-
-	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp, err := httpDelete(manifestDigestURL)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 }
 
 func TestManifestAPI_Put_OCIByTag(t *testing.T) {
@@ -3400,36 +3094,6 @@ func TestManifestAPI_Put_OCIImageIndexByTagManifestsNotPresentInDatabase(t *test
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
-func TestManifestAPI_Put_OCIImageIndexByTagManifestsNotPresentInDatabaseFilesystemFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withFilesystemFallback)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	tagName := "ociindexmissingmanifeststag"
-	repoPath := "ociindex/missingmanifests"
-
-	// putRandomOCIImageIndex with putByTag tests that the manifest put happened without issue.
-	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, writeToFilesystemOnly)
-
-	// Build URLs.
-	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
-	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	resp := putManifest(t, "putting oci image index no error", tagURL, v1.MediaTypeImageIndex, deserializedManifest.ManifestList)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-	require.Equal(t, digestURL, resp.Header.Get("Location"))
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-	dgst := digest.FromBytes(payload)
-	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
-}
-
 func TestManifestAPI_Get_OCIIndexNonMatchingEtag(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -3573,73 +3237,6 @@ func TestManifestAPI_Get_OCIIndexMatchingEtag(t *testing.T) {
 			require.Equal(t, http.StatusNotModified, resp.StatusCode)
 			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
 			require.Equal(t, http.NoBody, resp.Body)
-		})
-	}
-}
-
-func TestManifestAPI_Get_OCIIndexFilesystemFallback(t *testing.T) {
-	env := newTestEnv(t, withFilesystemFallback)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	tagName := "ociindexfallbacktag"
-	repoPath := "ociindex/fallback"
-
-	deserializedManifest := seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName), writeToFilesystemOnly)
-
-	// Build URLs.
-	tagURL := buildManifestTagURL(t, env, repoPath, tagName)
-	digestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
-
-	_, payload, err := deserializedManifest.Payload()
-	require.NoError(t, err)
-
-	dgst := digest.FromBytes(payload)
-
-	tt := []struct {
-		name        string
-		manifestURL string
-		etag        string
-	}{
-		{
-			name:        "by tag",
-			manifestURL: tagURL,
-		},
-		{
-			name:        "by digest",
-			manifestURL: digestURL,
-		},
-	}
-
-	for _, test := range tt {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", test.manifestURL, nil)
-			require.NoError(t, err)
-
-			req.Header.Set("Accept", v1.MediaTypeImageIndex)
-			if test.etag != "" {
-				req.Header.Set("If-None-Match", test.etag)
-			}
-
-			resp, err := http.DefaultClient.Do(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			require.Equal(t, http.StatusOK, resp.StatusCode)
-			require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
-			require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
-			require.Equal(t, fmt.Sprintf(`"%s"`, dgst), resp.Header.Get("ETag"))
-
-			var fetchedManifest *manifestlist.DeserializedManifestList
-			dec := json.NewDecoder(resp.Body)
-
-			err = dec.Decode(&fetchedManifest)
-			require.NoError(t, err)
-
-			require.EqualValues(t, deserializedManifest, fetchedManifest)
 		})
 	}
 }
