@@ -632,6 +632,34 @@ func TestMigrator_Status_Full(t *testing.T) {
 	}
 }
 
+func TestMigrator_Status_PostDeployment(t *testing.T) {
+	db, err := testutil.NewDB()
+	require.NoError(t, err)
+	defer cleanupDB(t, db)
+
+	m := migrations.NewMigrator(db.DB, migrations.Source(testmigrations.All()))
+	_, err = m.Up()
+	require.NoError(t, err)
+
+	all := testmigrations.All()
+
+	statuses, err := m.Status()
+	require.NoError(t, err)
+	require.Len(t, statuses, len(all))
+
+	// See migrations/testdata/fixtures/
+	postDeploymentID := "20201027124302_create_post_migration_test_two_table"
+	standardID := "20200319131542_create_manifests_test_table"
+
+	postDeploymentStatus := statuses[postDeploymentID]
+	require.NotNil(t, postDeploymentStatus)
+	require.True(t, postDeploymentStatus.PostDeployment)
+
+	standardStatus := statuses[standardID]
+	require.NotNil(t, standardStatus)
+	require.False(t, standardStatus.PostDeployment)
+}
+
 func TestMigrator_Status_Unknown(t *testing.T) {
 	db, err := testutil.NewDB()
 	require.NoError(t, err)

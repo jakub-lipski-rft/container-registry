@@ -361,6 +361,10 @@ var MigrateStatusCmd = &cobra.Command{
 				name += " (unknown)"
 			}
 
+			if statuses[id].PostDeployment {
+				name += " (post deployment)"
+			}
+
 			var appliedAt string
 			if statuses[id].AppliedAt != nil {
 				appliedAt = statuses[id].AppliedAt.String()
