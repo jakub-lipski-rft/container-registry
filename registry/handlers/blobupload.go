@@ -61,7 +61,7 @@ type blobUploadHandler struct {
 	State blobUploadState
 }
 
-func dbMountBlob(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, fromRepoPath, toRepoPath string, d digest.Digest, fallback bool) error {
+func dbMountBlob(ctx context.Context, db datastore.Queryer, blobStatter distribution.BlobStatter, fromRepoPath, toRepoPath string, d digest.Digest) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
 		"source":      fromRepoPath,
 		"destination": toRepoPath,
@@ -70,7 +70,7 @@ func dbMountBlob(ctx context.Context, db datastore.Queryer, blobStatter distribu
 	log.Debug("cross repository blob mounting")
 
 	// find source blob from source repository
-	b, err := dbFindRepositoryBlob(ctx, db, blobStatter, distribution.Descriptor{Digest: d}, fromRepoPath, fallback)
+	b, err := dbFindRepositoryBlob(ctx, db, distribution.Descriptor{Digest: d}, fromRepoPath)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		if ebm, ok := err.(distribution.ErrBlobMounted); ok {
 			if buh.Config.Database.Enabled {
-				if err = dbMountBlob(buh, buh.db, blobs, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest, buh.App.Config.Database.Experimental.Fallback); err != nil {
+				if err = dbMountBlob(buh, buh.db, blobs, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
 					e := fmt.Errorf("failed to mount blob in database: %v", err)
 					buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
 				}

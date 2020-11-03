@@ -1207,23 +1207,6 @@ database:
 	testParameter(t, yml, "REGISTRY_DATABASE_POOL_MAXLIFETIME", tt, validator)
 }
 
-func TestParseDatabaseExperimental_Fallback(t *testing.T) {
-	yml := `
-version: 0.1
-storage: inmemory
-database:
-  experimental:
-    fallback: %s
-`
-	tt := boolParameterTests(false)
-
-	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, strconv.FormatBool(got.Database.Experimental.Fallback))
-	}
-
-	testParameter(t, yml, "REGISTRY_DATABASE_EXPERIMENTAL_FALLBACK", tt, validator)
-}
-
 func TestParseReportingSentry_Enabled(t *testing.T) {
 	yml := `
 version: 0.1

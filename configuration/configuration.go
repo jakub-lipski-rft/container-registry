@@ -340,11 +340,7 @@ type Database struct {
 		MaxLifetime time.Duration `yaml:"maxlifetime,omitempty"`
 	} `yaml:"pool,omitempty"`
 	// Experimental enables behavior of experimental features related to the database.
-	Experimental struct {
-		// Fallback instructs the registry to search the filesystem for metadata
-		// if that metadata is not found within the database.
-		Fallback bool `yaml:"fallback,omitempty"`
-	}
+	Experimental struct{}
 }
 
 // LogHook is composed of hook Level and Type.
