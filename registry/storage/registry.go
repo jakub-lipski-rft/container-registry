@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"github.com/docker/distribution"
@@ -27,6 +28,7 @@ type registry struct {
 	manifestURLs                 manifestURLs
 	driver                       storagedriver.StorageDriver
 	db                           *datastore.DB
+	redirectExceptions           []*regexp.Regexp
 }
 
 // manifestURLs holds regular expressions for controlling manifest URL allowlisting
@@ -43,6 +45,24 @@ type RegistryOption func(*registry) error
 func EnableRedirect(registry *registry) error {
 	registry.blobServer.redirect = true
 	return nil
+}
+
+// EnableRedirectWithExceptions enables redirections except for repositories
+// whose paths match any of the exceptions.
+func EnableRedirectWithExceptions(exceptions []string) RegistryOption {
+	return func(registry *registry) error {
+		registry.blobServer.redirect = true
+
+		for _, e := range exceptions {
+			r, err := regexp.Compile(e)
+			if err != nil {
+				return fmt.Errorf("configuring storage redirect exception: %v", err)
+			}
+
+			registry.redirectExceptions = append(registry.redirectExceptions, r)
+		}
+		return nil
+	}
 }
 
 // EnableDelete is a functional option for NewRegistry. It enables deletion on
@@ -329,10 +349,23 @@ func (repo *repository) Blobs(ctx context.Context) distribution.BlobStore {
 		statter = repo.registry.blobDescriptorServiceFactory.BlobAccessController(statter)
 	}
 
+	// Shallow copy is fine, we only care about the value of blobServer.redirect
+	// for the purpose of conditionally disabling redirection for repositories.
+	blobServer := *repo.blobServer
+
+	if blobServer.redirect {
+		for _, exception := range repo.redirectExceptions {
+			if exception.MatchString(repo.name.Name()) {
+				blobServer.redirect = false
+				break
+			}
+		}
+	}
+
 	return &linkedBlobStore{
 		registry:             repo.registry,
 		blobStore:            repo.blobStore,
-		blobServer:           repo.blobServer,
+		blobServer:           &blobServer,
 		blobAccessController: statter,
 		repository:           repo,
 		ctx:                  ctx,
