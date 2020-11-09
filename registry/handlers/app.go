@@ -227,7 +227,20 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	if redirectDisabled {
 		log.Info("backend redirection disabled")
 	} else {
-		options = append(options, storage.EnableRedirect)
+		exceptions := config.Storage["redirect"]["exceptions"]
+		if exceptions, ok := exceptions.([]interface{}); ok && len(exceptions) > 0 {
+			s := make([]string, len(exceptions))
+			for i, v := range exceptions {
+				s[i] = fmt.Sprint(v)
+			}
+
+			log.WithField("exceptions", s).
+				Warn("redirect enabled with exceptions, this feature is temporary and will be removed in a future version")
+
+			options = append(options, storage.EnableRedirectWithExceptions(s))
+		} else {
+			options = append(options, storage.EnableRedirect)
+		}
 	}
 
 	if !config.Validation.Enabled {
