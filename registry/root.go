@@ -51,11 +51,11 @@ func init() {
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	ImportCmd.Flags().BoolVarP(&importDanglingBlobs, "dangling-blobs", "b", false, "import all blobs, regardless of whether they are referenced by a manifest or not")
 	ImportCmd.Flags().BoolVarP(&importDanglingManifests, "dangling-manifests", "m", false, "import all manifests, regardless of whether they are tagged or not")
-	ImportCmd.Flags().BoolVarP(&continueImport, "continue-import", "c", false, "allow import to be retried on a database which is already partially imported")
+	ImportCmd.Flags().BoolVarP(&requireEmptyDatabase, "require-empty-database", "e", false, "abort import if the database is not empty")
 }
 
 var (
-	continueImport          bool
+	requireEmptyDatabase    bool
 	debugAddr               string
 	dryRun                  bool
 	force                   bool
@@ -381,10 +381,9 @@ var MigrateStatusCmd = &cobra.Command{
 var ImportCmd = &cobra.Command{
 	Use:   "import",
 	Short: "Import filesystem metadata into the database",
-	Long: "Import filesystem metadata into the database. This should only be\n" +
-		"used for an one-off migration, starting with an empty database.\n" +
+	Long: "Import filesystem metadata into the database.\n" +
 		"By default, dangling blobs and untagged manifests are not imported.\n " +
-		"Imports may be retried with the --continue-import flag set to true.\n " +
+		"Individual repositories may be imported via the --repository option.\n " +
 		"This tool can not be used with the parallelwalk storage configuration enabled.",
 	Run: func(cmd *cobra.Command, args []string) {
 		config, err := resolveConfiguration(args)
@@ -441,7 +440,7 @@ var ImportCmd = &cobra.Command{
 		if dryRun {
 			opts = append(opts, datastore.WithDryRun)
 		}
-		if !continueImport {
+		if requireEmptyDatabase {
 			opts = append(opts, datastore.WithRequireEmptyDatabase)
 		}
 

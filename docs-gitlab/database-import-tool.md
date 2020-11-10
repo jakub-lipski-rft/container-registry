@@ -15,19 +15,14 @@ form.
 
 ### Options
 
-#### Continue Import
+#### Require Empty Database
 
-The `--continue-import` option allows the user to bypass the safety check which
-prevent the import command from running on a database which already contains
-some information. This option is useful for very large registries where it is
-not feasible to import all registry data in one single period of read-only mode
-or downtime. Or for when only a subset of repositories should be imported.
-
-This also possible to use this option in conjunction with a registry which is
-configured to use the database and is in read/write mode and taking new
-requests. In this way, the importer will catch up previously pushed images and
-blobs without downtime. This relies on filesystem mirroring which is a
-temporary feature for testing that will be removed in a future version.
+The `--require-empty-database` option allows the user to enable a safety check
+which prevents the import command from running on a database which already
+contains some information. This option is useful for relatively small registries
+where it is possible to import all registry data in one single period of
+read-only mode or downtime. Larger registries will likely need to break up the
+import process over multiple sessions.
 
 #### Dangling Blobs
 
@@ -53,9 +48,9 @@ are added while the dry run is in progress.
 #### Repository
 
 The `--repository` option allow the user to pass the path to a particular
-repository to be imported. This option can be combined with the
-`--continue-import` to import a subset of repositories via repeated calls to
-the import command, passing in a new repository path each time.
+repository to be imported. This option enables the user to import a subset of
+repositories via repeated calls to the import command, passing in a new
+repository path each time.
 
 Note: The `--dangling-blobs` option is ignored when this option is specified.
 
