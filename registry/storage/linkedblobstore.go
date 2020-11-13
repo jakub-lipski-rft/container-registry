@@ -31,6 +31,7 @@ type linkedBlobStore struct {
 	ctx                    context.Context // only to be used where context can't come through method args
 	deleteEnabled          bool
 	resumableDigestEnabled bool
+	mirrorFS               bool
 
 	// linkPathFns specifies one or more path functions allowing one to
 	// control the repository blob link set to which the blob store
@@ -332,6 +333,7 @@ func (lbs *linkedBlobStore) newBlobUpload(ctx context.Context, uuid, path string
 		db:                     lbs.registry.db,
 		path:                   path,
 		resumableDigestEnabled: lbs.resumableDigestEnabled,
+		mirrorFS:               lbs.mirrorFS,
 	}
 
 	return bw, nil

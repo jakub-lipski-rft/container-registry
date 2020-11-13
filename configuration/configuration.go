@@ -69,6 +69,9 @@ type Configuration struct {
 	// Database is the configuration for the registry's metadata database
 	Database Database `yaml:"database"`
 
+	// Migration is the configuration for registry migration-related features.
+	Migration Migration `yaml:"migration,omitempty"`
+
 	// Auth allows configuration of various authorization methods that may be
 	// used to gate requests.
 	Auth Auth `yaml:"auth,omitempty"`
@@ -339,8 +342,13 @@ type Database struct {
 		// lazily before reuse. Defaults to 0 (unlimited).
 		MaxLifetime time.Duration `yaml:"maxlifetime,omitempty"`
 	} `yaml:"pool,omitempty"`
-	// Experimental enables behavior of experimental features related to the database.
-	Experimental struct{}
+}
+
+// Migration configures behavior of features related migration from
+// filesystem metadata to database metadata.
+type Migration struct {
+	// DisableMirrorFS disables registry metadata writes to the filesystem.
+	DisableMirrorFS bool `yaml:"disablemirrorfs,omitempty"`
 }
 
 // LogHook is composed of hook Level and Type.

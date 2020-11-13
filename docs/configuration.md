@@ -188,6 +188,8 @@ database:
     maxlifetime: 5m
   experimental:
     fallback: true
+migration:
+  disablemirrorfs: true
 auth:
   silly:
     realm: silly-realm
@@ -666,6 +668,20 @@ database:
 | `sslcert`  | no       | The PEM encoded certificate file path. |
 | `sslkey`   | no       | The PEM encoded key file path. |
 | `sslrootcert`  | no       | The PEM encoded root certificate file path. |
+
+## `migration`
+
+The `migration` subsection configures options related to migration of the
+registry from filesystem backed to database backed metadata storage.
+
+```none
+migration:
+  disablemirrorfs: true
+```
+
+| Parameter     | Required | Description                                                                                                                                                                                                                                          |
+|----------- |----------|------------------
+| `disablemirrorfs` | no       | When set to `true`, the registry does not write metadata to the filesystem. Defaults to `false`. Must be used in combination with the metadata database.
 
 ### `pool`
 

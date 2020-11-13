@@ -77,6 +77,10 @@ func withReadOnly(config *configuration.Configuration) {
 	config.Storage["maintenance"]["readonly"] = map[interface{}]interface{}{"enabled": true}
 }
 
+func disableMirrorFS(config *configuration.Configuration) {
+	config.Migration.DisableMirrorFS = true
+}
+
 func withSharedInMemoryDriver(name string) configOpt {
 	return func(config *configuration.Configuration) {
 		config.Storage["sharedinmemorydriver"] = configuration.Parameters{"name": name}

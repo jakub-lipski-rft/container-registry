@@ -320,6 +320,10 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 
 		app.db = db
 		options = append(options, storage.Database(app.db))
+
+		if config.Migration.DisableMirrorFS {
+			options = append(options, storage.DisableMirrorFS)
+		}
 	}
 
 	// configure storage caches

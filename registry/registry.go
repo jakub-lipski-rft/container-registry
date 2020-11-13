@@ -528,7 +528,19 @@ func resolveConfiguration(args []string) (*configuration.Configuration, error) {
 		return nil, fmt.Errorf("parsing %s: %w", configurationPath, err)
 	}
 
+	if err := validate(config); err != nil {
+		return nil, fmt.Errorf("validating configuration: %w", err)
+	}
+
 	return config, nil
+}
+
+func validate(config *configuration.Configuration) error {
+	if !config.Database.Enabled && config.Migration.DisableMirrorFS {
+		return fmt.Errorf("filesystem mirroring may only be disabled when database is enabled")
+	}
+
+	return nil
 }
 
 func nextProtos(config *configuration.Configuration) []string {
