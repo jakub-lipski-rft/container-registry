@@ -9,6 +9,7 @@
 - [Database Development Guidelines](database-dev-guidelines.md)
 - [Push/pull request flow](push-pull-request-flow.md)
 - [Database Import](database-import-tool.md)
+- [Authentication request flow](auth-request-flow.md)
 
 ## Differences From Upstream
 
