@@ -23,6 +23,7 @@ type registry struct {
 	deleteEnabled                bool
 	schema1Enabled               bool
 	resumableDigestEnabled       bool
+	mirrorFS                     bool
 	schema1SigningKey            libtrust.PrivateKey
 	blobDescriptorServiceFactory distribution.BlobDescriptorServiceFactory
 	manifestURLs                 manifestURLs
@@ -148,6 +149,13 @@ func Database(db *datastore.DB) RegistryOption {
 	}
 }
 
+// DisableWriteMetadataToFS is a functional option for NewRegistry. It instructs
+// the blob metadata not to be linked to the filesystem metadata.
+func DisableMirrorFS(registry *registry) error {
+	registry.mirrorFS = false
+	return nil
+}
+
 // NewRegistry creates a new registry instance from the provided driver. The
 // resulting registry may be shared by multiple goroutines but is cheap to
 // allocate. If the Redirect option is specified, the backend blob server will
@@ -172,6 +180,7 @@ func NewRegistry(ctx context.Context, driver storagedriver.StorageDriver, option
 		},
 		statter:                statter,
 		resumableDigestEnabled: true,
+		mirrorFS:               true,
 		driver:                 driver,
 	}
 
@@ -375,5 +384,6 @@ func (repo *repository) Blobs(ctx context.Context) distribution.BlobStore {
 		linkPathFns:            []linkPathFunc{blobLinkPath},
 		deleteEnabled:          repo.registry.deleteEnabled,
 		resumableDigestEnabled: repo.resumableDigestEnabled,
+		mirrorFS:               repo.mirrorFS,
 	}
 }

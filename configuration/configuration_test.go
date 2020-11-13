@@ -68,6 +68,9 @@ var configStruct = Configuration{
 		Schema:   "public",
 		SSLMode:  "disable",
 	},
+	Migration: Migration{
+		DisableMirrorFS: true,
+	},
 	Auth: Auth{
 		"silly": Parameters{
 			"realm":   "silly",
@@ -271,6 +274,7 @@ func (suite *ConfigSuite) TestParseSimple(c *C) {
 func (suite *ConfigSuite) TestParseInmemory(c *C) {
 	suite.expectedConfig.Storage = Storage{"inmemory": Parameters{}}
 	suite.expectedConfig.Database = Database{}
+	suite.expectedConfig.Migration = Migration{}
 	suite.expectedConfig.Reporting = Reporting{}
 	suite.expectedConfig.Log.Fields = nil
 
@@ -290,6 +294,7 @@ func (suite *ConfigSuite) TestParseIncomplete(c *C) {
 	suite.expectedConfig.Log.Fields = nil
 	suite.expectedConfig.Storage = Storage{"filesystem": Parameters{"rootdirectory": "/tmp/testroot"}}
 	suite.expectedConfig.Database = Database{}
+	suite.expectedConfig.Migration = Migration{}
 	suite.expectedConfig.Auth = Auth{"silly": Parameters{"realm": "silly"}}
 	suite.expectedConfig.Reporting = Reporting{}
 	suite.expectedConfig.Notifications = Notifications{}
@@ -673,6 +678,22 @@ func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
 	config, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
 	c.Assert(err, IsNil)
 	c.Assert(config, DeepEquals, suite.expectedConfig)
+}
+
+func TestParseMigrationDisabledMirrorFS(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+migration:
+  disablemirrorfs: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Migration.DisableMirrorFS))
+	}
+
+	testParameter(t, yml, "REGISTRY_MIGRATION_DISABLEMIRRORFS", tt, validator)
 }
 
 // TestParseInvalidVersion validates that the parser will fail to parse a newer configuration
