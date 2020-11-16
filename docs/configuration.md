@@ -999,6 +999,10 @@ registry.
 
 ### `tls`
 
+**DEPRECATED:** TLS 1.0 and 1.1 support is deprecated and will be removed by January 22nd, 2021, and TLS 1.2 will become
+the default. Please use TLS 1.2 or 1.3 instead. See https://gitlab.com/gitlab-org/container-registry/-/issues/244 for
+more details.
+
 The `tls` structure within `http` is **optional**. Use this to configure TLS
 for the server. If you already have a web server running on
 the same host as the registry, you may prefer to configure TLS on that web server

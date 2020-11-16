@@ -5,6 +5,7 @@
 - configuration: Deprecate NewRelic support, to be removed by January 22nd, 2021
 - configuration: Deprecate logstash and combined log formats, to be removed by January 22nd, 2021
 - registry/api: Deprecate Docker Schema v1 compatibility, to be removed by January 22nd, 2021
+- configuration: Deprecate TLS 1.0 and TLS 1.1 support, to be removed by January 22nd, 2021
 
 ## Added
 - registry: Experimental PostgreSQL metadata database (incomplete, in progress)
