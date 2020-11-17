@@ -40,25 +40,6 @@ VALUES (
            'a-test-group/bar',
            5);
 
-INSERT INTO "media_types" (
-    "id",
-    "media_type")
-VALUES (
-           1,
-           'application/vnd.docker.image.rootfs.diff.tar.gzip'),
-       (
-           2,
-           'application/vnd.docker.container.image.v1+json'),
-       (
-           3,
-           'application/vnd.docker.distribution.manifest.v2+json'),
-       (
-           4,
-           'application/vnd.docker.distribution.manifest.v1+json'),
-       (
-           5,
-           'application/vnd.docker.distribution.manifest.list.v2+json');
-
 INSERT INTO "blobs" (
     "media_type_id",
     "digest",
