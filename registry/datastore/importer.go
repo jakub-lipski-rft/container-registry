@@ -2,7 +2,6 @@ package datastore
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -23,14 +22,13 @@ import (
 // Importer populates the registry database with filesystem metadata. This is only meant to be used for an initial
 // one-off migration, starting with an empty database.
 type Importer struct {
-	storageDriver      driver.StorageDriver
-	registry           distribution.Namespace
-	db                 *DB
-	repositoryStore    *repositoryStore
-	configurationStore *configurationStore
-	manifestStore      *manifestStore
-	tagStore           *tagStore
-	blobStore          *blobStore
+	storageDriver   driver.StorageDriver
+	registry        distribution.Namespace
+	db              *DB
+	repositoryStore *repositoryStore
+	manifestStore   *manifestStore
+	tagStore        *tagStore
+	blobStore       *blobStore
 
 	importDanglingManifests bool
 	importDanglingBlobs     bool
@@ -93,15 +91,14 @@ func (imp *Importer) beginTx(ctx context.Context) (*Tx, error) {
 }
 
 func (imp *Importer) loadStores(db Queryer) {
-	imp.configurationStore = NewConfigurationStore(db)
 	imp.manifestStore = NewManifestStore(db)
 	imp.blobStore = NewBlobStore(db)
 	imp.repositoryStore = NewRepositoryStore(db)
 	imp.tagStore = NewTagStore(db)
 }
 
-func (imp *Importer) findOrCreateDBManifest(ctx context.Context, m *models.Manifest) (*models.Manifest, error) {
-	dbManifest, err := imp.manifestStore.FindByDigest(ctx, m.Digest)
+func (imp *Importer) findOrCreateDBManifest(ctx context.Context, dbRepo *models.Repository, m *models.Manifest) (*models.Manifest, error) {
+	dbManifest, err := imp.repositoryStore.FindManifestByDigest(ctx, dbRepo, m.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("searching for manifest: %w", err)
 	}
@@ -143,7 +140,7 @@ func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distributio
 	return dbLayer, nil
 }
 
-func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, d distribution.Descriptor, payload []byte) (*models.Configuration, error) {
+func (imp *Importer) findOrCreateDBManifestConfigBlob(ctx context.Context, d distribution.Descriptor, payload []byte) (*models.Blob, error) {
 	dbBlob, err := imp.blobStore.FindByDigest(ctx, d.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("searching for configuration blob: %w", err)
@@ -159,22 +156,7 @@ func (imp *Importer) findOrCreateDBManifestConfig(ctx context.Context, d distrib
 		}
 	}
 
-	dbConfig, err := imp.configurationStore.FindByDigest(ctx, d.Digest)
-	if err != nil {
-		return nil, fmt.Errorf("searching for configuration: %w", err)
-	}
-
-	if dbConfig == nil {
-		dbConfig = &models.Configuration{
-			BlobID:  dbBlob.ID,
-			Payload: payload,
-		}
-		if err := imp.configurationStore.Create(ctx, dbConfig); err != nil {
-			return nil, fmt.Errorf("creating configuration: %w", err)
-		}
-	}
-
-	return dbConfig, nil
+	return dbBlob, nil
 }
 
 func (imp *Importer) findOrCreateDBTag(ctx context.Context, dbRepo *models.Repository, dbTag *models.Tag) {
@@ -191,7 +173,7 @@ func (imp *Importer) findOrCreateDBTag(ctx context.Context, dbRepo *models.Repos
 		return
 	}
 
-	if err := imp.tagStore.Create(ctx, dbTag); err != nil {
+	if err := imp.tagStore.CreateOrUpdate(ctx, dbTag); err != nil {
 		log.WithError(err).Error("creating tag")
 		return
 	}
@@ -206,7 +188,7 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 		return fmt.Errorf("associating layer blob with manifest: %w", err)
 	}
 
-	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbLayer); err != nil {
+	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbLayer.Digest); err != nil {
 		return fmt.Errorf("linking layer blob to repository: %w", err)
 	}
 
@@ -260,7 +242,8 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 
 func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *schema1.SignedManifest, dgst digest.Digest) (*models.Manifest, error) {
 	// find or create DB manifest
-	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
+	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
+		RepositoryID:  dbRepo.ID,
 		SchemaVersion: m.SchemaVersion,
 		MediaType:     schema1.MediaTypeManifest,
 		Digest:        dgst,
@@ -275,11 +258,6 @@ func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribut
 		return nil, fmt.Errorf("error importing layers: %w", err)
 	}
 
-	// associate manifest with repository
-	if err := imp.repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
-		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
-	}
-
 	return dbManifest, nil
 }
 
@@ -289,30 +267,35 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
 	}
 
-	// find or create DB configuration
+	// get configuration blob payload
 	blobStore := fsRepo.Blobs(ctx)
 	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
 	}
 
-	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, m.Config, configPayload)
+	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.Config, configPayload)
 	if err != nil {
 		return nil, err
 	}
 
 	// link configuration to repository
-	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, &models.Blob{ID: dbConfig.BlobID}); err != nil {
-		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
+	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbConfigBlob.Digest); err != nil {
+		return nil, fmt.Errorf("error associating configuration blob with repository: %w", err)
 	}
 
 	// find or create DB manifest
-	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
-		ConfigurationID: sql.NullInt64{Int64: dbConfig.ID, Valid: true},
-		SchemaVersion:   m.SchemaVersion,
-		MediaType:       m.MediaType,
-		Digest:          dgst,
-		Payload:         payload,
+	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
+		RepositoryID:  dbRepo.ID,
+		SchemaVersion: m.SchemaVersion,
+		MediaType:     m.MediaType,
+		Digest:        dgst,
+		Payload:       payload,
+		Configuration: &models.Configuration{
+			MediaType: dbConfigBlob.MediaType,
+			Digest:    dbConfigBlob.Digest,
+			Payload:   configPayload,
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -321,11 +304,6 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 	// import manifest layers
 	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.Layers); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
-	}
-
-	// associate repository with manifest
-	if err := imp.repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
-		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
 	}
 
 	return dbManifest, nil
@@ -337,30 +315,35 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
 	}
 
-	// find or create DB configuration
+	// get configuration blob payload
 	blobStore := fsRepo.Blobs(ctx)
 	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
 	}
 
-	dbConfig, err := imp.findOrCreateDBManifestConfig(ctx, m.Config, configPayload)
+	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.Config, configPayload)
 	if err != nil {
 		return nil, err
 	}
 
-	// link configuration to repository
-	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, &models.Blob{ID: dbConfig.BlobID}); err != nil {
-		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
+	// link configuration blob to repository
+	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbConfigBlob.Digest); err != nil {
+		return nil, fmt.Errorf("error associating configuration blob with repository: %w", err)
 	}
 
 	// find or create DB manifest
-	dbManifest, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
-		ConfigurationID: sql.NullInt64{Int64: dbConfig.ID, Valid: true},
-		SchemaVersion:   m.SchemaVersion,
-		MediaType:       v1.MediaTypeImageManifest,
-		Digest:          dgst,
-		Payload:         payload,
+	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
+		RepositoryID:  dbRepo.ID,
+		SchemaVersion: m.SchemaVersion,
+		MediaType:     v1.MediaTypeImageManifest,
+		Digest:        dgst,
+		Payload:       payload,
+		Configuration: &models.Configuration{
+			MediaType: dbConfigBlob.MediaType,
+			Digest:    dbConfigBlob.Digest,
+			Payload:   configPayload,
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -369,11 +352,6 @@ func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.
 	// import manifest layers
 	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.Layers); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
-	}
-
-	// associate repository with manifest
-	if err := imp.repositoryStore.AssociateManifest(ctx, dbRepo, dbManifest); err != nil {
-		return nil, fmt.Errorf("error associating manifest with repository: %w", err)
 	}
 
 	return dbManifest, nil
@@ -393,7 +371,8 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 	}
 
 	// create manifest list on DB
-	dbManifestList, err := imp.findOrCreateDBManifest(ctx, &models.Manifest{
+	dbManifestList, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
+		RepositoryID:  dbRepo.ID,
 		SchemaVersion: ml.SchemaVersion,
 		MediaType:     mediaType,
 		Digest:        dgst,
@@ -434,11 +413,6 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 			logrus.WithError(err).Error("associating manifest and manifest list")
 			continue
 		}
-	}
-
-	// associate repository and manifest list
-	if err := imp.repositoryStore.AssociateManifest(ctx, dbRepo, dbManifestList); err != nil {
-		return nil, fmt.Errorf("associating repository and manifest list: %w", err)
 	}
 
 	return dbManifestList, nil
@@ -524,7 +498,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 
 		// Find corresponding manifest in DB or filesystem.
 		var dbManifest *models.Manifest
-		dbManifest, err = imp.manifestStore.FindByDigest(ctx, desc.Digest)
+		dbManifest, err = imp.repositoryStore.FindManifestByDigest(ctx, dbRepo, desc.Digest)
 		if err != nil {
 			log.WithError(err).Error("finding tag manifest")
 			continue
@@ -606,10 +580,6 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	numConfigs, err := imp.configurationStore.Count(ctx)
-	if err != nil {
-		return nil, err
-	}
 	numBlobs, err := imp.blobStore.Count(ctx)
 	if err != nil {
 		return nil, err
@@ -620,11 +590,10 @@ func (imp *Importer) countRows(ctx context.Context) (map[string]int, error) {
 	}
 
 	count := map[string]int{
-		"repositories":   numRepositories,
-		"manifests":      numManifests,
-		"configurations": numConfigs,
-		"blobs":          numBlobs,
-		"tags":           numTags,
+		"repositories": numRepositories,
+		"manifests":    numManifests,
+		"blobs":        numBlobs,
+		"tags":         numTags,
 	}
 
 	return count, nil

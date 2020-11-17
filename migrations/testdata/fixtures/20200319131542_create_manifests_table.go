@@ -22,13 +22,13 @@ func init() {
                 media_type text NOT NULL,
                 CONSTRAINT pk_manifests_test PRIMARY KEY (id),
                 CONSTRAINT fk_manifests_test_configuration_id_configurations FOREIGN KEY (configuration_id) REFERENCES configurations_test (id) ON DELETE CASCADE,
-                CONSTRAINT uq_manifests_test_digest UNIQUE (digest),
-                CONSTRAINT ck_manifests_test_media_type_length CHECK ((char_length(media_type) <= 255))
+                CONSTRAINT unique_manifests_test_digest UNIQUE (digest),
+                CONSTRAINT check_manifests_test_media_type_length CHECK ((char_length(media_type) <= 255))
             )`,
-			"CREATE INDEX IF NOT EXISTS ix_manifests_test_configuration_id ON manifests_test (configuration_id) WHERE configuration_id IS NOT NULL",
+			"CREATE INDEX IF NOT EXISTS index_manifests_test_configuration_id ON manifests_test (configuration_id) WHERE configuration_id IS NOT NULL",
 		},
 		Down: []string{
-			"DROP INDEX IF EXISTS ix_manifests_test_configuration_id CASCADE",
+			"DROP INDEX IF EXISTS index_manifests_test_configuration_id CASCADE",
 			"DROP TABLE IF EXISTS manifests_test CASCADE",
 		},
 	}}

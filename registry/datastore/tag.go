@@ -19,9 +19,7 @@ type TagReader interface {
 
 // TagWriter is the interface that defines write operations for a tag store.
 type TagWriter interface {
-	Create(ctx context.Context, t *models.Tag) error
-	Update(ctx context.Context, t *models.Tag) error
-	Delete(ctx context.Context, id int64) error
+	CreateOrUpdate(ctx context.Context, t *models.Tag) error
 }
 
 // TagStore is the interface that a tag store should conform to.
@@ -141,78 +139,45 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 // Manifest finds a tag manifest. A tag can be associated with either a manifest or a manifest list.
 func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error) {
 	q := `SELECT
-			id,
-			configuration_id,
-			schema_version,
-			media_type,
-			encode(digest, 'hex') as digest,
-			payload,
-			created_at,
-			marked_at
+			m.id,
+			m.repository_id,
+			m.schema_version,
+			mt.media_type,
+			encode(m.digest, 'hex') as digest,
+			m.payload,
+			mtc.media_type as configuration_media_type,
+			encode(m.configuration_blob_digest, 'hex') as configuration_blob_digest,
+			m.configuration_payload,
+			m.created_at
 		FROM
-			manifests
+			manifests AS m
+			JOIN media_types AS mt ON mt.id = m.media_type_id
+			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
 		WHERE
-			id = $1`
-	row := s.db.QueryRowContext(ctx, q, t.ManifestID)
+			m.repository_id = $1
+			AND m.id = $2`
+	row := s.db.QueryRowContext(ctx, q, t.RepositoryID, t.ManifestID)
 
 	return scanFullManifest(row)
 }
 
-// Create saves a new Tag.
-func (s *tagStore) Create(ctx context.Context, t *models.Tag) error {
-	q := `INSERT INTO tags (name, repository_id, manifest_id)
-			VALUES ($1, $2, $3)
-		RETURNING
-			id, created_at`
+// CreateOrUpdate upsert a tag. A tag with a given name on a given repository may not exist (in which case it should be
+// inserted), already exist and point to the same manifest (in which case nothing needs to be done) or already exist but
+// points to a different manifest (in which case it should be updated).
+func (s *tagStore) CreateOrUpdate(ctx context.Context, t *models.Tag) error {
+	q := `INSERT INTO tags (repository_id, manifest_id, name)
+		   VALUES ($1, $2, $3)
+	   ON CONFLICT (repository_id, name)
+		   DO UPDATE SET
+			   manifest_id = EXCLUDED.manifest_id, updated_at = now()
+		   WHERE
+			   tags.manifest_id <> excluded.manifest_id
+	   RETURNING
+		   id, created_at, updated_at`
 
-	row := s.db.QueryRowContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID)
-	if err := row.Scan(&t.ID, &t.CreatedAt); err != nil {
+	row := s.db.QueryRowContext(ctx, q, t.RepositoryID, t.ManifestID, t.Name)
+	if err := row.Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt); err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("creating tag: %w", err)
-	}
-
-	return nil
-}
-
-// Update updates an existing Tag.
-func (s *tagStore) Update(ctx context.Context, t *models.Tag) error {
-	q := `UPDATE
-			tags
-		SET
-			(name, repository_id, manifest_id) = ($1, $2, $3)
-		WHERE
-			id = $4`
-
-	res, err := s.db.ExecContext(ctx, q, t.Name, t.RepositoryID, t.ManifestID, t.ID)
-	if err != nil {
-		return fmt.Errorf("updating tag: %w", err)
-	}
-
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("updating tag: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("tag not found")
-	}
-
-	return nil
-}
-
-// Delete deletes a Tag.
-func (s *tagStore) Delete(ctx context.Context, id int64) error {
-	q := "DELETE FROM tags WHERE id = $1"
-
-	res, err := s.db.ExecContext(ctx, q, id)
-	if err != nil {
-		return fmt.Errorf("deleting tag: %w", err)
-	}
-
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("deleting tag: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("tag not found")
 	}
 
 	return nil

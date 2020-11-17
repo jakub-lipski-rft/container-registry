@@ -175,16 +175,15 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return errors.New("repository not found in database")
 	}
 
-	t, err := rStore.FindTagByName(ctx, r, tagName)
+	found, err := rStore.DeleteTagByName(ctx, r, tagName)
 	if err != nil {
 		return err
 	}
-	if t == nil {
+	if !found {
 		return errors.New("tag not found in database")
 	}
 
-	tStore := datastore.NewTagStore(db)
-	return tStore.Delete(ctx, t.ID)
+	return nil
 }
 
 // DeleteTag deletes a tag for a specific image name.

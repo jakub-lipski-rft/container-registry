@@ -19,14 +19,14 @@ func init() {
                 CONSTRAINT pk_repository_blobs_test PRIMARY KEY (id),
                 CONSTRAINT fk_repository_blobs_test_repository_id_repositories FOREIGN KEY (repository_id) REFERENCES repositories_test (id) ON DELETE CASCADE,
                 CONSTRAINT fk_repository_blobs_test_blob_id_blobs FOREIGN KEY (blob_id) REFERENCES blobs_test (id) ON DELETE CASCADE,
-                CONSTRAINT uq_repository_blobs_test_repository_id_blob_id UNIQUE (repository_id, blob_id)
+                CONSTRAINT unique_repository_blobs_test_repository_id_blob_id UNIQUE (repository_id, blob_id)
             )`,
-			"CREATE INDEX IF NOT EXISTS ix_repository_blobs_test_repository_id ON repository_blobs_test (repository_id)",
-			"CREATE INDEX IF NOT EXISTS ix_repository_blobs_test_blob_id ON repository_blobs_test (blob_id)",
+			"CREATE INDEX IF NOT EXISTS index_repository_blobs_test_repository_id ON repository_blobs_test (repository_id)",
+			"CREATE INDEX IF NOT EXISTS index_repository_blobs_test_blob_id ON repository_blobs_test (blob_id)",
 		},
 		Down: []string{
-			"DROP INDEX IF EXISTS ix_repository_blobs_test_blob_id CASCADE",
-			"DROP INDEX IF EXISTS ix_repository_blobs_test_repository_id CASCADE",
+			"DROP INDEX IF EXISTS index_repository_blobs_test_blob_id CASCADE",
+			"DROP INDEX IF EXISTS index_repository_blobs_test_repository_id CASCADE",
 			"DROP TABLE IF EXISTS repository_blobs_test CASCADE",
 		},
 	}}

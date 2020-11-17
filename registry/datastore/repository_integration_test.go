@@ -448,25 +448,36 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 	local := mm[0].CreatedAt.Location()
 	expected := models.Manifests{
 		{
-			ID:              1,
-			ConfigurationID: sql.NullInt64{Int64: 1, Valid: true},
-			SchemaVersion:   2,
-			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-			Digest:          "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
-			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
-			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+			ID:            1,
+			RepositoryID:  3,
+			SchemaVersion: 2,
+			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:        "sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155",
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1640,"digest":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"}]}`),
+			Configuration: &models.Configuration{
+				MediaType: "application/vnd.docker.container.image.v1+json",
+				Digest:    "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
+				Payload:   json.RawMessage(`{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:e7d92cdc71feacf90708cb59182d0df1b911f8ae022d29e8e95d75ca6a99776a","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"7980908783eb05384926afb5ffad45856f65bc30029722a4be9f1eb3661e9c5e","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","echo \"1\" \u003e /data"],"Image":"sha256:e7d92cdc71feacf90708cb59182d0df1b911f8ae022d29e8e95d75ca6a99776a","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-03-02T12:21:53.8027967Z","docker_version":"19.03.5","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-03-02T12:21:53.8027967Z","created_by":"/bin/sh -c echo \"1\" \u003e /data"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:99cb4c5d9f96432a00201f4b14c058c6235e563917ba7af8ed6c4775afa5780f"]}}`),
+			},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
 		},
 		{
-			ID:              2,
-			ConfigurationID: sql.NullInt64{Int64: 2, Valid: true},
-			SchemaVersion:   2,
-			MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-			Digest:          "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
-			Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
-			CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
+			ID:            2,
+			RepositoryID:  3,
+			SchemaVersion: 2,
+			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+			Digest:        "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
+			Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+			Configuration: &models.Configuration{
+				MediaType: "application/vnd.docker.container.image.v1+json",
+				Digest:    "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
+				Payload:   json.RawMessage(`{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"cb78c8a8058712726096a7a8f80e6a868ffb514a07f4fef37639f42d99d997e4","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","echo \"2\" \u003e\u003e /data"],"Image":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-03-02T12:24:16.7039823Z","docker_version":"19.03.5","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-03-02T12:21:53.8027967Z","created_by":"/bin/sh -c echo \"1\" \u003e /data"},{"created":"2020-03-02T12:24:16.7039823Z","created_by":"/bin/sh -c echo \"2\" \u003e\u003e /data"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:99cb4c5d9f96432a00201f4b14c058c6235e563917ba7af8ed6c4775afa5780f","sha256:6322c07f5c6ad456f64647993dfc44526f4548685ee0f3d8f03534272b3a06d8"]}}`),
+			},
+			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", local),
 		},
 		{
-			ID:            5,
+			ID:            6,
+			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     manifestlist.MediaTypeManifestList,
 			Digest:        "sha256:dc27c897a7e24710a2821878456d56f3965df7cc27398460aa6f21f8b385d2d0",
@@ -512,7 +523,7 @@ func TestRepositoryStore_Tags(t *testing.T) {
 			ID:           8,
 			Name:         "rc2",
 			RepositoryID: 4,
-			ManifestID:   6,
+			ManifestID:   7,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 	}
@@ -550,7 +561,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           8,
 					Name:         "rc2",
 					RepositoryID: 4,
-					ManifestID:   6,
+					ManifestID:   7,
 				},
 				{
 					ID:           6,
@@ -581,7 +592,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           8,
 					Name:         "rc2",
 					RepositoryID: 4,
-					ManifestID:   6,
+					ManifestID:   7,
 				},
 			},
 		},
@@ -620,7 +631,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 					ID:           8,
 					Name:         "rc2",
 					RepositoryID: 4,
-					ManifestID:   6,
+					ManifestID:   7,
 				},
 				{
 					ID:           6,
@@ -811,15 +822,57 @@ func TestRepositoryStore_FindManifestByDigest(t *testing.T) {
 	require.NotNil(t, m)
 	// see testdata/fixtures/repository_manifests.sql
 	expected := &models.Manifest{
-		ID:              2,
-		ConfigurationID: sql.NullInt64{Int64: 2, Valid: true},
-		SchemaVersion:   2,
-		MediaType:       "application/vnd.docker.distribution.manifest.v2+json",
-		Digest:          d,
-		Payload:         json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
-		CreatedAt:       testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
+		ID:            2,
+		RepositoryID:  3,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        d,
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+		Configuration: &models.Configuration{
+			MediaType: "application/vnd.docker.container.image.v1+json",
+			Digest:    "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
+			Payload:   json.RawMessage(`{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"cb78c8a8058712726096a7a8f80e6a868ffb514a07f4fef37639f42d99d997e4","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","echo \"2\" \u003e\u003e /data"],"Image":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-03-02T12:24:16.7039823Z","docker_version":"19.03.5","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-03-02T12:21:53.8027967Z","created_by":"/bin/sh -c echo \"1\" \u003e /data"},{"created":"2020-03-02T12:24:16.7039823Z","created_by":"/bin/sh -c echo \"2\" \u003e\u003e /data"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:99cb4c5d9f96432a00201f4b14c058c6235e563917ba7af8ed6c4775afa5780f","sha256:6322c07f5c6ad456f64647993dfc44526f4548685ee0f3d8f03534272b3a06d8"]}}`),
+		},
+		CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
 	}
 	require.Equal(t, expected, m)
+}
+
+func TestRepositoryStore_FindManifestByTagName(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	m, err := s.FindManifestByTagName(suite.ctx, &models.Repository{ID: 3}, "latest")
+	require.NoError(t, err)
+	require.NotNil(t, m)
+
+	// see testdata/fixtures/repository_manifests.sql
+	expected := &models.Manifest{
+		ID:            2,
+		RepositoryID:  3,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
+		Digest:        "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f",
+		Payload:       json.RawMessage(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"mediaType":"application/vnd.docker.container.image.v1+json","size":1819,"digest":"sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073"},"layers":[{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":2802957,"digest":"sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":108,"digest":"sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21"},{"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size":109,"digest":"sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1"}]}`),
+		Configuration: &models.Configuration{
+			MediaType: "application/vnd.docker.container.image.v1+json",
+			Digest:    "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
+			Payload:   json.RawMessage(`{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"cb78c8a8058712726096a7a8f80e6a868ffb514a07f4fef37639f42d99d997e4","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","echo \"2\" \u003e\u003e /data"],"Image":"sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-03-02T12:24:16.7039823Z","docker_version":"19.03.5","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-03-02T12:21:53.8027967Z","created_by":"/bin/sh -c echo \"1\" \u003e /data"},{"created":"2020-03-02T12:24:16.7039823Z","created_by":"/bin/sh -c echo \"2\" \u003e\u003e /data"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:99cb4c5d9f96432a00201f4b14c058c6235e563917ba7af8ed6c4775afa5780f","sha256:6322c07f5c6ad456f64647993dfc44526f4548685ee0f3d8f03534272b3a06d8"]}}`),
+		},
+		CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:50:26.461745", m.CreatedAt.Location()),
+	}
+	require.Equal(t, expected, m)
+}
+
+func TestRepositoryStore_FindManifestByTagName_NotFound(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	m, err := s.FindManifestByTagName(suite.ctx, &models.Repository{ID: 3}, "foo")
+	require.NoError(t, err)
+	require.Nil(t, m)
 }
 
 func TestRepositoryStore_FindTagByName(t *testing.T) {
@@ -840,7 +893,7 @@ func TestRepositoryStore_FindTagByName(t *testing.T) {
 	require.Equal(t, expected, tag)
 }
 
-func TestRepositoryStore_Layers(t *testing.T) {
+func TestRepositoryStore_Blobs(t *testing.T) {
 	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -848,39 +901,36 @@ func TestRepositoryStore_Layers(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	ll, err := s.Blobs(suite.ctx, r)
+	bb, err := s.Blobs(suite.ctx, r)
 	require.NoError(t, err)
-	require.NotEmpty(t, ll)
+	require.NotEmpty(t, bb)
 
 	// see testdata/fixtures/repository_blobs.sql
-	local := ll[0].CreatedAt.Location()
+	local := bb[0].CreatedAt.Location()
 	expected := models.Blobs{
 		{
-			ID:        1,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			Digest:    "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9",
 			Size:      2802957,
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
 		},
 		{
-			ID:        2,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			Digest:    "sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21",
 			Size:      108,
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
 		},
 		{
-			ID:        3,
 			MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 			Digest:    "sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1",
 			Size:      109,
 			CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:06:32.856423", local),
 		},
 	}
-	require.Equal(t, expected, ll)
+	require.Equal(t, expected, bb)
 }
 
-func TestRepositoryStore_LayersNone(t *testing.T) {
+func TestRepositoryStore_BlobsNone(t *testing.T) {
 	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
@@ -889,9 +939,74 @@ func TestRepositoryStore_LayersNone(t *testing.T) {
 	require.NotNil(t, r)
 
 	// see testdata/fixtures/repository_blobs.sql
-	ll, err := s.Blobs(suite.ctx, r)
+	bb, err := s.Blobs(suite.ctx, r)
 	require.NoError(t, err)
-	require.Empty(t, ll)
+	require.Empty(t, bb)
+}
+
+func TestRepositoryStore_FindBlobByDigest(t *testing.T) {
+	reloadBlobFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByID(suite.ctx, 3)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	b, err := s.FindBlob(suite.ctx, r, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	require.NoError(t, err)
+	require.NotNil(t, b)
+
+	// see testdata/fixtures/repository_blobs.sql
+	local := b.CreatedAt.Location()
+	expected := &models.Blob{
+		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
+		Digest:    "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9",
+		Size:      2802957,
+		CreatedAt: testutil.ParseTimestamp(t, "2020-03-04 20:05:35.338639", local),
+	}
+	require.Equal(t, expected, b)
+}
+
+func TestRepositoryStore_FindBlobByDigest_NotFound(t *testing.T) {
+	reloadBlobFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByID(suite.ctx, 1)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// see testdata/fixtures/repository_blobs.sql
+	b, err := s.FindBlob(suite.ctx, r, "sha256:d9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	require.NoError(t, err)
+	require.Nil(t, b)
+}
+
+func TestRepositoryStore_ExistsBlobByDigest(t *testing.T) {
+	reloadBlobFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByID(suite.ctx, 3)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// see testdata/fixtures/repository_blobs.sql
+	exists, err := s.ExistsBlob(suite.ctx, r, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	require.NoError(t, err)
+	require.True(t, exists)
+}
+
+func TestRepositoryStore_ExistsBlobByDigest_NotFound(t *testing.T) {
+	reloadBlobFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByID(suite.ctx, 1)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	// see testdata/fixtures/repository_blobs.sql
+	exists, err := s.ExistsBlob(suite.ctx, r, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	require.NoError(t, err)
+	require.False(t, exists)
 }
 
 func TestRepositoryStore_Create(t *testing.T) {
@@ -1286,69 +1401,6 @@ func TestRepositoryStore_Update_NotFound(t *testing.T) {
 	require.EqualError(t, err, "repository not found")
 }
 
-func TestRepositoryStore_AssociateManifest(t *testing.T) {
-	reloadManifestFixtures(t)
-	require.NoError(t, testutil.TruncateTables(suite.db, testutil.RepositoryManifestsTable))
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifests.sql
-	r := &models.Repository{ID: 4}
-	m := &models.Manifest{ID: 2}
-
-	err := s.AssociateManifest(suite.ctx, r, m)
-	require.NoError(t, err)
-
-	mm, err := s.Manifests(suite.ctx, r)
-	require.NoError(t, err)
-
-	var assocManifestIDs []int64
-	for _, m := range mm {
-		assocManifestIDs = append(assocManifestIDs, m.ID)
-	}
-	require.Contains(t, assocManifestIDs, int64(2))
-}
-
-func TestRepositoryStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *testing.T) {
-	reloadManifestFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifests.sql
-	r := &models.Repository{ID: 3}
-	m := &models.Manifest{ID: 1}
-	err := s.AssociateManifest(suite.ctx, r, m)
-	require.NoError(t, err)
-}
-
-func TestRepositoryStore_DissociateManifest(t *testing.T) {
-	reloadManifestFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifests.sql
-	r := &models.Repository{ID: 3}
-	m := &models.Manifest{ID: 1}
-
-	err := s.DissociateManifest(suite.ctx, r, m)
-	require.NoError(t, err)
-
-	mm, err := s.Manifests(suite.ctx, r)
-	require.NoError(t, err)
-
-	for _, m := range mm {
-		require.NotEqual(t, 1, m.ID)
-	}
-}
-
-func TestRepositoryStore_DissociateManifest_NotAssociatedDoesNotFail(t *testing.T) {
-	reloadManifestFixtures(t)
-
-	s := datastore.NewRepositoryStore(suite.db)
-	// see testdata/fixtures/repository_manifests.sql
-	r := &models.Repository{ID: 4}
-	m := &models.Manifest{ID: 1}
-	err := s.DissociateManifest(suite.ctx, r, m)
-	require.NoError(t, err)
-}
-
 func TestRepositoryStore_UntagManifest(t *testing.T) {
 	reloadTagFixtures(t)
 
@@ -1370,20 +1422,14 @@ func TestRepositoryStore_UntagManifest(t *testing.T) {
 	require.Empty(t, tt)
 }
 
-func isLayerLinked(t *testing.T, r *models.Repository, l *models.Blob) bool {
+func isBlobLinked(t *testing.T, r *models.Repository, d digest.Digest) bool {
 	t.Helper()
 
 	s := datastore.NewRepositoryStore(suite.db)
-	ll, err := s.Blobs(suite.ctx, r)
+	linked, err := s.ExistsBlob(suite.ctx, r, d)
 	require.NoError(t, err)
 
-	for _, layer := range ll {
-		if layer.ID == l.ID {
-			return true
-		}
-	}
-
-	return false
+	return linked
 }
 
 func TestRepositoryStore_LinkLayer(t *testing.T) {
@@ -1393,56 +1439,120 @@ func TestRepositoryStore_LinkLayer(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	r := &models.Repository{ID: 3}
-	l := &models.Blob{ID: 4}
+	d := digest.Digest("sha256:68ced04f60ab5c7a5f1d0b0b4e7572c5a4c8cce44866513d30d9df1a15277d6b")
 
-	err := s.LinkBlob(suite.ctx, r, l)
+	err := s.LinkBlob(suite.ctx, r, d)
 	require.NoError(t, err)
 
-	require.True(t, isLayerLinked(t, r, l))
+	require.True(t, isBlobLinked(t, r, d))
 }
 
-func TestRepositoryStore_LinkLayer_AlreadyLinkedDoesNotFail(t *testing.T) {
+func TestRepositoryStore_LinkBlob_AlreadyLinkedDoesNotFail(t *testing.T) {
 	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
 	r := &models.Repository{ID: 3}
-	l := &models.Blob{ID: 1}
-	require.True(t, isLayerLinked(t, r, l))
+	d := digest.Digest("sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1")
+	require.True(t, isBlobLinked(t, r, d))
 
-	err := s.LinkBlob(suite.ctx, r, l)
+	err := s.LinkBlob(suite.ctx, r, d)
 	require.NoError(t, err)
 }
 
-func TestRepositoryStore_UnlinkLayer(t *testing.T) {
+func TestRepositoryStore_UnlinkBlob(t *testing.T) {
 	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
 	r := &models.Repository{ID: 3}
-	l := &models.Blob{ID: 1}
-	require.True(t, isLayerLinked(t, r, l))
+	d := digest.Digest("sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1")
+	require.True(t, isBlobLinked(t, r, d))
 
-	err := s.UnlinkBlob(suite.ctx, r, l)
+	found, err := s.UnlinkBlob(suite.ctx, r, d)
 	require.NoError(t, err)
-	require.False(t, isLayerLinked(t, r, l))
+	require.True(t, found)
+	require.False(t, isBlobLinked(t, r, d))
 }
 
-func TestRepositoryStore_UnlinkLayer_NotLinkedDoesNotFail(t *testing.T) {
+func TestRepositoryStore_UnlinkBlob_NotLinkedDoesNotFail(t *testing.T) {
 	reloadBlobFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
 	r := &models.Repository{ID: 3}
-	l := &models.Blob{ID: 4}
-	require.False(t, isLayerLinked(t, r, l))
+	d := digest.Digest("sha256:68ced04f60ab5c7a5f1d0b0b4e7572c5a4c8cce44866513d30d9df1a15277d6b")
 
-	err := s.UnlinkBlob(suite.ctx, r, l)
+	found, err := s.UnlinkBlob(suite.ctx, r, d)
 	require.NoError(t, err)
-	require.False(t, isLayerLinked(t, r, l))
+	require.False(t, found)
+	require.False(t, isBlobLinked(t, r, d))
+}
+
+func TestRepositoryStore_DeleteTagByName(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/tags.sql
+	r := &models.Repository{ID: 3}
+	name := "1.0.0"
+
+	found, err := s.DeleteTagByName(suite.ctx, r, name)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	tag, err := s.FindTagByName(suite.ctx, r, name)
+	require.NoError(t, err)
+	require.Nil(t, tag)
+}
+
+func TestRepositoryStore_DeleteTagByName_NotFoundDoesNotFail(t *testing.T) {
+	reloadTagFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/repository_blobs.sql
+	r := &models.Repository{ID: 3}
+	name := "10.0.0"
+
+	found, err := s.DeleteTagByName(suite.ctx, r, name)
+	require.NoError(t, err)
+	require.False(t, found)
+}
+
+func TestRepositoryStore_DeleteManifest(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/manifests.sql
+	r := &models.Repository{ID: 3}
+	d := digest.Digest("sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155")
+
+	found, err := s.DeleteManifest(suite.ctx, r, d)
+	require.NoError(t, err)
+	require.True(t, found)
+
+	m, err := s.FindManifestByDigest(suite.ctx, r, d)
+	require.NoError(t, err)
+	require.Nil(t, m)
+}
+
+func TestRepositoryStore_DeleteManifest_NotFoundDoesNotFail(t *testing.T) {
+	reloadRepositoryFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	r := &models.Repository{ID: 3}
+	d := digest.Digest("sha256:ad165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155")
+
+	found, err := s.DeleteManifest(suite.ctx, r, d)
+	require.NoError(t, err)
+	require.False(t, found)
 }
 
 func TestRepositoryStore_Delete(t *testing.T) {

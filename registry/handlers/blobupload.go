@@ -82,7 +82,7 @@ func dbMountBlob(ctx context.Context, db datastore.Queryer, blobStatter distribu
 	}
 
 	// link blob (does nothing if already linked)
-	return rStore.LinkBlob(ctx, destRepo, b)
+	return rStore.LinkBlob(ctx, destRepo, b.Digest)
 }
 
 // StartBlobUpload begins the blob upload process and allocates a server-side
@@ -207,7 +207,7 @@ func dbPutBlobUploadComplete(ctx context.Context, db *datastore.DB, repoPath str
 	}
 
 	// link blob to repository
-	if err := rStore.LinkBlob(ctx, r, b); err != nil {
+	if err := rStore.LinkBlob(ctx, r, b.Digest); err != nil {
 		return err
 	}
 

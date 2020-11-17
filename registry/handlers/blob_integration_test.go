@@ -78,7 +78,7 @@ func TestDeleteBlobDB(t *testing.T) {
 
 	// build test repository
 	rStore := datastore.NewRepositoryStore(env.db)
-	r, err := rStore.CreateByPath(env.ctx, "foo")
+	r, err := rStore.CreateByPath(env.ctx, "bar")
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
@@ -94,14 +94,11 @@ func TestDeleteBlobDB(t *testing.T) {
 	require.NotEmpty(t, r.ID)
 
 	// link blob to repository
-	err = rStore.LinkBlob(env.ctx, r, b)
+	err = rStore.LinkBlob(env.ctx, r, b.Digest)
 	require.NoError(t, err)
 
 	// make sure it's linked
-	bb, err := rStore.Blobs(env.ctx, r)
-	require.NoError(t, err)
-	require.NotNil(t, bb)
-	require.Contains(t, bb, b)
+	require.True(t, isBlobLinked(t, env, r, b.Digest))
 
 	// Test
 
@@ -109,14 +106,12 @@ func TestDeleteBlobDB(t *testing.T) {
 	require.NoError(t, err)
 
 	// the layer blob should still be there
-	b2, err := bStore.FindByID(env.ctx, b.ID)
+	b2, err := bStore.FindByDigest(env.ctx, b.Digest)
 	require.NoError(t, err)
 	require.NotNil(t, b2)
 
 	// but not the link for the repository
-	bb2, err := rStore.Blobs(env.ctx, r)
-	require.NoError(t, err)
-	require.NotContains(t, bb2, b)
+	require.False(t, isBlobLinked(t, env, r, b.Digest))
 }
 
 func TestDeleteBlobDB_RepositoryNotFound(t *testing.T) {

@@ -18,12 +18,12 @@ func init() {
                 payload bytea NOT NULL,
                 CONSTRAINT pk_configurations_test PRIMARY KEY (id),
                 CONSTRAINT fk_configurations_test_blob_id_blobs FOREIGN KEY (blob_id) REFERENCES blobs_test (id) ON DELETE CASCADE,
-                CONSTRAINT uq_configurations_test_blob_id UNIQUE (blob_id)
+                CONSTRAINT unique_configurations_test_blob_id UNIQUE (blob_id)
             )`,
-			"CREATE INDEX IF NOT EXISTS ix_configurations_test_blob_id ON configurations_test (blob_id)",
+			"CREATE INDEX IF NOT EXISTS index_configurations_test_blob_id ON configurations_test (blob_id)",
 		},
 		Down: []string{
-			"DROP INDEX IF EXISTS ix_configurations_test_blob_id CASCADE",
+			"DROP INDEX IF EXISTS index_configurations_test_blob_id CASCADE",
 			"DROP TABLE IF EXISTS configurations_test CASCADE",
 		},
 	}}
