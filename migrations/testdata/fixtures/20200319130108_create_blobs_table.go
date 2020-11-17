@@ -19,8 +19,8 @@ func init() {
                 digest bytea NOT NULL,
                 media_type text NOT NULL,
                 CONSTRAINT pk_blobs_test PRIMARY KEY (id),
-                CONSTRAINT uq_blobs_test_digest UNIQUE (digest),
-                CONSTRAINT ck_blobs_test_media_type_length CHECK ((char_length(media_type) <= 255))
+                CONSTRAINT unique_blobs_test_digest UNIQUE (digest),
+                CONSTRAINT check_blobs_test_media_type_length CHECK ((char_length(media_type) <= 255))
             )`,
 		},
 		Down: []string{

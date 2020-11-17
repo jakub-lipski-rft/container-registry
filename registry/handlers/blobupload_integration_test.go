@@ -85,28 +85,22 @@ func descriptorFromBlob(t *testing.T, b *models.Blob) distribution.Descriptor {
 	}
 }
 
-func linkBlob(t *testing.T, env *env, r *models.Repository, b *models.Blob) {
+func linkBlob(t *testing.T, env *env, r *models.Repository, d digest.Digest) {
 	t.Helper()
 
 	rStore := datastore.NewRepositoryStore(env.db)
-	err := rStore.LinkBlob(env.ctx, r, b)
+	err := rStore.LinkBlob(env.ctx, r, d)
 	require.NoError(t, err)
 }
 
-func isBlobLinked(t *testing.T, env *env, r *models.Repository, b *models.Blob) bool {
+func isBlobLinked(t *testing.T, env *env, r *models.Repository, d digest.Digest) bool {
 	t.Helper()
 
 	rStore := datastore.NewRepositoryStore(env.db)
-	bb, err := rStore.Blobs(env.ctx, r)
+	linked, err := rStore.ExistsBlob(env.ctx, r, d)
 	require.NoError(t, err)
 
-	for _, blob := range bb {
-		if blob.Digest == b.Digest {
-			return true
-		}
-	}
-
-	return false
+	return linked
 }
 
 func findRepository(t *testing.T, env *env, path string) *models.Repository {
@@ -174,13 +168,13 @@ func TestDBMountBlob_NonExistentDestinationRepo(t *testing.T) {
 
 	fromRepo := buildRepository(t, env, "from")
 	b := buildRandomBlob(t, env)
-	linkBlob(t, env, fromRepo, b)
+	linkBlob(t, env, fromRepo, b.Digest)
 
 	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, "to", b.Digest)
 	require.NoError(t, err)
 
 	destRepo := findRepository(t, env, "to")
-	require.True(t, isBlobLinked(t, env, destRepo, b))
+	require.True(t, isBlobLinked(t, env, destRepo, b.Digest))
 }
 
 func TestDBMountBlob_AlreadyLinked(t *testing.T) {
@@ -190,15 +184,15 @@ func TestDBMountBlob_AlreadyLinked(t *testing.T) {
 	b := buildRandomBlob(t, env)
 
 	fromRepo := buildRepository(t, env, "from")
-	linkBlob(t, env, fromRepo, b)
+	linkBlob(t, env, fromRepo, b.Digest)
 
 	destRepo := buildRepository(t, env, "to")
-	linkBlob(t, env, destRepo, b)
+	linkBlob(t, env, destRepo, b.Digest)
 
 	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, destRepo.Path, b.Digest)
 	require.NoError(t, err)
 
-	require.True(t, isBlobLinked(t, env, destRepo, b))
+	require.True(t, isBlobLinked(t, env, destRepo, b.Digest))
 }
 
 func TestDBPutBlobUploadComplete_NonExistentRepoAndBlob(t *testing.T) {
@@ -214,7 +208,7 @@ func TestDBPutBlobUploadComplete_NonExistentRepoAndBlob(t *testing.T) {
 	// and so does the repository
 	r := findRepository(t, env, "foo")
 	// and the link between blob and repository
-	require.True(t, isBlobLinked(t, env, r, b))
+	require.True(t, isBlobLinked(t, env, r, b.Digest))
 }
 
 func TestDBPutBlobUploadComplete_NonExistentRepoAndExistentBlob(t *testing.T) {
@@ -230,7 +224,7 @@ func TestDBPutBlobUploadComplete_NonExistentRepoAndExistentBlob(t *testing.T) {
 	// the repository should have been created
 	r := findRepository(t, env, "foo")
 	// and so does the link between blob and repository
-	require.True(t, isBlobLinked(t, env, r, b))
+	require.True(t, isBlobLinked(t, env, r, b.Digest))
 }
 
 func TestDBPutBlobUploadComplete_ExistentRepoAndNonExistentBlob(t *testing.T) {
@@ -246,7 +240,7 @@ func TestDBPutBlobUploadComplete_ExistentRepoAndNonExistentBlob(t *testing.T) {
 	// the blob should have been created
 	b := findBlob(t, env, desc.Digest)
 	// and so does the link between blob and repository
-	require.True(t, isBlobLinked(t, env, r, b))
+	require.True(t, isBlobLinked(t, env, r, b.Digest))
 }
 
 func TestDBPutBlobUploadComplete_ExistentRepoAndBlobButNotLinked(t *testing.T) {
@@ -261,7 +255,7 @@ func TestDBPutBlobUploadComplete_ExistentRepoAndBlobButNotLinked(t *testing.T) {
 	require.NoError(t, err)
 
 	// the link between blob and repository should have been created
-	require.True(t, isBlobLinked(t, env, r, b))
+	require.True(t, isBlobLinked(t, env, r, b.Digest))
 }
 
 func TestDBPutBlobUploadComplete_ExistentRepoAndBlobAlreadyLinked(t *testing.T) {
@@ -270,12 +264,12 @@ func TestDBPutBlobUploadComplete_ExistentRepoAndBlobAlreadyLinked(t *testing.T) 
 
 	r := buildRepository(t, env, "foo")
 	b := buildRandomBlob(t, env)
-	linkBlob(t, env, r, b)
+	linkBlob(t, env, r, b.Digest)
 
 	desc := descriptorFromBlob(t, b)
 	err := dbPutBlobUploadComplete(env.ctx, env.db, r.Path, desc)
 	require.NoError(t, err)
 
 	// the link between blob and repository should remain
-	require.True(t, isBlobLinked(t, env, r, b))
+	require.True(t, isBlobLinked(t, env, r, b.Digest))
 }

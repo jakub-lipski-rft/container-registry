@@ -19,14 +19,14 @@ func init() {
                 CONSTRAINT pk_manifest_layers_test PRIMARY KEY (id),
                 CONSTRAINT fk_manifest_layers_test_manifest_id_manifests FOREIGN KEY (manifest_id) REFERENCES manifests_test (id) ON DELETE CASCADE,
                 CONSTRAINT fk_manifest_layers_test_blob_id_blobs_test FOREIGN KEY (blob_id) REFERENCES blobs_test (id) ON DELETE CASCADE,
-                CONSTRAINT uq_manifest_layers_test_manifest_id_blob_id UNIQUE (manifest_id, blob_id)
+                CONSTRAINT unique_manifest_layers_test_manifest_id_blob_id UNIQUE (manifest_id, blob_id)
             )`,
-			"CREATE INDEX IF NOT EXISTS ix_manifest_layers_test_manifest_id ON manifest_layers_test (manifest_id)",
-			"CREATE INDEX IF NOT EXISTS ix_manifest_layers_test_blob_id ON manifest_layers_test (blob_id)",
+			"CREATE INDEX IF NOT EXISTS index_manifest_layers_test_manifest_id ON manifest_layers_test (manifest_id)",
+			"CREATE INDEX IF NOT EXISTS index_manifest_layers_test_blob_id ON manifest_layers_test (blob_id)",
 		},
 		Down: []string{
-			"DROP INDEX IF EXISTS ix_manifest_layers_test_blob_id CASCADE",
-			"DROP INDEX IF EXISTS ix_manifest_layers_test_manifest_id CASCADE",
+			"DROP INDEX IF EXISTS index_manifest_layers_test_blob_id CASCADE",
+			"DROP INDEX IF EXISTS index_manifest_layers_test_manifest_id CASCADE",
 			"DROP TABLE IF EXISTS manifest_layers_test CASCADE",
 		},
 	}}

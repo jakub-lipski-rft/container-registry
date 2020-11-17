@@ -115,7 +115,7 @@ static-analysis:
     REGISTRY_DATABASE_DBNAME: "registry_test"
     REGISTRY_DATABASE_SSLMODE: "disable"
   services:
-    - name: postgres:11-alpine
+    - name: postgres:12-alpine
       alias: "db"
   script: go test -timeout 20m -v -tags=integration $PACKAGE
 

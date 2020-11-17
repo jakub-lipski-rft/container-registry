@@ -19,15 +19,15 @@ func init() {
                 CONSTRAINT pk_manifest_references_test PRIMARY KEY (id),
                 CONSTRAINT fk_manifest_references_test_parent_id_manifests_test FOREIGN KEY (parent_id) REFERENCES manifests_test (id) ON DELETE CASCADE,
                 CONSTRAINT fk_manifest_references_test_child_id_manifests_test FOREIGN KEY (child_id) REFERENCES manifests_test (id) ON DELETE CASCADE,
-                CONSTRAINT uq_manifest_references_test_parent_id_child_id UNIQUE (parent_id, child_id),
-				CONSTRAINT ck_manifest_references_test_parent_id_child_id_differ CHECK ((parent_id <> child_id))
+                CONSTRAINT unique_manifest_references_test_parent_id_child_id UNIQUE (parent_id, child_id),
+				CONSTRAINT check_manifest_references_test_parent_id_child_id_differ CHECK ((parent_id <> child_id))
             )`,
-			"CREATE INDEX IF NOT EXISTS ix_manifest_references_test_parent_id ON manifest_references_test (parent_id)",
-			"CREATE INDEX IF NOT EXISTS ix_manifest_references_test_child_id ON manifest_references_test (child_id)",
+			"CREATE INDEX IF NOT EXISTS index_manifest_references_test_parent_id ON manifest_references_test (parent_id)",
+			"CREATE INDEX IF NOT EXISTS index_manifest_references_test_child_id ON manifest_references_test (child_id)",
 		},
 		Down: []string{
-			"DROP INDEX IF EXISTS ix_manifest_references_test_child_id CASCADE",
-			"DROP INDEX IF EXISTS ix_manifest_references_test_parent_id CASCADE",
+			"DROP INDEX IF EXISTS index_manifest_references_test_child_id CASCADE",
+			"DROP INDEX IF EXISTS index_manifest_references_test_parent_id CASCADE",
 			"DROP TABLE IF EXISTS manifest_references_test CASCADE",
 		},
 	}}

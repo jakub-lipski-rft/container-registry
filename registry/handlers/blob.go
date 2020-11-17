@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/docker/distribution/registry/datastore/models"
-
 	dcontext "github.com/docker/distribution/context"
 
 	"github.com/docker/distribution/registry/datastore"
@@ -72,19 +70,11 @@ func dbGetBlob(ctx context.Context, db datastore.Queryer, repoPath string, dgst 
 		return v2.ErrorCodeBlobUnknown.WithDetail(dgst)
 	}
 
-	bb, err := rStore.Blobs(ctx, r)
+	exists, err := rStore.ExistsBlob(ctx, r, dgst)
 	if err != nil {
 		return errcode.ErrorCodeUnknown.WithDetail(err)
 	}
-
-	var found bool
-	for _, b := range bb {
-		if b.Digest == dgst {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !exists {
 		log.Warn("blob link not found in database")
 		return v2.ErrorCodeBlobUnknown.WithDetail(dgst)
 	}
@@ -136,23 +126,15 @@ func dbDeleteBlob(ctx context.Context, db datastore.Queryer, repoPath string, d 
 		return errors.New("repository not found in database")
 	}
 
-	bb, err := rStore.Blobs(ctx, r)
+	found, err := rStore.UnlinkBlob(ctx, r, d)
 	if err != nil {
 		return err
 	}
-
-	var b *models.Blob
-	for _, layer := range bb {
-		if layer.Digest == d {
-			b = layer
-			break
-		}
-	}
-	if b == nil {
+	if !found {
 		return errors.New("blob not found in database")
 	}
 
-	return rStore.UnlinkBlob(ctx, r, b)
+	return nil
 }
 
 // DeleteBlob deletes a layer blob

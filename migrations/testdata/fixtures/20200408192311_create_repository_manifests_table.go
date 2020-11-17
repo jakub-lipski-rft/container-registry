@@ -19,14 +19,14 @@ func init() {
                 CONSTRAINT pk_repository_manifests_test PRIMARY KEY (id),
                 CONSTRAINT fk_repository_manifests_test_repository_id_repositories FOREIGN KEY (repository_id) REFERENCES repositories_test (id) ON DELETE CASCADE,
                 CONSTRAINT fk_repository_manifests_test_manifest_id_manifests FOREIGN KEY (manifest_id) REFERENCES manifests_test (id) ON DELETE CASCADE,
-                CONSTRAINT uq_repository_manifests_test_repository_id_manifest_id UNIQUE (repository_id, manifest_id)
+                CONSTRAINT unique_repository_manifests_test_repository_id_manifest_id UNIQUE (repository_id, manifest_id)
             )`,
-			"CREATE INDEX IF NOT EXISTS ix_repository_manifests_test_repository_id ON repository_manifests_test (repository_id)",
-			"CREATE INDEX IF NOT EXISTS ix_repository_manifests_test_manifest_id ON repository_manifests_test (manifest_id)",
+			"CREATE INDEX IF NOT EXISTS index_repository_manifests_test_repository_id ON repository_manifests_test (repository_id)",
+			"CREATE INDEX IF NOT EXISTS index_repository_manifests_test_manifest_id ON repository_manifests_test (manifest_id)",
 		},
 		Down: []string{
-			"DROP INDEX IF EXISTS ix_repository_manifests_test_manifest_id CASCADE",
-			"DROP INDEX IF EXISTS ix_repository_manifests_test_repository_id CASCADE",
+			"DROP INDEX IF EXISTS index_repository_manifests_test_manifest_id CASCADE",
+			"DROP INDEX IF EXISTS index_repository_manifests_test_repository_id CASCADE",
 			"DROP TABLE IF EXISTS repository_manifests_test CASCADE",
 		},
 	}}

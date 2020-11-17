@@ -30,8 +30,11 @@ type RepositoryReader interface {
 	TagsCountAfterName(ctx context.Context, r *models.Repository, lastName string) (int, error)
 	ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error)
 	FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error)
+	FindManifestByTagName(ctx context.Context, r *models.Repository, tagName string) (*models.Manifest, error)
 	FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error)
 	Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error)
+	FindBlob(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Blob, error)
+	ExistsBlob(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error)
 }
 
 // RepositoryWriter is the interface that defines write operations for a repository store.
@@ -41,11 +44,11 @@ type RepositoryWriter interface {
 	CreateOrFind(ctx context.Context, r *models.Repository) error
 	CreateOrFindByPath(ctx context.Context, path string) (*models.Repository, error)
 	Update(ctx context.Context, r *models.Repository) error
-	AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
-	DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
 	UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error
-	LinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error
-	UnlinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error
+	LinkBlob(ctx context.Context, r *models.Repository, d digest.Digest) error
+	UnlinkBlob(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error)
+	DeleteTagByName(ctx context.Context, r *models.Repository, name string) (bool, error)
+	DeleteManifest(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error)
 	Delete(ctx context.Context, id int64) error
 }
 
@@ -172,9 +175,9 @@ func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastP
 			EXISTS (
 				SELECT
 				FROM
-					repository_manifests AS rm
+					manifests AS m
 				WHERE
-					rm.repository_id = r.id)
+					m.repository_id = r.id)
 			AND r.path > $1
 		ORDER BY
 			r.path
@@ -415,9 +418,9 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 			EXISTS (
 				SELECT
 				FROM
-					repository_manifests AS rm
+					manifests AS m
 				WHERE
-					rm.repository_id = r.id)
+					m.repository_id = r.id)
 			AND r.path > $1`
 
 	var count int
@@ -432,19 +435,22 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
 	q := `SELECT
 			m.id,
-			m.configuration_id,
+			m.repository_id,
 			m.schema_version,
-			m.media_type,
+			mt.media_type,
 			encode(m.digest, 'hex') as digest,
 			m.payload,
-			m.created_at,
-			m.marked_at
+			mtc.media_type as configuration_media_type,
+			encode(m.configuration_blob_digest, 'hex') as configuration_blob_digest,
+			m.configuration_payload,
+			m.created_at
 		FROM
 			manifests AS m
-			JOIN repository_manifests AS rm ON rm.manifest_id = m.id
-			JOIN repositories AS r ON r.id = rm.repository_id
+			JOIN media_types AS mt ON mt.id = m.media_type_id
+			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
 		WHERE
-			r.id = $1`
+			m.repository_id = $1
+		ORDER BY m.id`
 
 	rows, err := s.db.QueryContext(ctx, q, r.ID)
 	if err != nil {
@@ -458,19 +464,21 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
 	q := `SELECT
 			m.id,
-			m.configuration_id,
+			m.repository_id,
 			m.schema_version,
-			m.media_type,
+			mt.media_type,
 			encode(m.digest, 'hex') as digest,
 			m.payload,
-			m.created_at,
-			m.marked_at
+			mtc.media_type as configuration_media_type,
+			encode(m.configuration_blob_digest, 'hex') as configuration_blob_digest,
+			m.configuration_payload,
+			m.created_at
 		FROM
 			manifests AS m
-			JOIN repository_manifests AS rm ON rm.manifest_id = m.id
-			JOIN repositories AS r ON r.id = rm.repository_id
+			JOIN media_types AS mt ON mt.id = m.media_type_id
+			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
 		WHERE
-			r.id = $1
+			m.repository_id = $1
 			AND m.digest = decode($2, 'hex')`
 
 	dgst, err := NewDigest(d)
@@ -482,19 +490,46 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 	return scanFullManifest(row)
 }
 
+// FindManifestByTagName finds a manifest by tag name within a repository.
+func (s *repositoryStore) FindManifestByTagName(ctx context.Context, r *models.Repository, tagName string) (*models.Manifest, error) {
+	q := `SELECT
+			m.id,
+			m.repository_id,
+			m.schema_version,
+			mt.media_type,
+			encode(m.digest, 'hex') as digest,
+			m.payload,
+			mtc.media_type as configuration_media_type,
+			encode(m.configuration_blob_digest, 'hex') as configuration_blob_digest,
+			m.configuration_payload,
+			m.created_at
+		FROM
+			manifests AS m
+			JOIN media_types AS mt ON mt.id = m.media_type_id
+			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
+			JOIN tags AS t ON t.repository_id = m.repository_id
+				AND t.manifest_id = m.id
+		WHERE
+			m.repository_id = $1
+			AND t.name = $2`
+
+	row := s.db.QueryRowContext(ctx, q, r.ID, tagName)
+
+	return scanFullManifest(row)
+}
+
 // Blobs finds all blobs associated with the repository.
 func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error) {
 	q := `SELECT
-			b.id,
-			b.media_type,
+			mt.media_type,
 			encode(b.digest, 'hex') as digest,
 			b.size,
-			b.created_at,
-			b.marked_at
+			b.created_at
 		FROM
 			blobs AS b
-			JOIN repository_blobs AS rb ON rb.blob_id = b.id
+			JOIN repository_blobs AS rb ON rb.blob_digest = b.digest
 			JOIN repositories AS r ON r.id = rb.repository_id
+			JOIN media_types AS mt ON mt.id = b.media_type_id
 		WHERE
 			r.id = $1`
 
@@ -504,6 +539,56 @@ func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (mode
 	}
 
 	return scanFullBlobs(rows)
+}
+
+// FindBlobByDigest finds a blob by digest within a repository.
+func (s *repositoryStore) FindBlob(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Blob, error) {
+	q := `SELECT
+			mt.media_type,
+			encode(b.digest, 'hex') as digest,
+			b.size,
+			b.created_at
+		FROM
+			blobs AS b
+			JOIN media_types AS mt ON mt.id = b.media_type_id
+			JOIN repository_blobs AS rb ON rb.blob_digest = b.digest
+		WHERE
+			rb.repository_id = $1
+			AND b.digest = decode($2, 'hex')`
+
+	dgst, err := NewDigest(d)
+	if err != nil {
+		return nil, err
+	}
+	row := s.db.QueryRowContext(ctx, q, r.ID, dgst)
+
+	return scanFullBlob(row)
+}
+
+// ExistsBlobByDigest finds if a blob with a given digest exists within a repository.
+func (s *repositoryStore) ExistsBlob(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
+	q := `SELECT
+			EXISTS (
+				SELECT
+					1
+				FROM
+					repository_blobs
+				WHERE
+					repository_id = $1
+					AND blob_digest = decode($2, 'hex'))`
+
+	dgst, err := NewDigest(d)
+	if err != nil {
+		return false, err
+	}
+
+	var exists bool
+	row := s.db.QueryRowContext(ctx, q, r.ID, dgst)
+	if err := row.Scan(&exists); err != nil {
+		return false, fmt.Errorf("scanning blob: %w", err)
+	}
+
+	return exists, nil
 }
 
 // Create saves a new repository.
@@ -686,36 +771,6 @@ func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) erro
 	return nil
 }
 
-// AssociateManifest associates a manifest and a repository. It does nothing if already associated.
-func (s *repositoryStore) AssociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
-	q := `INSERT INTO repository_manifests (repository_id, manifest_id)
-			VALUES ($1, $2)
-		ON CONFLICT (repository_id, manifest_id)
-			DO NOTHING`
-
-	if _, err := s.db.ExecContext(ctx, q, r.ID, m.ID); err != nil {
-		return fmt.Errorf("associating manifest: %w", err)
-	}
-
-	return nil
-}
-
-// DissociateManifest dissociates a manifest and a repository. It does nothing if not associated.
-func (s *repositoryStore) DissociateManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
-	q := "DELETE FROM repository_manifests WHERE repository_id = $1 AND manifest_id = $2"
-
-	res, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
-	if err != nil {
-		return fmt.Errorf("dissociating manifest: %w", err)
-	}
-
-	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("dissociating manifest: %w", err)
-	}
-
-	return nil
-}
-
 // UntagManifest deletes all tags of a manifest in a repository.
 func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
 	q := "DELETE FROM tags WHERE repository_id = $1 AND manifest_id = $2"
@@ -729,33 +784,84 @@ func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repositor
 }
 
 // LinkBlob links a blob to a repository. It does nothing if already linked.
-func (s *repositoryStore) LinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error {
-	q := `INSERT INTO repository_blobs (repository_id, blob_id)
-			VALUES ($1, $2)
-		ON CONFLICT (repository_id, blob_id)
+func (s *repositoryStore) LinkBlob(ctx context.Context, r *models.Repository, d digest.Digest) error {
+	q := `INSERT INTO repository_blobs (repository_id, blob_digest)
+			VALUES ($1, decode($2, 'hex'))
+		ON CONFLICT (repository_id, blob_digest)
 			DO NOTHING`
 
-	if _, err := s.db.ExecContext(ctx, q, r.ID, b.ID); err != nil {
+	dgst, err := NewDigest(d)
+	if err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, q, r.ID, dgst); err != nil {
 		return fmt.Errorf("linking blob: %w", err)
 	}
 
 	return nil
 }
 
-// UnlinkBlob unlinks a blob from a repository. It does nothing if not linked.
-func (s *repositoryStore) UnlinkBlob(ctx context.Context, r *models.Repository, b *models.Blob) error {
-	q := "DELETE FROM repository_blobs WHERE repository_id = $1 AND blob_id = $2"
+// UnlinkBlob unlinks a blob from a repository. It does nothing if not linked. A boolean is returned to denote whether
+// the link was deleted or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
+func (s *repositoryStore) UnlinkBlob(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
+	q := "DELETE FROM repository_blobs WHERE repository_id = $1 AND blob_digest = decode($2, 'hex')"
 
-	res, err := s.db.ExecContext(ctx, q, r.ID, b.ID)
+	dgst, err := NewDigest(d)
 	if err != nil {
-		return fmt.Errorf("linking blob: %w", err)
+		return false, err
+	}
+	res, err := s.db.ExecContext(ctx, q, r.ID, dgst)
+	if err != nil {
+		return false, fmt.Errorf("linking blob: %w", err)
 	}
 
-	if _, err := res.RowsAffected(); err != nil {
-		return fmt.Errorf("linking blob: %w", err)
+	count, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("linking blob: %w", err)
 	}
 
-	return nil
+	return count == 1, nil
+}
+
+// DeleteTagByName deletes a tag by name within a repository. A boolean is returned to denote whether the tag was
+// deleted or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
+func (s *repositoryStore) DeleteTagByName(ctx context.Context, r *models.Repository, name string) (bool, error) {
+	q := "DELETE FROM tags WHERE repository_id = $1 AND name = $2"
+
+	res, err := s.db.ExecContext(ctx, q, r.ID, name)
+	if err != nil {
+		return false, fmt.Errorf("deleting tag: %w", err)
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("deleting tag: %w", err)
+	}
+
+	return count == 1, nil
+}
+
+// DeleteManifest deletes a manifest from a repository. A boolean is returned to denote whether the manifest was deleted
+// or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
+func (s *repositoryStore) DeleteManifest(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
+	q := "DELETE FROM manifests WHERE repository_id = $1 AND digest = decode($2, 'hex')"
+
+	dgst, err := NewDigest(d)
+	if err != nil {
+		return false, err
+	}
+
+	res, err := s.db.ExecContext(ctx, q, r.ID, dgst)
+	if err != nil {
+		return false, fmt.Errorf("deleting manifest: %w", err)
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("deleting manifest: %w", err)
+	}
+
+	return count == 1, nil
 }
 
 // Delete deletes a repository.
