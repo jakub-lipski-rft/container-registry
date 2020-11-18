@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/docker/distribution/configuration"
 	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
@@ -15,8 +16,9 @@ import (
 )
 
 type env struct {
-	ctx context.Context
-	db  *datastore.DB
+	ctx    context.Context
+	db     *datastore.DB
+	config *configuration.Configuration
 
 	// isShutdown helps ensure that tests do not try to access the db after the
 	// connection has been closed.
@@ -63,7 +65,16 @@ func initDatabase(t *testing.T, env *env) {
 func newEnv(t *testing.T) *env {
 	t.Helper()
 
-	env := &env{ctx: context.Background()}
+	env := &env{
+		ctx: context.Background(),
+		config: &configuration.Configuration{
+			Storage: map[string]configuration.Parameters{
+				"delete": map[string]interface{}{
+					"enabled": true,
+				},
+			},
+		},
+	}
 
 	initDatabase(t, env)
 
@@ -102,7 +113,7 @@ func TestDeleteBlobDB(t *testing.T) {
 
 	// Test
 
-	err = dbDeleteBlob(env.ctx, env.db, r.Path, b.Digest)
+	err = dbDeleteBlob(env.ctx, env.config, env.db, r.Path, b.Digest)
 	require.NoError(t, err)
 
 	// the layer blob should still be there
@@ -118,20 +129,6 @@ func TestDeleteBlobDB_RepositoryNotFound(t *testing.T) {
 	env := newEnv(t)
 	defer env.shutdown(t)
 
-	err := dbDeleteBlob(env.ctx, env.db, "foo", "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
-	require.Error(t, err)
-}
-
-func TestDeleteBlobDB_BlobNotFound(t *testing.T) {
-	env := newEnv(t)
-	defer env.shutdown(t)
-
-	// build test repository
-	rStore := datastore.NewRepositoryStore(env.db)
-	r, err := rStore.CreateByPath(env.ctx, "foo")
-	require.NoError(t, err)
-	require.NotNil(t, r)
-
-	err = dbDeleteBlob(env.ctx, env.db, r.Path, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	err := dbDeleteBlob(env.ctx, env.config, env.db, "foo", "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
 	require.Error(t, err)
 }
