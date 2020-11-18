@@ -493,6 +493,44 @@ func TestBlobAPI_Get(t *testing.T) {
 	require.True(t, v.Verified())
 }
 
+func TestBlobAPI_Get_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// fetch layer
+	res, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	// verify response headers
+	_, err = args.layerFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(args.layerFile)
+	require.NoError(t, err)
+
+	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
+	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
+	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
+	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
+	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
+
+	// verify response body
+	v := args.layerDigest.Verifier()
+	_, err = io.Copy(v, res.Body)
+	require.NoError(t, err)
+	require.True(t, v.Verified())
+}
+
 func TestBlobAPI_Get_BlobNotInDatabase(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
@@ -535,9 +573,55 @@ func TestBlobAPI_Get_RepositoryNotFound(t *testing.T) {
 	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeBlobUnknown)
 }
 
+func TestBlobAPI_Get_RepositoryNotFound_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	args := makeBlobArgs(t)
+	ref, err := reference.WithDigest(args.imageName, args.layerDigest)
+	require.NoError(t, err)
+
+	blobURL, err := env.builder.BuildBlobURL(ref)
+	require.NoError(t, err)
+
+	resp, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeBlobUnknown)
+}
+
 func TestBlobAPI_Get_BlobNotFound(t *testing.T) {
 	env := newTestEnv(t, withDelete)
 	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Get(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	checkBodyHasErrorCodes(t, "blob not found", res, v2.ErrorCodeBlobUnknown)
+}
+
+func TestBlobAPI_Get_BlobNotFound_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
 
 	// create repository with a layer
 	args := makeBlobArgs(t)
@@ -597,9 +681,66 @@ func TestBlobAPI_GetBlobFromFilesystemAfterDatabaseWrites(t *testing.T) {
 	require.True(t, v.Verified())
 }
 
+func TestBlobAPI_GetBlobFromFilesystemAfterDatabaseWrites_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Disable the database to check that the filesystem mirroring was disabled.
+	env.config.Database.Enabled = false
+
+	// fetch layer
+	res, err := http.Get(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
 func TestBlobAPI_Head(t *testing.T) {
 	env := newTestEnv(t)
 	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// check if layer exists
+	res, err := http.Head(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	// verify headers
+	_, err = args.layerFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(args.layerFile)
+	require.NoError(t, err)
+
+	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
+	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
+	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
+	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
+	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
+
+	// verify body
+	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_Head_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
 
 	// create repository with a layer
 	args := makeBlobArgs(t)
@@ -645,9 +786,55 @@ func TestBlobAPI_Head_RepositoryNotFound(t *testing.T) {
 	require.Equal(t, http.NoBody, res.Body)
 }
 
+func TestBlobAPI_Head_RepositoryNotFound_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	args := makeBlobArgs(t)
+	ref, err := reference.WithDigest(args.imageName, args.layerDigest)
+	require.NoError(t, err)
+
+	blobURL, err := env.builder.BuildBlobURL(ref)
+	require.NoError(t, err)
+
+	res, err := http.Head(blobURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+}
+
 func TestBlobAPI_Head_BlobNotFound(t *testing.T) {
 	env := newTestEnv(t, withDelete)
 	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_Head_BlobNotFound_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
 
 	// create repository with a layer
 	args := makeBlobArgs(t)
@@ -685,6 +872,147 @@ func TestBlobAPI_Delete(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_Delete_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+}
+
+func TestBlobAPI_DeleteDisabled(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Attempt to delete blob link from repository.
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
+}
+
+func TestBlobAPI_DeleteDisabled_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// Attempt to delete blob link from repository.
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
+}
+
+func TestBlobAPI_Delete_AlreadyDeleted(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+
+	// Attempt to delete blob link from repository again.
+	res, err = httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestBlobAPI_Delete_AlreadyDeleted_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create repository with a layer
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, res.StatusCode)
+
+	// test
+	res, err = http.Head(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+	require.Equal(t, http.NoBody, res.Body)
+
+	// Attempt to delete blob link from repository again.
+	res, err = httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestBlobAPI_Delete_UnknownRepository_DisableMirrorFS(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// Create url for a blob whose repository does not exist.
+	args := makeBlobArgs(t)
+
+	digester := digest.Canonical.Digester()
+	sha256Dgst := digester.Digest()
+
+	ref, err := reference.WithDigest(args.imageName, sha256Dgst)
+	require.NoError(t, err)
+
+	location, err := env.builder.BuildBlobURL(ref)
+	require.NoError(t, err)
+
+	// delete blob link from repository
+	res, err := httpDelete(location)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
 func TestBlobDelete(t *testing.T) {

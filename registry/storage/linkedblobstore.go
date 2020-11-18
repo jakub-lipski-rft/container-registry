@@ -70,17 +70,24 @@ func (lbs *linkedBlobStore) Open(ctx context.Context, dgst digest.Digest) (distr
 }
 
 func (lbs *linkedBlobStore) ServeBlob(ctx context.Context, w http.ResponseWriter, r *http.Request, dgst digest.Digest) error {
-	canonical, err := lbs.Stat(ctx, dgst) // access check
-	if err != nil {
-		return err
+	var d digest.Digest
+
+	if lbs.mirrorFS {
+		canonical, err := lbs.Stat(ctx, dgst) // access check
+		if err != nil {
+			return err
+		}
+
+		if canonical.MediaType != "" {
+			// Set the repository local content type.
+			w.Header().Set("Content-Type", canonical.MediaType)
+		}
+		d = canonical.Digest
+	} else {
+		d = dgst
 	}
 
-	if canonical.MediaType != "" {
-		// Set the repository local content type.
-		w.Header().Set("Content-Type", canonical.MediaType)
-	}
-
-	return lbs.blobServer.ServeBlob(ctx, w, r, canonical.Digest)
+	return lbs.blobServer.ServeBlob(ctx, w, r, d)
 }
 
 func (lbs *linkedBlobStore) Put(ctx context.Context, mediaType string, p []byte) (distribution.Descriptor, error) {
