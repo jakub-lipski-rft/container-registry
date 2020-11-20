@@ -535,7 +535,7 @@ func resolveConfiguration(args []string) (*configuration.Configuration, error) {
 	}
 
 	if err := validate(config); err != nil {
-		return nil, fmt.Errorf("validating configuration: %w", err)
+		return nil, fmt.Errorf("validation: %w", err)
 	}
 
 	return config, nil
@@ -544,6 +544,19 @@ func resolveConfiguration(args []string) (*configuration.Configuration, error) {
 func validate(config *configuration.Configuration) error {
 	if !config.Database.Enabled && config.Migration.DisableMirrorFS {
 		return fmt.Errorf("filesystem mirroring may only be disabled when database is enabled")
+	}
+
+	// Validate redirect section.
+	if redirectConfig, ok := config.Storage["redirect"]; ok {
+		v, ok := redirectConfig["disable"]
+		if !ok {
+			return fmt.Errorf("'storage.redirect' section must include 'disable' parameter (boolean)")
+		}
+		switch v := v.(type) {
+		case bool:
+		default:
+			return fmt.Errorf("invalid type %[1]T for 'storage.redirect.disable' (boolean)", v)
+		}
 	}
 
 	return nil

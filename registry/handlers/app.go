@@ -221,7 +221,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		case bool:
 			redirectDisabled = v
 		default:
-			panic(fmt.Sprintf("invalid type for redirect config: %#v", redirectConfig))
+			panic(fmt.Sprintf("invalid type %T for 'storage.redirect.disable' (boolean)", v))
 		}
 	}
 	if redirectDisabled {
