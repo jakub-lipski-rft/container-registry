@@ -18,6 +18,7 @@
 
 ### Changed
 - configuration: Cloudfront middleware `ipfilteredby` setting is now optional
+- configuration: Improve error reporting when `storage.redirect` section is misconfigured
 
 ### Fixed
 - registry/api/v2: Text-charset selector removed from `application/json` content-type
