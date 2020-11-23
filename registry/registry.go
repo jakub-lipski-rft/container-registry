@@ -395,30 +395,29 @@ func configureBugsnag(config *configuration.Configuration) {
 }
 
 func configureMonitoring(config *configuration.Configuration) []monitoring.Option {
+	var opts []monitoring.Option
 	debugAddr := config.HTTP.Debug.Addr
-	metricsPath := config.HTTP.Debug.Prometheus.Path
-	mux := http.NewServeMux()
 
-	opts := []monitoring.Option{
-		monitoring.WithServeMux(mux),
-		monitoring.WithListenerAddress(debugAddr),
-		monitoring.WithMetricsHandlerPattern(metricsPath),
-		monitoring.WithProfilerCredentialsFile(config.Profiling.Stackdriver.KeyFile),
-		monitoring.WithBuildInformation(version.Version, version.BuildTime),
-		monitoring.WithBuildExtraLabels(map[string]string{
-			"package":  version.Package,
-			"revision": version.Revision,
-		}),
-	}
-
-	if config.HTTP.Debug.Addr != "" {
+	if debugAddr != "" {
+		mux := http.NewServeMux()
 		mux.HandleFunc("/debug/health", health.StatusHandler)
 		log.WithFields(log.Fields{"address": debugAddr, "path": "/debug/health"}).Info("starting health checker")
+
+		opts = []monitoring.Option{
+			monitoring.WithServeMux(mux),
+			monitoring.WithListenerAddress(debugAddr),
+		}
 
 		if !config.HTTP.Debug.Prometheus.Enabled {
 			opts = append(opts, monitoring.WithoutMetrics())
 		} else {
-			log.WithFields(log.Fields{"address": debugAddr, "path": metricsPath}).Info("starting Prometheus listener")
+			opts = append(opts, monitoring.WithMetricsHandlerPattern(config.HTTP.Debug.Prometheus.Path))
+			opts = append(opts, monitoring.WithBuildInformation(version.Version, version.BuildTime))
+			opts = append(opts, monitoring.WithBuildExtraLabels(map[string]string{
+				"package":  version.Package,
+				"revision": version.Revision,
+			}))
+			log.WithFields(log.Fields{"address": debugAddr, "path": config.HTTP.Debug.Prometheus.Path}).Info("starting Prometheus listener")
 		}
 
 		if !config.HTTP.Debug.Pprof.Enabled {
@@ -426,11 +425,17 @@ func configureMonitoring(config *configuration.Configuration) []monitoring.Optio
 		} else {
 			log.WithFields(log.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
 		}
+	} else {
+		opts = []monitoring.Option{
+			monitoring.WithoutMetrics(),
+			monitoring.WithoutPprof(),
+		}
 	}
 
 	if !config.Profiling.Stackdriver.Enabled {
 		opts = append(opts, monitoring.WithoutContinuousProfiling())
 	} else {
+		opts = append(opts, monitoring.WithProfilerCredentialsFile(config.Profiling.Stackdriver.KeyFile))
 		if err := configureStackdriver(config); err != nil {
 			log.WithError(err).Error("failed to configure Stackdriver profiler")
 			return opts
