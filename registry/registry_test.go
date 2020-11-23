@@ -285,6 +285,11 @@ func assertMonitoringResponse(t *testing.T, addr, path string, expectedStatus in
 
 func TestConfigureMonitoring_NoErrorWithNoOptions(t *testing.T) {
 	config := &configuration.Configuration{}
+	ln, err := net.Listen("tcp", ":")
+	require.NoError(t, err)
+
+	// close listener so that we know if LabKit tried to use it
+	require.NoError(t, ln.Close())
 
 	go func() {
 		err := monitoring.Start(configureMonitoring(config)...)
@@ -326,7 +331,6 @@ func TestConfigureMonitoring_PprofHandler(t *testing.T) {
 func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
 	ln, err := net.Listen("tcp", ":")
 	require.NoError(t, err)
-	defer ln.Close()
 
 	addr := ln.Addr().String()
 	config := &configuration.Configuration{}
@@ -352,7 +356,6 @@ func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
 func TestConfigureMonitoring_All(t *testing.T) {
 	ln, err := net.Listen("tcp", ":")
 	require.NoError(t, err)
-	defer ln.Close()
 
 	addr := ln.Addr().String()
 	config := &configuration.Configuration{}
