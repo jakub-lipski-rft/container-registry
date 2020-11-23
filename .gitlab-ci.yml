@@ -54,7 +54,7 @@ static-analysis:
 .storage-driver-test: &storage-driver-test
   stage: integration
   needs: []
-  script: go test -v $PACKAGE -args -check.v -test.short
+  script: go test -v -coverprofile=coverage.out $PACKAGE -args -check.v -test.short
 
 .filesystem:
   <<: *storage-driver-test
@@ -98,7 +98,7 @@ static-analysis:
 .api:
   stage: integration
   needs: []
-  script: go test -timeout 20m -v -tags=integration github.com/docker/distribution/registry/handlers
+  script: go test -timeout 20m -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/handlers
 
 .database: &database
   stage: integration
@@ -117,7 +117,7 @@ static-analysis:
   services:
     - name: postgres:12-alpine
       alias: "db"
-  script: go test -timeout 20m -v -tags=integration $PACKAGE
+  script: go test -timeout 20m -v -coverprofile=coverage.out -tags=integration $PACKAGE
 
 .database:migrations:
   <<: *database
@@ -250,7 +250,7 @@ verify Go 1.15:
   services:
     - name: redis:alpine
       alias: "redis"
-  script: go test -v -tags=integration github.com/docker/distribution/registry/storage/cache/redis
+  script: go test -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/storage/cache/redis
 
 cache:redis Go 1.13:
   extends: .cache:redis
