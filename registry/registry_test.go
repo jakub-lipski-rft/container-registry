@@ -324,7 +324,11 @@ func TestConfigureMonitoring_PprofHandler(t *testing.T) {
 }
 
 func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
-	addr := freeLnAddr(t).String()
+	ln, err := net.Listen("tcp", ":")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	addr := ln.Addr().String()
 	config := &configuration.Configuration{}
 	config.HTTP.Debug.Addr = addr
 	config.HTTP.Debug.Prometheus.Enabled = true
@@ -335,7 +339,8 @@ func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
 		// Use local Prometheus registry for each test, otherwise different tests may attempt to register the same
 		// metrics in the default Prometheus registry, causing a panic.
 		opts = append(opts, monitoring.WithPrometheusRegisterer(prometheus.NewRegistry()))
-		err := monitoring.Start(opts...)
+		opts = append(opts, monitoring.WithListener(ln))
+		err = monitoring.Start(opts...)
 		require.NoError(t, err)
 	}()
 
@@ -345,7 +350,11 @@ func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
 }
 
 func TestConfigureMonitoring_All(t *testing.T) {
-	addr := freeLnAddr(t).String()
+	ln, err := net.Listen("tcp", ":")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	addr := ln.Addr().String()
 	config := &configuration.Configuration{}
 	config.HTTP.Debug.Addr = addr
 	config.HTTP.Debug.Pprof.Enabled = true
@@ -357,6 +366,7 @@ func TestConfigureMonitoring_All(t *testing.T) {
 		// Use local Prometheus registry for each test, otherwise different tests may attempt to register the same
 		// metrics in the default Prometheus registry, causing a panic.
 		opts = append(opts, monitoring.WithPrometheusRegisterer(prometheus.NewRegistry()))
+		opts = append(opts, monitoring.WithListener(ln))
 		err := monitoring.Start(opts...)
 		require.NoError(t, err)
 	}()
