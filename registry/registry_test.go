@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/docker/distribution/configuration"
 	_ "github.com/docker/distribution/registry/storage/driver/inmemory"
 	"github.com/stretchr/testify/require"
@@ -282,7 +284,7 @@ func assertMonitoringResponse(t *testing.T, addr, path string, expectedStatus in
 	require.Equal(t, expectedStatus, req.StatusCode)
 }
 
-func TestConfigureMonitoring_WithNoOptionsNoError(t *testing.T) {
+func TestConfigureMonitoring_NoErrorWithNoOptions(t *testing.T) {
 	config := &configuration.Configuration{}
 
 	go func() {
@@ -327,10 +329,14 @@ func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
 	config := &configuration.Configuration{}
 	config.HTTP.Debug.Addr = addr
 	config.HTTP.Debug.Prometheus.Enabled = true
-	configuration.ApplyDefaults(config)
+	config.HTTP.Debug.Prometheus.Path = "/metrics"
 
 	go func() {
-		err := monitoring.Start(configureMonitoring(config)...)
+		opts := configureMonitoring(config)
+		// Use local Prometheus registry for each test, otherwise different tests may attempt to register the same
+		// metrics in the default Prometheus registry, causing a panic.
+		opts = append(opts, monitoring.WithPrometheusRegisterer(prometheus.NewRegistry()))
+		err := monitoring.Start(opts...)
 		require.NoError(t, err)
 	}()
 
@@ -339,33 +345,20 @@ func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
 	assertMonitoringResponse(t, addr, "/metrics", http.StatusOK)
 }
 
-func TestConfigureMonitoring_MetricsHandlerWithCustomPath(t *testing.T) {
-	addr := freeLnAddr(t).String()
-	config := &configuration.Configuration{}
-	config.HTTP.Debug.Addr = addr
-	config.HTTP.Debug.Prometheus.Enabled = true
-	config.HTTP.Debug.Prometheus.Path = "/foo"
-
-	go func() {
-		err := monitoring.Start(configureMonitoring(config)...)
-		require.NoError(t, err)
-	}()
-
-	assertMonitoringResponse(t, addr, "/debug/health", http.StatusOK)
-	assertMonitoringResponse(t, addr, "/debug/pprof", http.StatusNotFound)
-	assertMonitoringResponse(t, addr, "/foo", http.StatusOK)
-}
-
 func TestConfigureMonitoring_All(t *testing.T) {
 	addr := freeLnAddr(t).String()
 	config := &configuration.Configuration{}
 	config.HTTP.Debug.Addr = addr
 	config.HTTP.Debug.Pprof.Enabled = true
 	config.HTTP.Debug.Prometheus.Enabled = true
-	configuration.ApplyDefaults(config)
+	config.HTTP.Debug.Prometheus.Path = "/metrics"
 
 	go func() {
-		err := monitoring.Start(configureMonitoring(config)...)
+		opts := configureMonitoring(config)
+		// Use local Prometheus registry for each test, otherwise different tests may attempt to register the same
+		// metrics in the default Prometheus registry, causing a panic.
+		opts = append(opts, monitoring.WithPrometheusRegisterer(prometheus.NewRegistry()))
+		err := monitoring.Start(opts...)
 		require.NoError(t, err)
 	}()
 
