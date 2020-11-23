@@ -14,10 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/docker/distribution/configuration"
 	_ "github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"gitlab.com/gitlab-org/labkit/monitoring"
 )
