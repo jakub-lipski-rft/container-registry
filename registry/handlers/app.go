@@ -234,9 +234,6 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 				s[i] = fmt.Sprint(v)
 			}
 
-			log.WithField("exceptions", s).
-				Warn("redirect enabled with exceptions, this feature is temporary and will be removed in a future version")
-
 			options = append(options, storage.EnableRedirectWithExceptions(s))
 		} else {
 			options = append(options, storage.EnableRedirect)
