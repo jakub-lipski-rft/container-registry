@@ -234,6 +234,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 				s[i] = fmt.Sprint(v)
 			}
 
+			log.WithField("exceptions", s).Info("backend redirection enabled with exceptions")
+
 			options = append(options, storage.EnableRedirectWithExceptions(s))
 		} else {
 			options = append(options, storage.EnableRedirect)
