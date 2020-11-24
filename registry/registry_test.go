@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"syscall"
@@ -15,7 +16,9 @@ import (
 
 	"github.com/docker/distribution/configuration"
 	_ "github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/labkit/monitoring"
 )
 
 // Tests to ensure nextProtos returns the correct protocols when:
@@ -258,4 +261,107 @@ func TestConfigureStackDriver_DoesNotOverrideGitlabContinuousProfilingEnvVar(t *
 	defer os.Unsetenv("GITLAB_CONTINUOUS_PROFILING")
 
 	requireEnvSet(t, "GITLAB_CONTINUOUS_PROFILING", value)
+}
+
+func freeLnAddr(t *testing.T) net.Addr {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", ":")
+	require.NoError(t, err)
+	addr := ln.Addr()
+	require.NoError(t, ln.Close())
+
+	return addr
+}
+func assertMonitoringResponse(t *testing.T, addr, path string, expectedStatus int) {
+	t.Helper()
+
+	u := url.URL{Scheme: "http", Host: addr, Path: path}
+	req, err := http.Get(u.String())
+	require.NoError(t, err)
+	defer req.Body.Close()
+	require.Equal(t, expectedStatus, req.StatusCode)
+}
+
+func TestConfigureMonitoring_HealthHandler(t *testing.T) {
+	addr := freeLnAddr(t).String()
+
+	config := &configuration.Configuration{}
+	config.HTTP.Debug.Addr = addr
+
+	go func() {
+		opts := configureMonitoring(config)
+		err := monitoring.Start(opts...)
+		require.NoError(t, err)
+	}()
+	// give the monitoring service some time to start
+	time.Sleep(5 * time.Millisecond)
+
+	assertMonitoringResponse(t, addr, "/debug/health", http.StatusOK)
+	assertMonitoringResponse(t, addr, "/debug/pprof", http.StatusNotFound)
+	assertMonitoringResponse(t, addr, "/metrics", http.StatusNotFound)
+}
+
+func TestConfigureMonitoring_PprofHandler(t *testing.T) {
+	addr := freeLnAddr(t).String()
+
+	config := &configuration.Configuration{}
+	config.HTTP.Debug.Addr = addr
+	config.HTTP.Debug.Pprof.Enabled = true
+
+	go func() {
+		opts := configureMonitoring(config)
+		err := monitoring.Start(opts...)
+		require.NoError(t, err)
+	}()
+	time.Sleep(5 * time.Millisecond)
+
+	assertMonitoringResponse(t, addr, "/debug/health", http.StatusOK)
+	assertMonitoringResponse(t, addr, "/debug/pprof", http.StatusOK)
+	assertMonitoringResponse(t, addr, "/metrics", http.StatusNotFound)
+}
+
+func TestConfigureMonitoring_MetricsHandler(t *testing.T) {
+	addr := freeLnAddr(t).String()
+
+	config := &configuration.Configuration{}
+	config.HTTP.Debug.Addr = addr
+	config.HTTP.Debug.Prometheus.Enabled = true
+	config.HTTP.Debug.Prometheus.Path = "/metrics"
+
+	go func() {
+		opts := configureMonitoring(config)
+		// Use local Prometheus registry for each test, otherwise different tests may attempt to register the same
+		// metrics in the default Prometheus registry, causing a panic.
+		opts = append(opts, monitoring.WithPrometheusRegisterer(prometheus.NewRegistry()))
+		err := monitoring.Start(opts...)
+		require.NoError(t, err)
+	}()
+	time.Sleep(5 * time.Millisecond)
+
+	assertMonitoringResponse(t, addr, "/debug/health", http.StatusOK)
+	assertMonitoringResponse(t, addr, "/debug/pprof", http.StatusNotFound)
+	assertMonitoringResponse(t, addr, "/metrics", http.StatusOK)
+}
+
+func TestConfigureMonitoring_All(t *testing.T) {
+	addr := freeLnAddr(t).String()
+
+	config := &configuration.Configuration{}
+	config.HTTP.Debug.Addr = addr
+	config.HTTP.Debug.Pprof.Enabled = true
+	config.HTTP.Debug.Prometheus.Enabled = true
+	config.HTTP.Debug.Prometheus.Path = "/metrics"
+
+	go func() {
+		opts := configureMonitoring(config)
+		opts = append(opts, monitoring.WithPrometheusRegisterer(prometheus.NewRegistry()))
+		err := monitoring.Start(opts...)
+		require.NoError(t, err)
+	}()
+	time.Sleep(5 * time.Millisecond)
+
+	assertMonitoringResponse(t, addr, "/debug/health", http.StatusOK)
+	assertMonitoringResponse(t, addr, "/debug/pprof", http.StatusOK)
+	assertMonitoringResponse(t, addr, "/metrics", http.StatusOK)
 }
