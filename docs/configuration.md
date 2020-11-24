@@ -1053,8 +1053,6 @@ the `HOST:PORT` on which the debug server should accept connections.
 The `prometheus` option defines whether the prometheus metrics is enable, as well
 as the path to access the metrics.
 
-These options will be ignored if the `debug.addr` attribute is not set.
-
 | Parameter | Required | Description                                           |
 |-----------|----------|-------------------------------------------------------|
 | `enabled` | no       | Set `true` to enable the prometheus server            |
@@ -1066,8 +1064,6 @@ in `addr` under `debug`.
 #### `pprof`
 
 The `pprof` section configures a pprof server, which listens at `/debug/pprof/`.
-
-These options will be ignored if the `debug.addr` attribute is not set.
 
 | Parameter | Required | Description                                           |
 |-----------|----------|-------------------------------------------------------|
