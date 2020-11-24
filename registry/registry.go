@@ -395,40 +395,52 @@ func configureBugsnag(config *configuration.Configuration) {
 }
 
 func configureMonitoring(config *configuration.Configuration) []monitoring.Option {
-	debugAddr := config.HTTP.Debug.Addr
-	metricsPath := config.HTTP.Debug.Prometheus.Path
+	var opts []monitoring.Option
+	addr := config.HTTP.Debug.Addr
 
-	opts := []monitoring.Option{
-		monitoring.WithListenerAddress(debugAddr),
-		monitoring.WithMetricsHandlerPattern(metricsPath),
-		monitoring.WithProfilerCredentialsFile(config.Profiling.Stackdriver.KeyFile),
-		monitoring.WithBuildInformation(version.Version, version.BuildTime),
-		monitoring.WithBuildExtraLabels(map[string]string{
-			"package":  version.Package,
-			"revision": version.Revision,
-		}),
+	if addr != "" {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/debug/health", health.StatusHandler)
+		log.WithFields(log.Fields{"address": addr, "path": "/debug/health"}).Info("starting health checker")
+
+		opts = []monitoring.Option{
+			monitoring.WithServeMux(mux),
+			monitoring.WithListenerAddress(addr),
+		}
+
+		if config.HTTP.Debug.Prometheus.Enabled {
+			opts = append(opts, monitoring.WithMetricsHandlerPattern(config.HTTP.Debug.Prometheus.Path))
+			opts = append(opts, monitoring.WithBuildInformation(version.Version, version.BuildTime))
+			opts = append(opts, monitoring.WithBuildExtraLabels(map[string]string{
+				"package":  version.Package,
+				"revision": version.Revision,
+			}))
+			log.WithFields(log.Fields{"address": addr, "path": config.HTTP.Debug.Prometheus.Path}).Info("starting Prometheus listener")
+		} else {
+			opts = append(opts, monitoring.WithoutMetrics())
+		}
+
+		if config.HTTP.Debug.Pprof.Enabled {
+			log.WithFields(log.Fields{"address": addr, "path": "/debug/pprof/"}).Info("starting pprof listener")
+		} else {
+			opts = append(opts, monitoring.WithoutPprof())
+		}
+	} else {
+		opts = []monitoring.Option{
+			monitoring.WithoutMetrics(),
+			monitoring.WithoutPprof(),
+		}
 	}
 
-	if !config.HTTP.Debug.Prometheus.Enabled {
-		opts = append(opts, monitoring.WithoutMetrics())
-	} else {
-		log.WithFields(log.Fields{"address": debugAddr, "path": metricsPath}).Info("starting Prometheus listener")
-	}
-
-	if !config.HTTP.Debug.Pprof.Enabled {
-		opts = append(opts, monitoring.WithoutPprof())
-	} else {
-		log.WithFields(log.Fields{"address": debugAddr, "path": "/debug/pprof/"}).Info("starting pprof listener")
-	}
-
-	if !config.Profiling.Stackdriver.Enabled {
-		opts = append(opts, monitoring.WithoutContinuousProfiling())
-	} else {
+	if config.Profiling.Stackdriver.Enabled {
+		opts = append(opts, monitoring.WithProfilerCredentialsFile(config.Profiling.Stackdriver.KeyFile))
 		if err := configureStackdriver(config); err != nil {
 			log.WithError(err).Error("failed to configure Stackdriver profiler")
 			return opts
 		}
 		log.Info("starting Stackdriver profiler")
+	} else {
+		opts = append(opts, monitoring.WithoutContinuousProfiling())
 	}
 
 	return opts
