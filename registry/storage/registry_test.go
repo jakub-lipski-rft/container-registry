@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/docker/distribution/testutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,4 +81,36 @@ func expectRedirect(t *testing.T, reg *registry, repoPath string, redirect bool)
 func TestNewRegistry_RedirectException_InvalidRegex(t *testing.T) {
 	_, err := NewRegistry(context.Background(), inmemory.New(), EnableRedirectWithExceptions([]string{"><(((('>"}))
 	require.EqualError(t, err, "configuring storage redirect exception: error parsing regexp: missing closing ): `><(((('>`")
+}
+
+func TestRepositoryExists(t *testing.T) {
+	ctx := context.Background()
+
+	registry, err := NewRegistry(ctx, inmemory.New())
+	require.NoError(t, err)
+
+	named, err := reference.WithName("test/repo")
+	require.NoError(t, err)
+
+	repo, err := registry.Repository(ctx, named)
+	require.NoError(t, err)
+
+	r, ok := repo.(*repository)
+	require.True(t, ok)
+
+	// check non existing test repo
+	exists, err := r.Exists(ctx)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// upload a blob to test repo (will create the repository path)
+	ll, err := testutil.CreateRandomLayers(1)
+	require.NoError(t, err)
+	err = testutil.UploadBlobs(r, ll)
+	require.NoError(t, err)
+
+	// check existing test repo
+	exists, err = r.Exists(ctx)
+	require.NoError(t, err)
+	require.True(t, exists)
 }

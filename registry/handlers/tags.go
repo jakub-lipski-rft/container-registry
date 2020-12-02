@@ -23,10 +23,10 @@ func tagsDispatcher(ctx *Context, r *http.Request) http.Handler {
 	tagsHandler := &tagsHandler{
 		Context: ctx,
 	}
-
-	return handlers.MethodHandler{
+	h := handlers.MethodHandler{
 		"GET": http.HandlerFunc(tagsHandler.GetTags),
 	}
+	return migrationWrapper(ctx, h)
 }
 
 // tagsHandler handles requests for lists of tags under a repository name.
@@ -153,7 +153,7 @@ func tagDispatcher(ctx *Context, r *http.Request) http.Handler {
 		thandler["DELETE"] = http.HandlerFunc(tagHandler.DeleteTag)
 	}
 
-	return thandler
+	return migrationWrapper(ctx, thandler)
 }
 
 // tagHandler handles requests for a specific tag under a repository name.

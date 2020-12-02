@@ -84,6 +84,12 @@ func TestPathMapper(t *testing.T) {
 			},
 			expected: "/docker/registry/v2/repositories/foo/bar/_uploads/asdf-asdf-asdf-adsf/startedat",
 		},
+		{
+			spec: repositoryRootPathSpec{
+				name: "foo/bar",
+			},
+			expected: "/docker/registry/v2/repositories/foo/bar",
+		},
 	} {
 		p, err := pathFor(testcase.spec)
 		if err != nil {
