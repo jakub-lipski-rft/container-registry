@@ -250,6 +250,8 @@ func pathFor(spec pathSpec) (string, error) {
 		return path.Join(append(repoPrefix, v.name, "_uploads", v.id, "hashstates", string(v.alg), offset)...), nil
 	case repositoriesRootPathSpec:
 		return path.Join(repoPrefix...), nil
+	case repositoryRootPathSpec:
+		return path.Join(append(repoPrefix, v.name)...), nil
 	default:
 		// TODO(sday): This is an internal error. Ensure it doesn't escape (panic?).
 		return "", fmt.Errorf("unknown path spec: %#v", v)
@@ -436,6 +438,13 @@ type repositoriesRootPathSpec struct {
 }
 
 func (repositoriesRootPathSpec) pathSpec() {}
+
+// repositoryRootPathSpec returns the root of a repository.
+type repositoryRootPathSpec struct {
+	name string
+}
+
+func (repositoryRootPathSpec) pathSpec() {}
 
 // digestPathComponents provides a consistent path breakdown for a given
 // digest. For a generic digest, it will be as follows:

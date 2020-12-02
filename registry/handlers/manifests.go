@@ -55,11 +55,11 @@ func manifestDispatcher(ctx *Context, r *http.Request) http.Handler {
 	manifestHandler := &manifestHandler{
 		Context: ctx,
 	}
-	reference := getReference(ctx)
-	dgst, err := digest.Parse(reference)
+	ref := getReference(ctx)
+	dgst, err := digest.Parse(ref)
 	if err != nil {
 		// We just have a tag
-		manifestHandler.Tag = reference
+		manifestHandler.Tag = ref
 	} else {
 		manifestHandler.Digest = dgst
 	}
@@ -74,7 +74,7 @@ func manifestDispatcher(ctx *Context, r *http.Request) http.Handler {
 		mhandler["DELETE"] = http.HandlerFunc(manifestHandler.DeleteManifest)
 	}
 
-	return mhandler
+	return migrationWrapper(ctx, mhandler)
 }
 
 // manifestHandler handles http operations on image manifests.

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -386,4 +387,26 @@ func (repo *repository) Blobs(ctx context.Context) distribution.BlobStore {
 		resumableDigestEnabled: repo.resumableDigestEnabled,
 		mirrorFS:               repo.mirrorFS,
 	}
+}
+
+// RepositoryValidator provides an interface for validating repositories.
+type RepositoryValidator interface {
+	// Exists determines whether the repository exists in the storage backend or not.
+	Exists(ctx context.Context) (bool, error)
+}
+
+// Exists determines whether the repository exists in the storage backend or not.
+func (repo *repository) Exists(ctx context.Context) (bool, error) {
+	p, err := pathFor(repositoryRootPathSpec{name: repo.name.Name()})
+	if err != nil {
+		return false, err
+	}
+	if _, err := repo.driver.Stat(ctx, p); err != nil {
+		if !errors.As(err, &storagedriver.PathNotFoundError{}) {
+			return false, err
+		}
+		return false, nil
+	}
+
+	return true, nil
 }

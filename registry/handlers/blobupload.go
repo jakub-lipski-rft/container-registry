@@ -38,14 +38,22 @@ func blobUploadDispatcher(ctx *Context, r *http.Request) http.Handler {
 		handler["DELETE"] = http.HandlerFunc(buh.CancelBlobUpload)
 	}
 
-	if buh.UUID != "" {
-		if h := buh.ResumeBlobUpload(ctx, r); h != nil {
-			return h
-		}
-		return closeResources(handler, buh.Upload)
-	}
+	return migrationWrapper(ctx, buh.validateUpload(handler))
+}
 
-	return handler
+func (buh *blobUploadHandler) validateUpload(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if buh.UUID != "" {
+			if h := buh.ResumeBlobUpload(buh.Context, r); h != nil {
+				h.ServeHTTP(w, r)
+			} else {
+				h := closeResources(handler, buh.Upload)
+				h.ServeHTTP(w, r)
+			}
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
 }
 
 // blobUploadHandler handles the http blob upload process.
