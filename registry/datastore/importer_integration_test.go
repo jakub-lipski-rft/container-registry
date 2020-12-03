@@ -24,8 +24,14 @@ import (
 func newFilesystemStorageDriver(tb testing.TB) *filesystem.Driver {
 	tb.Helper()
 
+	return newFilesystemStorageDriverWithRoot(tb, "happy-path")
+}
+
+func newFilesystemStorageDriverWithRoot(tb testing.TB, root string) *filesystem.Driver {
+	tb.Helper()
+
 	driver, err := filesystem.FromParameters(map[string]interface{}{
-		"rootdirectory": path.Join(suite.fixturesPath, "importer"),
+		"rootdirectory": path.Join(suite.fixturesPath, "importer", root),
 	})
 	require.NoError(tb, err, "error creating storage driver")
 
@@ -74,7 +80,13 @@ func overrideDynamicData(tb testing.TB, actual []byte) []byte {
 func newImporter(t *testing.T, db *datastore.DB, opts ...datastore.ImporterOption) *datastore.Importer {
 	t.Helper()
 
-	driver := newFilesystemStorageDriver(t)
+	return newImporterWithRoot(t, db, "happy-path", opts...)
+}
+
+func newImporterWithRoot(t *testing.T, db *datastore.DB, root string, opts ...datastore.ImporterOption) *datastore.Importer {
+	t.Helper()
+
+	driver := newFilesystemStorageDriverWithRoot(t, root)
 	registry := newRegistry(t, driver)
 
 	return datastore.NewImporter(db, driver, registry, opts...)
