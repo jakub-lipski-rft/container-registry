@@ -698,7 +698,9 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 			if !(errors.As(err, &driver.PathNotFoundError{}) || errors.As(err, &distribution.ErrRepositoryUnknown{})) {
 				return err
 			}
+			return nil
 		}
+
 		repoEnd := time.Since(repoStart).Seconds()
 		log.WithField("duration_s", repoEnd).Info("repository import complete")
 
