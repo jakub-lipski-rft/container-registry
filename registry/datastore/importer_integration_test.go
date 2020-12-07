@@ -182,6 +182,14 @@ func TestImporter_ImportAll_DanglingManifests_ContinuesAfterRepositoryNotFound(t
 	validateImport(t, suite.db)
 }
 
+func TestImporter_ImportAll_DanglingBlobs_StopsOnError(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporterWithRoot(t, suite.db, "invalid-blob", datastore.WithImportDanglingBlobs)
+	require.Error(t, imp.ImportAll(suite.ctx))
+	validateImport(t, suite.db)
+}
+
 func TestImporter_Import(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
