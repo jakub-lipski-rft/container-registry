@@ -182,6 +182,14 @@ func TestImporter_ImportAll_DanglingManifests_ContinuesAfterRepositoryNotFound(t
 	validateImport(t, suite.db)
 }
 
+func TestImporter_ImportAll_DanglingManifests_StopsOnMissingConfigBlob(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporterWithRoot(t, suite.db, "unlinked-config", datastore.WithImportDanglingManifests)
+	require.Error(t, imp.ImportAll(suite.ctx))
+	validateImport(t, suite.db)
+}
+
 func TestImporter_ImportAll_DanglingBlobs_StopsOnError(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
