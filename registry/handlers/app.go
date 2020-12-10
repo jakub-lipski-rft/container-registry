@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/gitlab-org/labkit/metrics/sqlmetrics"
+
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
@@ -40,6 +42,7 @@ import (
 	"github.com/docker/libtrust"
 	"github.com/gomodule/redigo/redis"
 	"github.com/gorilla/mux"
+	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/labkit/errortracking"
 	metricskit "gitlab.com/gitlab-org/labkit/metrics"
@@ -319,6 +322,12 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 
 		app.db = db
 		options = append(options, storage.Database(app.db))
+
+		if config.HTTP.Debug.Prometheus.Enabled {
+			// Expose database metrics to prometheus.
+			collector := sqlmetrics.NewDBStatsCollector(config.Database.DBName, db)
+			promclient.MustRegister(collector)
+		}
 
 		if config.Migration.DisableMirrorFS {
 			options = append(options, storage.DisableMirrorFS)
