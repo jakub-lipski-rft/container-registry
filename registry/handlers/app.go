@@ -833,7 +833,10 @@ func (app *App) logError(ctx context.Context, errors errcode.Errors) {
 func (app *App) context(w http.ResponseWriter, r *http.Request) *Context {
 	ctx := r.Context()
 	ctx = dcontext.WithVars(ctx, r)
+	name := dcontext.GetStringValue(ctx, "vars.name")
+	ctx = context.WithValue(ctx, "root_repo", strings.Split(name, "/")[0])
 	ctx = dcontext.WithLogger(ctx, dcontext.GetLogger(ctx,
+		"root_repo",
 		"vars.name",
 		"vars.reference",
 		"vars.digest",

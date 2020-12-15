@@ -16,6 +16,7 @@ import (
 	"github.com/docker/distribution/registry/storage"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
 )
 
 // blobUploadDispatcher constructs and returns the blob upload handler for the
@@ -265,6 +266,7 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 		// of this.
 	})
 
+	log := dcontext.GetLogger(buh)
 	if err != nil {
 		switch err := err.(type) {
 		case distribution.ErrBlobInvalidDigest:
@@ -280,7 +282,7 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 			case distribution.ErrBlobInvalidLength, distribution.ErrBlobDigestUnsupported:
 				buh.Errors = append(buh.Errors, v2.ErrorCodeBlobUploadInvalid.WithDetail(err))
 			default:
-				dcontext.GetLogger(buh).Errorf("unknown error completing upload: %v", err)
+				log.Errorf("unknown error completing upload: %v", err)
 				buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 			}
 
@@ -289,7 +291,7 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 		// Clean up the backend blob data if there was an error.
 		if err := buh.Upload.Cancel(buh); err != nil {
 			// If the cleanup fails, all we can do is observe and report.
-			dcontext.GetLogger(buh).Errorf("error canceling upload after error: %v", err)
+			log.Errorf("error canceling upload after error: %v", err)
 		}
 
 		return
@@ -307,6 +309,12 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 		buh.Errors = append(buh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		return
 	}
+
+	log.WithFields(logrus.Fields{
+		"media_type": desc.MediaType,
+		"size_bytes": desc.Size,
+		"digest":     desc.Digest,
+	}).Info("blob uploaded")
 }
 
 // CancelBlobUpload cancels an in-progress upload of a blob.

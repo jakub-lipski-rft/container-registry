@@ -27,6 +27,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 )
 
 // These constants determine which architecture and OS to choose from a
@@ -504,7 +505,8 @@ func etagMatch(r *http.Request, etag string) bool {
 
 // PutManifest validates and stores a manifest in the registry.
 func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) {
-	dcontext.GetLogger(imh).Debug("PutImageManifest")
+	log := dcontext.GetLogger(imh)
+	log.Debug("PutImageManifest")
 	manifests, err := imh.Repository.Manifests(imh)
 	if err != nil {
 		imh.Errors = append(imh.Errors, err)
@@ -527,7 +529,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 	if imh.Digest != "" {
 		if desc.Digest != imh.Digest {
-			dcontext.GetLogger(imh).Errorf("payload digest does match: %q != %q", desc.Digest, imh.Digest)
+			log.Errorf("payload digest does match: %q != %q", desc.Digest, imh.Digest)
 			imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
 			return
 		}
@@ -541,9 +543,9 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	isAnOCIManifest := mediaType == v1.MediaTypeImageManifest || mediaType == v1.MediaTypeImageIndex
 
 	if isAnOCIManifest {
-		dcontext.GetLogger(imh).Debug("Putting an OCI Manifest!")
+		log.Debug("Putting an OCI Manifest!")
 	} else {
-		dcontext.GetLogger(imh).Debug("Putting a Docker Manifest!")
+		log.Debug("Putting a Docker Manifest!")
 	}
 
 	var options []distribution.ManifestServiceOption
@@ -677,14 +679,19 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		// NOTE(stevvooe): Given the behavior above, this absurdly unlikely to
 		// happen. We'll log the error here but proceed as if it worked. Worst
 		// case, we set an empty location header.
-		dcontext.GetLogger(imh).Errorf("error building manifest url from digest: %v", err)
+		log.Errorf("error building manifest url from digest: %v", err)
 	}
 
 	w.Header().Set("Location", location)
 	w.Header().Set("Docker-Content-Digest", imh.Digest.String())
 	w.WriteHeader(http.StatusCreated)
 
-	dcontext.GetLogger(imh).Debug("Succeeded in putting manifest!")
+	log.WithFields(logrus.Fields{
+		"media_type": desc.MediaType,
+		"size_bytes": desc.Size,
+		"digest":     desc.Digest,
+		"tag":        imh.Tag,
+	}).Info("manifest uploaded")
 }
 
 func dbPutManifest(
