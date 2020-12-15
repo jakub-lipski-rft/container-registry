@@ -1,5 +1,15 @@
 ## [Unreleased]
-## Deprecated
+### Added
+- registry: Experimental PostgreSQL metadata database (incomplete, in progress)
+- registry: Use GitLab LabKit for HTTP metrics collection
+- registry: Add support for a pprof monitoring server
+
+### Changed
+- configuration: Improve error reporting when `storage.redirect` section is misconfigured
+- registry/storage: Upgrade the GCS SDK to v1.12.0
+
+## [v2.12.0-gitlab] - 2020-11-23
+### Deprecated
 - configuration: Deprecate log hooks, to be removed by January 22nd, 2021
 - configuration: Deprecate Bugsnag support, to be removed by January 22nd, 2021
 - configuration: Deprecate NewRelic support, to be removed by January 22nd, 2021
@@ -7,24 +17,21 @@
 - registry/api: Deprecate Docker Schema v1 compatibility, to be removed by January 22nd, 2021
 - configuration: Deprecate TLS 1.0 and TLS 1.1 support, to be removed by January 22nd, 2021
 
-## Added
-- registry: Experimental PostgreSQL metadata database (incomplete, in progress)
-- registry: Use GitLab LabKit for HTTP metrics collection
+### Added
+- registry: Add support for error reporting with Sentry
 - registry/storage/cache/redis: Add Prometheus metrics for Redis cache store
-- registry: Add support for a pprof monitoring server
 - registry: Add TLS support for Redis
 - registry: Add support for Redis Sentinel
-- registry: Add support for error reporting with Sentry
+- registry: Enable toggling redirects to storage backends on a per-repository basis
 
 ### Changed
 - configuration: Cloudfront middleware `ipfilteredby` setting is now optional
-- configuration: Improve error reporting when `storage.redirect` section is misconfigured
 
 ### Fixed
-- registry/api/v2: Text-charset selector removed from `application/json` content-type
 - registry/storage: Swift path generation now generates multiple directories as intended
 - registry/client/auth: OAuth token authentication now returns a `ErrNoToken` if a token is not found in the response
 - registry/storage: Fix custom User-Agent header on S3 requests
+- registry/api/v2: Text-charset selector removed from `application/json` content-type
 
 ## [v2.11.0-gitlab] - 2020-09-08
 ## Added
