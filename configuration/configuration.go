@@ -387,8 +387,10 @@ type Migration struct {
 		Enabled bool `yaml:"enabled,omitempty"`
 		// URL is the URL of the target registry instance for where requests should be proxied to.
 		URL string `yaml:"url,omitempty"`
-		// Include allows filtering repositories to proxy by name, using a list of regular expressions.
+		// Include allows filtering repositories that should be proxied by name, using a list of regular expressions.
 		Include []*Regexp `yaml:"include,omitempty"`
+		// Exclude allows filtering repositories that should not be proxied by name, using a list of regular expressions.
+		Exclude []*Regexp `yaml:"exclude,omitempty"`
 	} `yaml:"proxy,omitempty"`
 }
 
