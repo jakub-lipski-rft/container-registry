@@ -38,6 +38,7 @@ import (
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	storagemiddleware "github.com/docker/distribution/registry/storage/driver/middleware"
+	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/distribution/version"
 	"github.com/docker/libtrust"
 	"github.com/gomodule/redigo/redis"
@@ -92,6 +93,8 @@ type App struct {
 
 	// readOnly is true if the registry is in a read-only maintenance mode
 	readOnly bool
+
+	manifestURLs validation.ManifestURLs
 }
 
 // NewApp takes a configuration and returns a configured app, ready to serve
@@ -253,7 +256,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	if config.Validation.Enabled {
 		if len(config.Validation.Manifests.URLs.Allow) == 0 && len(config.Validation.Manifests.URLs.Deny) == 0 {
 			// If Allow and Deny are empty, allow nothing.
-			options = append(options, storage.ManifestURLsAllowRegexp(regexp.MustCompile("^$")))
+			app.manifestURLs.Allow = regexp.MustCompile("^$")
+			options = append(options, storage.ManifestURLsAllowRegexp(app.manifestURLs.Allow))
 		} else {
 			if len(config.Validation.Manifests.URLs.Allow) > 0 {
 				for i, s := range config.Validation.Manifests.URLs.Allow {
@@ -264,8 +268,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 					// Wrap with non-capturing group.
 					config.Validation.Manifests.URLs.Allow[i] = fmt.Sprintf("(?:%s)", s)
 				}
-				re := regexp.MustCompile(strings.Join(config.Validation.Manifests.URLs.Allow, "|"))
-				options = append(options, storage.ManifestURLsAllowRegexp(re))
+				app.manifestURLs.Allow = regexp.MustCompile(strings.Join(config.Validation.Manifests.URLs.Allow, "|"))
+				options = append(options, storage.ManifestURLsAllowRegexp(app.manifestURLs.Allow))
 			}
 			if len(config.Validation.Manifests.URLs.Deny) > 0 {
 				for i, s := range config.Validation.Manifests.URLs.Deny {
@@ -276,8 +280,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 					// Wrap with non-capturing group.
 					config.Validation.Manifests.URLs.Deny[i] = fmt.Sprintf("(?:%s)", s)
 				}
-				re := regexp.MustCompile(strings.Join(config.Validation.Manifests.URLs.Deny, "|"))
-				options = append(options, storage.ManifestURLsDenyRegexp(re))
+				app.manifestURLs.Deny = regexp.MustCompile(strings.Join(config.Validation.Manifests.URLs.Deny, "|"))
+				options = append(options, storage.ManifestURLsDenyRegexp(app.manifestURLs.Deny))
 			}
 		}
 	}
