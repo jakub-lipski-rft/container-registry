@@ -54,6 +54,21 @@ func (h migrationHandler) proxyNewRepositories(rw http.ResponseWriter, req *http
 		return
 	}
 
+	// evaluate inclusion filters, if any
+	if len(h.App.Config.Migration.Proxy.Include) > 0 {
+		var proxy bool
+		for _, r := range h.App.Config.Migration.Proxy.Include {
+			if r.MatchString(repo.Named().String()) {
+				proxy = true
+			}
+		}
+		if !proxy {
+			log.Debug("repository name does not match any inclusion filter, request will be served by this registry")
+			h.fallback.ServeHTTP(rw, req)
+			return
+		}
+	}
+
 	targetURL := h.App.Config.Migration.Proxy.URL
 	log = log.WithField("url", targetURL)
 	log.Info("unknown repository, forwarding to target migration registry")
