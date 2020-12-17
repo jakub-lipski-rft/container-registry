@@ -11,6 +11,7 @@ import (
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/storage/cache"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/libtrust"
 )
 
@@ -27,16 +28,10 @@ type registry struct {
 	mirrorFS                     bool
 	schema1SigningKey            libtrust.PrivateKey
 	blobDescriptorServiceFactory distribution.BlobDescriptorServiceFactory
-	manifestURLs                 manifestURLs
+	manifestURLs                 validation.ManifestURLs
 	driver                       storagedriver.StorageDriver
 	db                           *datastore.DB
 	redirectExceptions           []*regexp.Regexp
-}
-
-// manifestURLs holds regular expressions for controlling manifest URL allowlisting
-type manifestURLs struct {
-	allow *regexp.Regexp
-	deny  *regexp.Regexp
 }
 
 // RegistryOption is the type used for functional options for NewRegistry.
@@ -91,7 +86,7 @@ func DisableDigestResumption(registry *registry) error {
 // ManifestURLsAllowRegexp is a functional option for NewRegistry.
 func ManifestURLsAllowRegexp(r *regexp.Regexp) RegistryOption {
 	return func(registry *registry) error {
-		registry.manifestURLs.allow = r
+		registry.manifestURLs.Allow = r
 		return nil
 	}
 }
@@ -99,7 +94,7 @@ func ManifestURLsAllowRegexp(r *regexp.Regexp) RegistryOption {
 // ManifestURLsDenyRegexp is a functional option for NewRegistry.
 func ManifestURLsDenyRegexp(r *regexp.Regexp) RegistryOption {
 	return func(registry *registry) error {
-		registry.manifestURLs.deny = r
+		registry.manifestURLs.Deny = r
 		return nil
 	}
 }

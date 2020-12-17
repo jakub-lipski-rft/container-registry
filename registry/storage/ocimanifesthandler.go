@@ -8,6 +8,7 @@ import (
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/manifest/ocischema"
+	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -17,7 +18,7 @@ type ocischemaManifestHandler struct {
 	repository   distribution.Repository
 	blobStore    distribution.BlobStore
 	ctx          context.Context
-	manifestURLs manifestURLs
+	manifestURLs validation.ManifestURLs
 }
 
 var _ ManifestHandler = &ocischemaManifestHandler{}
@@ -85,8 +86,8 @@ func (ms *ocischemaManifestHandler) verifyManifest(ctx context.Context, mnfst oc
 
 		switch descriptor.MediaType {
 		case v1.MediaTypeImageLayer, v1.MediaTypeImageLayerGzip, v1.MediaTypeImageLayerNonDistributable, v1.MediaTypeImageLayerNonDistributableGzip:
-			allow := ms.manifestURLs.allow
-			deny := ms.manifestURLs.deny
+			allow := ms.manifestURLs.Allow
+			deny := ms.manifestURLs.Deny
 			for _, u := range descriptor.URLs {
 				var pu *url.URL
 				pu, err = url.Parse(u)

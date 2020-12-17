@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/manifestlist"
 
 	"github.com/opencontainers/go-digest"
@@ -875,6 +876,38 @@ func TestRepositoryStore_FindManifestByTagName_NotFound(t *testing.T) {
 	require.Nil(t, m)
 }
 
+func TestRepositoryManifestService_ManifestExists(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// See testdata/fixtures/{manifests,repositories}.sql
+	rms := &datastore.RepositoryManifestService{
+		RepositoryReader: s,
+		RepositoryPath:   "gitlab-org/gitlab-test/backend",
+	}
+
+	ok, err := rms.Exists(suite.ctx, "sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f")
+	require.NoError(t, err)
+	require.True(t, ok)
+}
+
+func TestRepositoryManifestService_ManifestExists_NotFound(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// See testdata/fixtures/{manifests,repositories}.sql
+	rms := &datastore.RepositoryManifestService{
+		RepositoryReader: s,
+		RepositoryPath:   "gitlab-org/gitlab-test/backend",
+	}
+
+	ok, err := rms.Exists(suite.ctx, "sha256:4f4f2828206afd685c3ab9925409777bd015ae9cc27ddf2e0ddb90bcb2b1624c")
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
 func TestRepositoryStore_FindTagByName(t *testing.T) {
 	reloadTagFixtures(t)
 
@@ -1007,6 +1040,40 @@ func TestRepositoryStore_ExistsBlobByDigest_NotFound(t *testing.T) {
 	exists, err := s.ExistsBlob(suite.ctx, r, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
 	require.NoError(t, err)
 	require.False(t, exists)
+}
+
+func TestRepositoryBlobService_Stat(t *testing.T) {
+	reloadBlobFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// See testdata/fixtures/{repository_blobs,repositories}.sql
+	rbs := &datastore.RepositoryBlobService{
+		RepositoryReader: s,
+		RepositoryPath:   "a-test-group/bar",
+	}
+
+	dgst := digest.Digest("sha256:6b0937e234ce911b75630b744fb12836fe01bda5f7db203927edbb1390bc7e21")
+
+	desc, err := rbs.Stat(suite.ctx, dgst)
+	require.NoError(t, err)
+	require.EqualValues(t, distribution.Descriptor{Digest: dgst, Size: int64(108), MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip"}, desc)
+}
+
+func TestRepositoryBlobService_Stat_NotFound(t *testing.T) {
+	reloadBlobFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// See testdata/fixtures/{repository_blobs,repositories}.sql
+	rbs := &datastore.RepositoryBlobService{
+		RepositoryReader: s,
+		RepositoryPath:   "a-test-group/bar",
+	}
+
+	desc, err := rbs.Stat(suite.ctx, "sha256:fe0982e263ce911b75630b823fab12836fe51bda5f7db834020edc1390b19a45")
+	require.EqualError(t, err, distribution.ErrBlobUnknown.Error())
+	require.Equal(t, distribution.Descriptor{}, desc)
 }
 
 func TestRepositoryStore_Create(t *testing.T) {

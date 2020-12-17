@@ -10,6 +10,7 @@ import (
 
 	"github.com/opencontainers/go-digest"
 
+	"github.com/docker/distribution"
 	"github.com/docker/distribution/registry/datastore/models"
 )
 
@@ -67,6 +68,55 @@ type repositoryStore struct {
 // NewRepositoryStore builds a new repositoryStore.
 func NewRepositoryStore(db Queryer) *repositoryStore {
 	return &repositoryStore{db: db}
+}
+
+// RepositoryManifestService implements the validation.ManifestExister
+// interface for repository-scoped manifests.
+type RepositoryManifestService struct {
+	RepositoryReader
+	RepositoryPath string
+}
+
+// Exists returns true if the manifest is linked in the repository.
+func (rms *RepositoryManifestService) Exists(ctx context.Context, dgst digest.Digest) (bool, error) {
+	r, err := rms.FindByPath(ctx, rms.RepositoryPath)
+	if err != nil {
+		return false, err
+	}
+
+	m, err := rms.FindManifestByDigest(ctx, r, dgst)
+	if err != nil {
+		return false, err
+	}
+
+	return m != nil, nil
+}
+
+// RepositoryBlobService implements the distribution.BlobStatter interface for
+// repository-scoped blobs.
+type RepositoryBlobService struct {
+	RepositoryReader
+	RepositoryPath string
+}
+
+// Stat returns the descriptor of the blob with the provided digest, returns
+// distribution.ErrBlobUnknown if not found.
+func (rbs *RepositoryBlobService) Stat(ctx context.Context, dgst digest.Digest) (distribution.Descriptor, error) {
+	r, err := rbs.FindByPath(ctx, rbs.RepositoryPath)
+	if err != nil {
+		return distribution.Descriptor{}, err
+	}
+
+	b, err := rbs.FindBlob(ctx, r, dgst)
+	if err != nil {
+		return distribution.Descriptor{}, err
+	}
+
+	if b == nil {
+		return distribution.Descriptor{}, distribution.ErrBlobUnknown
+	}
+
+	return distribution.Descriptor{Digest: b.Digest, Size: b.Size, MediaType: b.MediaType}, nil
 }
 
 func scanFullRepository(row *sql.Row) (*models.Repository, error) {

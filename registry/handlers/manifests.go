@@ -23,6 +23,7 @@ import (
 	"github.com/docker/distribution/registry/auth"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/libtrust"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
@@ -560,49 +561,11 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 	_, err = manifests.Put(imh, manifest, options...)
 	if err != nil {
-		// TODO(stevvooe): These error handling switches really need to be
-		// handled by an app global mapper.
-		if err == distribution.ErrUnsupported {
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
-			return
-		}
-		if err == distribution.ErrAccessDenied {
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeDenied)
-			return
-		}
-		switch err := err.(type) {
-		case distribution.ErrManifestVerification:
-			for _, verificationError := range err {
-				switch verificationError := verificationError.(type) {
-				case distribution.ErrManifestBlobUnknown:
-					imh.Errors = append(imh.Errors, v2.ErrorCodeManifestBlobUnknown.WithDetail(verificationError.Digest))
-				case distribution.ErrManifestNameInvalid:
-					imh.Errors = append(imh.Errors, v2.ErrorCodeNameInvalid.WithDetail(err))
-				case distribution.ErrManifestUnverified:
-					imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnverified)
-				default:
-					if verificationError == digest.ErrDigestInvalidFormat {
-						imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
-					} else {
-						imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown, verificationError)
-					}
-				}
-			}
-		case errcode.Error:
-			imh.Errors = append(imh.Errors, err)
-		default:
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
-		}
+		imh.appendPutError(err)
 		return
 	}
 
 	if imh.Config.Database.Enabled {
-		manifestService, err := imh.Repository.Manifests(imh)
-		if err != nil {
-			imh.Errors = append(imh.Errors, err)
-			return
-		}
-
 		// We're using the database and mirroring writes to the filesystem. We'll run
 		// a transaction so we can revert any changes to the database in case that
 		// any part of this multi-phase database operation fails.
@@ -614,17 +577,8 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		}
 		defer tx.Rollback()
 
-		if err := dbPutManifest(
-			imh,
-			imh.App.db,
-			imh.Repository.Blobs(imh),
-			manifestService,
-			imh.Digest,
-			manifest,
-			imh.App.trustKey,
-			jsonBuf.Bytes(),
-			imh.Repository.Named().Name()); err != nil {
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+		if err := dbPutManifest(imh, manifest, jsonBuf.Bytes()); err != nil {
+			imh.appendPutError(err)
 			return
 		}
 
@@ -694,35 +648,65 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	}).Info("manifest uploaded")
 }
 
-func dbPutManifest(
-	ctx context.Context,
-	db datastore.Queryer,
-	blobService distribution.BlobService,
-	manifestService distribution.ManifestService,
-	dgst digest.Digest,
-	manifest distribution.Manifest,
-	schema1SigningKey libtrust.PrivateKey,
-	payload []byte,
-	repoPath string) error {
+func (imh *manifestHandler) appendPutError(err error) {
+	if err == distribution.ErrUnsupported {
+		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
+		return
+	}
+	if err == distribution.ErrAccessDenied {
+		imh.Errors = append(imh.Errors, errcode.ErrorCodeDenied)
+		return
+	}
+	switch err := err.(type) {
+	case distribution.ErrManifestVerification:
+		for _, verificationError := range err {
+			switch verificationError := verificationError.(type) {
+			case distribution.ErrManifestBlobUnknown:
+				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestBlobUnknown.WithDetail(verificationError.Digest))
+			case distribution.ErrManifestNameInvalid:
+				imh.Errors = append(imh.Errors, v2.ErrorCodeNameInvalid.WithDetail(err))
+			case distribution.ErrManifestUnverified:
+				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnverified)
+			default:
+				if verificationError == digest.ErrDigestInvalidFormat {
+					imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
+				} else {
+					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown, verificationError)
+				}
+			}
+		}
+	case errcode.Error:
+		imh.Errors = append(imh.Errors, err)
+	default:
+		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+	}
+}
+
+func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload []byte) error {
+	db := imh.App.db
+	dgst := imh.Digest
+	blobService := imh.Repository.Blobs(imh)
+	repoPath := imh.Repository.Named().Name()
+
 	switch reqManifest := manifest.(type) {
 	case *schema1.SignedManifest:
-		if err := dbPutManifestSchema1(ctx, db, blobService, dgst, reqManifest, repoPath); err != nil {
+		if err := dbPutManifestSchema1(imh, db, blobService, dgst, reqManifest, repoPath); err != nil {
 			return fmt.Errorf("failed to write manifest to database: %v", err)
 		}
 	case *schema2.DeserializedManifest:
-		if err := dbPutManifestSchema2(ctx, db, blobService, dgst, reqManifest, payload, repoPath); err != nil {
+		if err := dbPutManifestSchema2(imh, reqManifest, payload); err != nil {
 			return fmt.Errorf("failed to write manifest to database: %v", err)
 		}
 	case *ocischema.DeserializedManifest:
-		if err := dbPutManifestOCI(ctx, db, blobService, dgst, reqManifest, payload, repoPath); err != nil {
+		if err := dbPutManifestOCI(imh, db, blobService, dgst, reqManifest, payload, repoPath); err != nil {
 			return fmt.Errorf("failed to write manifest to database: %v", err)
 		}
 	case *manifestlist.DeserializedManifestList:
-		if err := dbPutManifestList(ctx, db, blobService, manifestService, dgst, reqManifest, schema1SigningKey, payload, repoPath); err != nil {
+		if err := dbPutManifestList(imh, db, blobService, dgst, reqManifest, payload, repoPath); err != nil {
 			return fmt.Errorf("failed to write manifest list to database: %v", err)
 		}
 	default:
-		dcontext.GetLoggerWithField(ctx, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
+		dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
 	}
 	return nil
 }
@@ -768,15 +752,39 @@ func dbPutManifestOCI(
 	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, repoPath)
 }
 
-func dbPutManifestSchema2(
-	ctx context.Context,
-	db datastore.Queryer,
-	blobService distribution.BlobService,
-	dgst digest.Digest,
-	manifest *schema2.DeserializedManifest,
-	payload []byte,
-	repoPath string) error {
-	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, repoPath)
+func dbPutManifestSchema2(imh *manifestHandler, manifest *schema2.DeserializedManifest, payload []byte) error {
+	if imh.App.Config.Validation.Enabled {
+		repoReader := datastore.NewRepositoryStore(imh.db)
+		repoPath := imh.Repository.Named().Name()
+
+		v := &validation.Schema2Validator{
+			ManifestExister: &datastore.RepositoryManifestService{
+				RepositoryReader: repoReader,
+				RepositoryPath:   repoPath,
+			},
+			BlobStatter: &datastore.RepositoryBlobService{
+				RepositoryReader: repoReader,
+				RepositoryPath:   repoPath,
+			},
+			SkipDependencyVerification: imh.App.isCache,
+			ManifestURLs:               imh.App.manifestURLs,
+		}
+
+		if err := v.Validate(imh, manifest); err != nil {
+			return err
+		}
+	}
+
+	return dbPutManifestOCIOrSchema2(
+		imh,
+		imh.App.db,
+		imh.Repository.Blobs(imh),
+		imh.Digest,
+		manifest.Versioned,
+		manifest.Layers,
+		manifest.Config,
+		payload,
+		imh.Repository.Named().Name())
 }
 
 func dbPutManifestOCIOrSchema2(
@@ -968,10 +976,8 @@ func dbPutManifestList(
 	ctx context.Context,
 	db datastore.Queryer,
 	blobService distribution.BlobService,
-	manifestService distribution.ManifestService,
 	dgst digest.Digest,
 	manifestList *manifestlist.DeserializedManifestList,
-	schema1SigningKey libtrust.PrivateKey,
 	payload []byte,
 	repoPath string) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": dgst})
