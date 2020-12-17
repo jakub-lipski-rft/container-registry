@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -240,4 +241,97 @@ func TestProxyNewRepositories_FailIfTargetIsDown(t *testing.T) {
 	b, err := errcode.Errors{errcode.ErrorCodeUnavailable}.MarshalJSON()
 	require.NoError(t, err)
 	require.Equal(t, append(b, '\n'), res.Body.Bytes())
+}
+
+func TestProxyNewRepositories_ProxiesRequestsForNewReposThatMatchIncludeFilters(t *testing.T) {
+	// create fake target registry server
+	targetHandler := &handlerMock{response: "hello from target registry"}
+	targetServer := httptest.NewServer(targetHandler)
+	defer targetServer.Close()
+
+	// create test app
+	config := &configuration.Configuration{
+		Storage: configuration.Storage{"inmemory": configuration.Parameters{}},
+	}
+	config.Migration.Proxy.Enabled = true
+	config.Migration.Proxy.URL = targetServer.URL
+	config.Migration.Proxy.Include = []*configuration.Regexp{
+		{Regexp: regexp.MustCompile("^a.*$")},
+		{Regexp: regexp.MustCompile("^test/.*$")},
+	}
+	app := NewApp(context.Background(), config)
+
+	// target non-existing repository
+	named, err := reference.WithName("test/repo")
+	require.NoError(t, err)
+	repo, err := app.registry.Repository(context.Background(), named)
+	require.NoError(t, err)
+
+	ctx := &Context{
+		App:        app,
+		Repository: repo,
+		Context:    context.Background(),
+	}
+
+	// create test request and response
+	req := httptest.NewRequest("GET", "http://old-registry.example.com/some/path", nil)
+	res := httptest.NewRecorder()
+
+	// test handler
+	h := migrationHandler{Context: ctx, fallback: &handlerMock{}}
+	h.proxyNewRepositories(res, req)
+
+	// validate that request is proxied to target registry
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Equal(t, targetHandler.response, res.Body.String())
+}
+
+func TestProxyNewRepositories_DoesNotProxyRequestsForNewReposThatDoNotMatchIncludeFilters(t *testing.T) {
+	// create fake target registry server
+	targetHandler := &handlerMock{response: "hello from target registry"}
+	targetServer := httptest.NewServer(targetHandler)
+	defer targetServer.Close()
+
+	// create test app
+	config := &configuration.Configuration{
+		Storage: configuration.Storage{"inmemory": configuration.Parameters{}},
+	}
+	config.Migration.Proxy.Enabled = true
+	config.Migration.Proxy.URL = targetServer.URL
+	config.Migration.Proxy.Include = []*configuration.Regexp{
+		{Regexp: regexp.MustCompile("^a.*$")},
+	}
+	app := NewApp(context.Background(), config)
+
+	// target non-existing repository
+	named, err := reference.WithName("test/repo")
+	require.NoError(t, err)
+	repo, err := app.registry.Repository(context.Background(), named)
+	require.NoError(t, err)
+
+	ctx := &Context{
+		App:        app,
+		Repository: repo,
+		Context:    context.Background(),
+	}
+
+	// create test request and response
+	req := httptest.NewRequest("GET", "http://old-registry.example.com/some/path", nil)
+	res := httptest.NewRecorder()
+
+	// create fake proxy registry handler
+	proxyHandler := &handlerMock{response: "hello from proxy registry"}
+
+	// make sure it doesn't reach the target registry
+	targetHandler.validatorFn = func(rw http.ResponseWriter, req *http.Request) {
+		require.FailNow(t, "request reached target registry")
+	}
+
+	// test handler
+	h := migrationHandler{Context: ctx, fallback: proxyHandler}
+	h.proxyNewRepositories(res, req)
+
+	// validate that request was not proxied to target registry but rather served by the old one
+	require.Equal(t, http.StatusOK, res.Code)
+	require.Equal(t, proxyHandler.response, res.Body.String())
 }

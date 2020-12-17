@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -344,6 +345,35 @@ type Database struct {
 	} `yaml:"pool,omitempty"`
 }
 
+// Regexp wraps regexp.Regexp to implement the encoding.TextMarshaler interface.
+type Regexp struct {
+	*regexp.Regexp
+}
+
+// compileRegexp wraps the standard library's regexp.Compile.
+func compileRegexp(expr string) (*Regexp, error) {
+	re, err := regexp.Compile(expr)
+	if err != nil {
+		return nil, err
+	}
+	return &Regexp{re}, nil
+}
+
+// UnmarshalText implements encoding.TextMarshaler.
+func (r *Regexp) UnmarshalText(text []byte) error {
+	rr, err := compileRegexp(string(text))
+	if err != nil {
+		return fmt.Errorf("invalid regexp %q: %w", text, err)
+	}
+	*r = *rr
+	return nil
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (r *Regexp) MarshalText() ([]byte, error) {
+	return []byte(r.String()), nil
+}
+
 // Migration configures behavior of features related with the migration from filesystem metadata to database metadata.
 type Migration struct {
 	// DisableMirrorFS disables registry metadata writes to the filesystem.
@@ -357,6 +387,8 @@ type Migration struct {
 		Enabled bool `yaml:"enabled,omitempty"`
 		// URL is the URL of the target registry instance for where requests should be proxied to.
 		URL string `yaml:"url,omitempty"`
+		// Include allows filtering repositories to proxy by name, using a list of regular expressions.
+		Include []*Regexp `yaml:"include,omitempty"`
 	} `yaml:"proxy,omitempty"`
 }
 
