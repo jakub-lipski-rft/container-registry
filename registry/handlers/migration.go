@@ -49,7 +49,7 @@ func (h migrationHandler) proxyNewRepositories(rw http.ResponseWriter, req *http
 	}
 	log := dcontext.GetLogger(h)
 	if exists {
-		log.Debug("known repository, request will be served")
+		log.Debug("known repository, request will be served by this registry")
 		h.fallback.ServeHTTP(rw, req)
 		return
 	}
@@ -66,6 +66,16 @@ func (h migrationHandler) proxyNewRepositories(rw http.ResponseWriter, req *http
 			log.Debug("repository name does not match any inclusion filter, request will be served by this registry")
 			h.fallback.ServeHTTP(rw, req)
 			return
+		}
+	}
+	// evaluate exclusion filters, if any
+	if len(h.App.Config.Migration.Proxy.Exclude) > 0 {
+		for _, r := range h.App.Config.Migration.Proxy.Exclude {
+			if r.MatchString(repo.Named().String()) {
+				log.WithField("filter", r.String()).Debug("repository name matches an exclusion filter, request will be served by this registry")
+				h.fallback.ServeHTTP(rw, req)
+				return
+			}
 		}
 	}
 
