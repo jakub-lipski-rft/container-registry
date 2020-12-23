@@ -702,7 +702,7 @@ func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload
 			return fmt.Errorf("failed to write manifest to database: %v", err)
 		}
 	case *manifestlist.DeserializedManifestList:
-		if err := dbPutManifestList(imh, db, blobService, dgst, reqManifest, payload, repoPath); err != nil {
+		if err := dbPutManifestList(imh, reqManifest, payload); err != nil {
 			return fmt.Errorf("failed to write manifest list to database: %v", err)
 		}
 	default:
@@ -970,25 +970,36 @@ func dbPutManifestSchema1(
 	return nil
 }
 
-func dbPutManifestList(
-	ctx context.Context,
-	db datastore.Queryer,
-	blobService distribution.BlobService,
-	dgst digest.Digest,
-	manifestList *manifestlist.DeserializedManifestList,
-	payload []byte,
-	repoPath string) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": dgst})
+func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.DeserializedManifestList, payload []byte) error {
+	repoPath := imh.Repository.Named().Name()
+
+	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": imh.Digest})
 	log.Debug("putting manifest list")
 
+	if imh.App.Config.Validation.Enabled {
+		repoReader := datastore.NewRepositoryStore(imh.db)
+
+		v := &validation.ManifestListValidator{
+			ManifestExister: &datastore.RepositoryManifestService{
+				RepositoryReader: repoReader,
+				RepositoryPath:   repoPath,
+			},
+			SkipDependencyVerification: imh.App.isCache,
+		}
+
+		if err := v.Validate(imh, manifestList); err != nil {
+			return err
+		}
+	}
+
 	// create or find target repository
-	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, repoPath)
+	repositoryStore := datastore.NewRepositoryStore(imh.App.db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(imh, repoPath)
 	if err != nil {
 		return err
 	}
 
-	dbManifestList, err := repositoryStore.FindManifestByDigest(ctx, dbRepo, dgst)
+	dbManifestList, err := repositoryStore.FindManifestByDigest(imh, dbRepo, imh.Digest)
 	if err != nil {
 		return err
 	}
@@ -1007,22 +1018,22 @@ func dbPutManifestList(
 			RepositoryID:  dbRepo.ID,
 			SchemaVersion: manifestList.SchemaVersion,
 			MediaType:     mediaType,
-			Digest:        dgst,
+			Digest:        imh.Digest,
 			Payload:       payload,
 		}
-		mStore := datastore.NewManifestStore(db)
-		if err := mStore.Create(ctx, dbManifestList); err != nil {
+		mStore := datastore.NewManifestStore(imh.App.db)
+		if err := mStore.Create(imh, dbManifestList); err != nil {
 			return err
 		}
 
 		// Associate manifests to the manifest list.
 		for _, m := range manifestList.Manifests {
-			dbManifest, err := dbFindManifestListManifest(ctx, db, dbRepo, m.Digest, dbRepo.Path)
+			dbManifest, err := dbFindManifestListManifest(imh, imh.App.db, dbRepo, m.Digest, dbRepo.Path)
 			if err != nil {
 				return err
 			}
 
-			if err := mStore.AssociateManifest(ctx, dbManifestList, dbManifest); err != nil {
+			if err := mStore.AssociateManifest(imh, dbManifestList, dbManifest); err != nil {
 				return err
 			}
 		}

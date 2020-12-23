@@ -7,6 +7,7 @@ import (
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/manifest/manifestlist"
+	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -38,7 +39,7 @@ func (ms *manifestListHandler) Put(ctx context.Context, manifestList distributio
 		return "", fmt.Errorf("wrong type put to manifestListHandler: %T", manifestList)
 	}
 
-	if err := ms.verifyManifest(ms.ctx, *m, skipDependencyVerification); err != nil {
+	if err := ms.verifyManifest(ms.ctx, m, skipDependencyVerification); err != nil {
 		return "", err
 	}
 
@@ -60,37 +61,16 @@ func (ms *manifestListHandler) Put(ctx context.Context, manifestList distributio
 // perspective of the registry. As a policy, the registry only tries to
 // store valid content, leaving trust policies of that content up to
 // consumers.
-func (ms *manifestListHandler) verifyManifest(ctx context.Context, mnfst manifestlist.DeserializedManifestList, skipDependencyVerification bool) error {
-	var errs distribution.ErrManifestVerification
-
-	if mnfst.SchemaVersion != 2 {
-		return fmt.Errorf("unrecognized manifest list schema version %d", mnfst.SchemaVersion)
+func (ms *manifestListHandler) verifyManifest(ctx context.Context, mnfst *manifestlist.DeserializedManifestList, skipDependencyVerification bool) error {
+	manifestService, err := ms.repository.Manifests(ctx)
+	if err != nil {
+		return err
 	}
 
-	if !skipDependencyVerification {
-		// This manifest service is different from the blob service
-		// returned by Blob. It uses a linked blob store to ensure that
-		// only manifests are accessible.
-
-		manifestService, err := ms.repository.Manifests(ctx)
-		if err != nil {
-			return err
-		}
-
-		for _, manifestDescriptor := range mnfst.References() {
-			exists, err := manifestService.Exists(ctx, manifestDescriptor.Digest)
-			if err != nil && err != distribution.ErrBlobUnknown {
-				errs = append(errs, err)
-			}
-			if err != nil || !exists {
-				// On error here, we always append unknown blob errors.
-				errs = append(errs, distribution.ErrManifestBlobUnknown{Digest: manifestDescriptor.Digest})
-			}
-		}
-	}
-	if len(errs) != 0 {
-		return errs
+	v := &validation.ManifestListValidator{
+		ManifestExister:            manifestService,
+		SkipDependencyVerification: skipDependencyVerification,
 	}
 
-	return nil
+	return v.Validate(ctx, mnfst)
 }
