@@ -84,6 +84,10 @@ func (rms *RepositoryManifestService) Exists(ctx context.Context, dgst digest.Di
 		return false, err
 	}
 
+	if r == nil {
+		return false, errors.New("unable to find repository in database")
+	}
+
 	m, err := rms.FindManifestByDigest(ctx, r, dgst)
 	if err != nil {
 		return false, err
@@ -105,6 +109,10 @@ func (rbs *RepositoryBlobService) Stat(ctx context.Context, dgst digest.Digest) 
 	r, err := rbs.FindByPath(ctx, rbs.RepositoryPath)
 	if err != nil {
 		return distribution.Descriptor{}, err
+	}
+
+	if r == nil {
+		return distribution.Descriptor{}, errors.New("unable to find repository in database")
 	}
 
 	b, err := rbs.FindBlob(ctx, r, dgst)
