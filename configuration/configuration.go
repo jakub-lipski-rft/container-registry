@@ -584,6 +584,7 @@ type logOutput string
 const (
 	LogOutputStdout  logOutput = "stdout"
 	LogOutputStderr  logOutput = "stderr"
+	LogOutputDiscard logOutput = "discard"
 	defaultLogOutput           = LogOutputStdout
 )
 
@@ -599,6 +600,8 @@ func (out logOutput) Descriptor() io.Writer {
 	switch out {
 	case LogOutputStderr:
 		return os.Stderr
+	case LogOutputDiscard:
+		return ioutil.Discard
 	default:
 		return os.Stdout
 	}

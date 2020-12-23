@@ -339,7 +339,7 @@ func newConfig(opts ...configOpt) configuration.Configuration {
 	config.HTTP.Headers = headerConfig
 
 	if os.Getenv("REGISTRY_DATABASE_ENABLED") == "true" {
-		dsn, err := dbtestutil.NewDSN()
+		dsn, err := dbtestutil.NewDSNFromEnv()
 		if err != nil {
 			panic(fmt.Sprintf("error creating dsn: %v", err))
 		}
@@ -5256,7 +5256,7 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 	var db *datastore.DB
 
 	if config.Database.Enabled {
-		db, err = dbtestutil.NewDB()
+		db, err = dbtestutil.NewDBFromConfig(config)
 		if err != nil {
 			t.Fatal(err)
 		}

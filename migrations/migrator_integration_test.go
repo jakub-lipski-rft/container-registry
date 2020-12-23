@@ -23,7 +23,7 @@ func init() {
 }
 
 func TestMigrator_Version(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -40,7 +40,7 @@ func TestMigrator_Version(t *testing.T) {
 }
 
 func TestMigrator_Version_NoMigrations(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -53,7 +53,7 @@ func TestMigrator_Version_NoMigrations(t *testing.T) {
 }
 
 func TestMigrator_LatestVersion(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -65,7 +65,7 @@ func TestMigrator_LatestVersion(t *testing.T) {
 }
 
 func TestMigrator_LatestVersion_NoMigrations(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -77,7 +77,7 @@ func TestMigrator_LatestVersion_NoMigrations(t *testing.T) {
 }
 
 func TestMigrator_Up(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -98,7 +98,7 @@ func TestMigrator_Up(t *testing.T) {
 }
 
 func TestMigrator_Up_ApplyPostDeploymentMigrations(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -145,7 +145,7 @@ func TestMigrator_Up_ApplyPostDeploymentMigrations(t *testing.T) {
 }
 
 func TestMigrator_Up_SkipPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -171,7 +171,7 @@ func TestMigrator_Up_SkipPostDeployment(t *testing.T) {
 }
 
 func TestMigrator_UpN(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -210,7 +210,7 @@ func TestMigrator_UpN(t *testing.T) {
 }
 
 func TestMigrator_UpN_SkipPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -253,7 +253,7 @@ func TestMigrator_UpN_SkipPostDeployment(t *testing.T) {
 }
 
 func TestMigrator_UpNPlan(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -291,7 +291,7 @@ func TestMigrator_UpNPlan(t *testing.T) {
 }
 
 func TestMigrator_UpNPlan_SkipPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -333,7 +333,7 @@ func TestMigrator_UpNPlan_SkipPostDeployment(t *testing.T) {
 }
 
 func TestMigrator_Down(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -353,7 +353,7 @@ func TestMigrator_Down(t *testing.T) {
 }
 
 func TestMigrator_Down_SkipPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -377,7 +377,7 @@ func TestMigrator_Down_SkipPostDeployment(t *testing.T) {
 }
 
 func TestMigrator_Down_SkipPostDeployment_ExistingPostDeployments(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -401,7 +401,7 @@ func TestMigrator_Down_SkipPostDeployment_ExistingPostDeployments(t *testing.T) 
 }
 
 func TestMigrator_DownN(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -442,7 +442,7 @@ func TestMigrator_DownN(t *testing.T) {
 }
 
 func TestMigrator_DownN_SkipPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -487,7 +487,7 @@ func TestMigrator_DownN_SkipPostDeployment(t *testing.T) {
 }
 
 func TestMigrator_DownNPlan(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -529,7 +529,7 @@ func TestMigrator_DownNPlan(t *testing.T) {
 }
 
 func TestMigrator_DownNPlan_SkipPostDeploymnet(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -575,7 +575,7 @@ func TestMigrator_DownNPlan_SkipPostDeploymnet(t *testing.T) {
 }
 
 func TestMigrator_Status_Empty(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -603,7 +603,7 @@ func TestMigrator_Status_Empty(t *testing.T) {
 }
 
 func TestMigrator_Status_Full(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -633,7 +633,7 @@ func TestMigrator_Status_Full(t *testing.T) {
 }
 
 func TestMigrator_Status_PostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -661,7 +661,7 @@ func TestMigrator_Status_PostDeployment(t *testing.T) {
 }
 
 func TestMigrator_Status_Unknown(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -689,7 +689,7 @@ func TestMigrator_Status_Unknown(t *testing.T) {
 }
 
 func TestMigrator_HasPending_No(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -703,7 +703,7 @@ func TestMigrator_HasPending_No(t *testing.T) {
 }
 
 func TestMigrator_HasPending_No_SkipPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -721,7 +721,7 @@ func TestMigrator_HasPending_No_SkipPostDeployment(t *testing.T) {
 }
 
 func TestMigrator_HasPending_Yes(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 
@@ -738,7 +738,7 @@ func TestMigrator_HasPending_Yes(t *testing.T) {
 }
 
 func TestMigrator_HasPending_Yes_PendingPostDeployment(t *testing.T) {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	require.NoError(t, err)
 	defer cleanupDB(t, db)
 

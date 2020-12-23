@@ -52,7 +52,7 @@ func initDatabase(t *testing.T, env *env) {
 		t.Skip("database connection is required for this test")
 	}
 
-	db, err := dbtestutil.NewDB()
+	db, err := dbtestutil.NewDBFromEnv()
 	require.NoError(t, err)
 
 	env.db = db

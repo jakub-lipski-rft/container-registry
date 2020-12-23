@@ -32,7 +32,7 @@ var (
 )
 
 func (s *testSuite) setup() error {
-	db, err := testutil.NewDB()
+	db, err := testutil.NewDBFromEnv()
 	if err != nil {
 		return err
 	}

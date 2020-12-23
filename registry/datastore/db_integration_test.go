@@ -23,7 +23,7 @@ func TestOpen(t *testing.T) {
 	}{
 		{
 			name:       "success",
-			dsnFactory: testutil.NewDSN,
+			dsnFactory: testutil.NewDSNFromEnv,
 			opts: []datastore.OpenOption{
 				datastore.WithLogger(logrus.NewEntry(logrus.New())),
 				datastore.WithPoolConfig(&datastore.PoolConfig{
@@ -37,7 +37,7 @@ func TestOpen(t *testing.T) {
 		{
 			name: "error",
 			dsnFactory: func() (*datastore.DSN, error) {
-				dsn, err := testutil.NewDSN()
+				dsn, err := testutil.NewDSNFromEnv()
 				if err != nil {
 					return nil, err
 				}
