@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/distribution/configuration"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -90,8 +91,8 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 	return dump, nil
 }
 
-// NewDSN generates a new DSN for the test database based on environment variable configurations.
-func NewDSN() (*datastore.DSN, error) {
+// NewDSNFromEnv generates a new DSN for the test database based on environment variable configurations.
+func NewDSNFromEnv() (*datastore.DSN, error) {
 	port, err := strconv.Atoi(os.Getenv("REGISTRY_DATABASE_PORT"))
 	if err != nil {
 		return nil, fmt.Errorf("parsing DSN port: %w", err)
@@ -111,9 +112,39 @@ func NewDSN() (*datastore.DSN, error) {
 	return dsn, nil
 }
 
-// NewDB generates a new datastore.DB and opens the underlying connection.
-func NewDB() (*datastore.DB, error) {
-	dsn, err := NewDSN()
+// NewDSNFromConfig generates a new DSN for the test database based on configuration options.
+func NewDSNFromConfig(config configuration.Database) (*datastore.DSN, error) {
+	dsn := &datastore.DSN{
+		Host:        config.Host,
+		Port:        config.Port,
+		User:        config.User,
+		Password:    config.Password,
+		DBName:      "registry_test",
+		SSLMode:     config.SSLMode,
+		SSLCert:     config.SSLCert,
+		SSLKey:      config.SSLKey,
+		SSLRootCert: config.SSLRootCert,
+	}
+
+	return dsn, nil
+}
+
+func newDB(dsn *datastore.DSN, logLevel logrus.Level, logOut io.Writer) (*datastore.DB, error) {
+	log := logrus.New()
+	log.SetLevel(logLevel)
+	log.SetOutput(logOut)
+
+	db, err := datastore.Open(dsn, datastore.WithLogger(logrus.NewEntry(log)))
+	if err != nil {
+		return nil, fmt.Errorf("opening database connection: %w", err)
+	}
+
+	return db, nil
+}
+
+// NewDBFromEnv generates a new datastore.DB and opens the underlying connection based on environment variable settings.
+func NewDBFromEnv() (*datastore.DB, error) {
+	dsn, err := NewDSNFromEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -135,16 +166,33 @@ func NewDB() (*datastore.DB, error) {
 		logOut = os.Stdout
 	}
 
-	log := logrus.New()
-	log.SetLevel(logLevel)
-	log.SetOutput(logOut)
+	return newDB(dsn, logLevel, logOut)
+}
 
-	db, err := datastore.Open(dsn, datastore.WithLogger(logrus.NewEntry(log)))
+// NewDBFromConfig generates a new datastore.DB and opens the underlying connection based on configuration settings.
+func NewDBFromConfig(config *configuration.Configuration) (*datastore.DB, error) {
+	dsn, err := NewDSNFromConfig(config.Database)
 	if err != nil {
-		return nil, fmt.Errorf("opening database connection: %w", err)
+		return nil, err
 	}
 
-	return db, nil
+	logLevel, err := logrus.ParseLevel(config.Log.Level.String())
+	if err != nil {
+		logLevel = logrus.InfoLevel
+	}
+
+	var logOut io.Writer
+	switch config.Log.Output {
+	case configuration.LogOutputStdout:
+		logOut = configuration.LogOutputStdout.Descriptor()
+	case configuration.LogOutputStderr:
+		logOut = configuration.LogOutputStderr.Descriptor()
+	case configuration.LogOutputDiscard:
+	default:
+		logOut = configuration.LogOutputStdout.Descriptor()
+	}
+
+	return newDB(dsn, logLevel, logOut)
 }
 
 // TruncateTables truncates a set of tables in the test database.
