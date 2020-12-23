@@ -5,13 +5,13 @@ import (
 	"fmt"
 
 	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/schema1"
-	"github.com/docker/distribution/manifest/schema2"
+	"github.com/docker/distribution/manifest/ocischema"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// Schema2Validator ensures that a schema2 manifest is valid and optionally
+// OCIValidator ensures that a OCI image manifest is valid and optionally
 // verifies all manifest references.
-type Schema2Validator struct {
+type OCIValidator struct {
 	ManifestExister            ManifestExister
 	BlobStatter                distribution.BlobStatter
 	SkipDependencyVerification bool
@@ -21,7 +21,7 @@ type Schema2Validator struct {
 // Validate ensures that the manifest content is valid from the
 // perspective of the registry. As a policy, the registry only tries to store
 // valid content, leaving trust policies of that content up to consumers.
-func (v *Schema2Validator) Validate(ctx context.Context, mnfst *schema2.DeserializedManifest) error {
+func (v *OCIValidator) Validate(ctx context.Context, mnfst *ocischema.DeserializedManifest) error {
 	var errs distribution.ErrManifestVerification
 
 	if mnfst.Manifest.SchemaVersion != 2 {
@@ -36,20 +36,19 @@ func (v *Schema2Validator) Validate(ctx context.Context, mnfst *schema2.Deserial
 		var err error
 
 		switch descriptor.MediaType {
-		case schema2.MediaTypeForeignLayer:
-			// Clients download this layer from an external URL, so do not check for
-			// its presence.
-			if len(descriptor.URLs) == 0 {
-				err = errMissingURL
-			}
-
+		case v1.MediaTypeImageLayer, v1.MediaTypeImageLayerGzip, v1.MediaTypeImageLayerNonDistributable, v1.MediaTypeImageLayerNonDistributableGzip:
 			for _, u := range descriptor.URLs {
 				if !validURL(u, v.ManifestURLs) {
 					err = errInvalidURL
 					break
 				}
 			}
-		case schema2.MediaTypeManifest, schema1.MediaTypeManifest:
+
+			if err == nil && len(descriptor.URLs) == 0 {
+				// If no URLs, require that the blob exists
+				_, err = v.BlobStatter.Stat(ctx, descriptor.Digest)
+			}
+		case v1.MediaTypeImageManifest:
 			var exists bool
 			exists, err = v.ManifestExister.Exists(ctx, descriptor.Digest)
 			if err != nil || !exists {

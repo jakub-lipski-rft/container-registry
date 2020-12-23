@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/docker/distribution"
@@ -10,12 +9,6 @@ import (
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/opencontainers/go-digest"
-)
-
-var (
-	errUnexpectedURL = errors.New("unexpected URL on layer")
-	errMissingURL    = errors.New("missing URL on layer")
-	errInvalidURL    = errors.New("invalid URL on layer")
 )
 
 //schema2ManifestHandler is a ManifestHandler that covers schema2 manifests.

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"regexp"
 
+	"net/url"
+
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -24,4 +26,13 @@ type ManifestExister interface {
 type ManifestURLs struct {
 	Allow *regexp.Regexp
 	Deny  *regexp.Regexp
+}
+
+func validURL(s string, u ManifestURLs) bool {
+	pu, err := url.Parse(s)
+	if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Fragment != "" || (u.Allow != nil && !u.Allow.MatchString(s)) || (u.Deny != nil && u.Deny.MatchString(s)) {
+		return false
+	}
+
+	return true
 }
