@@ -1,7 +1,6 @@
 package validation_test
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"testing"
@@ -9,65 +8,31 @@ import (
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/manifest/schema2"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/storage"
-	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/distribution/testutil"
 	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	errUnexpectedURL = errors.New("unexpected URL on layer")
-	errMissingURL    = errors.New("missing URL on layer")
-	errInvalidURL    = errors.New("invalid URL on layer")
-)
-
-func createRegistry(t *testing.T) distribution.Namespace {
+// return a oci manifest with a pre-pushed config placeholder.
+func makeOCIManifestTemplate(t *testing.T, repo distribution.Repository) ocischema.Manifest {
 	ctx := context.Background()
 
-	registry, err := storage.NewRegistry(ctx, inmemory.New())
-	if err != nil {
-		t.Fatalf("Failed to construct namespace")
-	}
-	return registry
-}
-
-func makeRepository(t *testing.T, registry distribution.Namespace, name string) distribution.Repository {
-	ctx := context.Background()
-
-	// Initialize a dummy repository
-	named, err := reference.WithName(name)
-	if err != nil {
-		t.Fatalf("Failed to parse name %s:  %v", name, err)
-	}
-
-	repo, err := registry.Repository(ctx, named)
-	if err != nil {
-		t.Fatalf("Failed to construct repository: %v", err)
-	}
-	return repo
-}
-
-// return a schema2 manifest with a pre-pushed config placeholder.
-func makeSchema2ManifestTemplate(t *testing.T, repo distribution.Repository) schema2.Manifest {
-	ctx := context.Background()
-
-	config, err := repo.Blobs(ctx).Put(ctx, schema2.MediaTypeImageConfig, nil)
+	config, err := repo.Blobs(ctx).Put(ctx, v1.MediaTypeImageConfig, nil)
 	require.NoError(t, err)
 
-	return schema2.Manifest{
+	return ocischema.Manifest{
 		Versioned: manifest.Versioned{
 			SchemaVersion: 2,
-			MediaType:     schema2.MediaTypeManifest,
+			MediaType:     v1.MediaTypeImageConfig,
 		},
 		Config: config,
 	}
 }
 
-func TestVerifyManifest_Schema2_ForeignLayer(t *testing.T) {
+func TestVerifyManifest_OCI_NonDistributableLayer(t *testing.T) {
 	ctx := context.Background()
 
 	registry := createRegistry(t)
@@ -76,16 +41,16 @@ func TestVerifyManifest_Schema2_ForeignLayer(t *testing.T) {
 	manifestService, err := testutil.MakeManifestService(repo)
 	require.NoError(t, err)
 
-	layer, err := repo.Blobs(ctx).Put(ctx, schema2.MediaTypeLayer, nil)
+	template := makeOCIManifestTemplate(t, repo)
+
+	layer, err := repo.Blobs(ctx).Put(ctx, v1.MediaTypeImageLayer, nil)
 	require.NoError(t, err)
 
-	foreignLayer := distribution.Descriptor{
-		Digest:    digest.FromString("foreignLayer-digest"),
+	nonDistributableLayer := distribution.Descriptor{
+		Digest:    digest.FromString("nonDistributableLayer"),
 		Size:      6323,
-		MediaType: schema2.MediaTypeForeignLayer,
+		MediaType: v1.MediaTypeImageLayerNonDistributableGzip,
 	}
-
-	template := makeSchema2ManifestTemplate(t, repo)
 
 	type testcase struct {
 		BaseLayer distribution.Descriptor
@@ -95,58 +60,57 @@ func TestVerifyManifest_Schema2_ForeignLayer(t *testing.T) {
 
 	cases := []testcase{
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			nil,
-			errMissingURL,
+			distribution.ErrManifestBlobUnknown{Digest: nonDistributableLayer.Digest},
 		},
 		{
-			// regular layers may have foreign urls
 			layer,
 			[]string{"http://foo/bar"},
 			nil,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"file:///local/file"},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"http://foo/bar#baz"},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{""},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"https://foo/bar", ""},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"", "https://foo/bar"},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"http://nope/bar"},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"http://foo/nope"},
 			errInvalidURL,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"http://foo/bar"},
 			nil,
 		},
 		{
-			foreignLayer,
+			nonDistributableLayer,
 			[]string{"https://foo/bar"},
 			nil,
 		},
@@ -157,13 +121,13 @@ func TestVerifyManifest_Schema2_ForeignLayer(t *testing.T) {
 		l := c.BaseLayer
 		l.URLs = c.URLs
 		m.Layers = []distribution.Descriptor{l}
-		dm, err := schema2.FromStruct(m)
+		dm, err := ocischema.FromStruct(m)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
 
-		v := &validation.Schema2Validator{
+		v := &validation.OCIValidator{
 			ManifestExister:            manifestService,
 			BlobStatter:                repo.Blobs(ctx),
 			SkipDependencyVerification: false,
@@ -179,13 +143,15 @@ func TestVerifyManifest_Schema2_ForeignLayer(t *testing.T) {
 				if _, ok = verr[1].(distribution.ErrManifestBlobUnknown); ok {
 					err = verr[0]
 				}
+			} else if len(verr) == 1 {
+				err = verr[0]
 			}
 		}
 		require.Equal(t, c.Err, err)
 	}
 }
 
-func TestVerifyManifest_Schema2_InvalidSchemaVersion(t *testing.T) {
+func TestVerifyManifest_OCI_InvalidSchemaVersion(t *testing.T) {
 	ctx := context.Background()
 
 	registry := createRegistry(t)
@@ -194,13 +160,13 @@ func TestVerifyManifest_Schema2_InvalidSchemaVersion(t *testing.T) {
 	manifestService, err := testutil.MakeManifestService(repo)
 	require.NoError(t, err)
 
-	m := makeSchema2ManifestTemplate(t, repo)
+	m := makeOCIManifestTemplate(t, repo)
 	m.Versioned.SchemaVersion = 42
 
-	dm, err := schema2.FromStruct(m)
+	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.Schema2Validator{
+	v := &validation.OCIValidator{
 		ManifestExister:            manifestService,
 		BlobStatter:                repo.Blobs(ctx),
 		SkipDependencyVerification: false,
@@ -210,7 +176,7 @@ func TestVerifyManifest_Schema2_InvalidSchemaVersion(t *testing.T) {
 	require.EqualError(t, err, fmt.Sprintf("unrecognized manifest schema version %d", m.Versioned.SchemaVersion))
 }
 
-func TestVerifyManifest_Schema2_SkipDependencyVerification(t *testing.T) {
+func TestVerifyManifest_OCI_SkipDependencyVerification(t *testing.T) {
 	ctx := context.Background()
 
 	registry := createRegistry(t)
@@ -219,25 +185,24 @@ func TestVerifyManifest_Schema2_SkipDependencyVerification(t *testing.T) {
 	manifestService, err := testutil.MakeManifestService(repo)
 	require.NoError(t, err)
 
-	m := makeSchema2ManifestTemplate(t, repo)
+	m := makeOCIManifestTemplate(t, repo)
 	m.Layers = []distribution.Descriptor{{Digest: digest.FromString("fake-digest")}}
 
-	dm, err := schema2.FromStruct(m)
+	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.Schema2Validator{
+	v := &validation.OCIValidator{
 		ManifestExister:            manifestService,
 		BlobStatter:                repo.Blobs(ctx),
 		SkipDependencyVerification: true,
-		ManifestURLs: validation.ManifestURLs{
-			Allow: regexp.MustCompile("^https?://*"),
-		}}
+		ManifestURLs:               validation.ManifestURLs{},
+	}
 
 	err = v.Validate(ctx, dm)
 	require.NoError(t, err)
 }
 
-func TestVerifyManifest_Schema2_ManifestLayer(t *testing.T) {
+func TestVerifyManifest_OCI_ManifestLayer(t *testing.T) {
 	ctx := context.Background()
 
 	registry := createRegistry(t)
@@ -246,16 +211,16 @@ func TestVerifyManifest_Schema2_ManifestLayer(t *testing.T) {
 	manifestService, err := testutil.MakeManifestService(repo)
 	require.NoError(t, err)
 
-	layer, err := repo.Blobs(ctx).Put(ctx, schema2.MediaTypeLayer, nil)
+	layer, err := repo.Blobs(ctx).Put(ctx, v1.MediaTypeImageLayer, nil)
 	require.NoError(t, err)
 
-	// Test a manifest used as a layer. Looking at the original schema2 validation
-	// logic it appears that schema2 manifests allow manifests as layers. So we
+	// Test a manifest used as a layer. Looking at the original oci validation
+	// logic it appears that oci manifests allow manifests as layers. So we
 	// should try to preserve this rather odd behavior.
-	depManifest := makeSchema2ManifestTemplate(t, repo)
+	depManifest := makeOCIManifestTemplate(t, repo)
 	depManifest.Layers = []distribution.Descriptor{layer}
 
-	depM, err := schema2.FromStruct(depManifest)
+	depM, err := ocischema.FromStruct(depManifest)
 	require.NoError(t, err)
 
 	mt, payload, err := depM.Payload()
@@ -269,13 +234,13 @@ func TestVerifyManifest_Schema2_ManifestLayer(t *testing.T) {
 	_, err = repo.Blobs(ctx).Put(ctx, mt, payload)
 	require.NoError(t, err)
 
-	m := makeSchema2ManifestTemplate(t, repo)
+	m := makeOCIManifestTemplate(t, repo)
 	m.Layers = []distribution.Descriptor{{Digest: dgst, MediaType: mt}}
 
-	dm, err := schema2.FromStruct(m)
+	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.Schema2Validator{
+	v := &validation.OCIValidator{
 		ManifestExister:            manifestService,
 		BlobStatter:                repo.Blobs(ctx),
 		SkipDependencyVerification: false,
@@ -287,7 +252,7 @@ func TestVerifyManifest_Schema2_ManifestLayer(t *testing.T) {
 	require.NoErrorf(t, err, fmt.Sprintf("digest: %s", dgst))
 }
 
-func TestVerifyManifest_Schema2_MultipleErrors(t *testing.T) {
+func TestVerifyManifest_OCI_MultipleErrors(t *testing.T) {
 	ctx := context.Background()
 
 	registry := createRegistry(t)
@@ -296,24 +261,24 @@ func TestVerifyManifest_Schema2_MultipleErrors(t *testing.T) {
 	manifestService, err := testutil.MakeManifestService(repo)
 	require.NoError(t, err)
 
-	layer, err := repo.Blobs(ctx).Put(ctx, schema2.MediaTypeLayer, nil)
+	layer, err := repo.Blobs(ctx).Put(ctx, v1.MediaTypeImageLayer, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create a manifest with three layers, two of which are missing. We should
 	// see the digest of each missing layer in the error message.
-	m := makeSchema2ManifestTemplate(t, repo)
+	m := makeOCIManifestTemplate(t, repo)
 	m.Layers = []distribution.Descriptor{
-		{Digest: digest.FromString("fake-blob-layer"), MediaType: schema2.MediaTypeLayer},
+		{Digest: digest.FromString("fake-blob-layer"), MediaType: v1.MediaTypeImageLayer},
 		layer,
-		{Digest: digest.FromString("fake-manifest-layer"), MediaType: schema2.MediaTypeManifest},
+		{Digest: digest.FromString("fake-manifest-layer"), MediaType: v1.MediaTypeImageManifest},
 	}
 
-	dm, err := schema2.FromStruct(m)
+	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.Schema2Validator{
+	v := &validation.OCIValidator{
 		ManifestExister:            manifestService,
 		BlobStatter:                repo.Blobs(ctx),
 		SkipDependencyVerification: false,

@@ -698,7 +698,7 @@ func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload
 			return fmt.Errorf("failed to write manifest to database: %v", err)
 		}
 	case *ocischema.DeserializedManifest:
-		if err := dbPutManifestOCI(imh, db, blobService, dgst, reqManifest, payload, repoPath); err != nil {
+		if err := dbPutManifestOCI(imh, reqManifest, payload); err != nil {
 			return fmt.Errorf("failed to write manifest to database: %v", err)
 		}
 	case *manifestlist.DeserializedManifestList:
@@ -741,15 +741,30 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 	})
 }
 
-func dbPutManifestOCI(
-	ctx context.Context,
-	db datastore.Queryer,
-	blobService distribution.BlobService,
-	dgst digest.Digest,
-	manifest *ocischema.DeserializedManifest,
-	payload []byte,
-	repoPath string) error {
-	return dbPutManifestOCIOrSchema2(ctx, db, blobService, dgst, manifest.Versioned, manifest.Layers, manifest.Config, payload, repoPath)
+func dbPutManifestOCI(imh *manifestHandler, manifest *ocischema.DeserializedManifest, payload []byte) error {
+	if imh.App.Config.Validation.Enabled {
+		repoReader := datastore.NewRepositoryStore(imh.db)
+		repoPath := imh.Repository.Named().Name()
+
+		v := &validation.OCIValidator{
+			ManifestExister: &datastore.RepositoryManifestService{
+				RepositoryReader: repoReader,
+				RepositoryPath:   repoPath,
+			},
+			BlobStatter: &datastore.RepositoryBlobService{
+				RepositoryReader: repoReader,
+				RepositoryPath:   repoPath,
+			},
+			SkipDependencyVerification: imh.App.isCache,
+			ManifestURLs:               imh.App.manifestURLs,
+		}
+
+		if err := v.Validate(imh, manifest); err != nil {
+			return err
+		}
+	}
+
+	return dbPutManifestOCIOrSchema2(imh, manifest.Versioned, manifest.Layers, manifest.Config, payload)
 }
 
 func dbPutManifestSchema2(imh *manifestHandler, manifest *schema2.DeserializedManifest, payload []byte) error {
@@ -775,53 +790,36 @@ func dbPutManifestSchema2(imh *manifestHandler, manifest *schema2.DeserializedMa
 		}
 	}
 
-	return dbPutManifestOCIOrSchema2(
-		imh,
-		imh.App.db,
-		imh.Repository.Blobs(imh),
-		imh.Digest,
-		manifest.Versioned,
-		manifest.Layers,
-		manifest.Config,
-		payload,
-		imh.Repository.Named().Name())
+	return dbPutManifestOCIOrSchema2(imh, manifest.Versioned, manifest.Layers, manifest.Config, payload)
 }
 
-func dbPutManifestOCIOrSchema2(
-	ctx context.Context,
-	db datastore.Queryer,
-	blobService distribution.BlobService,
-	dgst digest.Digest,
-	versioned manifest.Versioned,
-	layers []distribution.Descriptor,
-	cfgDesc distribution.Descriptor,
-	payload []byte,
-	repoPath string) error {
+func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versioned, layers []distribution.Descriptor, cfgDesc distribution.Descriptor, payload []byte) error {
+	repoPath := imh.Repository.Named().Name()
 
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": dgst, "schema_version": versioned.SchemaVersion})
+	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": imh.Digest, "schema_version": versioned.SchemaVersion})
 	log.Debug("putting manifest")
 
 	// create or find target repository
-	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, repoPath)
+	repositoryStore := datastore.NewRepositoryStore(imh.App.db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(imh, repoPath)
 	if err != nil {
 		return err
 	}
 
 	// Find the config now to ensure that the config's blob is associated with the repository.
-	dbCfgBlob, err := dbFindRepositoryBlob(ctx, db, cfgDesc, dbRepo.Path)
+	dbCfgBlob, err := dbFindRepositoryBlob(imh, imh.App.db, cfgDesc, dbRepo.Path)
 	if err != nil {
 		return err
 	}
 	// TODO: update the config blob media_type here, it was set to "application/octet-stream" during the upload
 	// 		 but now we know its concrete type (cfgDesc.MediaType).
 
-	cfgPayload, err := blobService.Get(ctx, dbCfgBlob.Digest)
+	cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, dbCfgBlob.Digest)
 	if err != nil {
 		return err
 	}
 
-	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, dbRepo, dgst)
+	dbManifest, err := repositoryStore.FindManifestByDigest(imh, dbRepo, imh.Digest)
 	if err != nil {
 		return err
 	}
@@ -832,7 +830,7 @@ func dbPutManifestOCIOrSchema2(
 			RepositoryID:  dbRepo.ID,
 			SchemaVersion: versioned.SchemaVersion,
 			MediaType:     versioned.MediaType,
-			Digest:        dgst,
+			Digest:        imh.Digest,
 			Payload:       payload,
 			Configuration: &models.Configuration{
 				MediaType: dbCfgBlob.MediaType,
@@ -841,8 +839,8 @@ func dbPutManifestOCIOrSchema2(
 			},
 		}
 
-		mStore := datastore.NewManifestStore(db)
-		if err := mStore.Create(ctx, m); err != nil {
+		mStore := datastore.NewManifestStore(imh.App.db)
+		if err := mStore.Create(imh, m); err != nil {
 			return err
 		}
 
@@ -850,7 +848,7 @@ func dbPutManifestOCIOrSchema2(
 
 		// find and associate manifest layer blobs
 		for _, reqLayer := range layers {
-			dbBlob, err := dbFindRepositoryBlob(ctx, db, reqLayer, dbRepo.Path)
+			dbBlob, err := dbFindRepositoryBlob(imh, imh.App.db, reqLayer, dbRepo.Path)
 			if err != nil {
 				return err
 			}
@@ -858,7 +856,7 @@ func dbPutManifestOCIOrSchema2(
 			// TODO: update the layer blob media_type here, it was set to "application/octet-stream" during the upload
 			// 		 but now we know its concrete type (reqLayer.MediaType).
 
-			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
+			if err := mStore.AssociateLayerBlob(imh, dbManifest, dbBlob); err != nil {
 				return err
 			}
 		}
