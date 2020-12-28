@@ -67,10 +67,7 @@ func (ms *manifestListHandler) verifyManifest(ctx context.Context, mnfst *manife
 		return err
 	}
 
-	v := &validation.ManifestListValidator{
-		ManifestExister:            manifestService,
-		SkipDependencyVerification: skipDependencyVerification,
-	}
+	v := validation.NewManifestListValidator(manifestService, skipDependencyVerification)
 
 	return v.Validate(ctx, mnfst)
 }

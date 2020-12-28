@@ -67,12 +67,7 @@ func (ms *schema2ManifestHandler) verifyManifest(ctx context.Context, mnfst *sch
 		return err
 	}
 
-	v := &validation.Schema2Validator{
-		ManifestExister:            manifestService,
-		BlobStatter:                ms.repository.Blobs(ctx),
-		SkipDependencyVerification: skipDependencyVerification,
-		ManifestURLs:               ms.manifestURLs,
-	}
+	v := validation.NewSchema2Validator(manifestService, ms.repository.Blobs(ctx), skipDependencyVerification, ms.manifestURLs)
 
 	return v.Validate(ctx, mnfst)
 }

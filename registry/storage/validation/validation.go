@@ -7,6 +7,7 @@ import (
 
 	"net/url"
 
+	"github.com/docker/distribution"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -15,6 +16,12 @@ var (
 	errMissingURL    = errors.New("missing URL on layer")
 	errInvalidURL    = errors.New("invalid URL on layer")
 )
+
+type baseValidator struct {
+	manifestExister            ManifestExister
+	blobStatter                distribution.BlobStatter
+	skipDependencyVerification bool
+}
 
 // ManifestExister checks for the existance of a manifest.
 type ManifestExister interface {

@@ -746,18 +746,12 @@ func dbPutManifestOCI(imh *manifestHandler, manifest *ocischema.DeserializedMani
 		repoReader := datastore.NewRepositoryStore(imh.db)
 		repoPath := imh.Repository.Named().Name()
 
-		v := &validation.OCIValidator{
-			ManifestExister: &datastore.RepositoryManifestService{
-				RepositoryReader: repoReader,
-				RepositoryPath:   repoPath,
-			},
-			BlobStatter: &datastore.RepositoryBlobService{
-				RepositoryReader: repoReader,
-				RepositoryPath:   repoPath,
-			},
-			SkipDependencyVerification: imh.App.isCache,
-			ManifestURLs:               imh.App.manifestURLs,
-		}
+		v := validation.NewOCIValidator(
+			&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+			&datastore.RepositoryBlobService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+			imh.App.isCache,
+			imh.App.manifestURLs,
+		)
 
 		if err := v.Validate(imh, manifest); err != nil {
 			return err
@@ -772,18 +766,12 @@ func dbPutManifestSchema2(imh *manifestHandler, manifest *schema2.DeserializedMa
 		repoReader := datastore.NewRepositoryStore(imh.db)
 		repoPath := imh.Repository.Named().Name()
 
-		v := &validation.Schema2Validator{
-			ManifestExister: &datastore.RepositoryManifestService{
-				RepositoryReader: repoReader,
-				RepositoryPath:   repoPath,
-			},
-			BlobStatter: &datastore.RepositoryBlobService{
-				RepositoryReader: repoReader,
-				RepositoryPath:   repoPath,
-			},
-			SkipDependencyVerification: imh.App.isCache,
-			ManifestURLs:               imh.App.manifestURLs,
-		}
+		v := validation.NewSchema2Validator(
+			&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+			&datastore.RepositoryBlobService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+			imh.App.isCache,
+			imh.App.manifestURLs,
+		)
 
 		if err := v.Validate(imh, manifest); err != nil {
 			return err
@@ -979,13 +967,7 @@ func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.Deserial
 	if imh.App.Config.Validation.Enabled {
 		repoReader := datastore.NewRepositoryStore(imh.db)
 
-		v := &validation.ManifestListValidator{
-			ManifestExister: &datastore.RepositoryManifestService{
-				RepositoryReader: repoReader,
-				RepositoryPath:   repoPath,
-			},
-			SkipDependencyVerification: imh.App.isCache,
-		}
+		v := validation.NewManifestListValidator(&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath}, imh.App.isCache)
 
 		if err := v.Validate(imh, manifestList); err != nil {
 			return err

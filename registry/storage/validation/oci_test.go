@@ -127,14 +127,14 @@ func TestVerifyManifest_OCI_NonDistributableLayer(t *testing.T) {
 			continue
 		}
 
-		v := &validation.OCIValidator{
-			ManifestExister:            manifestService,
-			BlobStatter:                repo.Blobs(ctx),
-			SkipDependencyVerification: false,
-			ManifestURLs: validation.ManifestURLs{
+		v := validation.NewOCIValidator(
+			manifestService,
+			repo.Blobs(ctx),
+			false,
+			validation.ManifestURLs{
 				Allow: regexp.MustCompile("^https?://foo"),
 				Deny:  regexp.MustCompile("^https?://foo/nope"),
-			}}
+			})
 
 		err = v.Validate(ctx, dm)
 		if verr, ok := err.(distribution.ErrManifestVerification); ok {
@@ -166,12 +166,8 @@ func TestVerifyManifest_OCI_InvalidSchemaVersion(t *testing.T) {
 	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.OCIValidator{
-		ManifestExister:            manifestService,
-		BlobStatter:                repo.Blobs(ctx),
-		SkipDependencyVerification: false,
-		ManifestURLs:               validation.ManifestURLs{},
-	}
+	v := validation.NewOCIValidator(manifestService, repo.Blobs(ctx), false, validation.ManifestURLs{})
+
 	err = v.Validate(ctx, dm)
 	require.EqualError(t, err, fmt.Sprintf("unrecognized manifest schema version %d", m.Versioned.SchemaVersion))
 }
@@ -191,12 +187,7 @@ func TestVerifyManifest_OCI_SkipDependencyVerification(t *testing.T) {
 	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.OCIValidator{
-		ManifestExister:            manifestService,
-		BlobStatter:                repo.Blobs(ctx),
-		SkipDependencyVerification: true,
-		ManifestURLs:               validation.ManifestURLs{},
-	}
+	v := validation.NewOCIValidator(manifestService, repo.Blobs(ctx), true, validation.ManifestURLs{})
 
 	err = v.Validate(ctx, dm)
 	require.NoError(t, err)
@@ -240,13 +231,7 @@ func TestVerifyManifest_OCI_ManifestLayer(t *testing.T) {
 	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.OCIValidator{
-		ManifestExister:            manifestService,
-		BlobStatter:                repo.Blobs(ctx),
-		SkipDependencyVerification: false,
-		ManifestURLs: validation.ManifestURLs{
-			Allow: regexp.MustCompile("^https?://*"),
-		}}
+	v := validation.NewOCIValidator(manifestService, repo.Blobs(ctx), false, validation.ManifestURLs{})
 
 	err = v.Validate(ctx, dm)
 	require.NoErrorf(t, err, fmt.Sprintf("digest: %s", dgst))
@@ -278,13 +263,7 @@ func TestVerifyManifest_OCI_MultipleErrors(t *testing.T) {
 	dm, err := ocischema.FromStruct(m)
 	require.NoError(t, err)
 
-	v := &validation.OCIValidator{
-		ManifestExister:            manifestService,
-		BlobStatter:                repo.Blobs(ctx),
-		SkipDependencyVerification: false,
-		ManifestURLs: validation.ManifestURLs{
-			Allow: regexp.MustCompile("^https?://*"),
-		}}
+	v := validation.NewOCIValidator(manifestService, repo.Blobs(ctx), false, validation.ManifestURLs{})
 
 	err = v.Validate(ctx, dm)
 	require.Error(t, err)

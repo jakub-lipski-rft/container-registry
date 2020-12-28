@@ -12,10 +12,20 @@ import (
 // Schema2Validator ensures that a schema2 manifest is valid and optionally
 // verifies all manifest references.
 type Schema2Validator struct {
-	ManifestExister            ManifestExister
-	BlobStatter                distribution.BlobStatter
-	SkipDependencyVerification bool
-	ManifestURLs               ManifestURLs
+	baseValidator
+	manifestURLs ManifestURLs
+}
+
+// NewSchema2Validator returns a new Schema2Validator.
+func NewSchema2Validator(exister ManifestExister, statter distribution.BlobStatter, skipDependencyVerification bool, manifestURLs ManifestURLs) *Schema2Validator {
+	return &Schema2Validator{
+		baseValidator: baseValidator{
+			manifestExister:            exister,
+			blobStatter:                statter,
+			skipDependencyVerification: skipDependencyVerification,
+		},
+		manifestURLs: manifestURLs,
+	}
 }
 
 // Validate ensures that the manifest content is valid from the
@@ -28,7 +38,7 @@ func (v *Schema2Validator) Validate(ctx context.Context, mnfst *schema2.Deserial
 		return fmt.Errorf("unrecognized manifest schema version %d", mnfst.Manifest.SchemaVersion)
 	}
 
-	if v.SkipDependencyVerification {
+	if v.skipDependencyVerification {
 		return nil
 	}
 
@@ -44,14 +54,14 @@ func (v *Schema2Validator) Validate(ctx context.Context, mnfst *schema2.Deserial
 			}
 
 			for _, u := range descriptor.URLs {
-				if !validURL(u, v.ManifestURLs) {
+				if !validURL(u, v.manifestURLs) {
 					err = errInvalidURL
 					break
 				}
 			}
 		case schema2.MediaTypeManifest, schema1.MediaTypeManifest:
 			var exists bool
-			exists, err = v.ManifestExister.Exists(ctx, descriptor.Digest)
+			exists, err = v.manifestExister.Exists(ctx, descriptor.Digest)
 			if err != nil || !exists {
 				err = distribution.ErrBlobUnknown // just coerce to unknown.
 			}
@@ -60,7 +70,7 @@ func (v *Schema2Validator) Validate(ctx context.Context, mnfst *schema2.Deserial
 		default:
 			// forward all else to blob storage
 			if len(descriptor.URLs) == 0 {
-				_, err = v.BlobStatter.Stat(ctx, descriptor.Digest)
+				_, err = v.blobStatter.Stat(ctx, descriptor.Digest)
 			}
 		}
 

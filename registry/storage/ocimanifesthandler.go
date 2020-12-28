@@ -67,12 +67,7 @@ func (ms *ocischemaManifestHandler) verifyManifest(ctx context.Context, mnfst *o
 		return err
 	}
 
-	v := &validation.OCIValidator{
-		ManifestExister:            manifestService,
-		BlobStatter:                ms.repository.Blobs(ctx),
-		SkipDependencyVerification: skipDependencyVerification,
-		ManifestURLs:               ms.manifestURLs,
-	}
+	v := validation.NewOCIValidator(manifestService, ms.repository.Blobs(ctx), skipDependencyVerification, ms.manifestURLs)
 
 	return v.Validate(ctx, mnfst)
 }
