@@ -12,10 +12,20 @@ import (
 // OCIValidator ensures that a OCI image manifest is valid and optionally
 // verifies all manifest references.
 type OCIValidator struct {
-	ManifestExister            ManifestExister
-	BlobStatter                distribution.BlobStatter
-	SkipDependencyVerification bool
-	ManifestURLs               ManifestURLs
+	baseValidator
+	manifestURLs ManifestURLs
+}
+
+// NewOCIValidator returns a new OCIValidator.
+func NewOCIValidator(exister ManifestExister, statter distribution.BlobStatter, skipDependencyVerification bool, manifestURLs ManifestURLs) *OCIValidator {
+	return &OCIValidator{
+		baseValidator: baseValidator{
+			manifestExister:            exister,
+			blobStatter:                statter,
+			skipDependencyVerification: skipDependencyVerification,
+		},
+		manifestURLs: manifestURLs,
+	}
 }
 
 // Validate ensures that the manifest content is valid from the
@@ -28,7 +38,7 @@ func (v *OCIValidator) Validate(ctx context.Context, mnfst *ocischema.Deserializ
 		return fmt.Errorf("unrecognized manifest schema version %d", mnfst.Manifest.SchemaVersion)
 	}
 
-	if v.SkipDependencyVerification {
+	if v.skipDependencyVerification {
 		return nil
 	}
 
@@ -38,7 +48,7 @@ func (v *OCIValidator) Validate(ctx context.Context, mnfst *ocischema.Deserializ
 		switch descriptor.MediaType {
 		case v1.MediaTypeImageLayer, v1.MediaTypeImageLayerGzip, v1.MediaTypeImageLayerNonDistributable, v1.MediaTypeImageLayerNonDistributableGzip:
 			for _, u := range descriptor.URLs {
-				if !validURL(u, v.ManifestURLs) {
+				if !validURL(u, v.manifestURLs) {
 					err = errInvalidURL
 					break
 				}
@@ -46,11 +56,11 @@ func (v *OCIValidator) Validate(ctx context.Context, mnfst *ocischema.Deserializ
 
 			if err == nil && len(descriptor.URLs) == 0 {
 				// If no URLs, require that the blob exists
-				_, err = v.BlobStatter.Stat(ctx, descriptor.Digest)
+				_, err = v.blobStatter.Stat(ctx, descriptor.Digest)
 			}
 		case v1.MediaTypeImageManifest:
 			var exists bool
-			exists, err = v.ManifestExister.Exists(ctx, descriptor.Digest)
+			exists, err = v.manifestExister.Exists(ctx, descriptor.Digest)
 			if err != nil || !exists {
 				err = distribution.ErrBlobUnknown // just coerce to unknown.
 			}
@@ -59,7 +69,7 @@ func (v *OCIValidator) Validate(ctx context.Context, mnfst *ocischema.Deserializ
 		default:
 			// forward all else to blob storage
 			if len(descriptor.URLs) == 0 {
-				_, err = v.BlobStatter.Stat(ctx, descriptor.Digest)
+				_, err = v.blobStatter.Stat(ctx, descriptor.Digest)
 			}
 		}
 
