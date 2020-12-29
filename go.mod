@@ -8,6 +8,7 @@ require (
 	github.com/Azure/go-autorest v10.8.1+incompatible // indirect
 	github.com/FZambia/sentinel v1.1.0
 	github.com/Shopify/logrus-bugsnag v0.0.0-20171204204709-577dee27f20d
+	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/aws/aws-sdk-go v1.27.0
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect

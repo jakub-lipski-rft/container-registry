@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -149,6 +150,11 @@ func (dsn *DSN) String() string {
 	}
 
 	return strings.Join(params, " ")
+}
+
+// Address returns the host:port segment of a DSN.
+func (dsn *DSN) Address() string {
+	return net.JoinHostPort(dsn.Host, strconv.Itoa(dsn.Port))
 }
 
 // statementLogger allows queries to be pretty printed in debug mode without

@@ -2,7 +2,9 @@ package errcode
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -263,4 +265,25 @@ func (errs *Errors) UnmarshalJSON(data []byte) error {
 
 	*errs = newErrs
 	return nil
+}
+
+// FromUnknownError will try to parse an unknown error and infer the appropriate Error to use.
+func FromUnknownError(err error) Error {
+	// return if this is an Error already
+	var e Error
+	if errors.As(err, &e) {
+		return e
+	}
+	// use 503 Service Unavailable for network timeout errors
+	var netError net.Error
+	if ok := errors.As(err, &netError); ok && netError.Timeout() {
+		return ErrorCodeUnavailable.WithDetail(err)
+	}
+	// use 503 Service Unavailable for network connection refused or unknown host errors
+	var netOpError *net.OpError
+	if errors.As(err, &netOpError) {
+		return ErrorCodeUnavailable.WithDetail(err)
+	}
+	// otherwise, we're not sure what the error is or how to react, use 500 Internal Server Error
+	return ErrorCodeUnknown.WithDetail(err)
 }

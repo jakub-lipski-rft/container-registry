@@ -104,9 +104,9 @@ static-analysis:
   stage: integration
   needs: []
   variables:
+    FF_NETWORK_PER_BUILD: 1
     POSTGRES_PASSWORD: "secret"
     POSTGRES_DB: "registry_test"
-
     REGISTRY_DATABASE_ENABLED: "true"
     REGISTRY_DATABASE_HOST: "db"
     REGISTRY_DATABASE_PORT: "5432"
@@ -133,6 +133,21 @@ static-analysis:
   <<: *database
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/handlers
+
+# Tests that simulate adverse network conditions/errors between the registry and its database.
+.database:api-fault-tolerance:
+  <<: *database
+  before_script:
+    - export PACKAGE=github.com/docker/distribution/registry/handlers
+    - export TOXIPROXY_HOST=toxiproxy
+    - export TOXIPROXY_PORT=8474
+  services:
+    # `services` are not extended, so we have to redeclare `postgres:12-alpine` here.
+    - name: postgres:12-alpine
+      alias: "db"
+    - name: shopify/toxiproxy
+      alias: "toxiproxy"
+  script: go test -v -coverprofile=coverage.out -tags=integration,toxiproxy $PACKAGE -run ^TestDBFaultTolerance
 
 database:migrations Go 1.13:
   extends: .database:migrations
@@ -168,6 +183,18 @@ database:api Go 1.14:
 
 database:api Go 1.15:
   extends: .database:api
+  image: golang:1.15-buster
+
+database:api-fault-tolerance Go 1.13:
+  extends: .database:api-fault-tolerance
+  image: golang:1.13-buster
+
+database:api-fault-tolerance Go 1.14:
+  extends: .database:api-fault-tolerance
+  image: golang:1.14-buster
+
+database:api-fault-tolerance Go 1.15:
+  extends: .database:api-fault-tolerance
   image: golang:1.15-buster
 
 api Go 1.13:

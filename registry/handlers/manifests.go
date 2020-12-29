@@ -155,7 +155,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 				// not found or with broken current/link (invalid digest)
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
 			} else {
-				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
 			}
 			return
 		}
@@ -175,7 +175,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
 			} else {
-				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
 			}
 			return
 		}
@@ -248,7 +248,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
 			} else {
-				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
 			}
 			return
 		}
@@ -572,7 +572,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		tx, err := imh.App.db.BeginTx(imh, nil)
 		if err != nil {
 			imh.Errors = append(imh.Errors,
-				errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to create database transaction: %v", err)))
+				errcode.FromUnknownError(fmt.Errorf("failed to create database transaction: %w", err)))
 			return
 		}
 		defer tx.Rollback()
@@ -584,7 +584,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 		if err := tx.Commit(); err != nil {
 			imh.Errors = append(imh.Errors,
-				errcode.ErrorCodeUnknown.WithDetail(fmt.Errorf("failed to commit manifest to database: %v", err)))
+				errcode.FromUnknownError(fmt.Errorf("failed to commit manifest to database: %w", err)))
 			return
 		}
 	}
@@ -602,20 +602,20 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		if imh.Config.Database.Enabled {
 			tx, err := imh.App.db.BeginTx(imh, nil)
 			if err != nil {
-				e := fmt.Errorf("failed to create database transaction: %v", err)
-				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				e := fmt.Errorf("failed to create database transaction: %w", err)
+				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 				return
 			}
 			defer tx.Rollback()
 
 			if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
-				e := fmt.Errorf("failed to create tag in database: %v", err)
-				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				e := fmt.Errorf("failed to create tag in database: %w", err)
+				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 				return
 			}
 			if err := tx.Commit(); err != nil {
 				e := fmt.Errorf("failed to commit tag to database: %v", err)
-				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 				return
 			}
 		}
@@ -678,7 +678,7 @@ func (imh *manifestHandler) appendPutError(err error) {
 	case errcode.Error:
 		imh.Errors = append(imh.Errors, err)
 	default:
-		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+		imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
 	}
 }
 
@@ -1162,21 +1162,21 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 	if imh.App.Config.Database.Enabled {
 		tx, err := imh.db.BeginTx(r.Context(), nil)
 		if err != nil {
-			e := fmt.Errorf("failed to create database transaction: %v", err)
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			e := fmt.Errorf("failed to create database transaction: %w", err)
+			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 			return
 		}
 		defer tx.Rollback()
 
 		if err = dbDeleteManifest(imh, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
-			e := fmt.Errorf("failed to delete manifest in database: %v", err)
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			e := fmt.Errorf("failed to delete manifest in database: %w", err)
+			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 			return
 		}
 
 		if err = tx.Commit(); err != nil {
-			e := fmt.Errorf("failed to commit database transaction: %v", err)
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			e := fmt.Errorf("failed to commit database transaction: %w", err)
+			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 			return
 		}
 	}
