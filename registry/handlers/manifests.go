@@ -742,40 +742,36 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 }
 
 func dbPutManifestOCI(imh *manifestHandler, manifest *ocischema.DeserializedManifest, payload []byte) error {
-	if imh.App.Config.Validation.Enabled {
-		repoReader := datastore.NewRepositoryStore(imh.db)
-		repoPath := imh.Repository.Named().Name()
+	repoReader := datastore.NewRepositoryStore(imh.db)
+	repoPath := imh.Repository.Named().Name()
 
-		v := validation.NewOCIValidator(
-			&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath},
-			&datastore.RepositoryBlobService{RepositoryReader: repoReader, RepositoryPath: repoPath},
-			imh.App.isCache,
-			imh.App.manifestURLs,
-		)
+	v := validation.NewOCIValidator(
+		&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+		&datastore.RepositoryBlobService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+		imh.App.isCache,
+		imh.App.manifestURLs,
+	)
 
-		if err := v.Validate(imh, manifest); err != nil {
-			return err
-		}
+	if err := v.Validate(imh, manifest); err != nil {
+		return err
 	}
 
 	return dbPutManifestOCIOrSchema2(imh, manifest.Versioned, manifest.Layers, manifest.Config, payload)
 }
 
 func dbPutManifestSchema2(imh *manifestHandler, manifest *schema2.DeserializedManifest, payload []byte) error {
-	if imh.App.Config.Validation.Enabled {
-		repoReader := datastore.NewRepositoryStore(imh.db)
-		repoPath := imh.Repository.Named().Name()
+	repoReader := datastore.NewRepositoryStore(imh.db)
+	repoPath := imh.Repository.Named().Name()
 
-		v := validation.NewSchema2Validator(
-			&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath},
-			&datastore.RepositoryBlobService{RepositoryReader: repoReader, RepositoryPath: repoPath},
-			imh.App.isCache,
-			imh.App.manifestURLs,
-		)
+	v := validation.NewSchema2Validator(
+		&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+		&datastore.RepositoryBlobService{RepositoryReader: repoReader, RepositoryPath: repoPath},
+		imh.App.isCache,
+		imh.App.manifestURLs,
+	)
 
-		if err := v.Validate(imh, manifest); err != nil {
-			return err
-		}
+	if err := v.Validate(imh, manifest); err != nil {
+		return err
 	}
 
 	return dbPutManifestOCIOrSchema2(imh, manifest.Versioned, manifest.Layers, manifest.Config, payload)
@@ -964,14 +960,12 @@ func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.Deserial
 	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": imh.Digest})
 	log.Debug("putting manifest list")
 
-	if imh.App.Config.Validation.Enabled {
-		repoReader := datastore.NewRepositoryStore(imh.db)
+	repoReader := datastore.NewRepositoryStore(imh.db)
 
-		v := validation.NewManifestListValidator(&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath}, imh.App.isCache)
+	v := validation.NewManifestListValidator(&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath}, imh.App.isCache)
 
-		if err := v.Validate(imh, manifestList); err != nil {
-			return err
-		}
+	if err := v.Validate(imh, manifestList); err != nil {
+		return err
 	}
 
 	// create or find target repository
