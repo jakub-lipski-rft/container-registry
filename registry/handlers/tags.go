@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -46,7 +45,7 @@ func dbGetTags(ctx context.Context, db datastore.Queryer, repoPath string, n int
 	rStore := datastore.NewRepositoryStore(db)
 	r, err := rStore.FindByPath(ctx, repoPath)
 	if err != nil {
-		return nil, false, errcode.ErrorCodeUnknown.WithDetail(err)
+		return nil, false, err
 	}
 	if r == nil {
 		log.Warn("repository not found in database")
@@ -55,7 +54,7 @@ func dbGetTags(ctx context.Context, db datastore.Queryer, repoPath string, n int
 
 	tt, err := rStore.TagsPaginated(ctx, r, n, last)
 	if err != nil {
-		return nil, false, errcode.ErrorCodeUnknown.WithDetail(err)
+		return nil, false, err
 	}
 
 	tags := make([]string, 0, len(tt))
@@ -67,7 +66,7 @@ func dbGetTags(ctx context.Context, db datastore.Queryer, repoPath string, n int
 	if len(tt) > 0 {
 		n, err := rStore.TagsCountAfterName(ctx, r, tt[len(tt)-1].Name)
 		if err != nil {
-			return nil, false, errcode.ErrorCodeUnknown.WithDetail(err)
+			return nil, false, err
 		}
 		moreEntries = n > 0
 	}
@@ -93,7 +92,7 @@ func (th *tagsHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 	if th.Config.Database.Enabled {
 		tags, moreEntries, err = dbGetTags(th.Context, th.db, th.Repository.Named().Name(), maxEntries, lastEntry)
 		if err != nil {
-			th.Errors = append(th.Errors, err)
+			th.Errors = append(th.Errors, errcode.FromUnknownError(err))
 			return
 		}
 		if len(tags) == 0 {
@@ -172,7 +171,7 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if r == nil {
-		return errors.New("repository not found in database")
+		return v2.ErrorCodeNameUnknown
 	}
 
 	found, err := rStore.DeleteTagByName(ctx, r, tagName)
@@ -180,7 +179,7 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if !found {
-		return errors.New("tag not found in database")
+		return v2.ErrorCodeManifestUnknown
 	}
 
 	return nil
@@ -209,8 +208,8 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 
 	if th.App.Config.Database.Enabled {
 		if err := dbDeleteTag(th, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
-			e := fmt.Errorf("failed to delete tag in database: %v", err)
-			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown.WithDetail(e))
+			e := fmt.Errorf("failed to delete tag in database: %w", err)
+			th.Errors = append(th.Errors, errcode.FromUnknownError(e))
 			return
 		}
 	}

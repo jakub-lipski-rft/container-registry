@@ -23,10 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/docker/distribution/version"
-
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/configuration"
 	"github.com/docker/distribution/manifest"
@@ -34,6 +30,7 @@ import (
 	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
+	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
@@ -45,10 +42,12 @@ import (
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
 	_ "github.com/docker/distribution/registry/storage/driver/testdriver"
 	"github.com/docker/distribution/testutil"
+	"github.com/docker/distribution/version"
 	"github.com/docker/libtrust"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -84,6 +83,13 @@ func disableMirrorFS(config *configuration.Configuration) {
 func withSharedInMemoryDriver(name string) configOpt {
 	return func(config *configuration.Configuration) {
 		config.Storage["sharedinmemorydriver"] = configuration.Parameters{"name": name}
+	}
+}
+
+func withCustomDBHostAndPort(host string, port int) configOpt {
+	return func(config *configuration.Configuration) {
+		config.Database.Host = host
+		config.Database.Port = port
 	}
 }
 
@@ -5231,6 +5237,21 @@ func newTestEnv(t *testing.T, opts ...configOpt) *testEnv {
 func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *testEnv {
 	ctx := context.Background()
 
+	// The API test needs access to the database only to clean it up during
+	// shutdown so that environments come up with a fresh copy of the database.
+	var db *datastore.DB
+	var err error
+	if config.Database.Enabled {
+		db, err = dbtestutil.NewDBFromConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := migrations.NewMigrator(db.DB)
+		if _, err = m.Up(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	app := registryhandlers.NewApp(ctx, config)
 
 	var out io.Writer
@@ -5249,17 +5270,6 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 	pk, err := libtrust.GenerateECP256PrivateKey()
 	if err != nil {
 		t.Fatalf("unexpected error generating private key: %v", err)
-	}
-
-	// The API test needs access to the database only to clean it up during
-	// shutdown so that environments come up with a fresh copy of the database.
-	var db *datastore.DB
-
-	if config.Database.Enabled {
-		db, err = dbtestutil.NewDBFromConfig(config)
-		if err != nil {
-			t.Fatal(err)
-		}
 	}
 
 	return &testEnv{

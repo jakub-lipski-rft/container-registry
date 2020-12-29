@@ -64,7 +64,7 @@ func dbGetBlob(ctx context.Context, db datastore.Queryer, repoPath string, dgst 
 	rStore := datastore.NewRepositoryStore(db)
 	r, err := rStore.FindByPath(ctx, repoPath)
 	if err != nil {
-		return errcode.ErrorCodeUnknown.WithDetail(err)
+		return err
 	}
 	if r == nil {
 		log.Warn("repository not found in database")
@@ -73,7 +73,7 @@ func dbGetBlob(ctx context.Context, db datastore.Queryer, repoPath string, dgst 
 
 	bb, err := rStore.Blobs(ctx, r)
 	if err != nil {
-		return errcode.ErrorCodeUnknown.WithDetail(err)
+		return err
 	}
 
 	var found bool
@@ -101,7 +101,7 @@ func (bh *blobHandler) GetBlob(w http.ResponseWriter, r *http.Request) {
 
 	if bh.Config.Database.Enabled {
 		if err := dbGetBlob(bh.Context, bh.db, bh.Repository.Named().Name(), bh.Digest); err != nil {
-			bh.Errors = append(bh.Errors, err)
+			bh.Errors = append(bh.Errors, errcode.FromUnknownError(err))
 			return
 		}
 
@@ -186,8 +186,8 @@ func (bh *blobHandler) DeleteBlob(w http.ResponseWriter, r *http.Request) {
 			bh.Errors = append(bh.Errors, v2.ErrorCodeNameUnknown)
 			return
 		default:
-			bh.Errors = append(bh.Errors, err)
-			dcontext.GetLogger(bh).WithError(err).Error("Unknown error deleting blob")
+			bh.Errors = append(bh.Errors, errcode.FromUnknownError(err))
+			dcontext.GetLogger(bh).WithError(err).Error("failed to delete blob")
 			return
 		}
 	}

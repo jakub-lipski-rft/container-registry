@@ -76,7 +76,7 @@ func (ch *catalogHandler) GetCatalog(w http.ResponseWriter, r *http.Request) {
 	if ch.Config.Database.Enabled {
 		repos, moreEntries, err = dbGetCatalog(ch.Context, ch.db, maxEntries, lastEntry)
 		if err != nil {
-			ch.Errors = append(ch.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			ch.Errors = append(ch.Errors, errcode.FromUnknownError(err))
 			return
 		}
 		filled = len(repos)

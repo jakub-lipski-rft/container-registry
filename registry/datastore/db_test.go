@@ -67,3 +67,22 @@ func TestDSN_String(t *testing.T) {
 		})
 	}
 }
+
+func TestDSN_Address(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  datastore.DSN
+		out  string
+	}{
+		{name: "empty", arg: datastore.DSN{}, out: ":0"},
+		{name: "no port", arg: datastore.DSN{Host: "127.0.0.1"}, out: "127.0.0.1:0"},
+		{name: "no host", arg: datastore.DSN{Port: 5432}, out: ":5432"},
+		{name: "full", arg: datastore.DSN{Host: "127.0.0.1", Port: 5432}, out: "127.0.0.1:5432"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.out, tt.arg.Address())
+		})
+	}
+}
