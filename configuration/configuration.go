@@ -343,6 +343,8 @@ type Database struct {
 		// lazily before reuse. Defaults to 0 (unlimited).
 		MaxLifetime time.Duration `yaml:"maxlifetime,omitempty"`
 	} `yaml:"pool,omitempty"`
+	// Maximum time to wait for a connection. Zero or not specified means waiting indefinitely.
+	ConnectTimeout time.Duration `yaml:"connecttimeout,omitempty"`
 }
 
 // Regexp wraps regexp.Regexp to implement the encoding.TextMarshaler interface.

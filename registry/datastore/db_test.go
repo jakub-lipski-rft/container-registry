@@ -2,6 +2,7 @@ package datastore_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/stretchr/testify/require"
@@ -19,17 +20,18 @@ func TestDSN_String(t *testing.T) {
 		{
 			name: "full",
 			arg: datastore.DSN{
-				Host:        "127.0.0.1",
-				Port:        5432,
-				User:        "registry",
-				Password:    "secret",
-				DBName:      "registry_production",
-				SSLMode:     "require",
-				SSLCert:     "/path/to/client.crt",
-				SSLKey:      "/path/to/client.key",
-				SSLRootCert: "/path/to/root.crt",
+				Host:           "127.0.0.1",
+				Port:           5432,
+				User:           "registry",
+				Password:       "secret",
+				DBName:         "registry_production",
+				SSLMode:        "require",
+				SSLCert:        "/path/to/client.crt",
+				SSLKey:         "/path/to/client.key",
+				SSLRootCert:    "/path/to/root.crt",
+				ConnectTimeout: 5 * time.Second,
 			},
-			out: "host=127.0.0.1 port=5432 user=registry password=secret dbname=registry_production sslmode=require sslcert=/path/to/client.crt sslkey=/path/to/client.key sslrootcert=/path/to/root.crt",
+			out: "host=127.0.0.1 port=5432 user=registry password=secret dbname=registry_production sslmode=require sslcert=/path/to/client.crt sslkey=/path/to/client.key sslrootcert=/path/to/root.crt connect_timeout=5",
 		},
 		{
 			name: "with zero port",
@@ -58,6 +60,13 @@ func TestDSN_String(t *testing.T) {
 				Password: "jw8s%^@0F4",
 			},
 			out: "password=jw8s%^@0F4",
+		},
+		{
+			name: "with zero connection timeout",
+			arg: datastore.DSN{
+				ConnectTimeout: 0,
+			},
+			out: "",
 		},
 	}
 

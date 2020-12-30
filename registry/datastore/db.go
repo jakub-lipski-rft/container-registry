@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"regexp"
@@ -108,15 +109,16 @@ func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}
 
 // DSN represents the Data Source Name parameters for a DB connection.
 type DSN struct {
-	Host        string
-	Port        int
-	User        string
-	Password    string
-	DBName      string
-	SSLMode     string
-	SSLCert     string
-	SSLKey      string
-	SSLRootCert string
+	Host           string
+	Port           int
+	User           string
+	Password       string
+	DBName         string
+	SSLMode        string
+	SSLCert        string
+	SSLKey         string
+	SSLRootCert    string
+	ConnectTimeout time.Duration
 }
 
 // String builds the string representation of a DSN.
@@ -126,6 +128,10 @@ func (dsn *DSN) String() string {
 	port := ""
 	if dsn.Port > 0 {
 		port = strconv.Itoa(dsn.Port)
+	}
+	connectTimeout := ""
+	if dsn.ConnectTimeout > 0 {
+		connectTimeout = fmt.Sprintf("%.0f", dsn.ConnectTimeout.Seconds())
 	}
 
 	for _, param := range []struct{ k, v string }{
@@ -138,6 +144,7 @@ func (dsn *DSN) String() string {
 		{"sslcert", dsn.SSLCert},
 		{"sslkey", dsn.SSLKey},
 		{"sslrootcert", dsn.SSLRootCert},
+		{"connect_timeout", connectTimeout},
 	} {
 		if len(param.v) == 0 {
 			continue
