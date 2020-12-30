@@ -86,10 +86,16 @@ func withSharedInMemoryDriver(name string) configOpt {
 	}
 }
 
-func withCustomDBHostAndPort(host string, port int) configOpt {
+func withDBHostAndPort(host string, port int) configOpt {
 	return func(config *configuration.Configuration) {
 		config.Database.Host = host
 		config.Database.Port = port
+	}
+}
+
+func withDBConnectTimeout(d time.Duration) configOpt {
+	return func(config *configuration.Configuration) {
+		config.Database.ConnectTimeout = d
 	}
 }
 

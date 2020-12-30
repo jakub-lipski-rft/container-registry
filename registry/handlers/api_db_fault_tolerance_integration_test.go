@@ -14,8 +14,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
-	toxiclient "github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/client"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/datastore/testutil"
@@ -29,7 +30,7 @@ import (
 // with ensuring that all HTTP handlers and methods are handling failure scenarios properly.
 
 var (
-	toxiClient    *toxiclient.Client
+	toxiClient    *toxiproxy.Client
 	toxiproxyHost string
 )
 
@@ -42,14 +43,14 @@ func init() {
 	if port == "" {
 		panic("TOXIPROXY_PORT environment variable not set")
 	}
-	toxiClient = toxiclient.NewClient(net.JoinHostPort(toxiproxyHost, port))
+	toxiClient = toxiproxy.NewClient(net.JoinHostPort(toxiproxyHost, port))
 	if err := toxiClient.ResetState(); err != nil {
 		panic(fmt.Errorf("failed to reset toxiproxy: %w", err))
 	}
 }
 
 type dbProxy struct {
-	proxy *toxiclient.Proxy
+	proxy *toxiproxy.Proxy
 	t     *testing.T
 }
 
@@ -79,6 +80,18 @@ func (p dbProxy) Delete() {
 	require.NoError(p.t, p.proxy.Delete())
 }
 
+func (p dbProxy) AddToxic(typeName string, attrs toxiproxy.Attributes) *toxiproxy.Toxic {
+	p.t.Helper()
+	toxic, err := p.proxy.AddToxic("", typeName, "", 1, attrs)
+	require.NoError(p.t, err)
+	return toxic
+}
+
+func (p dbProxy) RemoveToxic(toxic *toxiproxy.Toxic) {
+	p.t.Helper()
+	require.NoError(p.t, p.proxy.RemoveToxic(toxic.Name))
+}
+
 func newDBProxy(t *testing.T) *dbProxy {
 	t.Helper()
 
@@ -94,7 +107,7 @@ func TestDBFaultTolerance_ConnectionRefused_Catalog(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	u, err := env.builder.BuildCatalogURL()
@@ -113,7 +126,7 @@ func TestDBFaultTolerance_ConnectionRefused_TagList(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -134,7 +147,7 @@ func TestDBFaultTolerance_ConnectionRefused_TagDelete(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withSchema1Compatibility, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withSchema1Compatibility, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -156,7 +169,7 @@ func TestDBFaultTolerance_ConnectionRefused_BlobGet(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	// we can use a non-existing repo and blob, as reads are executed against the DB first
@@ -176,7 +189,7 @@ func TestDBFaultTolerance_ConnectionRefused_BlobHead(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	// we can use a non-existing repo and blob, as reads are executed against the DB first
@@ -196,7 +209,7 @@ func TestDBFaultTolerance_ConnectionRefused_BlobDelete(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withDelete, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDelete, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	// query API with proxy disabled, should fail
@@ -215,7 +228,7 @@ func TestDBFaultTolerance_ConnectionRefused_BlobPut(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	// query API with proxy disabled, should fail
@@ -233,7 +246,7 @@ func TestDBFaultTolerance_ConnectionRefused_BlobPostMount(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	args, _ := createRepoWithBlob(t, env)
@@ -252,7 +265,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestGetByDigest(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -271,7 +284,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestGetByTag(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "test/repo"
@@ -291,7 +304,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestHeadByDigest(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -310,7 +323,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestHeadByTag(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "test/repo"
@@ -330,7 +343,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestPutByDigest(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -349,7 +362,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestPutByTag(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -369,7 +382,7 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestDelete(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withDelete, withCustomDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDelete, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -381,6 +394,300 @@ func TestDBFaultTolerance_ConnectionRefused_ManifestDelete(t *testing.T) {
 
 	// query API with proxy re-enabled, should succeed
 	dbProxy.Enable()
+	m = seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+	assertManifestDeleteResponse(t, env, repoName, m, http.StatusAccepted)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_Catalog(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	u, err := env.builder.BuildCatalogURL()
+	require.NoError(t, err)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertGetResponse(t, u, http.StatusServiceUnavailable)
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertGetResponse(t, u, http.StatusOK)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_TagList(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	name, err := reference.WithName(repoName)
+	require.NoError(t, err)
+	u, err := env.builder.BuildTagsURL(name)
+	require.NoError(t, err)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertGetResponse(t, u, http.StatusServiceUnavailable)
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertGetResponse(t, u, http.StatusNotFound)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_TagDelete(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withSchema1Compatibility, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+
+	// query API with timeout, should fail
+	// create the repo, otherwise the request will halt on the filesystem search, which precedes the DB search
+	createRepository(env, t, repoName, tagName)
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertTagDeleteResponse(t, env, repoName, tagName, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	createRepository(env, t, repoName, tagName)
+	assertTagDeleteResponse(t, env, repoName, tagName, http.StatusAccepted)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_BlobGet(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	// we can use a non-existing repo and blob, as reads are executed against the DB first
+	repoName := "foo"
+	dgst := digest.FromString(repoName)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertBlobGetResponse(t, env, repoName, dgst, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertBlobGetResponse(t, env, repoName, dgst, http.StatusNotFound)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_BlobHead(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	// we can use a non-existing repo and blob, as reads are executed against the DB first
+	repoName := "foo"
+	dgst := digest.FromString(repoName)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertBlobHeadResponse(t, env, repoName, dgst, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertBlobHeadResponse(t, env, repoName, dgst, http.StatusNotFound)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_BlobDelete(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDelete, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	// query API with timeout, should fail
+	// create the repo and blob, otherwise the request will halt on the filesystem search, which precedes the DB search
+	args, _ := createRepoWithBlob(t, env)
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertBlobDeleteResponse(t, env, args.imageName.String(), args.layerDigest, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	args, _ = createRepoWithBlob(t, env)
+	assertBlobDeleteResponse(t, env, args.imageName.String(), args.layerDigest, http.StatusAccepted)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_BlobPut(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	args := makeBlobArgs(t)
+	assertBlobPutResponse(t, env, args.imageName.String(), args.layerDigest, args.layerFile, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	args = makeBlobArgs(t)
+	assertBlobPutResponse(t, env, args.imageName.String(), args.layerDigest, args.layerFile, http.StatusCreated)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_BlobPostMount(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	args, _ := createRepoWithBlob(t, env)
+	destRepo := "foo"
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertBlobPostMountResponse(t, env, args.imageName.String(), destRepo, args.layerDigest, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertBlobPostMountResponse(t, env, args.imageName.String(), destRepo, args.layerDigest, http.StatusCreated)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestGetByDigest(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestGetByDigestResponse(t, env, repoName, m, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertManifestGetByDigestResponse(t, env, repoName, m, http.StatusOK)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestGetByTag(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "test/repo"
+	tagName := "latest"
+	seedRandomSchema2Manifest(t, env, repoName, putByTag(tagName))
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestGetByTagResponse(t, env, repoName, tagName, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertManifestGetByTagResponse(t, env, repoName, tagName, http.StatusOK)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestHeadByDigest(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestHeadByDigestResponse(t, env, repoName, m, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertManifestHeadByDigestResponse(t, env, repoName, m, http.StatusOK)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestHeadByTag(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "test/repo"
+	tagName := "latest"
+	seedRandomSchema2Manifest(t, env, repoName, putByTag(tagName))
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestHeadByTagResponse(t, env, repoName, tagName, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertManifestHeadByTagResponse(t, env, repoName, tagName, http.StatusOK)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestPutByDigest(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestPutByDigestResponse(t, env, repoName, m, m.MediaType, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertManifestPutByDigestResponse(t, env, repoName, m, m.MediaType, http.StatusCreated)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestPutByTag(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByTag(tagName))
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestPutByTagResponse(t, env, repoName, m, m.MediaType, tagName, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
+	assertManifestPutByTagResponse(t, env, repoName, m, m.MediaType, tagName, http.StatusCreated)
+}
+
+func TestDBFaultTolerance_ConnectionTimeout_ManifestDelete(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	env := newTestEnv(t, withDelete, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	// query API with timeout, should fail
+	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
+	assertManifestDeleteResponse(t, env, repoName, m, http.StatusServiceUnavailable)
+
+	// query API with no timeout, should succeed
+	dbProxy.RemoveToxic(toxic)
 	m = seedRandomSchema2Manifest(t, env, repoName, putByDigest)
 	assertManifestDeleteResponse(t, env, repoName, m, http.StatusAccepted)
 }
