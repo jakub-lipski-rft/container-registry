@@ -559,10 +559,12 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_, err = manifests.Put(imh, manifest, options...)
-	if err != nil {
-		imh.appendPutError(err)
-		return
+	if !imh.App.Config.Migration.DisableMirrorFS {
+		_, err = manifests.Put(imh, manifest, options...)
+		if err != nil {
+			imh.appendPutError(err)
+			return
+		}
 	}
 
 	if imh.Config.Database.Enabled {
@@ -591,11 +593,13 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 	// Tag this manifest
 	if imh.Tag != "" {
-		tags := imh.Repository.Tags(imh)
-		err = tags.Tag(imh, imh.Tag, desc)
-		if err != nil {
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
-			return
+		if !imh.App.Config.Migration.DisableMirrorFS {
+			tags := imh.Repository.Tags(imh)
+			err = tags.Tag(imh, imh.Tag, desc)
+			if err != nil {
+				imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+				return
+			}
 		}
 
 		// Associate tag with manifest in database.
@@ -690,21 +694,13 @@ func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload
 
 	switch reqManifest := manifest.(type) {
 	case *schema1.SignedManifest:
-		if err := dbPutManifestSchema1(imh, db, blobService, dgst, reqManifest, repoPath); err != nil {
-			return fmt.Errorf("failed to write manifest to database: %v", err)
-		}
+		return dbPutManifestSchema1(imh, db, blobService, dgst, reqManifest, repoPath)
 	case *schema2.DeserializedManifest:
-		if err := dbPutManifestSchema2(imh, reqManifest, payload); err != nil {
-			return fmt.Errorf("failed to write manifest to database: %v", err)
-		}
+		return dbPutManifestSchema2(imh, reqManifest, payload)
 	case *ocischema.DeserializedManifest:
-		if err := dbPutManifestOCI(imh, reqManifest, payload); err != nil {
-			return fmt.Errorf("failed to write manifest to database: %v", err)
-		}
+		return dbPutManifestOCI(imh, reqManifest, payload)
 	case *manifestlist.DeserializedManifestList:
-		if err := dbPutManifestList(imh, reqManifest, payload); err != nil {
-			return fmt.Errorf("failed to write manifest list to database: %v", err)
-		}
+		return dbPutManifestList(imh, reqManifest, payload)
 	default:
 		dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
 	}
@@ -798,7 +794,16 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 	// TODO: update the config blob media_type here, it was set to "application/octet-stream" during the upload
 	// 		 but now we know its concrete type (cfgDesc.MediaType).
 
-	cfgPayload, err := imh.Repository.Blobs(imh).Get(imh, dbCfgBlob.Digest)
+	// Since filesystem writes may be optional, We cannot be sure that the
+	// repository scoped filesystem blob service will have a link to the
+	// configuration blob; however, since we check for repository scoped access
+	// via the database above, we may retrieve the blob directly common storage.
+	blobService, ok := imh.App.registry.Blobs().(distribution.BlobProvider)
+	if !ok {
+		return fmt.Errorf("unable to convert BlobEnumerator into BlobService")
+	}
+
+	cfgPayload, err := blobService.Get(imh, dbCfgBlob.Digest)
 	if err != nil {
 		return err
 	}

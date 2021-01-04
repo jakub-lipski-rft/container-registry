@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -471,47 +472,9 @@ func TestBlobAPI(t *testing.T) {
 	env2.Shutdown()
 }
 
-func TestBlobAPI_Get(t *testing.T) {
-	env := newTestEnv(t)
+func blob_Get(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// fetch layer
-	res, err := http.Get(blobURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, res.StatusCode)
-
-	// verify response headers
-	_, err = args.layerFile.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(args.layerFile)
-	require.NoError(t, err)
-
-	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
-	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
-	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
-	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
-	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
-
-	// verify response body
-	v := args.layerDigest.Verifier()
-	_, err = io.Copy(v, res.Body)
-	require.NoError(t, err)
-	require.True(t, v.Verified())
-}
-
-func TestBlobAPI_Get_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
 
 	// create repository with a layer
 	args := makeBlobArgs(t)
@@ -568,8 +531,8 @@ func TestBlobAPI_Get_BlobNotInDatabase(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
-func TestBlobAPI_Get_RepositoryNotFound(t *testing.T) {
-	env := newTestEnv(t)
+func blob_Get_RepositoryNotFound(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	args := makeBlobArgs(t)
@@ -585,55 +548,10 @@ func TestBlobAPI_Get_RepositoryNotFound(t *testing.T) {
 	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeBlobUnknown)
 }
 
-func TestBlobAPI_Get_RepositoryNotFound_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, disableMirrorFS)
+func blob_Get_BlobNotFound(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	args := makeBlobArgs(t)
-	ref, err := reference.WithDigest(args.imageName, args.layerDigest)
-	require.NoError(t, err)
-
-	blobURL, err := env.builder.BuildBlobURL(ref)
-	require.NoError(t, err)
-
-	resp, err := http.Get(blobURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, resp.StatusCode)
-	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeBlobUnknown)
-}
-
-func TestBlobAPI_Get_BlobNotFound(t *testing.T) {
-	env := newTestEnv(t, withDelete)
-	defer env.Shutdown()
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// delete blob link from repository
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusAccepted, res.StatusCode)
-
-	// test
-	res, err = http.Get(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	checkBodyHasErrorCodes(t, "blob not found", res, v2.ErrorCodeBlobUnknown)
-}
-
-func TestBlobAPI_Get_BlobNotFound_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, withDelete, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
 
 	// create repository with a layer
 	args := makeBlobArgs(t)
@@ -715,8 +633,8 @@ func TestBlobAPI_GetBlobFromFilesystemAfterDatabaseWrites_DisableMirrorFS(t *tes
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
-func TestBlobAPI_Head(t *testing.T) {
-	env := newTestEnv(t)
+func blob_Head(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	// create repository with a layer
@@ -746,43 +664,8 @@ func TestBlobAPI_Head(t *testing.T) {
 	require.Equal(t, http.NoBody, res.Body)
 }
 
-func TestBlobAPI_Head_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// check if layer exists
-	res, err := http.Head(blobURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, res.StatusCode)
-
-	// verify headers
-	_, err = args.layerFile.Seek(0, io.SeekStart)
-	require.NoError(t, err)
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(args.layerFile)
-	require.NoError(t, err)
-
-	require.Equal(t, res.Header.Get("Content-Type"), "application/octet-stream")
-	require.Equal(t, res.Header.Get("Content-Length"), strconv.Itoa(buf.Len()))
-	require.Equal(t, res.Header.Get("Docker-Content-Digest"), args.layerDigest.String())
-	require.Equal(t, res.Header.Get("ETag"), fmt.Sprintf(`"%s"`, args.layerDigest))
-	require.Equal(t, res.Header.Get("Cache-Control"), "max-age=31536000")
-
-	// verify body
-	require.Equal(t, http.NoBody, res.Body)
-}
-
-func TestBlobAPI_Head_RepositoryNotFound(t *testing.T) {
-	env := newTestEnv(t)
+func blob_Head_RepositoryNotFound(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	args := makeBlobArgs(t)
@@ -798,29 +681,9 @@ func TestBlobAPI_Head_RepositoryNotFound(t *testing.T) {
 	require.Equal(t, http.NoBody, res.Body)
 }
 
-func TestBlobAPI_Head_RepositoryNotFound_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	args := makeBlobArgs(t)
-	ref, err := reference.WithDigest(args.imageName, args.layerDigest)
-	require.NoError(t, err)
-
-	blobURL, err := env.builder.BuildBlobURL(ref)
-	require.NoError(t, err)
-
-	res, err := http.Head(blobURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	require.Equal(t, http.NoBody, res.Body)
-}
-
-func TestBlobAPI_Head_BlobNotFound(t *testing.T) {
-	env := newTestEnv(t, withDelete)
+func blob_Head_BlobNotFound(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	// create repository with a layer
@@ -840,79 +703,8 @@ func TestBlobAPI_Head_BlobNotFound(t *testing.T) {
 	require.Equal(t, http.NoBody, res.Body)
 }
 
-func TestBlobAPI_Head_BlobNotFound_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, withDelete, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// delete blob link from repository
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusAccepted, res.StatusCode)
-
-	// test
-	res, err = http.Head(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	require.Equal(t, http.NoBody, res.Body)
-}
-
-func TestBlobAPI_Delete(t *testing.T) {
-	env := newTestEnv(t, withDelete)
-	defer env.Shutdown()
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// delete blob link from repository
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusAccepted, res.StatusCode)
-
-	// test
-	res, err = http.Head(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	require.Equal(t, http.NoBody, res.Body)
-}
-
-func TestBlobAPI_Delete_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, withDelete, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// delete blob link from repository
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusAccepted, res.StatusCode)
-
-	// test
-	res, err = http.Head(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	require.Equal(t, http.NoBody, res.Body)
-}
-
-func TestBlobAPI_DeleteDisabled(t *testing.T) {
-	env := newTestEnv(t)
+func blob_Delete_Disabled(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	// create repository with a layer
@@ -926,27 +718,9 @@ func TestBlobAPI_DeleteDisabled(t *testing.T) {
 	require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
 }
 
-func TestBlobAPI_DeleteDisabled_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// Attempt to delete blob link from repository.
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
-}
-
-func TestBlobAPI_Delete_AlreadyDeleted(t *testing.T) {
-	env := newTestEnv(t, withDelete)
+func blob_Delete_AlreadyDeleted(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	// create repository with a layer
@@ -971,43 +745,10 @@ func TestBlobAPI_Delete_AlreadyDeleted(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
-func TestBlobAPI_Delete_AlreadyDeleted_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, withDelete, disableMirrorFS)
+func blob_Delete_UnknownRepository(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
-
-	// create repository with a layer
-	args := makeBlobArgs(t)
-	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
-	location := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
-
-	// delete blob link from repository
-	res, err := httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusAccepted, res.StatusCode)
-
-	// test
-	res, err = http.Head(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-	require.Equal(t, http.NoBody, res.Body)
-
-	// Attempt to delete blob link from repository again.
-	res, err = httpDelete(location)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusNotFound, res.StatusCode)
-}
-
-func TestBlobAPI_Delete_UnknownRepository_DisableMirrorFS(t *testing.T) {
-	env := newTestEnv(t, withDelete, disableMirrorFS)
-	defer env.Shutdown()
-
-	if !env.config.Database.Enabled {
-		t.Skip("skipping test because the metadata database is not enabled")
-	}
 
 	// Create url for a blob whose repository does not exist.
 	args := makeBlobArgs(t)
@@ -1992,8 +1733,90 @@ func testManifestAPISchema1(t *testing.T, env *testEnv, imageName reference.Name
 	return args
 }
 
-func TestManifestAPI_Put_ByTagIsIdempotent(t *testing.T) {
-	env := newTestEnv(t)
+// TestAPIConformance runs a variety of tests against different environments
+// where the external behavior of the API is expected to be equivalent.
+func TestAPIConformance(t *testing.T) {
+	var testFuncs = []func(*testing.T, ...configOpt){
+		manifest_Put_Schema2_ByDigest,
+		manifest_Put_Schema2_ByDigest_ConfigNotAssociatedWithRepository,
+		manifest_Put_Schema2_ByDigest_LayersNotAssociatedWithRepository,
+		manifest_Put_Schema2_ByTag,
+		manifest_Put_Schema2_ByTag_IsIdempotent,
+		manifest_Put_Schema2_MissingConfig,
+		manifest_Put_Schema2_MissingConfigAndLayers,
+		manifest_Put_Schema2_MissingLayers,
+		manifest_Put_Schema2_ReuseTagManifestToManifest,
+		manifest_Head_Schema2,
+		manifest_Head_Schema2_MissingManifest,
+		manifest_Get_Schema2_ByDigest_MissingManifest,
+		manifest_Get_Schema2_ByDigest_MissingRepository,
+		manifest_Get_Schema2_ByDigest_NoAcceptHeaders,
+		manifest_Get_Schema2_ByDigest_NotAssociatedWithRepository,
+		manifest_Get_Schema2_ByTag_MissingRepository,
+		manifest_Get_Schema2_ByTag_MissingTag,
+		manifest_Get_Schema2_ByTag_NotAssociatedWithRepository,
+		manifest_Get_Schema2_MatchingEtag,
+		manifest_Get_Schema2_NonMatchingEtag,
+
+		manifest_Put_OCI_ByDigest,
+		manifest_Put_OCI_ByTag,
+		manifest_Get_OCI_MatchingEtag,
+		manifest_Get_OCI_NonMatchingEtag,
+
+		manifest_Put_OCIImageIndex_ByDigest,
+		manifest_Put_OCIImageIndex_ByTag,
+		manifest_Get_OCIIndex_MatchingEtag,
+		manifest_Get_OCIIndex_NonMatchingEtag,
+
+		blob_Head,
+		blob_Head_BlobNotFound,
+		blob_Head_RepositoryNotFound,
+		blob_Get,
+		blob_Get_BlobNotFound,
+		blob_Get_RepositoryNotFound,
+		blob_Delete_AlreadyDeleted,
+		blob_Delete_Disabled,
+		blob_Delete_UnknownRepository,
+	}
+
+	type envOpt struct {
+		name string
+		opts []configOpt
+	}
+
+	var envOpts = []envOpt{
+		{
+			"with filesystem mirroring",
+			[]configOpt{},
+		},
+	}
+
+	if os.Getenv("REGISTRY_DATABASE_ENABLED") == "true" {
+		envOpts = append(envOpts, envOpt{
+			"with filesystem mirroring disabled",
+			[]configOpt{disableMirrorFS},
+		})
+	}
+
+	for _, f := range testFuncs {
+		for _, o := range envOpts {
+			t.Run(funcName(f)+" "+o.name, func(t *testing.T) {
+				f(t, o.opts...)
+			})
+		}
+	}
+}
+
+func funcName(f func(*testing.T, ...configOpt)) string {
+	ptr := reflect.ValueOf(f).Pointer()
+	name := runtime.FuncForPC(ptr).Name()
+	segments := strings.Split(name, ".")
+
+	return segments[len(segments)-1]
+}
+
+func manifest_Put_Schema2_ByTag_IsIdempotent(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "idempotentag"
@@ -2027,8 +1850,8 @@ func TestManifestAPI_Put_ByTagIsIdempotent(t *testing.T) {
 	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 }
 
-func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_ReuseTagManifestToManifest(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "replacesmanifesttag"
@@ -2090,8 +1913,8 @@ func TestManifestAPI_Put_ReuseTagManifestToManifest(t *testing.T) {
 	require.NotEqual(t, originalPayload, newPayload)
 }
 
-func TestManifestAPI_Put_Schema2ByTag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_ByTag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2happypathtag"
@@ -2103,8 +1926,8 @@ func TestManifestAPI_Put_Schema2ByTag(t *testing.T) {
 
 }
 
-func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_ByDigest(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	repoPath := "schema2/happypath"
@@ -2114,8 +1937,8 @@ func TestManifestAPI_Put_Schema2ByDigest(t *testing.T) {
 	seedRandomSchema2Manifest(t, env, repoPath, putByDigest)
 }
 
-func TestManifestAPI_Get_Schema2NonMatchingEtag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_NonMatchingEtag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2happypathtag"
@@ -2197,8 +2020,8 @@ func TestManifestAPI_Get_Schema2NonMatchingEtag(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Get_Schema2MatchingEtag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_MatchingEtag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2happypathtag"
@@ -2312,8 +2135,8 @@ func TestManifestAPI_Get_Schema2LayersAndConfigNotInDatabase(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_MissingConfig(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2missingconfigtag"
@@ -2391,8 +2214,8 @@ func TestManifestAPI_Put_Schema2MissingConfig(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Put_Schema2MissingLayers(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_MissingLayers(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2missinglayerstag"
@@ -2469,8 +2292,8 @@ func TestManifestAPI_Put_Schema2MissingLayers(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_MissingConfigAndLayers(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2missingconfigandlayerstag"
@@ -2482,6 +2305,17 @@ func TestManifestAPI_Put_Schema2MissingConfigAndLayers(t *testing.T) {
 			MediaType:     schema2.MediaTypeManifest,
 		},
 	}
+
+	// Create a random layer and push up its content to ensure repository
+	// exists and that we are only testing missing manifest references.
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	rs, dgstStr, err := testutil.CreateRandomTarFile()
+	require.NoError(t, err)
+
+	uploadURLBase, _ := startPushLayer(t, env, repoRef)
+	pushLayer(t, env.builder, repoRef, digest.Digest(dgstStr), uploadURLBase, rs)
 
 	// Create a manifest config, but do not push up its content.
 	_, cfgDesc := schema2Config()
@@ -2613,11 +2447,11 @@ func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentIn
 
 	resp := putManifest(t, "putting manifest, layers not associated with repository", tagURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
 	defer resp.Body.Close()
-	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByDigest_MissingManifest(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "missingmanifesttag"
@@ -2651,8 +2485,8 @@ func TestManifestAPI_Get_Schema2ByManifestMissingManifest(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ByDigestMissingRepository(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByDigest_MissingRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "missingrepositorytag"
@@ -2676,8 +2510,8 @@ func TestManifestAPI_Get_Schema2ByDigestMissingRepository(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ByTagMissingRepository(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByTag_MissingRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "missingrepositorytag"
@@ -2701,8 +2535,8 @@ func TestManifestAPI_Get_Schema2ByTagMissingRepository(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ByTagMissingTag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByTag_MissingTag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "missingtagtag"
@@ -2726,8 +2560,8 @@ func TestManifestAPI_Get_Schema2ByTagMissingTag(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ByDigestNotAssociatedWithRepository(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByDigest_NotAssociatedWithRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName1 := "missingrepository1tag"
@@ -2756,8 +2590,8 @@ func TestManifestAPI_Get_Schema2ByDigestNotAssociatedWithRepository(t *testing.T
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Get_Schema2ByTagNotAssociatedWithRepository(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByTag_NotAssociatedWithRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName1 := "missingrepository1tag"
@@ -2786,8 +2620,8 @@ func TestManifestAPI_Get_Schema2ByTagNotAssociatedWithRepository(t *testing.T) {
 	checkBodyHasErrorCodes(t, "getting non-existent manifest", resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestManifestAPI_Put_Schema2ByDigestLayersNotAssociatedWithRepository(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_ByDigest_LayersNotAssociatedWithRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	repoPath1 := "schema2/layersnotassociated1"
@@ -2840,8 +2674,8 @@ func TestManifestAPI_Put_Schema2ByDigestLayersNotAssociatedWithRepository(t *tes
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestManifestAPI_Put_Schema2ByDigestConfigNotAssociatedWithRepository(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_Schema2_ByDigest_ConfigNotAssociatedWithRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	repoPath1 := "schema2/layersnotassociated1"
@@ -2894,8 +2728,8 @@ func TestManifestAPI_Put_Schema2ByDigestConfigNotAssociatedWithRepository(t *tes
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
-func TestManifestAPI_Head_Schema2(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Head_Schema2(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "headtag"
@@ -2948,8 +2782,8 @@ func TestManifestAPI_Head_Schema2(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Head_Schema2MissingManifest(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Head_Schema2_MissingManifest(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "headtag"
@@ -3003,7 +2837,7 @@ func TestManifestAPI_Head_Schema2MissingManifest(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T) {
+func TestManifestAPI_Get_Schema2_ByTag_AsSchema1(t *testing.T) {
 	env := newTestEnv(t, withSchema1Compatibility)
 	defer env.Shutdown()
 
@@ -3052,8 +2886,8 @@ func TestManifestAPI_Get_Schema2ByTagAsSchema1(t *testing.T) {
 	// layers.
 }
 
-func TestManifestAPI_Get_Schema2ByDigestNoAcceptHeaders(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_Schema2_ByDigest_NoAcceptHeaders(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "noaccepttag"
@@ -3198,8 +3032,8 @@ func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
-func TestManifestAPI_Put_OCIByTag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_OCI_ByTag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "ocihappypathtag"
@@ -3209,8 +3043,8 @@ func TestManifestAPI_Put_OCIByTag(t *testing.T) {
 	seedRandomOCIManifest(t, env, repoPath, putByTag(tagName))
 }
 
-func TestManifestAPI_Put_OCIByDigest(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_OCI_ByDigest(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	repoPath := "oci/happypath"
@@ -3248,8 +3082,8 @@ func TestManifestAPI_Put_OCIFilesystemFallbackLayersNotInDatabase(t *testing.T) 
 	require.Equal(t, dgst.String(), resp.Header.Get("Docker-Content-Digest"))
 }
 
-func TestManifestAPI_Get_OCINonMatchingEtag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_OCI_NonMatchingEtag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "ocihappypathtag"
@@ -3331,8 +3165,8 @@ func TestManifestAPI_Get_OCINonMatchingEtag(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Get_OCIMatchingEtag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_OCI_MatchingEtag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "ocihappypathtag"
@@ -3395,8 +3229,8 @@ func TestManifestAPI_Get_OCIMatchingEtag(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Put_OCIImageIndexByTag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_OCIImageIndex_ByTag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "ociindexhappypathtag"
@@ -3406,8 +3240,8 @@ func TestManifestAPI_Put_OCIImageIndexByTag(t *testing.T) {
 	seedRandomOCIImageIndex(t, env, repoPath, putByTag(tagName))
 }
 
-func TestManifestAPI_Put_OCIImageIndexByDigest(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Put_OCIImageIndex_ByDigest(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	repoPath := "ociindex/happypath"
@@ -3438,8 +3272,8 @@ func TestManifestAPI_Put_OCIImageIndexByTagManifestsNotPresentInDatabase(t *test
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
-func TestManifestAPI_Get_OCIIndexNonMatchingEtag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_OCIIndex_NonMatchingEtag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "ociindexhappypathtag"
@@ -3521,8 +3355,8 @@ func TestManifestAPI_Get_OCIIndexNonMatchingEtag(t *testing.T) {
 	}
 }
 
-func TestManifestAPI_Get_OCIIndexMatchingEtag(t *testing.T) {
-	env := newTestEnv(t)
+func manifest_Get_OCIIndex_MatchingEtag(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "ociindexhappypathtag"
