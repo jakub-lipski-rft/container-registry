@@ -1093,6 +1093,9 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 	return nil
 }
 
+// TODO: Placeholder until https://gitlab.com/gitlab-org/container-registry/-/issues/109
+var errManifestNotFoundDB = errors.New("manifest not found in database")
+
 // dbDeleteManifest replicates the DeleteManifest action in the metadata database. This method doesn't actually delete
 // a manifest from the database (that's a task for GC, if a manifest is unreferenced), it only deletes the record that
 // associates the manifest with a digest d with the repository with path repoPath. Any tags that reference the manifest
@@ -1115,7 +1118,7 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return err
 	}
 	if !found {
-		return errors.New("manifest not found in database")
+		return errManifestNotFoundDB
 	}
 
 	return nil
@@ -1125,46 +1128,40 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Request) {
 	dcontext.GetLogger(imh).Debug("DeleteImageManifest")
 
-	manifests, err := imh.Repository.Manifests(imh)
-	if err != nil {
-		imh.Errors = append(imh.Errors, err)
-		return
-	}
-
-	err = manifests.Delete(imh, imh.Digest)
-	if err != nil {
-		switch err {
-		case digest.ErrDigestUnsupported:
-		case digest.ErrDigestInvalidFormat:
-			imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
-			return
-		case distribution.ErrBlobUnknown:
-			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown)
-			return
-		case distribution.ErrUnsupported:
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
-			return
-		default:
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown)
-			return
-		}
-	}
-
-	tagService := imh.Repository.Tags(imh)
-	referencedTags, err := tagService.Lookup(imh, distribution.Descriptor{Digest: imh.Digest})
-	if err != nil {
-		imh.Errors = append(imh.Errors, err)
-		return
-	}
-
-	for _, tag := range referencedTags {
-		if err = tagService.Untag(imh, tag); err != nil {
+	if !imh.App.Config.Migration.DisableMirrorFS {
+		manifests, err := imh.Repository.Manifests(imh)
+		if err != nil {
 			imh.Errors = append(imh.Errors, err)
 			return
+		}
+
+		err = manifests.Delete(imh, imh.Digest)
+		if err != nil {
+			imh.appendManifestDeleteError(err)
+			return
+		}
+
+		tagService := imh.Repository.Tags(imh)
+		referencedTags, err := tagService.Lookup(imh, distribution.Descriptor{Digest: imh.Digest})
+		if err != nil {
+			imh.Errors = append(imh.Errors, err)
+			return
+		}
+
+		for _, tag := range referencedTags {
+			if err = tagService.Untag(imh, tag); err != nil {
+				imh.Errors = append(imh.Errors, err)
+				return
+			}
 		}
 	}
 
 	if imh.App.Config.Database.Enabled {
+		if !deleteEnabled(imh.App.Config) {
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
+			return
+		}
+
 		tx, err := imh.db.BeginTx(r.Context(), nil)
 		if err != nil {
 			e := fmt.Errorf("failed to create database transaction: %w", err)
@@ -1174,8 +1171,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 		defer tx.Rollback()
 
 		if err = dbDeleteManifest(imh, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
-			e := fmt.Errorf("failed to delete manifest in database: %w", err)
-			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
+			imh.appendManifestDeleteError(err)
 			return
 		}
 
@@ -1187,4 +1183,21 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (imh *manifestHandler) appendManifestDeleteError(err error) {
+	switch err {
+	case digest.ErrDigestUnsupported, digest.ErrDigestInvalidFormat:
+		imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
+		return
+	case distribution.ErrBlobUnknown, errManifestNotFoundDB:
+		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown)
+		return
+	case distribution.ErrUnsupported:
+		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
+		return
+	default:
+		imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
+		return
+	}
 }
