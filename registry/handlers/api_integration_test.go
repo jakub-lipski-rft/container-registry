@@ -100,6 +100,12 @@ func withDBConnectTimeout(d time.Duration) configOpt {
 	}
 }
 
+func withDBPoolMaxOpen(n int) configOpt {
+	return func(config *configuration.Configuration) {
+		config.Database.Pool.MaxOpen = n
+	}
+}
+
 var headerConfig = http.Header{
 	"X-Content-Type-Options": []string{"nosniff"},
 }
