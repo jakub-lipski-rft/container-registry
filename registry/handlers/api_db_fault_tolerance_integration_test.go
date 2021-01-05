@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -690,6 +691,47 @@ func TestDBFaultTolerance_ConnectionTimeout_ManifestDelete(t *testing.T) {
 	dbProxy.RemoveToxic(toxic)
 	m = seedRandomSchema2Manifest(t, env, repoName, putByDigest)
 	assertManifestDeleteResponse(t, env, repoName, m, http.StatusAccepted)
+}
+
+func TestDBFaultTolerance_ConnectionPoolSaturation(t *testing.T) {
+	dbProxy := newDBProxy(t)
+	defer dbProxy.Delete()
+
+	// simulate connection pool with up to 10 open connections
+	poolMaxSize := 10
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBPoolMaxOpen(poolMaxSize))
+	defer env.Shutdown()
+	require.Equal(t, poolMaxSize, env.app.DBStats().MaxOpenConnections)
+
+	// simulate latency of 500ms+0..100ms for every connection
+	toxic := dbProxy.AddToxic("latency", toxiproxy.Attributes{"latency": 500, "jitter": 100})
+	defer dbProxy.RemoveToxic(toxic)
+
+	// Connection pooling is handled by database/sql behind the scenes, so there is no app specific logic (besides
+	// configuring db.SetMaxOpenConns), therefore using the catalog endpoint (or any other) as example is enough to
+	// assert the behaviour.
+	u, err := env.builder.BuildCatalogURL()
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	// spawn 10 times more clients than max pool open connections
+	for i := 0; i < 10*poolMaxSize; i++ {
+		wg.Add(1)
+		t.Run(fmt.Sprintf("client %d", i), func(t *testing.T) {
+			go func() {
+				// If there are no available connections, database/sql should queue connection requests until they
+				// can be assigned, so all requests should succeed.
+				assertGetResponse(t, u, http.StatusOK)
+				wg.Done()
+			}()
+		})
+	}
+	// the connection pool should be saturated by now
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, poolMaxSize, env.app.DBStats().OpenConnections)
+	wg.Wait()
+	// the connection pool should be free by now
+	require.Zero(t, env.app.DBStats().OpenConnections)
 }
 
 func assertGetResponse(t *testing.T, url string, expectedStatus int) {

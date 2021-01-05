@@ -129,7 +129,7 @@ func NewDSNFromConfig(config configuration.Database) (*datastore.DSN, error) {
 	return dsn, nil
 }
 
-func newDB(dsn *datastore.DSN, logLevel logrus.Level, logOut io.Writer) (*datastore.DB, error) {
+func newDB(dsn *datastore.DSN, logLevel logrus.Level, logOut io.Writer, poolConfig datastore.PoolConfig) (*datastore.DB, error) {
 	log := logrus.New()
 	log.SetLevel(logLevel)
 	log.SetOutput(logOut)
@@ -138,6 +138,7 @@ func newDB(dsn *datastore.DSN, logLevel logrus.Level, logOut io.Writer) (*datast
 	if err != nil {
 		return nil, fmt.Errorf("opening database connection: %w", err)
 	}
+	db.SetMaxOpenConns(poolConfig.MaxOpen)
 
 	return db, nil
 }
@@ -166,7 +167,17 @@ func NewDBFromEnv() (*datastore.DB, error) {
 		logOut = os.Stdout
 	}
 
-	return newDB(dsn, logLevel, logOut)
+	poolConfig := datastore.PoolConfig{}
+	tmp := os.Getenv("REGISTRY_DATABASE_POOL_MAXOPEN")
+	if tmp != "" {
+		poolMaxOpen, err := strconv.Atoi(tmp)
+		if err != nil {
+			return nil, fmt.Errorf("invalid REGISTRY_DATABASE_POOL_MAXOPEN: %w", err)
+		}
+		poolConfig.MaxOpen = poolMaxOpen
+	}
+
+	return newDB(dsn, logLevel, logOut, poolConfig)
 }
 
 // NewDBFromConfig generates a new datastore.DB and opens the underlying connection based on configuration settings.
@@ -192,7 +203,9 @@ func NewDBFromConfig(config *configuration.Configuration) (*datastore.DB, error)
 		logOut = configuration.LogOutputStdout.Descriptor()
 	}
 
-	return newDB(dsn, logLevel, logOut)
+	poolConfig := datastore.PoolConfig{MaxOpen: config.Database.Pool.MaxOpen}
+
+	return newDB(dsn, logLevel, logOut, poolConfig)
 }
 
 // TruncateTables truncates a set of tables in the test database.
