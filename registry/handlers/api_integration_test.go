@@ -1368,14 +1368,11 @@ func TestGetManifestWithStorageError(t *testing.T) {
 
 func TestManifestDelete(t *testing.T) {
 	schema1Repo, _ := reference.WithName("foo/schema1")
-	schema2Repo, _ := reference.WithName("foo/schema2")
 
 	env := newTestEnv(t, withDelete, withSchema1Compatibility)
 	defer env.Shutdown()
 	schema1Args := testManifestAPISchema1(t, env, schema1Repo)
 	testManifestDelete(t, env, schema1Args)
-	schema2Args := testManifestAPISchema2(t, env, schema2Repo)
-	testManifestDelete(t, env, schema2Args)
 }
 
 func TestManifestDeleteDisabled(t *testing.T) {
@@ -1763,6 +1760,12 @@ func TestAPIConformance(t *testing.T) {
 		manifest_Get_Schema2_ByTag_NotAssociatedWithRepository,
 		manifest_Get_Schema2_MatchingEtag,
 		manifest_Get_Schema2_NonMatchingEtag,
+		manifest_Delete_Schema2,
+		manifest_Delete_Schema2_AlreadyDeleted,
+		manifest_Delete_Schema2_Reupload,
+		manifest_Delete_Schema2_MissingManifest,
+		manifest_Delete_Schema2_ClearsTags,
+		manifest_Delete_Schema2_DeleteDisabled,
 
 		manifest_Put_OCI_ByDigest,
 		manifest_Put_OCI_ByTag,
@@ -2994,8 +2997,9 @@ func TestManifestAPI_Get_Schema2FromFilesystemAfterDatabaseWrites(t *testing.T) 
 	}
 }
 
-func TestManifestAPI_Delete_Schema2(t *testing.T) {
-	env := newTestEnv(t, withDelete)
+func manifest_Delete_Schema2(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	tagName := "schema2deletetag"
@@ -3010,6 +3014,177 @@ func TestManifestAPI_Delete_Schema2(t *testing.T) {
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	req, err := http.NewRequest("GET", manifestDigestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	checkBodyHasErrorCodes(t, "getting freshly-deleted manifest", resp, v2.ErrorCodeManifestUnknown)
+}
+
+func manifest_Delete_Schema2_AlreadyDeleted(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
+	defer env.Shutdown()
+
+	tagName := "schema2deleteagain"
+	repoPath := "schema2/deleteagain"
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	resp, err = httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func manifest_Delete_Schema2_Reupload(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
+	defer env.Shutdown()
+
+	tagName := "schema2deletereupload"
+	repoPath := "schema2/deletereupload"
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	// Re-upload manifest by digest
+	resp = putManifest(t, "reuploading manifest no error", manifestDigestURL, schema2.MediaTypeManifest, deserializedManifest.Manifest)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.Equal(t, "nosniff", resp.Header.Get("X-Content-Type-Options"))
+	require.Equal(t, manifestDigestURL, resp.Header.Get("Location"))
+
+	// Attempt to fetch re-uploaded deleted digest
+	req, err := http.NewRequest("GET", manifestDigestURL, nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", schema2.MediaTypeManifest)
+
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func manifest_Delete_Schema2_MissingManifest(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
+	defer env.Shutdown()
+
+	repoPath := "schema2/deletemissing"
+
+	// Push up random manifest to ensure repo is created.
+	seedRandomSchema2Manifest(t, env, repoPath, putByDigest)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	dgst := digest.FromString("fake-manifest")
+
+	digestRef, err := reference.WithDigest(repoRef, dgst)
+	require.NoError(t, err)
+
+	manifestDigestURL, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func manifest_Delete_Schema2_ClearsTags(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withDelete)
+	env := newTestEnv(t, opts...)
+	defer env.Shutdown()
+
+	tagName := "schema2deletecleartag"
+	repoPath := "schema2/delete"
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+
+	tagsURL, err := env.builder.BuildTagsURL(repoRef)
+	require.NoError(t, err)
+
+	// Ensure that the tag is listed.
+	resp, err := http.Get(tagsURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	tagsResponse := tagsAPIResponse{}
+	err = dec.Decode(&tagsResponse)
+	require.NoError(t, err)
+
+	require.Equal(t, repoPath, tagsResponse.Name)
+	require.NotEmpty(t, tagsResponse.Tags)
+	require.Equal(t, tagName, tagsResponse.Tags[0])
+
+	// Delete manifest
+	resp, err = httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	// Ensure that the tag is not listed.
+	resp, err = http.Get(tagsURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	dec = json.NewDecoder(resp.Body)
+	err = dec.Decode(&tagsResponse)
+	require.NoError(t, err)
+
+	require.Equal(t, repoPath, tagsResponse.Name)
+	require.Empty(t, tagsResponse.Tags)
+}
+
+func manifest_Delete_Schema2_DeleteDisabled(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
+	defer env.Shutdown()
+
+	tagName := "schema2deletedisabled"
+	repoPath := "schema2/delete"
+
+	deserializedManifest := seedRandomSchema2Manifest(t, env, repoPath, putByTag(tagName))
+
+	manifestDigestURL := buildManifestDigestURL(t, env, repoPath, deserializedManifest)
+
+	resp, err := httpDelete(manifestDigestURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 }
 
 func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
@@ -3035,7 +3210,7 @@ func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func manifest_Put_OCI_ByTag(t *testing.T, opts ...configOpt) {
@@ -3540,13 +3715,6 @@ func TestManifestAPI_Put_ReuseTagManifestListToManifestList(t *testing.T) {}
 
 func TestManifestAPI_Put_DigestReadOnly(t *testing.T) {}
 func TestManifestAPI_Put_TagReadOnly(t *testing.T)    {}
-
-// TODO: Break out logic from testManifestDelete into these tests.
-// https://gitlab.com/gitlab-org/container-registry/-/issues/144
-func TestManifestAPI_Delete_Schema2PreviouslyDeleted(t *testing.T) {}
-func TestManifestAPI_Delete_Schema2UnknownManifest(t *testing.T)   {}
-func TestManifestAPI_Delete_Schema2Reupload(t *testing.T)          {}
-func TestManifestAPI_Delete_Schema2ClearsTags(t *testing.T)        {}
 
 type manifestOpts struct {
 	manifestURL           string
