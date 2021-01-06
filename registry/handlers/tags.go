@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -179,7 +178,7 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if !found {
-		return v2.ErrorCodeManifestUnknown
+		return distribution.ErrTagUnknown{Tag: tagName}
 	}
 
 	return nil
@@ -194,25 +193,30 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tagService := th.Repository.Tags(th)
-	if err := tagService.Untag(th.Context, th.Tag); err != nil {
-		switch err.(type) {
-		case distribution.ErrTagUnknown:
-		case storagedriver.PathNotFoundError:
-			th.Errors = append(th.Errors, v2.ErrorCodeManifestUnknown)
-		default:
-			th.Errors = append(th.Errors, errcode.ErrorCodeUnknown)
+	if !th.App.Config.Migration.DisableMirrorFS {
+		tagService := th.Repository.Tags(th)
+		if err := tagService.Untag(th.Context, th.Tag); err != nil {
+			th.appendDeleteTagError(err)
+			return
 		}
-		return
 	}
 
 	if th.App.Config.Database.Enabled {
 		if err := dbDeleteTag(th, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
-			e := fmt.Errorf("failed to delete tag in database: %w", err)
-			th.Errors = append(th.Errors, errcode.FromUnknownError(e))
+			th.appendDeleteTagError(err)
 			return
 		}
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (th *tagHandler) appendDeleteTagError(err error) {
+	switch err.(type) {
+	case distribution.ErrTagUnknown, storagedriver.PathNotFoundError:
+		th.Errors = append(th.Errors, v2.ErrorCodeManifestUnknown)
+	default:
+		th.Errors = append(th.Errors, errcode.FromUnknownError(err))
+	}
+	return
 }

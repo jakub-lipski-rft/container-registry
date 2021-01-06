@@ -1786,6 +1786,16 @@ func TestAPIConformance(t *testing.T) {
 		blob_Delete_AlreadyDeleted,
 		blob_Delete_Disabled,
 		blob_Delete_UnknownRepository,
+
+		tags_Get,
+		tags_Get_EmptyRepository,
+		tags_Get_RepositoryNotFound,
+		tags_Delete,
+		tags_Delete_AllowedMethods,
+		tags_Delete_AllowedMethodsReadOnly,
+		tags_Delete_ReadOnly,
+		tags_Delete_Unknown,
+		tags_Delete_WithSameImageID,
 	}
 
 	type envOpt struct {
@@ -4804,8 +4814,9 @@ func shuffledCopy(s []string) []string {
 	return shuffled
 }
 
-func TestTagsAPI_Get(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility)
+func tags_Get(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withSchema1Compatibility)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -4953,7 +4964,7 @@ func TestTagsAPI_Get(t *testing.T) {
 	// If the database is enabled, disable it and rerun the tests again with the
 	// database to check that the filesystem mirroring worked correctly.
 	// All results should be the full list as the filesytem does not support pagination.
-	if env.config.Database.Enabled {
+	if env.config.Database.Enabled && !env.config.Migration.DisableMirrorFS {
 		env.config.Database.Enabled = false
 		defer func() { env.config.Database.Enabled = true }()
 
@@ -4979,8 +4990,8 @@ func TestTagsAPI_Get(t *testing.T) {
 	}
 }
 
-func TestTagsAPI_Get_RepositoryNotFound(t *testing.T) {
-	env := newTestEnv(t)
+func tags_Get_RepositoryNotFound(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -4998,8 +5009,9 @@ func TestTagsAPI_Get_RepositoryNotFound(t *testing.T) {
 	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeNameUnknown)
 }
 
-func TestTagsAPI_Get_EmptyRepository(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility)
+func tags_Get_EmptyRepository(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withSchema1Compatibility)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -5042,8 +5054,8 @@ func TestTagsAPI_Get_EmptyRepository(t *testing.T) {
 	require.Equal(t, tagsAPIResponse{Name: imageName.Name()}, body)
 }
 
-func TestTagsAPITagDeleteAllowedMethods(t *testing.T) {
-	env := newTestEnv(t)
+func tags_Delete_AllowedMethods(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -5058,8 +5070,9 @@ func TestTagsAPITagDeleteAllowedMethods(t *testing.T) {
 	checkAllowedMethods(t, tagURL, []string{"DELETE"})
 }
 
-func TestTagsAPITagDeleteAllowedMethodsReadOnly(t *testing.T) {
-	env := newTestEnv(t, withReadOnly)
+func tags_Delete_AllowedMethodsReadOnly(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withReadOnly)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -5083,8 +5096,9 @@ func TestTagsAPITagDeleteAllowedMethodsReadOnly(t *testing.T) {
 	}
 }
 
-func TestTagsAPITagDelete(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility)
+func tags_Delete(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withSchema1Compatibility)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -5112,9 +5126,12 @@ func TestTagsAPITagDelete(t *testing.T) {
 	}
 }
 
-func TestTagsAPITagDeleteUnknown(t *testing.T) {
-	env := newTestEnv(t)
+func tags_Delete_Unknown(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
+
+	// Push up a random manifest to ensure that the repository exists.
+	seedRandomSchema2Manifest(t, env, "foo/bar", putByDigest)
 
 	imageName, err := reference.WithName("foo/bar")
 	checkErr(t, err, "building named object")
@@ -5135,9 +5152,9 @@ func TestTagsAPITagDeleteUnknown(t *testing.T) {
 	checkBodyHasErrorCodes(t, msg, resp, v2.ErrorCodeManifestUnknown)
 }
 
-func TestTagsAPITagDeleteReadOnly(t *testing.T) {
-
-	setupEnv := newTestEnv(t, withSchema1Compatibility, withSharedInMemoryDriver("TestTagsAPITagDeleteReadOnly"))
+func tags_Delete_ReadOnly(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withSchema1Compatibility, withSharedInMemoryDriver("TestTagsAPITagDeleteReadOnly"))
+	setupEnv := newTestEnv(t, opts...)
 	defer setupEnv.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
@@ -5148,7 +5165,8 @@ func TestTagsAPITagDeleteReadOnly(t *testing.T) {
 
 	// Reconfigure environment with withReadOnly enabled.
 	setupEnv.Shutdown()
-	env := newTestEnv(t, withSchema1Compatibility, withSharedInMemoryDriver("TestTagsAPITagDeleteReadOnly"), withReadOnly)
+	opts = append(opts, withReadOnly)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	ref, err := reference.WithTag(imageName, tag)
@@ -5168,8 +5186,9 @@ func TestTagsAPITagDeleteReadOnly(t *testing.T) {
 
 // TestTagsAPITagDeleteWithSameImageID tests that deleting a single image tag will not cause the deletion of other tags
 // pointing to the same image ID.
-func TestTagsAPITagDeleteWithSameImageID(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility)
+func tags_Delete_WithSameImageID(t *testing.T, opts ...configOpt) {
+	opts = append(opts, withSchema1Compatibility)
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	imageName, err := reference.WithName("foo/bar")
