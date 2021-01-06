@@ -115,7 +115,7 @@ func (buh *blobUploadHandler) StartBlobUpload(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		if ebm, ok := err.(distribution.ErrBlobMounted); ok {
 			if buh.Config.Database.Enabled {
-				if err = dbMountBlob(buh, buh.db, blobs, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
+				if err = dbMountBlob(buh.Context, buh.db, blobs, ebm.From.Name(), buh.Repository.Named().Name(), ebm.Descriptor.Digest); err != nil {
 					e := fmt.Errorf("failed to mount blob in database: %w", err)
 					buh.Errors = append(buh.Errors, errcode.FromUnknownError(e))
 					return
@@ -299,7 +299,7 @@ func (buh *blobUploadHandler) PutBlobUploadComplete(w http.ResponseWriter, r *ht
 	}
 
 	if buh.Config.Database.Enabled {
-		if err := dbPutBlobUploadComplete(buh, buh.db, buh.Repository.Named().Name(), desc); err != nil {
+		if err := dbPutBlobUploadComplete(buh.Context, buh.db, buh.Repository.Named().Name(), desc); err != nil {
 			e := fmt.Errorf("failed to create blob in database: %w", err)
 			buh.Errors = append(buh.Errors, errcode.FromUnknownError(e))
 			return

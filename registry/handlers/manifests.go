@@ -133,7 +133,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		var dbErr error
 
 		if imh.Config.Database.Enabled {
-			manifest, dgst, dbErr = dbGetManifestByTag(imh, imh.App.db, imh.Tag, imh.App.trustKey, imh.Repository.Named().Name())
+			manifest, dgst, dbErr = dbGetManifestByTag(imh.Context, imh.App.db, imh.Tag, imh.App.trustKey, imh.Repository.Named().Name())
 			if dbErr != nil {
 				// Use the common error handling code below.
 				err = dbErr
@@ -170,7 +170,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	// The manifest will be nil if we retrieved the tag from the filesystem or
 	// the manifest is being referenced by digest.
 	if manifest == nil {
-		manifest, err = dbGetManifestFilesystemFallback(imh, imh.App.db, manifestService, imh.Digest, imh.App.trustKey, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, imh.Digest, imh.App.trustKey, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled)
 		if err != nil {
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -243,7 +243,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		manifest, err = dbGetManifestFilesystemFallback(imh, imh.App.db, manifestService, manifestDigest, imh.App.trustKey, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, manifestDigest, imh.App.trustKey, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled)
 		if err != nil {
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -571,7 +571,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		// We're using the database and mirroring writes to the filesystem. We'll run
 		// a transaction so we can revert any changes to the database in case that
 		// any part of this multi-phase database operation fails.
-		tx, err := imh.App.db.BeginTx(imh, nil)
+		tx, err := imh.App.db.BeginTx(imh.Context, nil)
 		if err != nil {
 			imh.Errors = append(imh.Errors,
 				errcode.FromUnknownError(fmt.Errorf("failed to create database transaction: %w", err)))
@@ -604,7 +604,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 		// Associate tag with manifest in database.
 		if imh.Config.Database.Enabled {
-			tx, err := imh.App.db.BeginTx(imh, nil)
+			tx, err := imh.App.db.BeginTx(imh.Context, nil)
 			if err != nil {
 				e := fmt.Errorf("failed to create database transaction: %w", err)
 				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
@@ -687,14 +687,9 @@ func (imh *manifestHandler) appendPutError(err error) {
 }
 
 func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload []byte) error {
-	db := imh.App.db
-	dgst := imh.Digest
-	blobService := imh.Repository.Blobs(imh)
-	repoPath := imh.Repository.Named().Name()
-
 	switch reqManifest := manifest.(type) {
 	case *schema1.SignedManifest:
-		return dbPutManifestSchema1(imh, db, blobService, dgst, reqManifest, repoPath)
+		return dbPutManifestSchema1(imh, reqManifest)
 	case *schema2.DeserializedManifest:
 		return dbPutManifestSchema2(imh, reqManifest, payload)
 	case *ocischema.DeserializedManifest:
@@ -766,7 +761,7 @@ func dbPutManifestSchema2(imh *manifestHandler, manifest *schema2.DeserializedMa
 		imh.App.manifestURLs,
 	)
 
-	if err := v.Validate(imh, manifest); err != nil {
+	if err := v.Validate(imh.Context, manifest); err != nil {
 		return err
 	}
 
@@ -787,7 +782,7 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 	}
 
 	// Find the config now to ensure that the config's blob is associated with the repository.
-	dbCfgBlob, err := dbFindRepositoryBlob(imh, imh.App.db, cfgDesc, dbRepo.Path)
+	dbCfgBlob, err := dbFindRepositoryBlob(imh.Context, imh.App.db, cfgDesc, dbRepo.Path)
 	if err != nil {
 		return err
 	}
@@ -808,7 +803,7 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 		return err
 	}
 
-	dbManifest, err := repositoryStore.FindManifestByDigest(imh, dbRepo, imh.Digest)
+	dbManifest, err := repositoryStore.FindManifestByDigest(imh.Context, dbRepo, imh.Digest)
 	if err != nil {
 		return err
 	}
@@ -837,7 +832,7 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 
 		// find and associate manifest layer blobs
 		for _, reqLayer := range layers {
-			dbBlob, err := dbFindRepositoryBlob(imh, imh.App.db, reqLayer, dbRepo.Path)
+			dbBlob, err := dbFindRepositoryBlob(imh.Context, imh.App.db, reqLayer, dbRepo.Path)
 			if err != nil {
 				return err
 			}
@@ -845,7 +840,7 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 			// TODO: update the layer blob media_type here, it was set to "application/octet-stream" during the upload
 			// 		 but now we know its concrete type (reqLayer.MediaType).
 
-			if err := mStore.AssociateLayerBlob(imh, dbManifest, dbBlob); err != nil {
+			if err := mStore.AssociateLayerBlob(imh.Context, dbManifest, dbBlob); err != nil {
 				return err
 			}
 		}
@@ -901,24 +896,24 @@ func dbFindManifestListManifest(
 	return dbManifest, nil
 }
 
-func dbPutManifestSchema1(
-	ctx context.Context,
-	db datastore.Queryer,
-	blobStatter distribution.BlobStatter,
-	dgst digest.Digest,
-	manifest *schema1.SignedManifest,
-	repoPath string) error {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": dgst, "schema_version": manifest.Versioned.SchemaVersion})
+func dbPutManifestSchema1(imh *manifestHandler, manifest *schema1.SignedManifest) error {
+	repoPath := imh.Repository.Named().Name()
+
+	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
+		"repository":      repoPath,
+		"manifest_digest": imh.Digest,
+		"schema_version":  manifest.Versioned.SchemaVersion,
+	})
 	log.Debug("putting manifest")
 
 	// create or find target repository
-	repositoryStore := datastore.NewRepositoryStore(db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(ctx, repoPath)
+	repositoryStore := datastore.NewRepositoryStore(imh.db)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(imh.Context, repoPath)
 	if err != nil {
 		return err
 	}
 
-	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, dbRepo, dgst)
+	dbManifest, err := repositoryStore.FindManifestByDigest(imh.Context, dbRepo, imh.Digest)
 	if err != nil {
 		return err
 	}
@@ -929,12 +924,12 @@ func dbPutManifestSchema1(
 			RepositoryID:  dbRepo.ID,
 			SchemaVersion: manifest.SchemaVersion,
 			MediaType:     schema1.MediaTypeSignedManifest,
-			Digest:        dgst,
+			Digest:        imh.Digest,
 			Payload:       manifest.Canonical,
 		}
 
-		mStore := datastore.NewManifestStore(db)
-		if err := mStore.Create(ctx, m); err != nil {
+		mStore := datastore.NewManifestStore(imh.db)
+		if err := mStore.Create(imh.Context, m); err != nil {
 			return err
 		}
 
@@ -942,7 +937,7 @@ func dbPutManifestSchema1(
 
 		// find and associate manifest layer blobs
 		for _, layer := range manifest.FSLayers {
-			dbBlob, err := dbFindRepositoryBlob(ctx, db, distribution.Descriptor{Digest: layer.BlobSum}, dbRepo.Path)
+			dbBlob, err := dbFindRepositoryBlob(imh.Context, imh.db, distribution.Descriptor{Digest: layer.BlobSum}, dbRepo.Path)
 			if err != nil {
 				return err
 			}
@@ -950,7 +945,7 @@ func dbPutManifestSchema1(
 			// TODO: update the layer blob media_type here, it was set to "application/octet-stream" during the upload
 			// 		 but now we know its concrete type (reqLayer.MediaType).
 
-			if err := mStore.AssociateLayerBlob(ctx, dbManifest, dbBlob); err != nil {
+			if err := mStore.AssociateLayerBlob(imh.Context, dbManifest, dbBlob); err != nil {
 				return err
 			}
 		}
@@ -975,12 +970,12 @@ func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.Deserial
 
 	// create or find target repository
 	repositoryStore := datastore.NewRepositoryStore(imh.App.db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(imh, repoPath)
+	dbRepo, err := repositoryStore.CreateOrFindByPath(imh.Context, repoPath)
 	if err != nil {
 		return err
 	}
 
-	dbManifestList, err := repositoryStore.FindManifestByDigest(imh, dbRepo, imh.Digest)
+	dbManifestList, err := repositoryStore.FindManifestByDigest(imh.Context, dbRepo, imh.Digest)
 	if err != nil {
 		return err
 	}
@@ -1009,12 +1004,12 @@ func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.Deserial
 
 		// Associate manifests to the manifest list.
 		for _, m := range manifestList.Manifests {
-			dbManifest, err := dbFindManifestListManifest(imh, imh.App.db, dbRepo, m.Digest, dbRepo.Path)
+			dbManifest, err := dbFindManifestListManifest(imh.Context, imh.App.db, dbRepo, m.Digest, dbRepo.Path)
 			if err != nil {
 				return err
 			}
 
-			if err := mStore.AssociateManifest(imh, dbManifestList, dbManifest); err != nil {
+			if err := mStore.AssociateManifest(imh.Context, dbManifestList, dbManifest); err != nil {
 				return err
 			}
 		}
@@ -1162,7 +1157,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		tx, err := imh.db.BeginTx(r.Context(), nil)
+		tx, err := imh.db.BeginTx(imh.Context, nil)
 		if err != nil {
 			e := fmt.Errorf("failed to create database transaction: %w", err)
 			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
@@ -1170,7 +1165,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 		}
 		defer tx.Rollback()
 
-		if err = dbDeleteManifest(imh, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
+		if err = dbDeleteManifest(imh.Context, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
 			imh.appendManifestDeleteError(err)
 			return
 		}
