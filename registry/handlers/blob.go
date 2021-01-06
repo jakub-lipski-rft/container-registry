@@ -210,7 +210,7 @@ func (bh *blobHandler) deleteBlob() error {
 	}
 
 	if bh.App.Config.Database.Enabled {
-		return dbDeleteBlob(bh, bh.App.Config, bh.db, bh.Repository.Named().Name(), bh.Digest)
+		return dbDeleteBlob(bh.Context, bh.App.Config, bh.db, bh.Repository.Named().Name(), bh.Digest)
 	}
 
 	// If we reach this point, we should have failed on an invalid config already,

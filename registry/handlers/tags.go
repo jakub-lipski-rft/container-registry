@@ -202,7 +202,7 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if th.App.Config.Database.Enabled {
-		if err := dbDeleteTag(th, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
+		if err := dbDeleteTag(th.Context, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
 			th.appendDeleteTagError(err)
 			return
 		}
