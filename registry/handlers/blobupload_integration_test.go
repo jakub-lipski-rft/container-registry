@@ -134,7 +134,7 @@ func TestDBMountBlob_NonExistentSourceRepo(t *testing.T) {
 
 	b := buildRandomBlob(t, env)
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{b.Digest}, "from", "to", b.Digest)
+	err := dbMountBlob(env.ctx, env.db, "from", "to", b.Digest)
 	require.Error(t, err)
 	require.Equal(t, "source repository not found in database", err.Error())
 }
@@ -145,7 +145,7 @@ func TestDBMountBlob_NonExistentBlob(t *testing.T) {
 
 	fromRepo := buildRepository(t, env, "from")
 
-	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", randomDigest(t))
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", randomDigest(t))
 	require.Error(t, err)
 	require.Equal(t, "blob not found in database", err.Error())
 }
@@ -157,7 +157,7 @@ func TestDBMountBlob_NonExistentBlobLinkInSourceRepo(t *testing.T) {
 	fromRepo := buildRepository(t, env, "from")
 	b := buildRandomBlob(t, env) // not linked in fromRepo
 
-	err := dbMountBlob(env.ctx, env.db, &notFoundBlobStatter{}, fromRepo.Path, "to", b.Digest)
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", b.Digest)
 	require.Error(t, err)
 	require.Equal(t, "blob not found in database", err.Error())
 }
@@ -170,7 +170,7 @@ func TestDBMountBlob_NonExistentDestinationRepo(t *testing.T) {
 	b := buildRandomBlob(t, env)
 	linkBlob(t, env, fromRepo, b.Digest)
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, "to", b.Digest)
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, "to", b.Digest)
 	require.NoError(t, err)
 
 	destRepo := findRepository(t, env, "to")
@@ -189,7 +189,7 @@ func TestDBMountBlob_AlreadyLinked(t *testing.T) {
 	destRepo := buildRepository(t, env, "to")
 	linkBlob(t, env, destRepo, b.Digest)
 
-	err := dbMountBlob(env.ctx, env.db, &expectedBlobStatter{digest: b.Digest}, fromRepo.Path, destRepo.Path, b.Digest)
+	err := dbMountBlob(env.ctx, env.db, fromRepo.Path, destRepo.Path, b.Digest)
 	require.NoError(t, err)
 
 	require.True(t, isBlobLinked(t, env, destRepo, b.Digest))

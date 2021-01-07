@@ -734,6 +734,301 @@ func TestDBFaultTolerance_ConnectionPoolSaturation(t *testing.T) {
 	require.Zero(t, env.app.DBStats().OpenConnections)
 }
 
+func TestDBFaultTolerance_ConnectionLeak_Catalog(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	u, err := env.builder.BuildCatalogURL()
+	require.NoError(t, err)
+
+	// there should be no open/in use/idle connections at this point
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() { assertGetResponse(t, u, http.StatusOK) })
+	// eventually there should be one DB connection open and in use
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	// there should be no open/in use/idle connections at this point
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_TagList(t *testing.T) {
+	env := newTestEnv(t, withSchema1Compatibility, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+	createRepository(env, t, repoName, tagName)
+	name, err := reference.WithName(repoName)
+	require.NoError(t, err)
+	u, err := env.builder.BuildTagsURL(name)
+	require.NoError(t, err)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() { assertGetResponse(t, u, http.StatusOK) })
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_TagDelete(t *testing.T) {
+	env := newTestEnv(t, withSchema1Compatibility, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+	createRepository(env, t, repoName, tagName)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() { assertTagDeleteResponse(t, env, repoName, tagName, http.StatusAccepted) })
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_BlobGet(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	blobArgs, _ := createRepoWithBlob(t, env)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertBlobGetResponse(t, env, blobArgs.imageName.String(), blobArgs.layerDigest, http.StatusOK)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_BlobHead(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	blobArgs, _ := createRepoWithBlob(t, env)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertBlobHeadResponse(t, env, blobArgs.imageName.String(), blobArgs.layerDigest, http.StatusOK)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_BlobDelete(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	blobArgs, _ := createRepoWithBlob(t, env)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertBlobDeleteResponse(t, env, blobArgs.imageName.String(), blobArgs.layerDigest, http.StatusAccepted)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_BlobPut(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		args := makeBlobArgs(t)
+		assertBlobPutResponse(t, env, args.imageName.String(), args.layerDigest, args.layerFile, http.StatusCreated)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 10*time.Second)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_BlobPostMount(t *testing.T) {
+	env := newTestEnv(t)
+	defer env.Shutdown()
+
+	blobArgs, _ := createRepoWithBlob(t, env)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertBlobPostMountResponse(t, env, blobArgs.imageName.String(), "bar", blobArgs.layerDigest, http.StatusCreated)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestGetByDigest(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestGetByDigestResponse(t, env, repoName, m, http.StatusOK)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestGetByTag(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+	createRepository(env, t, repoName, tagName)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestGetByTagResponse(t, env, repoName, tagName, http.StatusOK)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestHeadByDigest(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestHeadByDigestResponse(t, env, repoName, m, http.StatusOK)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestHeadByTag(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+	createRepository(env, t, repoName, tagName)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestHeadByTagResponse(t, env, repoName, tagName, http.StatusOK)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestPutByDigest(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestPutByDigestResponse(t, env, repoName, m, m.MediaType, http.StatusCreated)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestPutByTag(t *testing.T) {
+	env := newTestEnv(t, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	tagName := "latest"
+	m := seedRandomSchema2Manifest(t, env, repoName)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestPutByTagResponse(t, env, repoName, m, m.MediaType, tagName, http.StatusCreated)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func TestDBFaultTolerance_ConnectionLeak_ManifestDelete(t *testing.T) {
+	env := newTestEnv(t, withDelete, disableMirrorFS)
+	defer env.Shutdown()
+
+	repoName := "foo"
+	m := seedRandomSchema2Manifest(t, env, repoName, putByDigest)
+
+	assertNoDBConnections(t, env)
+
+	done := asyncDo(func() {
+		assertManifestDeleteResponse(t, env, repoName, m, http.StatusAccepted)
+	})
+	assertEventuallyOpenAndInUseDBConnections(t, env, 1, 1, 100*time.Millisecond)
+
+	<-done
+	assertNoDBConnections(t, env)
+}
+
+func asyncDo(f func()) chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		f()
+		close(done)
+	}()
+	return done
+}
+
+func assertEventuallyOpenAndInUseDBConnections(t *testing.T, env *testEnv, open, inUse int, deadline time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		stats := env.app.DBStats()
+		return stats.OpenConnections == open && stats.InUse == inUse
+	}, deadline, 1*time.Millisecond)
+}
+
+func assertNoDBConnections(t *testing.T, env *testEnv) {
+	t.Helper()
+	stats := env.app.DBStats()
+	require.Zero(t, stats.OpenConnections)
+	require.Zero(t, stats.InUse)
+	require.Zero(t, stats.Idle)
+}
+
 func assertGetResponse(t *testing.T, url string, expectedStatus int) {
 	t.Helper()
 
