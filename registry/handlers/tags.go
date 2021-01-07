@@ -170,7 +170,7 @@ func dbDeleteTag(ctx context.Context, db datastore.Queryer, repoPath string, tag
 		return err
 	}
 	if r == nil {
-		return v2.ErrorCodeNameUnknown
+		return distribution.ErrRepositoryUnknown{Name: repoPath}
 	}
 
 	found, err := rStore.DeleteTagByName(ctx, r, tagName)
@@ -213,6 +213,8 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 
 func (th *tagHandler) appendDeleteTagError(err error) {
 	switch err.(type) {
+	case distribution.ErrRepositoryUnknown:
+		th.Errors = append(th.Errors, v2.ErrorCodeNameUnknown)
 	case distribution.ErrTagUnknown, storagedriver.PathNotFoundError:
 		th.Errors = append(th.Errors, v2.ErrorCodeManifestUnknown)
 	default:

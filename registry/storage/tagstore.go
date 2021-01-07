@@ -118,6 +118,19 @@ func (ts *tagStore) Get(ctx context.Context, tag string) (distribution.Descripto
 
 // Untag removes the tag association
 func (ts *tagStore) Untag(ctx context.Context, tag string) error {
+	repoName := ts.repository.Named().Name()
+	repoPath, err := pathFor(repositoryRootPathSpec{name: repoName})
+	if err != nil {
+		return err
+	}
+	ok, err := exists(ctx, ts.blobStore.driver, repoPath)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return distribution.ErrRepositoryUnknown{Name: repoName}
+	}
+
 	tagPath, err := pathFor(manifestTagPathSpec{
 		name: ts.repository.Named().Name(),
 		tag:  tag,
