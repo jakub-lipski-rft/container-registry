@@ -1795,6 +1795,7 @@ func TestAPIConformance(t *testing.T) {
 		tags_Delete_AllowedMethodsReadOnly,
 		tags_Delete_ReadOnly,
 		tags_Delete_Unknown,
+		tags_Delete_UnknownRepository,
 		tags_Delete_WithSameImageID,
 	}
 
@@ -5150,6 +5151,28 @@ func tags_Delete_Unknown(t *testing.T, opts ...configOpt) {
 
 	checkResponse(t, msg, resp, http.StatusNotFound)
 	checkBodyHasErrorCodes(t, msg, resp, v2.ErrorCodeManifestUnknown)
+}
+
+func tags_Delete_UnknownRepository(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
+	defer env.Shutdown()
+
+	imageName, err := reference.WithName("foo/bar")
+	require.NoError(t, err)
+
+	ref, err := reference.WithTag(imageName, "latest")
+	require.NoError(t, err)
+
+	tagURL, err := env.builder.BuildTagURL(ref)
+	require.NoError(t, err)
+
+	resp, err := httpDelete(tagURL)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+	checkBodyHasErrorCodes(t, "repository not found", resp, v2.ErrorCodeNameUnknown)
 }
 
 func tags_Delete_ReadOnly(t *testing.T, opts ...configOpt) {
