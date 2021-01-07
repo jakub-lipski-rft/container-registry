@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/opencontainers/go-digest"
-
 	"github.com/docker/distribution"
+	"github.com/docker/distribution/registry/datastore/metrics"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/opencontainers/go-digest"
 )
 
 // RepositoryReader is the interface that defines read operations for a repository store.
@@ -160,6 +160,7 @@ func scanFullRepositories(rows *sql.Rows) (models.Repositories, error) {
 
 // FindByID finds a repository by ID.
 func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repository, error) {
+	defer metrics.StatementDuration("repository_find_by_id")()
 	q := `SELECT
 			id,
 			name,
@@ -178,6 +179,7 @@ func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repos
 
 // FindByPath finds a repository by path.
 func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.Repository, error) {
+	defer metrics.StatementDuration("repository_find_by_path")()
 	q := `SELECT
 			id,
 			name,
@@ -196,6 +198,7 @@ func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.
 
 // FindAll finds all repositories.
 func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, error) {
+	defer metrics.StatementDuration("repository_find_all")()
 	q := `SELECT
 			id,
 			name,
@@ -220,6 +223,7 @@ func (s *repositoryStore) FindAll(ctx context.Context) (models.Repositories, err
 // lexicographically sorted. These constraints exists to preserve the existing API behavior (when doing a filesystem
 // walk based pagination).
 func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastPath string) (models.Repositories, error) {
+	defer metrics.StatementDuration("repository_find_all_paginated")()
 	q := `SELECT
 			r.id,
 			r.name,
@@ -250,6 +254,7 @@ func (s *repositoryStore) FindAllPaginated(ctx context.Context, limit int, lastP
 
 // FindDescendantsOf finds all descendants of a given repository.
 func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (models.Repositories, error) {
+	defer metrics.StatementDuration("repository_find_descendants_of")()
 	q := `WITH RECURSIVE descendants AS (
 			SELECT
 				id,
@@ -291,6 +296,7 @@ func (s *repositoryStore) FindDescendantsOf(ctx context.Context, id int64) (mode
 
 // FindAncestorsOf finds all ancestors of a given repository.
 func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models.Repositories, error) {
+	defer metrics.StatementDuration("repository_find_ancestors_of")()
 	q := `WITH RECURSIVE ancestors AS (
 			SELECT
 				id,
@@ -332,6 +338,7 @@ func (s *repositoryStore) FindAncestorsOf(ctx context.Context, id int64) (models
 
 // FindSiblingsOf finds all siblings of a given repository.
 func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.Repositories, error) {
+	defer metrics.StatementDuration("repository_find_siblings_of")()
 	q := `SELECT
 			siblings.id,
 			siblings.name,
@@ -356,6 +363,7 @@ func (s *repositoryStore) FindSiblingsOf(ctx context.Context, id int64) (models.
 
 // Tags finds all tags of a given repository.
 func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (models.Tags, error) {
+	defer metrics.StatementDuration("repository_tags")()
 	q := `SELECT
 			id,
 			name,
@@ -382,6 +390,7 @@ func (s *repositoryStore) Tags(ctx context.Context, r *models.Repository) (model
 // lastName. Finally, tags are lexicographically sorted. These constraints exists to preserve the existing API behavior
 // (when doing a filesystem walk based pagination).
 func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repository, limit int, lastName string) (models.Tags, error) {
+	defer metrics.StatementDuration("repository_tags_paginated")()
 	q := `SELECT
 			id,
 			name,
@@ -411,6 +420,7 @@ func (s *repositoryStore) TagsPaginated(ctx context.Context, r *models.Repositor
 // lastName. This constraint exists to preserve the existing API behavior (when doing a filesystem walk based
 // pagination).
 func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repository, lastName string) (int, error) {
+	defer metrics.StatementDuration("repository_tags_count_after_name")()
 	q := `SELECT
 			COUNT(id)
 		FROM
@@ -429,6 +439,7 @@ func (s *repositoryStore) TagsCountAfterName(ctx context.Context, r *models.Repo
 
 // ManifestTags finds all tags of a given repository manifest.
 func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository, m *models.Manifest) (models.Tags, error) {
+	defer metrics.StatementDuration("repository_manifest_tags")()
 	q := `SELECT
 			id,
 			name,
@@ -452,6 +463,7 @@ func (s *repositoryStore) ManifestTags(ctx context.Context, r *models.Repository
 
 // Count counts all repositories.
 func (s *repositoryStore) Count(ctx context.Context) (int, error) {
+	defer metrics.StatementDuration("repository_count")()
 	q := "SELECT COUNT(*) FROM repositories"
 	var count int
 
@@ -468,6 +480,7 @@ func (s *repositoryStore) Count(ctx context.Context) (int, error) {
 // repositories will always be those with a path lexicographically after lastPath. These constraints exists to preserve
 // the existing API behavior (when doing a filesystem walk based pagination).
 func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int, error) {
+	defer metrics.StatementDuration("repository_count_after_path")()
 	q := `SELECT
 			COUNT(*)
 		FROM
@@ -491,6 +504,7 @@ func (s *repositoryStore) CountAfterPath(ctx context.Context, path string) (int,
 
 // Manifests finds all manifests associated with a repository.
 func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (models.Manifests, error) {
+	defer metrics.StatementDuration("repository_manifests")()
 	q := `SELECT
 			m.id,
 			m.repository_id,
@@ -520,6 +534,7 @@ func (s *repositoryStore) Manifests(ctx context.Context, r *models.Repository) (
 
 // FindManifestByDigest finds a manifest by digest within a repository.
 func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Manifest, error) {
+	defer metrics.StatementDuration("repository_find_manifest_by_digest")()
 	q := `SELECT
 			m.id,
 			m.repository_id,
@@ -550,6 +565,7 @@ func (s *repositoryStore) FindManifestByDigest(ctx context.Context, r *models.Re
 
 // FindManifestByTagName finds a manifest by tag name within a repository.
 func (s *repositoryStore) FindManifestByTagName(ctx context.Context, r *models.Repository, tagName string) (*models.Manifest, error) {
+	defer metrics.StatementDuration("repository_find_manifest_by_tag_name")()
 	q := `SELECT
 			m.id,
 			m.repository_id,
@@ -578,6 +594,7 @@ func (s *repositoryStore) FindManifestByTagName(ctx context.Context, r *models.R
 
 // Blobs finds all blobs associated with the repository.
 func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (models.Blobs, error) {
+	defer metrics.StatementDuration("repository_blobs")()
 	q := `SELECT
 			mt.media_type,
 			encode(b.digest, 'hex') as digest,
@@ -601,6 +618,7 @@ func (s *repositoryStore) Blobs(ctx context.Context, r *models.Repository) (mode
 
 // FindBlobByDigest finds a blob by digest within a repository.
 func (s *repositoryStore) FindBlob(ctx context.Context, r *models.Repository, d digest.Digest) (*models.Blob, error) {
+	defer metrics.StatementDuration("repository_find_blob")()
 	q := `SELECT
 			mt.media_type,
 			encode(b.digest, 'hex') as digest,
@@ -625,6 +643,7 @@ func (s *repositoryStore) FindBlob(ctx context.Context, r *models.Repository, d 
 
 // ExistsBlobByDigest finds if a blob with a given digest exists within a repository.
 func (s *repositoryStore) ExistsBlob(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
+	defer metrics.StatementDuration("repository_exists_blob")()
 	q := `SELECT
 			EXISTS (
 				SELECT
@@ -651,6 +670,7 @@ func (s *repositoryStore) ExistsBlob(ctx context.Context, r *models.Repository, 
 
 // Create saves a new repository.
 func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) error {
+	defer metrics.StatementDuration("repository_create")()
 	q := `INSERT INTO repositories (name, path, parent_id)
 			VALUES ($1, $2, $3)
 		RETURNING
@@ -666,6 +686,7 @@ func (s *repositoryStore) Create(ctx context.Context, r *models.Repository) erro
 
 // FindTagByName finds a tag by name within a repository.
 func (s *repositoryStore) FindTagByName(ctx context.Context, r *models.Repository, name string) (*models.Tag, error) {
+	defer metrics.StatementDuration("repository_find_tag_by_name")()
 	q := `SELECT
 			id,
 			name,
@@ -688,6 +709,7 @@ func (s *repositoryStore) FindTagByName(ctx context.Context, r *models.Repositor
 // on write operations between the corresponding read (FindByPath) and write (Create) operations. Separate Find* and
 // Create method calls should be preferred to this when race conditions are not a concern.
 func (s *repositoryStore) CreateOrFind(ctx context.Context, r *models.Repository) error {
+	defer metrics.StatementDuration("repository_create_or_find")()
 	q := `INSERT INTO repositories (name, path, parent_id)
 			VALUES ($1, $2, $3)
 		ON CONFLICT (path)
@@ -772,6 +794,7 @@ func (s *repositoryStore) createOrFindParentByPath(ctx context.Context, path str
 // Returns the leaf repository (e.g. `c`). No error is raised if a parent repository already exists, only if the leaf
 // repository does.
 func (s *repositoryStore) CreateByPath(ctx context.Context, path string) (*models.Repository, error) {
+	defer metrics.StatementDuration("repository_create_by_path")()
 	p, err := s.createOrFindParentByPath(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("creating or finding parent repository: %w", err)
@@ -791,6 +814,7 @@ func (s *repositoryStore) CreateByPath(ctx context.Context, path string) (*model
 // CreateOrFindByPath is the fully idempotent version of CreateByPath, where no error is returned if the leaf repository
 // already exists.
 func (s *repositoryStore) CreateOrFindByPath(ctx context.Context, path string) (*models.Repository, error) {
+	defer metrics.StatementDuration("repository_create_or_find_by_path")()
 	p, err := s.createOrFindParentByPath(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("creating or finding parent repository: %w", err)
@@ -809,6 +833,7 @@ func (s *repositoryStore) CreateOrFindByPath(ctx context.Context, path string) (
 
 // Update updates an existing repository.
 func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) error {
+	defer metrics.StatementDuration("repository_update")()
 	q := `UPDATE
 			repositories
 		SET
@@ -831,6 +856,7 @@ func (s *repositoryStore) Update(ctx context.Context, r *models.Repository) erro
 
 // UntagManifest deletes all tags of a manifest in a repository.
 func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repository, m *models.Manifest) error {
+	defer metrics.StatementDuration("repository_untag_manifest")()
 	q := "DELETE FROM tags WHERE repository_id = $1 AND manifest_id = $2"
 
 	_, err := s.db.ExecContext(ctx, q, r.ID, m.ID)
@@ -843,6 +869,7 @@ func (s *repositoryStore) UntagManifest(ctx context.Context, r *models.Repositor
 
 // LinkBlob links a blob to a repository. It does nothing if already linked.
 func (s *repositoryStore) LinkBlob(ctx context.Context, r *models.Repository, d digest.Digest) error {
+	defer metrics.StatementDuration("repository_link_blob")()
 	q := `INSERT INTO repository_blobs (repository_id, blob_digest)
 			VALUES ($1, decode($2, 'hex'))
 		ON CONFLICT (repository_id, blob_digest)
@@ -862,6 +889,7 @@ func (s *repositoryStore) LinkBlob(ctx context.Context, r *models.Repository, d 
 // UnlinkBlob unlinks a blob from a repository. It does nothing if not linked. A boolean is returned to denote whether
 // the link was deleted or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
 func (s *repositoryStore) UnlinkBlob(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
+	defer metrics.StatementDuration("repository_unlink_blob")()
 	q := "DELETE FROM repository_blobs WHERE repository_id = $1 AND blob_digest = decode($2, 'hex')"
 
 	dgst, err := NewDigest(d)
@@ -884,6 +912,7 @@ func (s *repositoryStore) UnlinkBlob(ctx context.Context, r *models.Repository, 
 // DeleteTagByName deletes a tag by name within a repository. A boolean is returned to denote whether the tag was
 // deleted or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
 func (s *repositoryStore) DeleteTagByName(ctx context.Context, r *models.Repository, name string) (bool, error) {
+	defer metrics.StatementDuration("repository_delete_tag_by_name")()
 	q := "DELETE FROM tags WHERE repository_id = $1 AND name = $2"
 
 	res, err := s.db.ExecContext(ctx, q, r.ID, name)
@@ -902,6 +931,7 @@ func (s *repositoryStore) DeleteTagByName(ctx context.Context, r *models.Reposit
 // DeleteManifest deletes a manifest from a repository. A boolean is returned to denote whether the manifest was deleted
 // or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
 func (s *repositoryStore) DeleteManifest(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
+	defer metrics.StatementDuration("repository_delete_manifest")()
 	q := "DELETE FROM manifests WHERE repository_id = $1 AND digest = decode($2, 'hex')"
 
 	dgst, err := NewDigest(d)
@@ -924,6 +954,7 @@ func (s *repositoryStore) DeleteManifest(ctx context.Context, r *models.Reposito
 
 // Delete deletes a repository.
 func (s *repositoryStore) Delete(ctx context.Context, id int64) error {
+	defer metrics.StatementDuration("repository_delete")()
 	q := "DELETE FROM repositories WHERE id = $1"
 
 	res, err := s.db.ExecContext(ctx, q, id)
