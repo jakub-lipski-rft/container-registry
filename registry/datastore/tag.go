@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/docker/distribution/registry/datastore/metrics"
 	"github.com/docker/distribution/registry/datastore/models"
 )
 
@@ -71,6 +72,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 // FindByID finds a Tag by ID.
 func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) {
+	defer metrics.StatementDuration("tag_find_by_id")()
 	q := `SELECT
 			id,
 			name,
@@ -89,6 +91,7 @@ func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) 
 
 // FindAll finds all tags.
 func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
+	defer metrics.StatementDuration("tag_find_all")()
 	q := `SELECT
 			id,
 			name,
@@ -108,6 +111,7 @@ func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
 
 // Count counts all tags.
 func (s *tagStore) Count(ctx context.Context) (int, error) {
+	defer metrics.StatementDuration("tag_count")()
 	q := "SELECT COUNT(*) FROM tags"
 	var count int
 
@@ -120,6 +124,7 @@ func (s *tagStore) Count(ctx context.Context) (int, error) {
 
 // Repository finds a tag repository.
 func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repository, error) {
+	defer metrics.StatementDuration("tag_repository")()
 	q := `SELECT
 			id,
 			name,
@@ -138,6 +143,7 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 
 // Manifest finds a tag manifest. A tag can be associated with either a manifest or a manifest list.
 func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifest, error) {
+	defer metrics.StatementDuration("tag_manifest")()
 	q := `SELECT
 			m.id,
 			m.repository_id,
@@ -165,6 +171,7 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 // inserted), already exist and point to the same manifest (in which case nothing needs to be done) or already exist but
 // points to a different manifest (in which case it should be updated).
 func (s *tagStore) CreateOrUpdate(ctx context.Context, t *models.Tag) error {
+	defer metrics.StatementDuration("tag_create_or_update")()
 	q := `INSERT INTO tags (repository_id, manifest_id, name)
 		   VALUES ($1, $2, $3)
 	   ON CONFLICT (repository_id, name)
