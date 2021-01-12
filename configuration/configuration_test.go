@@ -32,7 +32,6 @@ var configStruct = Configuration{
 		Formatter logFormat              `yaml:"formatter,omitempty"`
 		Output    logOutput              `yaml:"output,omitempty"`
 		Fields    map[string]interface{} `yaml:"fields,omitempty"`
-		Hooks     []LogHook              `yaml:"hooks,omitempty"`
 	}{
 		AccessLog: struct {
 			Disabled  bool            `yaml:"disabled,omitempty"`
@@ -754,7 +753,7 @@ func (suite *ConfigSuite) TestParseEnvWrongTypeStruct(c *C) {
 // TestParseEnvWrongTypeSlice validates that incorrectly attempting to
 // unmarshal a string into a slice fails.
 func (suite *ConfigSuite) TestParseEnvWrongTypeSlice(c *C) {
-	os.Setenv("REGISTRY_LOG_HOOKS", "somestring")
+	os.Setenv("REGISTRY_HTTP_TLS_CLIENTCAS", "somestring")
 
 	_, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
 	c.Assert(err, NotNil)
@@ -767,9 +766,7 @@ func (suite *ConfigSuite) TestParseEnvMany(c *C) {
 	os.Setenv("REGISTRY_VERSION", "0.1")
 	os.Setenv("REGISTRY_LOG_LEVEL", "debug")
 	os.Setenv("REGISTRY_LOG_FORMATTER", "json")
-	os.Setenv("REGISTRY_LOG_HOOKS", "json")
 	os.Setenv("REGISTRY_LOG_FIELDS", "abc: xyz")
-	os.Setenv("REGISTRY_LOG_HOOKS", "- type: asdf")
 	os.Setenv("REGISTRY_LOGLEVEL", "debug")
 	os.Setenv("REGISTRY_STORAGE", "s3")
 	os.Setenv("REGISTRY_AUTH_PARAMS", "param1: value1")

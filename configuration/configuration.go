@@ -50,12 +50,6 @@ type Configuration struct {
 		// Fields allows users to specify static string fields to include in
 		// the logger context.
 		Fields map[string]interface{} `yaml:"fields,omitempty"`
-
-		// Hooks allows users to configure the log hooks, to enabling the
-		// sequent handling behavior, when defined levels of log message emit.
-		// NOTE: This is deprecated (https://gitlab.com/gitlab-org/container-registry/-/issues/182) and will be
-		// removed by January 22nd, 2021.
-		Hooks []LogHook `yaml:"hooks,omitempty"`
 	}
 
 	// Loglevel is the level at which registry operations are logged.
@@ -390,24 +384,6 @@ type Migration struct {
 		// Exclude allows filtering repositories that should not be proxied by name, using a list of regular expressions.
 		Exclude []*Regexp `yaml:"exclude,omitempty"`
 	} `yaml:"proxy,omitempty"`
-}
-
-// LogHook is composed of hook Level and Type.
-// After hooks configuration, it can execute the next handling automatically,
-// when defined levels of log message emitted.
-// Example: hook can sending an email notification when error log happens in app.
-type LogHook struct {
-	// Disable lets user select to enable hook or not.
-	Disabled bool `yaml:"disabled,omitempty"`
-
-	// Type allows user to select which type of hook handler they want.
-	Type string `yaml:"type,omitempty"`
-
-	// Levels set which levels of log message will let hook executed.
-	Levels []string `yaml:"levels,omitempty"`
-
-	// MailOptions allows user to configure email parameters.
-	MailOptions MailOptions `yaml:"options,omitempty"`
 }
 
 // MailOptions provides the configuration sections to user, for specific handler.
