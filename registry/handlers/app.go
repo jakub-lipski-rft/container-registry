@@ -170,7 +170,6 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	app.configureSecret(config)
 	app.configureEvents(config)
 	app.configureRedis(config)
-	app.configureLogHook(config)
 
 	options := registrymiddleware.GetRegistryOptions()
 	if config.Compatibility.Schema1.TrustKey != "" {
@@ -641,42 +640,6 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
 			"Active": poolStats.TotalConns - poolStats.IdleConns,
 		}
 	}))
-}
-
-// configureLogHook prepares logging hook parameters.
-func (app *App) configureLogHook(configuration *configuration.Configuration) {
-	if len(configuration.Log.Hooks) > 0 {
-		dcontext.GetLogger(app).Warn("DEPRECATION WARNING: Log hooks are deprecated and will be removed by " +
-			"January 22nd, 2021. See https://gitlab.com/gitlab-org/container-registry/-/issues/182 for more details.")
-	}
-
-	entry, ok := dcontext.GetLogger(app).(*logrus.Entry)
-	if !ok {
-		// somehow, we are not using logrus
-		return
-	}
-
-	logger := entry.Logger
-
-	for _, configHook := range configuration.Log.Hooks {
-		if !configHook.Disabled {
-			switch configHook.Type {
-			case "mail":
-				hook := &logHook{}
-				hook.LevelsParam = configHook.Levels
-				hook.Mail = &mailer{
-					Addr:     configHook.MailOptions.SMTP.Addr,
-					Username: configHook.MailOptions.SMTP.Username,
-					Password: configHook.MailOptions.SMTP.Password,
-					Insecure: configHook.MailOptions.SMTP.Insecure,
-					From:     configHook.MailOptions.From,
-					To:       configHook.MailOptions.To,
-				}
-				logger.Hooks.Add(hook)
-			default:
-			}
-		}
-	}
 }
 
 // configureSecret creates a random secret if a secret wasn't included in the

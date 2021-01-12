@@ -76,20 +76,6 @@ log:
   fields:
     service: registry
     environment: staging
-  hooks:
-    - type: mail
-      disabled: true
-      levels:
-        - panic
-      options:
-        smtp:
-          addr: mail.example.com:25
-          username: mailuser
-          password: password
-          insecure: true
-        from: sender@example.com
-        to:
-          - errors@example.com
 loglevel: debug # deprecated: use "log"
 storage:
   filesystem:
@@ -408,31 +394,6 @@ system. By default, the access logging system outputs to stdout in JSON format.
 |-------------|----------|-------------|
 | `disabled`  | no       | Set to `true` to disable access logging. The default is `false`. |
 | `formatter` | no       | This selects the format of logging output. Options are `text` and `json`. The default is `json`. |
-
-## `hooks`
-
-**DEPRECATED:** Log hooks are deprecated and will be removed by January 22nd, 2021.
-See https://gitlab.com/gitlab-org/container-registry/-/issues/182 for more details.
-
-```none
-hooks:
-  - type: mail
-    levels:
-      - panic
-    options:
-      smtp:
-        addr: smtp.sendhost.com:25
-        username: sendername
-        password: password
-        insecure: true
-      from: name@sendhost.com
-      to:
-        - name@receivehost.com
-```
-
-The `hooks` subsection configures the logging hooks' behavior. This subsection
-includes a sequence handler which you can use for sending mail, for example.
-Refer to `loglevel` to configure the level of messages printed.
 
 ## `loglevel`
 
