@@ -30,8 +30,8 @@ type Configuration struct {
 			// Disabled disables access logging.
 			Disabled bool `yaml:"disabled,omitempty"`
 
-			// Formatter overrides the default formatter with another. Options
-			// include "text", "json" and "combined". The default is "combined".
+			// Formatter overrides the default formatter with another. Options include "text" and "json". The default
+			// is "json".
 			Formatter accessLogFormat `yaml:"formatter,omitempty"`
 		} `yaml:"accesslog,omitempty"`
 
@@ -40,8 +40,7 @@ type Configuration struct {
 		// default is "info".
 		Level Loglevel `yaml:"level,omitempty"`
 
-		// Formatter sets the format of logging output. Options include "text",
-		// "json" and "logstash".
+		// Formatter sets the format of logging output. Options include "text" and "json". The default is "json".
 		Formatter logFormat `yaml:"formatter,omitempty"`
 
 		// Output sets the output destination. Options include "stderr" and
@@ -632,20 +631,18 @@ func (out *logOutput) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// logFormat is the format of the application logs output. This can be either "text", "json" or "logstash".
+// logFormat is the format of the application logs output. This can be either "text" or "json".
 type logFormat string
 
 const (
-	LogFormatText     logFormat = "text"
-	LogFormatJSON     logFormat = "json"
-	LogFormatLogstash logFormat = "logstash"
-	defaultLogFormat            = LogFormatText
+	LogFormatText    logFormat = "text"
+	LogFormatJSON    logFormat = "json"
+	defaultLogFormat           = LogFormatJSON
 )
 
 var logFormats = []logFormat{
 	LogFormatText,
 	LogFormatJSON,
-	LogFormatLogstash,
 }
 
 // String implements the Stringer interface for logFormat.
@@ -679,20 +676,18 @@ func (ft *logFormat) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// accessLogFormat is the format of the access logs output. This can be either "text", "json" or "combined".
+// accessLogFormat is the format of the access logs output. This can be either "text" or "json".
 type accessLogFormat string
 
 const (
-	AccessLogFormatText     accessLogFormat = "text"
-	AccessLogFormatJSON     accessLogFormat = "json"
-	AccessLogFormatCombined accessLogFormat = "combined"
-	defaultAccessLogFormat                  = AccessLogFormatCombined
+	AccessLogFormatText    accessLogFormat = "text"
+	AccessLogFormatJSON    accessLogFormat = "json"
+	defaultAccessLogFormat                 = AccessLogFormatJSON
 )
 
 var accessLogFormats = []accessLogFormat{
 	AccessLogFormatText,
 	AccessLogFormatJSON,
-	AccessLogFormatCombined,
 }
 
 // String implements the Stringer interface for accessLogFormat.
