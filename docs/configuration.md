@@ -311,8 +311,8 @@ redis:
     enabled: true
     insecure: true
   pool:
-    maxidle: 16
-    maxactive: 64
+    size: 10
+    maxlifetime: 1h
     idletimeout: 300s
 health:
   storagedriver:
@@ -1184,8 +1184,8 @@ redis:
     enabled: true
     insecure: true
   pool:
-    maxidle: 16
-    maxactive: 64
+    size: 10
+    maxlifetime: 1h
     idletimeout: 300s
 ```
 
@@ -1228,8 +1228,8 @@ Use these settings to configure TLS connections.
 
 ```none
 pool:
-  maxidle: 16
-  maxactive: 64
+  size: 10
+  maxlifetime: 1h
   idletimeout: 300s
 ```
 
@@ -1237,8 +1237,8 @@ Use these settings to configure the behavior of the Redis connection pool.
 
 | Parameter | Required | Description                                           |
 |-----------|----------|-------------------------------------------------------|
-| `maxidle` | no       | The maximum number of idle connections in the pool.   |
-| `maxactive`| no      | The maximum number of connections which can be open before blocking a connection request. |
+| `size` | no       | The maximum number of socket connections. Default is 10 connections. |
+| `maxlifetime`| no      | The connection age at which client retires a connection. Default is to not close aged connections. |
 | `idletimeout`| no    | How long to wait before closing inactive connections. |
 
 ## `health`

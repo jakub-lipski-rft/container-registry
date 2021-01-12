@@ -1,12 +1,14 @@
 ## [Unreleased]
 ### Added
 - registry: Experimental PostgreSQL metadata database (incomplete, in progress)
+- registry/storage/cache/redis: Add size and maxlifetime pool settings
 
 ### Fixed
 - registry/api: Fix tag delete response body
 
 ### Removed
 - configuration: Drop support for TLS 1.0 and 1.1 and default to 1.2
+- registry/storage/cache/redis: Remove maxidle and maxactive pool settings
 
 ## [v2.13.0-gitlab] - 2020-12-15
 ### Added

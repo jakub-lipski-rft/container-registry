@@ -216,15 +216,12 @@ type Configuration struct {
 
 		// Pool configures the behavior of the redis connection pool.
 		Pool struct {
-			// MaxIdle sets the maximum number of idle connections.
-			MaxIdle int `yaml:"maxidle,omitempty"`
-
-			// MaxActive sets the maximum number of connections that should be
-			// opened before blocking a connection request.
-			MaxActive int `yaml:"maxactive,omitempty"`
-
-			// IdleTimeout sets the amount time to wait before closing
-			// inactive connections.
+			// Size is the maximum number of socket connections. Default is 10 connections.
+			Size int `yaml:"size,omitempty"`
+			// MaxLifetime is the connection age at which client retires a connection. Default is to not close aged
+			// connections.
+			MaxLifetime time.Duration `yaml:"maxlifetime,omitempty"`
+			// IdleTimeout sets the amount time to wait before closing inactive connections.
 			IdleTimeout time.Duration `yaml:"idletimeout,omitempty"`
 		} `yaml:"pool,omitempty"`
 	} `yaml:"redis,omitempty"`
@@ -1045,8 +1042,10 @@ func ApplyDefaults(config *Configuration) {
 	if !config.Log.AccessLog.Disabled && config.Log.AccessLog.Formatter == "" {
 		config.Log.AccessLog.Formatter = defaultAccessLogFormat
 	}
-
 	if config.HTTP.Debug.Prometheus.Enabled && config.HTTP.Debug.Prometheus.Path == "" {
 		config.HTTP.Debug.Prometheus.Path = "/metrics"
+	}
+	if config.Redis.Addr != "" && config.Redis.Pool.Size == 0 {
+		config.Redis.Pool.Size = 10
 	}
 }
