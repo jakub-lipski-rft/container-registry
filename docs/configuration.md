@@ -987,7 +987,7 @@ http:
     clientcas:
       - /path/to/ca.pem
       - /path/to/another/ca.pem
-    minimumtls: tls1.0
+    minimumtls: tls1.2
     letsencrypt:
       cachefile: /path/to/cache-file
       email: emailused@letsencrypt.com
@@ -1016,10 +1016,6 @@ registry.
 
 ### `tls`
 
-**DEPRECATED:** TLS 1.0 and 1.1 support is deprecated and will be removed by January 22nd, 2021, and TLS 1.2 will become
-the default. Please use TLS 1.2 or 1.3 instead. See https://gitlab.com/gitlab-org/container-registry/-/issues/244 for
-more details.
-
 The `tls` structure within `http` is **optional**. Use this to configure TLS
 for the server. If you already have a web server running on
 the same host as the registry, you may prefer to configure TLS on that web server
@@ -1030,7 +1026,7 @@ and proxy connections to the registry server.
 | `certificate` | yes  | Absolute path to the x509 certificate file.           |
 | `key`         | yes  | Absolute path to the x509 private key file.           |
 | `clientcas`   | no   | An array of absolute paths to x509 CA files.          |
-| `minimumtls`  | no   | Minimum TLS version allowed (tls1.0, tls1.1, tls1.2, tls1.3). Defaults to tls1.0 |
+| `minimumtls`  | no   | Minimum TLS version allowed (tls1.2, tls1.3). Defaults to tls1.2. |
 
 ### `letsencrypt`
 

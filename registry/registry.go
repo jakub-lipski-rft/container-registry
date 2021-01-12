@@ -37,9 +37,7 @@ import (
 )
 
 var tlsLookup = map[string]uint16{
-	"":       tls.VersionTLS10,
-	"tls1.0": tls.VersionTLS10,
-	"tls1.1": tls.VersionTLS11,
+	"":       tls.VersionTLS12,
 	"tls1.2": tls.VersionTLS12,
 	"tls1.3": tls.VersionTLS13,
 }
@@ -148,12 +146,6 @@ func (registry *Registry) ListenAndServe() error {
 
 		if config.HTTP.TLS.MinimumTLS != "" {
 			dcontext.GetLogger(registry.app).Infof("restricting TLS to %s or higher", config.HTTP.TLS.MinimumTLS)
-		}
-
-		if tlsMinVersion == tls.VersionTLS10 || tlsMinVersion == tls.VersionTLS11 {
-			log.Warn("DEPRECATION WARNING: TLS 1.0 and 1.1 support is deprecated and will be removed by January 22nd, " +
-				"2021, and TLS 1.2 will become the default. Please use TLS 1.2 or 1.3 instead. See " +
-				"https://gitlab.com/gitlab-org/container-registry/-/issues/244 for more details.")
 		}
 
 		tlsConf := &tls.Config{
