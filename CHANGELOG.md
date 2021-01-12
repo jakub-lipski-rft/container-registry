@@ -5,6 +5,9 @@
 ### Fixed
 - registry/api: Fix tag delete response body
 
+### Removed
+- configuration: Drop support for TLS 1.0 and 1.1 and default to 1.2
+
 ## [v2.13.0-gitlab] - 2020-12-15
 ### Added
 - registry: Add support for a pprof monitoring server
