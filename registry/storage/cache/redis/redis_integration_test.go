@@ -3,101 +3,52 @@
 package redis_test
 
 import (
+	"context"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/docker/distribution/registry/storage/cache/cachecheck"
 	rediscache "github.com/docker/distribution/registry/storage/cache/redis"
-	"github.com/gomodule/redigo/redis"
-	log "github.com/sirupsen/logrus"
+	"github.com/go-redis/redis/v8"
 )
-
-var (
-	addr            string
-	mainName        string
-	password        string
-	db              int
-	dialTimeout     time.Duration
-	readTimeout     time.Duration
-	writeTimeout    time.Duration
-	poolMaxIdle     int
-	poolMaxActive   int
-	poolIdleTimeout time.Duration
-)
-
-func init() {
-	addr = os.Getenv("REDIS_ADDR")
-	mainName = os.Getenv("REDIS_MAIN_NAME")
-	password = os.Getenv("REDIS_PASSWORD")
-	db = mustParseEnvVarAsInt("REDIS_DB")
-	dialTimeout = mustParseEnvVarAsDuration("REDIS_DIAL_TIMEOUT")
-	readTimeout = mustParseEnvVarAsDuration("REDIS_READ_TIMEOUT")
-	writeTimeout = mustParseEnvVarAsDuration("REDIS_WRITE_TIMEOUT")
-	poolMaxIdle = mustParseEnvVarAsInt("REDIS_POOL_MAX_IDLE")
-	poolMaxActive = mustParseEnvVarAsInt("REDIS_POOL_MAX_ACTIVE")
-	poolIdleTimeout = mustParseEnvVarAsDuration("REDIS_POOL_IDLE_TIMEOUT")
-}
-
-func mustParseEnvVarAsInt(name string) int {
-	s := os.Getenv(name)
-	if s == "" {
-		return 0
-	}
-
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		log.Fatalf("error parsing %q environment variable: %v", name, err)
-	}
-
-	return i
-}
-
-func mustParseEnvVarAsDuration(name string) time.Duration {
-	s := os.Getenv(name)
-	if s == "" {
-		return 0
-	}
-
-	d, err := time.ParseDuration(s)
-	if err != nil {
-		log.Fatalf("error parsing %q environment variable: %v", name, err)
-	}
-
-	return d
-}
 
 func isEligible(t *testing.T) {
 	t.Helper()
 
-	if addr == "" {
+	if os.Getenv("REDIS_ADDR") == "" {
 		t.Skip("the 'REDIS_ADDR' environment variable must be set to enable these tests")
 	}
 }
 
-func poolOptsFromEnv() *rediscache.PoolOpts {
-	return &rediscache.PoolOpts{
-		Addr:            addr,
-		MainName:        mainName,
-		Password:        password,
-		DB:              db,
-		DialTimeout:     dialTimeout,
-		ReadTimeout:     readTimeout,
-		WriteTimeout:    writeTimeout,
-		PoolMaxIdle:     poolMaxIdle,
-		PoolMaxActive:   poolMaxActive,
-		PoolIdleTimeout: poolIdleTimeout,
+func poolOptsFromEnv(t *testing.T) *redis.UniversalOptions {
+	t.Helper()
+
+	var db int
+	s := os.Getenv("REDIS_DB")
+	if s == "" {
+		db = 0
+	} else {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			t.Fatalf("error parsing 'REDIS_DB' environment variable: %v", err)
+		}
+		db = i
+	}
+
+	return &redis.UniversalOptions{
+		Addrs:      strings.Split(os.Getenv("REDIS_ADDR"), ","),
+		DB:         db,
+		Password:   os.Getenv("REDIS_PASSWORD"),
+		MasterName: os.Getenv("REDIS_MAIN_NAME"),
 	}
 }
 
-func flushDB(t *testing.T, pool *redis.Pool) {
+func flushDB(t *testing.T, client redis.UniversalClient) {
 	t.Helper()
 
-	conn := pool.Get()
-	defer conn.Close()
-
-	if _, err := conn.Do("FLUSHDB"); err != nil {
+	if err := client.FlushDB(context.Background()).Err(); err != nil {
 		t.Fatalf("unexpected error flushing redis db: %v", err)
 	}
 }
@@ -107,8 +58,8 @@ func flushDB(t *testing.T, pool *redis.Pool) {
 func TestRedisBlobDescriptorCacheProvider(t *testing.T) {
 	isEligible(t)
 
-	pool := rediscache.NewPool(poolOptsFromEnv())
-	flushDB(t, pool)
+	client := redis.NewUniversalClient(poolOptsFromEnv(t))
+	flushDB(t, client)
 
-	cachecheck.CheckBlobDescriptorCache(t, rediscache.NewRedisBlobDescriptorCacheProvider(pool))
+	cachecheck.CheckBlobDescriptorCache(t, rediscache.NewRedisBlobDescriptorCacheProvider(client))
 }

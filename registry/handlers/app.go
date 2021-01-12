@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	cryptorand "crypto/rand"
+	"crypto/tls"
 	"database/sql"
 	"expvar"
 	"fmt"
@@ -42,7 +43,7 @@ import (
 	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/distribution/version"
 	"github.com/docker/libtrust"
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -82,7 +83,7 @@ type App struct {
 		source notifications.SourceRecord
 	}
 
-	redis *redis.Pool
+	redis redis.UniversalClient
 
 	// trustKey is a deprecated key used to sign manifests converted to
 	// schema1 for backward compatibility. It should not be used for any
@@ -598,28 +599,34 @@ func (app *App) configureEvents(configuration *configuration.Configuration) {
 	}
 }
 
-type redisStartAtKey struct{}
-
 func (app *App) configureRedis(configuration *configuration.Configuration) {
 	if configuration.Redis.Addr == "" {
 		dcontext.GetLogger(app).Infof("redis not configured")
 		return
 	}
 
-	app.redis = rediscache.NewPool(&rediscache.PoolOpts{
-		Addr:            configuration.Redis.Addr,
-		MainName:        configuration.Redis.MainName,
-		Password:        configuration.Redis.Password,
-		DB:              configuration.Redis.DB,
-		DialTimeout:     configuration.Redis.DialTimeout,
-		ReadTimeout:     configuration.Redis.ReadTimeout,
-		WriteTimeout:    configuration.Redis.WriteTimeout,
-		TLSEnabled:      configuration.Redis.TLS.Enabled,
-		TLSSkipVerify:   configuration.Redis.TLS.Insecure,
-		PoolMaxIdle:     configuration.Redis.Pool.MaxActive,
-		PoolMaxActive:   configuration.Redis.Pool.MaxActive,
-		PoolIdleTimeout: configuration.Redis.Pool.IdleTimeout,
-	})
+	opts := &redis.UniversalOptions{
+		Addrs:        strings.Split(configuration.Redis.Addr, ","),
+		DB:           configuration.Redis.DB,
+		Password:     configuration.Redis.Password,
+		DialTimeout:  configuration.Redis.DialTimeout,
+		ReadTimeout:  configuration.Redis.ReadTimeout,
+		WriteTimeout: configuration.Redis.WriteTimeout,
+		PoolSize:     configuration.Redis.Pool.Size,
+		MaxConnAge:   configuration.Redis.Pool.MaxLifetime,
+		MasterName:   configuration.Redis.MainName,
+	}
+	if configuration.Redis.TLS.Enabled {
+		opts.TLSConfig = &tls.Config{
+			InsecureSkipVerify: configuration.Redis.TLS.Insecure,
+		}
+	}
+	if configuration.Redis.Pool.IdleTimeout > 0 {
+		opts.IdleTimeout = configuration.Redis.Pool.IdleTimeout
+	}
+	// NewUniversalClient will take care of returning the appropriate client type (simple or sentinel) depending on the
+	// configuration options. See https://pkg.go.dev/github.com/go-redis/redis/v8#NewUniversalClient.
+	app.redis = redis.NewUniversalClient(opts)
 
 	// setup expvar
 	registry := expvar.Get("registry")
@@ -628,9 +635,10 @@ func (app *App) configureRedis(configuration *configuration.Configuration) {
 	}
 
 	registry.(*expvar.Map).Set("redis", expvar.Func(func() interface{} {
+		poolStats := app.redis.PoolStats()
 		return map[string]interface{}{
 			"Config": configuration.Redis,
-			"Active": app.redis.ActiveCount(),
+			"Active": poolStats.TotalConns - poolStats.IdleConns,
 		}
 	}))
 }

@@ -1043,6 +1043,87 @@ redis:
 	testParameter(t, yml, "REGISTRY_REDIS_MAINNAME", tt, validator)
 }
 
+func TestParseRedisPool_MaxOpen(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+redis:
+  pool:
+    size: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "10",
+			want:  10,
+		},
+		{
+			name: "empty",
+			want: 0,
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Redis.Pool.Size)
+	}
+
+	testParameter(t, yml, "REGISTRY_REDIS_POOL_SIZE", tt, validator)
+}
+
+func TestParseRedisPool_MaxLifeTime(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+redis:
+  pool:
+    maxlifetime: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "1h",
+			want:  1 * time.Hour,
+		},
+		{
+			name: "empty",
+			want: time.Duration(0),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Redis.Pool.MaxLifetime)
+	}
+
+	testParameter(t, yml, "REGISTRY_REDIS_POOL_MAXLIFETIME", tt, validator)
+}
+
+func TestParseRedisPool_IdleTimeout(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+redis:
+  pool:
+    idletimeout: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "300s",
+			want:  300 * time.Second,
+		},
+		{
+			name: "empty",
+			want: time.Duration(0),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Redis.Pool.IdleTimeout)
+	}
+
+	testParameter(t, yml, "REGISTRY_REDIS_POOL_IDLETIMEOUT", tt, validator)
+}
+
 func TestDatabase_SSLMode(t *testing.T) {
 	yml := `
 version: 0.1
