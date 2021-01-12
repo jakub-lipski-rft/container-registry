@@ -25,7 +25,6 @@ import (
 	"github.com/docker/distribution/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/yvasiyarov/gorelic"
 	"gitlab.com/gitlab-org/labkit/correlation"
 	"gitlab.com/gitlab-org/labkit/errortracking"
 	logkit "gitlab.com/gitlab-org/labkit/log"
@@ -254,23 +253,6 @@ func configureReporting(config *configuration.Configuration, h http.Handler) (ht
 
 	if config.Reporting.Bugsnag.APIKey != "" {
 		handler = bugsnag.Handler(handler)
-	}
-
-	if config.Reporting.NewRelic.LicenseKey != "" {
-		log.Warn("DEPRECATION WARNING: NewRelic support is deprecated and will be removed by January 22nd, 2021. " +
-			"Please use Sentry instead for error reporting. See " +
-			"https://gitlab.com/gitlab-org/container-registry/-/issues/180 for more details.")
-
-		agent := gorelic.NewAgent()
-		agent.NewrelicLicense = config.Reporting.NewRelic.LicenseKey
-		if config.Reporting.NewRelic.Name != "" {
-			agent.NewrelicName = config.Reporting.NewRelic.Name
-		}
-		agent.CollectHTTPStat = true
-		agent.Verbose = config.Reporting.NewRelic.Verbose
-		agent.Run()
-
-		handler = agent.WrapHTTPHandler(handler)
 	}
 
 	if config.Reporting.Sentry.Enabled {
