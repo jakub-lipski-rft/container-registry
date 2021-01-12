@@ -38,10 +38,10 @@ var configStruct = Configuration{
 			Disabled  bool            `yaml:"disabled,omitempty"`
 			Formatter accessLogFormat `yaml:"formatter,omitempty"`
 		}{
-			Formatter: "combined",
+			Formatter: "json",
 		},
 		Level:     "info",
-		Formatter: "text",
+		Formatter: "json",
 		Output:    "stdout",
 		Fields:    map[string]interface{}{"environment": "test"},
 	},
@@ -566,13 +566,8 @@ storage: inmemory
 			want:  "json",
 		},
 		{
-			name:  "logstash",
-			value: "logstash",
-			want:  "logstash",
-		},
-		{
 			name: "default",
-			want: "text",
+			want: "json",
 		},
 		{
 			name:    "unknown",
@@ -611,13 +606,8 @@ storage: inmemory
 			want:  "json",
 		},
 		{
-			name:  "combined",
-			value: "combined",
-			want:  "combined",
-		},
-		{
 			name: "default",
-			want: "combined",
+			want: "json",
 		},
 		{
 			name:    "unknown",

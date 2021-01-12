@@ -12,10 +12,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
-	logstash "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/bugsnag/bugsnag-go"
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
@@ -292,30 +290,14 @@ func configureReporting(config *configuration.Configuration, h http.Handler) (ht
 
 // configureLogging prepares the context with a logger using the configuration.
 func configureLogging(ctx context.Context, config *configuration.Configuration) (context.Context, error) {
-	switch config.Log.Formatter {
-	case configuration.LogFormatLogstash:
-		log.Warn("DEPRECATION WARNING: The 'logstash' log formatter is deprecated and will be removed by " +
-			"January 22nd, 2021. Please use 'text' or 'json' instead. See " +
-			"https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.")
-
-		// we don't use logstash at GitLab, so we don't initialize the global logger through LabKit
-		l, err := log.ParseLevel(config.Log.Level.String())
-		if err != nil {
-			return nil, err
-		}
-		log.SetLevel(l)
-		log.SetOutput(config.Log.Output.Descriptor())
-		log.SetFormatter(&logstash.LogstashFormatter{TimestampFormat: time.RFC3339Nano})
-	default:
-		// the registry doesn't log to a file, so we can ignore the io.Closer (noop) returned by LabKit (we could also
-		// ignore the error, but keeping it for future proofing)
-		if _, err := logkit.Initialize(
-			logkit.WithFormatter(config.Log.Formatter.String()),
-			logkit.WithLogLevel(config.Log.Level.String()),
-			logkit.WithOutputName(config.Log.Output.String()),
-		); err != nil {
-			return nil, err
-		}
+	// the registry doesn't log to a file, so we can ignore the io.Closer (noop) returned by LabKit (we could also
+	// ignore the error, but keeping it for future proofing)
+	if _, err := logkit.Initialize(
+		logkit.WithFormatter(config.Log.Formatter.String()),
+		logkit.WithLogLevel(config.Log.Level.String()),
+		logkit.WithOutputName(config.Log.Output.String()),
+	); err != nil {
+		return nil, err
 	}
 
 	if len(config.Log.Fields) > 0 {
@@ -335,12 +317,6 @@ func configureLogging(ctx context.Context, config *configuration.Configuration) 
 func configureAccessLogging(config *configuration.Configuration, h http.Handler) (http.Handler, error) {
 	if config.Log.AccessLog.Disabled {
 		return h, nil
-	}
-
-	if config.Log.AccessLog.Formatter == configuration.AccessLogFormatCombined {
-		log.Warn("DEPRECATION WARNING: The 'combined' log formatter is deprecated and will be removed by " +
-			"January 22nd, 2021. Please use 'text' or 'json' instead. See " +
-			"https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.")
 	}
 
 	logger := log.New()

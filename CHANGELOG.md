@@ -9,6 +9,7 @@
 ### Removed
 - configuration: Drop support for TLS 1.0 and 1.1 and default to 1.2
 - registry/storage/cache/redis: Remove maxidle and maxactive pool settings
+- configuration: Drop support for logstash and combined log formats and default to json
 
 ## [v2.13.0-gitlab] - 2020-12-15
 ### Added

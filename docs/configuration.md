@@ -369,9 +369,6 @@ check before parsing the remainder of the configuration file.
 
 ## `log`
 
-**DEPRECATED:** The `logstash` log formatter is deprecated and will be removed by January 22nd, 2021. Please use `text`
-or `json` instead. See https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.
-
 The `log` subsection configures the behavior of the logging system. The logging
 system outputs everything to stdout by default. You can adjust the granularity,
 output and format with this configuration section.
@@ -392,14 +389,11 @@ log:
 | Parameter   | Required | Description |
 |-------------|----------|-------------|
 | `level`     | no       | Sets the sensitivity of logging output. Permitted values are `error`, `warn`, `info`, `debug` and `trace`. The default is `info`. |
-| `formatter` | no       | This selects the format of logging output. The format primarily affects how keyed attributes for a log line are encoded. Options are `text`, `json`, and `logstash`. The default is `text`. |
+| `formatter` | no       | This selects the format of logging output. The format primarily affects how keyed attributes for a log line are encoded. Options are `text` and `json`. The default is `json`. |
 | `output`    | no       | This sets the output destination. Options are `stdout` and `stderr`. The default is `stdout`. |
 | `fields`    | no       | A map of field names to values. These are added to every log line for the context. This is useful for identifying log messages source after being mixed in other systems. |
 
 ### `accesslog`
-
-**DEPRECATED:** The `combined` log formatter is deprecated and will be removed by January 22nd, 2021. Please use `text`
-or `json` instead. See https://gitlab.com/gitlab-org/container-registry/-/issues/183 for more details.
 
 ```none
 accesslog:
@@ -408,13 +402,12 @@ accesslog:
 ```
 
 Within `log`, `accesslog` configures the behavior of the access logging
-system. By default, the access logging system outputs to stdout in
-[Combined Log Format](https://httpd.apache.org/docs/2.4/logs.html#combined).
+system. By default, the access logging system outputs to stdout in JSON format.
 
 | Parameter   | Required | Description |
 |-------------|----------|-------------|
 | `disabled`  | no       | Set to `true` to disable access logging. The default is `false`. |
-| `formatter` | no       | This selects the format of logging output. Options are `text`, `json`, and `combined`. The default is `combined`. |
+| `formatter` | no       | This selects the format of logging output. Options are `text` and `json`. The default is `json`. |
 
 ## `hooks`
 
