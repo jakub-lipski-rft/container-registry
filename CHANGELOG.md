@@ -5,7 +5,6 @@
 
 ### Fixed
 - registry/api: Fix tag delete response body
-- registry: Fix HTTP request duration and byte size Prometheus metrics buckets
 
 ### Removed
 - configuration: Drop support for TLS 1.0 and 1.1 and default to 1.2
@@ -14,6 +13,10 @@
 - configuration: Drop support for log hooks
 - configuration: Drop NewRelic reporting support
 - configuration: Drop Bugsnag reporting support
+
+## [v2.13.1-gitlab] - 2021-01-13
+### Fixed
+- registry: Fix HTTP request duration and byte size Prometheus metrics buckets
 
 ## [v2.13.0-gitlab] - 2020-12-15
 ### Added
