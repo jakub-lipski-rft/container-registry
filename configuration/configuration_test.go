@@ -77,8 +77,9 @@ var configStruct = Configuration{
 		},
 	},
 	Reporting: Reporting{
-		Bugsnag: BugsnagReporting{
-			APIKey: "BugsnagApiKey",
+		Sentry: SentryReporting{
+			Enabled: true,
+			DSN:     "https://foo@12345.ingest.sentry.io/876542",
 		},
 	},
 	Notifications: Notifications{
@@ -200,8 +201,9 @@ notifications:
         actions:
            - pull
 reporting:
-  bugsnag:
-    apikey: BugsnagApiKey
+  sentry:
+    enabled: true
+    dsn: https://foo@12345.ingest.sentry.io/876542
 http:
   clientcas:
     - /path/to/ca.pem
@@ -623,20 +625,6 @@ storage: inmemory
 	testParameter(t, yml, "REGISTRY_LOG_ACCESSLOG_FORMATTER", tt, validator)
 }
 
-// TestParseWithDifferentEnvReporting validates that environment variables
-// properly override reporting parameters
-func (suite *ConfigSuite) TestParseWithDifferentEnvReporting(c *C) {
-	suite.expectedConfig.Reporting.Bugsnag.APIKey = "anotherBugsnagApiKey"
-	suite.expectedConfig.Reporting.Bugsnag.Endpoint = "localhost:8080"
-
-	os.Setenv("REGISTRY_REPORTING_BUGSNAG_APIKEY", "anotherBugsnagApiKey")
-	os.Setenv("REGISTRY_REPORTING_BUGSNAG_ENDPOINT", "localhost:8080")
-
-	config, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
-	c.Assert(err, IsNil)
-	c.Assert(config, DeepEquals, suite.expectedConfig)
-}
-
 // TestParseWithDifferentEnvDatabase validates that environment variables properly override database parameters
 func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
 	expected := Database{
@@ -694,10 +682,10 @@ func (suite *ConfigSuite) TestParseInvalidVersion(c *C) {
 // TestParseExtraneousVars validates that environment variables referring to
 // nonexistent variables don't cause side effects.
 func (suite *ConfigSuite) TestParseExtraneousVars(c *C) {
-	suite.expectedConfig.Reporting.Bugsnag.Endpoint = "localhost:8080"
+	suite.expectedConfig.Reporting.Sentry.Environment = "test"
 
 	// A valid environment variable
-	os.Setenv("REGISTRY_REPORTING_BUGSNAG_ENDPOINT", "localhost:8080")
+	os.Setenv("REGISTRY_REPORTING_SENTRY_ENVIRONMENT", "test")
 
 	// Environment variables which shouldn't set config items
 	os.Setenv("REGISTRY_DUCKS", "quack")
@@ -1465,7 +1453,7 @@ func copyConfig(config Configuration) *Configuration {
 	configCopy.Database = config.Database
 
 	configCopy.Reporting = Reporting{
-		Bugsnag: BugsnagReporting{config.Reporting.Bugsnag.APIKey, config.Reporting.Bugsnag.ReleaseStage, config.Reporting.Bugsnag.Endpoint},
+		Sentry: SentryReporting{config.Reporting.Sentry.Enabled, config.Reporting.Sentry.DSN, config.Reporting.Sentry.Environment},
 	}
 
 	configCopy.Auth = Auth{config.Auth.Type(): Parameters{}}

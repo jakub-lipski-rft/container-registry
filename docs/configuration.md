@@ -225,10 +225,6 @@ reporting:
     enabled: true
     dsn: https://examplePublicKey@o0.ingest.sentry.io/0
     environment: production
-  bugsnag:
-    apikey: bugsnagapikey
-    releasestage: bugsnagreleasestage
-    endpoint: bugsnagendpoint
 profiling:
   stackdriver:
     service: registry
@@ -839,17 +835,12 @@ reporting:
     enabled: true
     dsn: https://examplePublicKey@o0.ingest.sentry.io/0
     environment: production
-  bugsnag:
-    apikey: bugsnagapikey
-    releasestage: bugsnagreleasestage
-    endpoint: bugsnagendpoint
 ```
 
 The `reporting` option is **optional** and configures error and metrics
-reporting tools. At the moment only three services are supported:
+reporting tools. At the moment only one service is supported:
 
 - [Sentry](#sentry)
-- [Bugsnag](#bugsnag)
 
 A valid configuration may contain multiple.
 
@@ -860,17 +851,6 @@ A valid configuration may contain multiple.
 | `enabled`     | no       | Set `true` to enable error reporting with Sentry. Defaults to `false`.                |
 | `dsn`         | yes      | The Sentry DSN.                                                                       |
 | `environment` | no       | The Sentry [environment](https://docs.sentry.io/product/sentry-basics/environments/). |
-
-### `bugsnag`
-
-**DEPRECATED:** Bugsnag support is deprecated and will be removed by January 22nd, 2021. Please use [Sentry](#sentry)
-instead for error reporting. See https://gitlab.com/gitlab-org/container-registry/-/issues/179 for more details.
-
-| Parameter | Required | Description                                           |
-|-----------|----------|-------------------------------------------------------|
-| `apikey`  | yes      | The API Key provided by Bugsnag.                      |
-| `releasestage` | no  | Tracks where the registry is deployed, using a string like `production`, `staging`, or `development`.|
-| `endpoint`| no       | The enterprise Bugsnag endpoint.                      |
 
 ## `profiling`
 
