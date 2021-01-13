@@ -229,10 +229,6 @@ reporting:
     apikey: bugsnagapikey
     releasestage: bugsnagreleasestage
     endpoint: bugsnagendpoint
-  newrelic:
-    licensekey: newreliclicensekey
-    name: newrelicname
-    verbose: true
 profiling:
   stackdriver:
     service: registry
@@ -847,10 +843,6 @@ reporting:
     apikey: bugsnagapikey
     releasestage: bugsnagreleasestage
     endpoint: bugsnagendpoint
-  newrelic:
-    licensekey: newreliclicensekey
-    name: newrelicname
-    verbose: true
 ```
 
 The `reporting` option is **optional** and configures error and metrics
@@ -858,7 +850,6 @@ reporting tools. At the moment only three services are supported:
 
 - [Sentry](#sentry)
 - [Bugsnag](#bugsnag)
-- [New Relic](#new-relic)
 
 A valid configuration may contain multiple.
 
@@ -880,17 +871,6 @@ instead for error reporting. See https://gitlab.com/gitlab-org/container-registr
 | `apikey`  | yes      | The API Key provided by Bugsnag.                      |
 | `releasestage` | no  | Tracks where the registry is deployed, using a string like `production`, `staging`, or `development`.|
 | `endpoint`| no       | The enterprise Bugsnag endpoint.                      |
-
-### `newrelic`
-
-**DEPRECATED:** NewRelic support is deprecated and will be removed by January 22nd, 2021. Please use [Sentry](#sentry)
-instead for error reporting. See https://gitlab.com/gitlab-org/container-registry/-/issues/180 for more details.
-
-| Parameter | Required | Description                                           |
-|-----------|----------|-------------------------------------------------------|
-| `licensekey` | yes   | License key provided by New Relic.                    |
-| `name`    | no       | New Relic application name.                           |
-|  `verbose`| no       | Set to `true` to enable New Relic debugging output on `stdout`. |
 
 ## `profiling`
 

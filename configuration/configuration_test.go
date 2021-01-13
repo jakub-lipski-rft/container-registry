@@ -628,13 +628,9 @@ storage: inmemory
 func (suite *ConfigSuite) TestParseWithDifferentEnvReporting(c *C) {
 	suite.expectedConfig.Reporting.Bugsnag.APIKey = "anotherBugsnagApiKey"
 	suite.expectedConfig.Reporting.Bugsnag.Endpoint = "localhost:8080"
-	suite.expectedConfig.Reporting.NewRelic.LicenseKey = "NewRelicLicenseKey"
-	suite.expectedConfig.Reporting.NewRelic.Name = "some NewRelic NAME"
 
 	os.Setenv("REGISTRY_REPORTING_BUGSNAG_APIKEY", "anotherBugsnagApiKey")
 	os.Setenv("REGISTRY_REPORTING_BUGSNAG_ENDPOINT", "localhost:8080")
-	os.Setenv("REGISTRY_REPORTING_NEWRELIC_LICENSEKEY", "NewRelicLicenseKey")
-	os.Setenv("REGISTRY_REPORTING_NEWRELIC_NAME", "some NewRelic NAME")
 
 	config, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
 	c.Assert(err, IsNil)
@@ -704,8 +700,6 @@ func (suite *ConfigSuite) TestParseExtraneousVars(c *C) {
 	os.Setenv("REGISTRY_REPORTING_BUGSNAG_ENDPOINT", "localhost:8080")
 
 	// Environment variables which shouldn't set config items
-	os.Setenv("registry_REPORTING_NEWRELIC_LICENSEKEY", "NewRelicLicenseKey")
-	os.Setenv("REPORTING_NEWRELIC_NAME", "some NewRelic NAME")
 	os.Setenv("REGISTRY_DUCKS", "quack")
 	os.Setenv("REGISTRY_REPORTING_ASDF", "ghjk")
 
@@ -1471,8 +1465,7 @@ func copyConfig(config Configuration) *Configuration {
 	configCopy.Database = config.Database
 
 	configCopy.Reporting = Reporting{
-		Bugsnag:  BugsnagReporting{config.Reporting.Bugsnag.APIKey, config.Reporting.Bugsnag.ReleaseStage, config.Reporting.Bugsnag.Endpoint},
-		NewRelic: NewRelicReporting{config.Reporting.NewRelic.LicenseKey, config.Reporting.NewRelic.Name, config.Reporting.NewRelic.Verbose},
+		Bugsnag: BugsnagReporting{config.Reporting.Bugsnag.APIKey, config.Reporting.Bugsnag.ReleaseStage, config.Reporting.Bugsnag.Endpoint},
 	}
 
 	configCopy.Auth = Auth{config.Auth.Type(): Parameters{}}
