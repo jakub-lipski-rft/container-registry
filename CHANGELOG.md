@@ -5,6 +5,7 @@
 
 ### Fixed
 - registry/api: Fix tag delete response body
+- registry: Fix HTTP request duration and byte size Prometheus metrics buckets
 
 ### Removed
 - configuration: Drop support for TLS 1.0 and 1.1 and default to 1.2
