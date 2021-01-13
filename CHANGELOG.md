@@ -13,6 +13,7 @@
 - configuration: Drop support for logstash and combined log formats and default to json
 - configuration: Drop support for log hooks
 - configuration: Drop NewRelic reporting support
+- configuration: Drop Bugsnag reporting support
 
 ## [v2.13.0-gitlab] - 2020-12-15
 ### Added

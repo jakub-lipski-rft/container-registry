@@ -889,10 +889,6 @@ type Ignore struct {
 type Reporting struct {
 	// Sentry configures error reporting for Sentry (sentry.io).
 	Sentry SentryReporting `yaml:"sentry,omitempty"`
-	// Bugsnag configures error reporting for Bugsnag (bugsnag.com).
-	// NOTE: This is deprecated (https://gitlab.com/gitlab-org/container-registry/-/issues/179) and will be removed by
-	// January 22nd, 2021.
-	Bugsnag BugsnagReporting `yaml:"bugsnag,omitempty"`
 }
 
 // SentryReporting configures error reporting for Sentry (sentry.io).
@@ -903,17 +899,6 @@ type SentryReporting struct {
 	DSN string `yaml:"dsn,omitempty"`
 	// Environment is the Sentry environment.
 	Environment string `yaml:"environment,omitempty"`
-}
-
-// BugsnagReporting configures error reporting for Bugsnag (bugsnag.com).
-type BugsnagReporting struct {
-	// APIKey is the Bugsnag api key.
-	APIKey string `yaml:"apikey,omitempty"`
-	// ReleaseStage tracks where the registry is deployed.
-	// Examples: production, staging, development
-	ReleaseStage string `yaml:"releasestage,omitempty"`
-	// Endpoint is used for specifying an enterprise Bugsnag endpoint.
-	Endpoint string `yaml:"endpoint,omitempty"`
 }
 
 // Middleware configures named middlewares to be applied at injection points.

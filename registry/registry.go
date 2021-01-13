@@ -13,8 +13,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	logrus_bugsnag "github.com/Shopify/logrus-bugsnag"
-	"github.com/bugsnag/bugsnag-go"
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/health"
@@ -89,8 +87,6 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 	if err != nil {
 		return nil, fmt.Errorf("configuring logger: %w", err)
 	}
-
-	configureBugsnag(config)
 
 	// inject a logger into the uuid library. warns us if there is a problem
 	// with uuid generation under low entropy.
@@ -251,10 +247,6 @@ func (registry *Registry) ListenAndServe() error {
 func configureReporting(config *configuration.Configuration, h http.Handler) (http.Handler, error) {
 	handler := h
 
-	if config.Reporting.Bugsnag.APIKey != "" {
-		handler = bugsnag.Handler(handler)
-	}
-
 	if config.Reporting.Sentry.Enabled {
 		if err := errortracking.Initialize(
 			errortracking.WithSentryDSN(config.Reporting.Sentry.DSN),
@@ -313,36 +305,6 @@ func configureAccessLogging(config *configuration.Configuration, h http.Handler)
 	}
 
 	return logkit.AccessLogger(h, logkit.WithAccessLogger(logger)), nil
-}
-
-// configureBugsnag configures bugsnag reporting, if enabled
-func configureBugsnag(config *configuration.Configuration) {
-	if config.Reporting.Bugsnag.APIKey == "" {
-		return
-	}
-
-	log.Warn("DEPRECATION WARNING: Bugsnag support is deprecated and will be removed by January 22nd, 2021. " +
-		"Please use Sentry instead for error reporting. See " +
-		"https://gitlab.com/gitlab-org/container-registry/-/issues/179 for more details.")
-
-	bugsnagConfig := bugsnag.Configuration{
-		APIKey: config.Reporting.Bugsnag.APIKey,
-	}
-	if config.Reporting.Bugsnag.ReleaseStage != "" {
-		bugsnagConfig.ReleaseStage = config.Reporting.Bugsnag.ReleaseStage
-	}
-	if config.Reporting.Bugsnag.Endpoint != "" {
-		bugsnagConfig.Endpoint = config.Reporting.Bugsnag.Endpoint
-	}
-	bugsnag.Configure(bugsnagConfig)
-
-	// configure logrus bugsnag hook
-	hook, err := logrus_bugsnag.NewBugsnagHook()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	log.AddHook(hook)
 }
 
 func configureMonitoring(config *configuration.Configuration) []monitoring.Option {
