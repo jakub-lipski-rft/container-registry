@@ -72,7 +72,8 @@ See [release instructions](https://gitlab.com/gitlab-org/container-registry/tree
     - [ ] Replace all mentions to the previous `vX.Y.Z-gitlab` release in [`doc/charts/registry/index.md`](https://gitlab.com/gitlab-org/charts/gitlab/blob/master/doc/charts/registry/index.md)
     - [ ] Label merge request with: `/label ~backstage ~"group::distribution" ~"devops::enablement" ~"Workflow::ready for review"`
 1. [ ] Version bump in [K8s Workloads](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com):
-    - [ ] Update `$registry_version` in [`init-values.yaml.gotmpl`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/-/blob/b0f7405663f94ffe452dff8cd5d42894bdbf910b/releases/gitlab/values/init-values.yaml.gotmpl#L75)
+    - [ ] Update `$registry_version` in [`init-values.yaml.gotmpl`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/-/blob/master/releases/gitlab/values/init-values.yaml.gotmpl#L75)
+    - [ ] Update `tag` in [`gstg.yaml.gotmpl`](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/-/blob/master/releases/gitlab/values/gstg.yaml.gotmpl#L6)
     - [ ] Label merge request with: `/label ~"Service::Container Registry" ~"group::distribution" ~"devops::enablement" ~"Workflow::ready for review"`
 
 <details>
