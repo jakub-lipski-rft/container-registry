@@ -195,25 +195,6 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 	return nil
 }
 
-func (imp *Importer) importSchema1Layers(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, fsLayers []schema1.FSLayer) error {
-	total := len(fsLayers)
-	for i, fsLayer := range fsLayers {
-		log := logrus.WithFields(logrus.Fields{
-			"digest": fsLayer.BlobSum,
-			"count":  i + 1,
-			"total":  total,
-		})
-		log.Info("importing layer")
-
-		if err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Blob{Digest: fsLayer.BlobSum}); err != nil {
-			log.WithError(err).Error("importing layer")
-			continue
-		}
-	}
-
-	return nil
-}
-
 func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, fsLayers []distribution.Descriptor) error {
 	total := len(fsLayers)
 	for i, fsLayer := range fsLayers {
@@ -238,27 +219,6 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 	}
 
 	return nil
-}
-
-func (imp *Importer) importSchema1Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *schema1.SignedManifest, dgst digest.Digest) (*models.Manifest, error) {
-	// find or create DB manifest
-	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
-		RepositoryID:  dbRepo.ID,
-		SchemaVersion: m.SchemaVersion,
-		MediaType:     schema1.MediaTypeManifest,
-		Digest:        dgst,
-		Payload:       m.Canonical,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// import manifest layers
-	if err := imp.importSchema1Layers(ctx, fsRepo, dbRepo, dbManifest, m.FSLayers); err != nil {
-		return nil, fmt.Errorf("error importing layers: %w", err)
-	}
-
-	return dbManifest, nil
 }
 
 func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *schema2.DeserializedManifest, dgst digest.Digest) (*models.Manifest, error) {
@@ -421,7 +381,7 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 func (imp *Importer) importManifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m distribution.Manifest, dgst digest.Digest) (*models.Manifest, error) {
 	switch fsManifest := m.(type) {
 	case *schema1.SignedManifest:
-		return imp.importSchema1Manifest(ctx, fsRepo, dbRepo, fsManifest, dgst)
+		return nil, distribution.ErrSchemaV1Unsupported
 	case *schema2.DeserializedManifest:
 		return imp.importSchema2Manifest(ctx, fsRepo, dbRepo, fsManifest, dgst)
 	case *ocischema.DeserializedManifest:
@@ -459,6 +419,10 @@ func (imp *Importer) importManifests(ctx context.Context, fsRepo distribution.Re
 		default:
 			log.Info("importing manifest")
 			_, err = imp.importManifest(ctx, fsRepo, dbRepo, fsManifest, dgst)
+			if errors.Is(err, distribution.ErrSchemaV1Unsupported) {
+				logrus.WithError(err).Error("importing manifest")
+				return nil
+			}
 		}
 
 		return err

@@ -234,31 +234,8 @@
       }
    ]
 },"media_type_id":4,"configuration_media_type_id":null,"configuration_payload":null,"configuration_blob_digest":null}, 
- {"id":9,"repository_id":9,"created_at":"2020-04-15T12:04:28.95584","schema_version":1,"digest":"018e1f28640eee7964ed4583b8f969a222c40bbd82afb930027d2f6adeba5a4e4b","payload":{
-   "schemaVersion": 1,
-   "name": "d-schema1",
-   "tag": "latest",
-   "architecture": "amd64",
-   "fsLayers": [
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      },
-      {
-         "blobSum": "sha256:e2334dd9fee4b77e48a8f2d793904118a3acf26f1f2e72a3d79c6cae993e07f0"
-      }
-   ],
-   "history": [
-      {
-         "v1Compatibility": "{\"architecture\":\"amd64\",\"config\":{\"Hostname\":\"\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"sh\"],\"ArgsEscaped\":true,\"Image\":\"sha256:b0acc7ebf5092fcdd0fe097448529147e6619bd051f03ccf25b29bcae87e783f\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":null},\"container\":\"f7e67f16a539f8bbf53aae18cdb5f8c53e6a56930e7660010d9396ae77f7acfa\",\"container_config\":{\"Hostname\":\"f7e67f16a539\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) \",\"CMD [\\\"sh\\\"]\"],\"ArgsEscaped\":true,\"Image\":\"sha256:b0acc7ebf5092fcdd0fe097448529147e6619bd051f03ccf25b29bcae87e783f\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"created\":\"2020-04-14T19:19:53.590635493Z\",\"docker_version\":\"18.09.7\",\"id\":\"9fe025227098ae424167d958a251947559d8a176b7ef4e7feeb38a16eb337446\",\"os\":\"linux\",\"parent\":\"bd4f6324ef6faaa275ef12c5ba3e48fc0fdf8974230d141b8c0bfcc6ef077a28\",\"throwaway\":true}"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"bd4f6324ef6faaa275ef12c5ba3e48fc0fdf8974230d141b8c0bfcc6ef077a28\",\"created\":\"2020-04-14T19:19:53.444488372Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) ADD file:09a89925137e1b768ef1f0e7d1d7325eb2b4f1a0895b3aa8dfc98b0c75f3f507 in / \"]}}"
-      }
-   ]
-}
-,"media_type_id":1,"configuration_media_type_id":null,"configuration_payload":null,"configuration_blob_digest":null}, 
- {"id":10,"repository_id":10,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cc2f7914532f430d4e5d75b5c855ec4b46feb893bbd2974456f0bf46015b7621","payload":{"schemaVersion":2,"config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"sha256:cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a","size":139},"layers":[{"mediaType":"application/tar+gzip","digest":"sha256:50723273cfd47a0e6222d64e993b1bd1bb97f84b4e0d1336bc0e24596c72b631","size":1371}]},"media_type_id":17,"configuration_media_type_id":19,"configuration_payload":{"name":"e-helm","version":"latest","description":"Sample Helm Chart","apiVersion":"v2","appVersion":"1.16.0","type":"application"},"configuration_blob_digest":"01cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a"}, 
- {"id":11,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01673315e9c0cad797587b6bc0c1e2b9a1903c15b521f26acc5364fcf034c0cfbd","payload":{
+ {"id":9,"repository_id":10,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cc2f7914532f430d4e5d75b5c855ec4b46feb893bbd2974456f0bf46015b7621","payload":{"schemaVersion":2,"config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"sha256:cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a","size":139},"layers":[{"mediaType":"application/tar+gzip","digest":"sha256:50723273cfd47a0e6222d64e993b1bd1bb97f84b4e0d1336bc0e24596c72b631","size":1371}]},"media_type_id":17,"configuration_media_type_id":19,"configuration_payload":{"name":"e-helm","version":"latest","description":"Sample Helm Chart","apiVersion":"v2","appVersion":"1.16.0","type":"application"},"configuration_blob_digest":"01cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a"}, 
+ {"id":10,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01673315e9c0cad797587b6bc0c1e2b9a1903c15b521f26acc5364fcf034c0cfbd","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -289,7 +266,7 @@
       }
    ]
 },"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:5f03622470a5aefdce94305e23a8cfe9d9752a8d4b2a98428dcb8f7c4b207f74","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"9c3c36f3577df262d96c658cbf0571fa5521b3b9ed45b9bc363c16d415afcb3c","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:5f03622470a5aefdce94305e23a8cfe9d9752a8d4b2a98428dcb8f7c4b207f74","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T23:01:16.487846531Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T23:01:15.146632113Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T23:01:15.777141013Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T23:01:16.487846531Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:c3160d09ac4830a1d6bc456f3f5ca63845ea1eccd92b97a5b2e2d1796fb441c1","sha256:8d2462cf19579c4a452d3aa7f833b0f49f6c6412f5ef8c287acc03ff56ba3652","sha256:461b4a829431171ebb1031c6096c742d1c9ac82a2d858e8dcb892318ee409e56"]}},"configuration_blob_digest":"01b265c63feef2db2365adab2b8f9cfdc4f8fef20f623a2c171bc3ef4d61779c91"}, 
- {"id":12,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01a848997f1caa7406fa148e184820f1ff55076eb3e5b33a8c09d1bb34cf335e7e","payload":{
+ {"id":11,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01a848997f1caa7406fa148e184820f1ff55076eb3e5b33a8c09d1bb34cf335e7e","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
@@ -320,7 +297,7 @@
       }
    ]
 },"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:68a21ae57e89f9e0cc52d3ae7b1b10537fac2cfb6df18c8be54fde2f7d7fc143","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"b7cb81ac842c2510da89e7360dbc172eabea07469456cfe8524a2da322ef6e8d","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:68a21ae57e89f9e0cc52d3ae7b1b10537fac2cfb6df18c8be54fde2f7d7fc143","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T22:53:27.894237452Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T22:53:26.499152738Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T22:53:27.174345842Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T22:53:27.894237452Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:f2c7fc57862bed9c3682e62475a71177eb58cfdaf7461a17bf18a3c4a285e78f","sha256:2f8386f2895dd28a7603bbfe3d82f10a06a550fb8fd7a24d26e8b4b82dac704f","sha256:8d134234be46c44163cf5d46f4d00ea17bf5d74baf7e0a610db1ee9d76c8163c"]}},"configuration_blob_digest":"013ef776e71635d79e5b6b8b6317b3adeda3b0c8aca61c4537678cc02eab466b17"}, 
- {"id":13,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01efdb07f074a5cfb25547c0cf1ddac509a10ec9eb15e565584988c913ccaa344a","payload":{
+ {"id":12,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01efdb07f074a5cfb25547c0cf1ddac509a10ec9eb15e565584988c913ccaa344a","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
    "config": {
