@@ -13,6 +13,7 @@
 - configuration: Drop support for log hooks
 - configuration: Drop NewRelic reporting support
 - configuration: Drop Bugsnag reporting support
+- registry/api/v2: Drop support for schema 1 manifests and default to schema 2
 
 ## [v2.13.1-gitlab] - 2021-01-13
 ### Fixed

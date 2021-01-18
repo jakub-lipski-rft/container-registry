@@ -148,7 +148,7 @@ func TestDBFaultTolerance_ConnectionRefused_TagDelete(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withSchema1Compatibility, withDBHostAndPort(dbProxy.HostAndPort()))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -156,13 +156,13 @@ func TestDBFaultTolerance_ConnectionRefused_TagDelete(t *testing.T) {
 
 	// query API with proxy disabled, should fail
 	// create the repo, otherwise the request will halt on the filesystem search, which precedes the DB search
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 	dbProxy.Disable()
 	assertTagDeleteResponse(t, env, repoName, tagName, http.StatusServiceUnavailable)
 
 	// query API with proxy re-enabled, should succeed
 	dbProxy.Enable()
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 	assertTagDeleteResponse(t, env, repoName, tagName, http.StatusAccepted)
 }
 
@@ -442,7 +442,7 @@ func TestDBFaultTolerance_ConnectionTimeout_TagDelete(t *testing.T) {
 	dbProxy := newDBProxy(t)
 	defer dbProxy.Delete()
 
-	env := newTestEnv(t, withSchema1Compatibility, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
+	env := newTestEnv(t, withDBHostAndPort(dbProxy.HostAndPort()), withDBConnectTimeout(1*time.Second))
 	defer env.Shutdown()
 
 	repoName := "foo"
@@ -450,13 +450,13 @@ func TestDBFaultTolerance_ConnectionTimeout_TagDelete(t *testing.T) {
 
 	// query API with timeout, should fail
 	// create the repo, otherwise the request will halt on the filesystem search, which precedes the DB search
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 	toxic := dbProxy.AddToxic("timeout", toxiproxy.Attributes{"timeout": 2000})
 	assertTagDeleteResponse(t, env, repoName, tagName, http.StatusServiceUnavailable)
 
 	// query API with no timeout, should succeed
 	dbProxy.RemoveToxic(toxic)
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 	assertTagDeleteResponse(t, env, repoName, tagName, http.StatusAccepted)
 }
 
@@ -754,12 +754,12 @@ func TestDBFaultTolerance_ConnectionLeak_Catalog(t *testing.T) {
 }
 
 func TestDBFaultTolerance_ConnectionLeak_TagList(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility, disableMirrorFS)
+	env := newTestEnv(t, disableMirrorFS)
 	defer env.Shutdown()
 
 	repoName := "foo"
 	tagName := "latest"
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 	name, err := reference.WithName(repoName)
 	require.NoError(t, err)
 	u, err := env.builder.BuildTagsURL(name)
@@ -775,12 +775,12 @@ func TestDBFaultTolerance_ConnectionLeak_TagList(t *testing.T) {
 }
 
 func TestDBFaultTolerance_ConnectionLeak_TagDelete(t *testing.T) {
-	env := newTestEnv(t, withSchema1Compatibility, disableMirrorFS)
+	env := newTestEnv(t, disableMirrorFS)
 	defer env.Shutdown()
 
 	repoName := "foo"
 	tagName := "latest"
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 
 	assertNoDBConnections(t, env)
 
@@ -899,7 +899,7 @@ func TestDBFaultTolerance_ConnectionLeak_ManifestGetByTag(t *testing.T) {
 
 	repoName := "foo"
 	tagName := "latest"
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 
 	assertNoDBConnections(t, env)
 
@@ -936,7 +936,7 @@ func TestDBFaultTolerance_ConnectionLeak_ManifestHeadByTag(t *testing.T) {
 
 	repoName := "foo"
 	tagName := "latest"
-	createRepository(env, t, repoName, tagName)
+	createRepository(t, env, repoName, tagName)
 
 	assertNoDBConnections(t, env)
 

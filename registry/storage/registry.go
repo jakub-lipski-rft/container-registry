@@ -24,6 +24,7 @@ type registry struct {
 	blobDescriptorCacheProvider  cache.BlobDescriptorCacheProvider
 	deleteEnabled                bool
 	schema1Enabled               bool
+	schema1PullsDisabled         bool
 	resumableDigestEnabled       bool
 	mirrorFS                     bool
 	schema1SigningKey            libtrust.PrivateKey
@@ -73,6 +74,13 @@ func EnableDelete(registry *registry) error {
 // schema1 manifests.
 func EnableSchema1(registry *registry) error {
 	registry.schema1Enabled = true
+	return nil
+}
+
+// DisableSchema1Pulls is a functional option for NewRegistry. It disables
+// pulling of schema1 manifests.
+func DisableSchema1Pulls(registry *registry) error {
+	registry.schema1PullsDisabled = true
 	return nil
 }
 
@@ -292,6 +300,7 @@ func (repo *repository) Manifests(ctx context.Context, options ...distribution.M
 		}
 	} else {
 		v1Handler = &v1UnsupportedHandler{
+			pullsDisabled: repo.schema1PullsDisabled,
 			innerHandler: &signedManifestHandler{
 				ctx:               ctx,
 				schema1SigningKey: repo.schema1SigningKey,

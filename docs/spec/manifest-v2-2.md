@@ -257,6 +257,9 @@ image. It's the direct replacement for the schema-1 manifest.
 
 # Backward compatibility
 
+*Backward compatibility is no longer supported in v3 of the Container Registry*
+this section describes the historical behavior of v2 versions of the Registry.
+
 The registry will continue to accept uploads of manifests in both the old and
 new formats.
 
