@@ -42,8 +42,7 @@ import (
 	storagemiddleware "github.com/docker/distribution/registry/storage/driver/middleware"
 	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/distribution/version"
-	"github.com/docker/libtrust"
-	"github.com/go-redis/redis/v8"
+	redis "github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -84,11 +83,6 @@ type App struct {
 	}
 
 	redis redis.UniversalClient
-
-	// trustKey is a deprecated key used to sign manifests converted to
-	// schema1 for backward compatibility. It should not be used for any
-	// other purposes.
-	trustKey libtrust.PrivateKey
 
 	// isCache is true if this registry is configured as a pull through cache
 	isCache bool
@@ -172,31 +166,10 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	app.configureRedis(config)
 
 	options := registrymiddleware.GetRegistryOptions()
-	if config.Compatibility.Schema1.TrustKey != "" {
-		log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
-			"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
-			"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
-		app.trustKey, err = libtrust.LoadKeyFile(config.Compatibility.Schema1.TrustKey)
-		if err != nil {
-			panic(fmt.Sprintf(`could not load schema1 "signingkey" parameter: %v`, err))
-		}
-	} else {
-		// Generate an ephemeral key to be used for signing converted manifests
-		// for clients that don't support schema2.
-		app.trustKey, err = libtrust.GenerateECP256PrivateKey()
-		if err != nil {
-			panic(err)
-		}
-	}
 
-	options = append(options, storage.Schema1SigningKey(app.trustKey))
-
-	if config.Compatibility.Schema1.Enabled {
-		log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
-			"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
-			"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
-		options = append(options, storage.EnableSchema1)
-	}
+	// TODO: Once schema1 code is removed throughout the registry, we will not
+	// need to explicitly configure this.
+	options = append(options, storage.DisableSchema1Pulls)
 
 	if config.HTTP.Host != "" {
 		u, err := url.Parse(config.HTTP.Host)

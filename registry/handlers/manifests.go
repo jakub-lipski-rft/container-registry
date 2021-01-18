@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"mime"
@@ -15,7 +14,6 @@ import (
 	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/ocischema"
-	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
@@ -24,7 +22,6 @@ import (
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/docker/distribution/registry/storage/validation"
-	"github.com/docker/libtrust"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -32,7 +29,7 @@ import (
 )
 
 // These constants determine which architecture and OS to choose from a
-// manifest list when downconverting it to a schema1 manifest.
+// manifest list when falling back to a schema2 manifest.
 const (
 	defaultArch         = "amd64"
 	defaultOS           = "linux"
@@ -133,7 +130,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		var dbErr error
 
 		if imh.Config.Database.Enabled {
-			manifest, dgst, dbErr = dbGetManifestByTag(imh.Context, imh.App.db, imh.Tag, imh.App.trustKey, imh.Repository.Named().Name())
+			manifest, dgst, dbErr = dbGetManifestByTag(imh.Context, imh.App.db, imh.Tag, imh.Repository.Named().Name())
 			if dbErr != nil {
 				// Use the common error handling code below.
 				err = dbErr
@@ -170,11 +167,14 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	// The manifest will be nil if we retrieved the tag from the filesystem or
 	// the manifest is being referenced by digest.
 	if manifest == nil {
-		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, imh.Digest, imh.App.trustKey, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, imh.Digest, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled)
 		if err != nil {
-			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
+			switch {
+			case errors.As(err, &distribution.ErrManifestUnknownRevision{}):
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
-			} else {
+			case errors.Is(err, distribution.ErrSchemaV1Unsupported):
+				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithMessage("Schema 1 manifest not supported"))
+			default:
 				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
 			}
 			return
@@ -183,7 +183,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 
 	// determine the type of the returned manifest
 	manifestType := manifestSchema1
-	schema2Manifest, isSchema2 := manifest.(*schema2.DeserializedManifest)
+	_, isSchema2 := manifest.(*schema2.DeserializedManifest)
 	manifestList, isManifestList := manifest.(*manifestlist.DeserializedManifestList)
 	if isSchema2 {
 		manifestType = manifestSchema2
@@ -197,6 +197,10 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	if manifestType == manifestSchema1 {
+		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithMessage("Schema 1 manifest not supported"))
+		return
+	}
 	if manifestType == ociImageManifestSchema && !supports[ociImageManifestSchema] {
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithMessage("OCI manifest found, but accept header does not support OCI manifests"))
 		return
@@ -205,22 +209,10 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithMessage("OCI index found, but accept header does not support OCI indexes"))
 		return
 	}
-	// Only rewrite schema2 manifests when they are being fetched by tag.
-	// If they are being fetched by digest, we can't return something not
-	// matching the digest.
-	if imh.Tag != "" && manifestType == manifestSchema2 && !supports[manifestSchema2] {
-		// Rewrite manifest in schema1 format
-		log := dcontext.GetLogger(imh)
-		log.Infof("rewriting manifest %s in schema1 format to support old client", imh.Digest.String())
-		log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
-			"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
-			"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
 
-		manifest, err = imh.convertSchema2Manifest(schema2Manifest)
-		if err != nil {
-			return
-		}
-	} else if imh.Tag != "" && manifestType == manifestlistSchema && !supports[manifestlistSchema] {
+	// Only rewrite manifests lists when they are being fetched by tag. If they
+	// are being fetched by digest, we can't return something not matching the digest.
+	if imh.Tag != "" && manifestType == manifestlistSchema && !supports[manifestlistSchema] {
 		log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
 			"manifest_list_digest": imh.Digest.String(),
 			"default_arch":         defaultArch,
@@ -243,7 +235,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, manifestDigest, imh.App.trustKey, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, manifestDigest, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled)
 		if err != nil {
 			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
@@ -253,20 +245,7 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		// If necessary, convert the image manifest into schema1
-		if schema2Manifest, isSchema2 := manifest.(*schema2.DeserializedManifest); isSchema2 && !supports[manifestSchema2] {
-			log.Warn("client does not advertise support for schema2 manifests, rewriting manifest in schema1 format")
-			log.Warn("DEPRECATION WARNING: Docker Schema v1 compatibility is deprecated and will be removed by January " +
-				"22nd, 2021. Please update Docker Engine to 17.12 or later and rebuild and push any v1 images you might " +
-				"still have. See https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.")
-
-			manifest, err = imh.convertSchema2Manifest(schema2Manifest)
-			if err != nil {
-				return
-			}
-		} else {
-			imh.Digest = manifestDigest
-		}
+		imh.Digest = manifestDigest
 	}
 
 	ct, p, err := manifest.Payload()
@@ -289,11 +268,10 @@ func dbGetManifestFilesystemFallback(
 	db datastore.Queryer,
 	fsManifests distribution.ManifestService,
 	dgst digest.Digest,
-	schema1SigningKey libtrust.PrivateKey,
 	tag, path string,
 	dbEnabled bool) (distribution.Manifest, error) {
 	if dbEnabled {
-		return dbGetManifest(ctx, db, dgst, schema1SigningKey, path)
+		return dbGetManifest(ctx, db, dgst, path)
 	}
 
 	var options []distribution.ManifestServiceOption
@@ -304,7 +282,7 @@ func dbGetManifestFilesystemFallback(
 	return fsManifests.Get(ctx, dgst, options...)
 }
 
-func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, schema1SigningKey libtrust.PrivateKey, path string) (distribution.Manifest, error) {
+func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, path string) (distribution.Manifest, error) {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "digest": dgst})
 	log.Debug("getting manifest by digest from database")
 
@@ -333,10 +311,10 @@ func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 		}
 	}
 
-	return dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion, schema1SigningKey)
+	return dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion)
 }
 
-func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName string, schema1SigningKey libtrust.PrivateKey, path string) (distribution.Manifest, digest.Digest, error) {
+func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName string, path string) (distribution.Manifest, digest.Digest, error) {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "tag": tagName})
 	log.Debug("getting manifest by tag from database")
 
@@ -360,7 +338,7 @@ func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName strin
 		return nil, "", distribution.ErrTagUnknown{Tag: tagName}
 	}
 
-	manifest, err := dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion, schema1SigningKey)
+	manifest, err := dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion)
 	if err != nil {
 		return nil, "", err
 	}
@@ -368,131 +346,66 @@ func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName strin
 	return manifest, dbManifest.Digest, nil
 }
 
-func dbPayloadToManifest(payload []byte, mediaType string, schemaVersion int, schema1SigningKey libtrust.PrivateKey) (distribution.Manifest, error) {
+func dbPayloadToManifest(payload []byte, mediaType string, schemaVersion int) (distribution.Manifest, error) {
+	if schemaVersion == 1 {
+		return nil, distribution.ErrSchemaV1Unsupported
+	}
+
+	if schemaVersion != 2 {
+		return nil, fmt.Errorf("unrecognized manifest schema version %d", schemaVersion)
+	}
+
 	// TODO: Each case here is taken directly from the respective
-	// registry/storage/*manifesthandler Unmarshal method. These are all relatively
-	// simple with the exception of schema1. We cannot invoke them directly as
-	// they are unexported. We should determine a single place for this logic
-	// during refactoring https://gitlab.com/gitlab-org/container-registry/-/issues/135
-	switch schemaVersion {
-	case 1:
-		var (
-			signatures [][]byte
-			err        error
-		)
+	// registry/storage/*manifesthandler Unmarshal method. We cannot invoke them
+	// directly as they are unexported, but they are relatively simple. We should
+	// determine a single place for this logic during refactoring
+	// https://gitlab.com/gitlab-org/container-registry/-/issues/135
 
-		jsig, err := libtrust.NewJSONSignature(payload, signatures...)
-		if err != nil {
+	// This can be an image manifest or a manifest list
+	switch mediaType {
+	case schema2.MediaTypeManifest:
+		m := &schema2.DeserializedManifest{}
+		if err := m.UnmarshalJSON(payload); err != nil {
 			return nil, err
 		}
 
-		if schema1SigningKey != nil {
-			if err := jsig.Sign(schema1SigningKey); err != nil {
-				return nil, err
-			}
-		}
-
-		// Extract the pretty JWS
-		raw, err := jsig.PrettySignature("signatures")
-		if err != nil {
+		return m, nil
+	case v1.MediaTypeImageManifest:
+		m := &ocischema.DeserializedManifest{}
+		if err := m.UnmarshalJSON(payload); err != nil {
 			return nil, err
 		}
 
-		var sm schema1.SignedManifest
-		if err := json.Unmarshal(raw, &sm); err != nil {
+		return m, nil
+	case manifestlist.MediaTypeManifestList, v1.MediaTypeImageIndex:
+		m := &manifestlist.DeserializedManifestList{}
+		if err := m.UnmarshalJSON(payload); err != nil {
 			return nil, err
 		}
 
-		return &sm, nil
-	case 2:
-		// This can be an image manifest or a manifest list
-		switch mediaType {
-		case schema2.MediaTypeManifest:
-			m := &schema2.DeserializedManifest{}
-			if err := m.UnmarshalJSON(payload); err != nil {
-				return nil, err
-			}
+		return m, nil
+	case "":
+		// OCI image or image index - no media type in the content
 
-			return m, nil
-		case v1.MediaTypeImageManifest:
-			m := &ocischema.DeserializedManifest{}
-			if err := m.UnmarshalJSON(payload); err != nil {
-				return nil, err
-			}
-
-			return m, nil
-		case manifestlist.MediaTypeManifestList, v1.MediaTypeImageIndex:
-			m := &manifestlist.DeserializedManifestList{}
-			if err := m.UnmarshalJSON(payload); err != nil {
-				return nil, err
-			}
-
-			return m, nil
-		case "":
-			// OCI image or image index - no media type in the content
-
-			// First see if it looks like an image index
-			resIndex := &manifestlist.DeserializedManifestList{}
-			if err := resIndex.UnmarshalJSON(payload); err != nil {
-				return nil, err
-			}
-			if resIndex.Manifests != nil {
-				return resIndex, nil
-			}
-
-			// Otherwise, assume it must be an image manifest
-			m := &ocischema.DeserializedManifest{}
-			if err := m.UnmarshalJSON(payload); err != nil {
-				return nil, err
-			}
-
-			return m, nil
-		default:
-			return nil, distribution.ErrManifestVerification{fmt.Errorf("unrecognized manifest content type %s", mediaType)}
-		}
-	}
-
-	return nil, fmt.Errorf("unrecognized manifest schema version %d", schemaVersion)
-}
-
-func (imh *manifestHandler) convertSchema2Manifest(schema2Manifest *schema2.DeserializedManifest) (distribution.Manifest, error) {
-	targetDescriptor := schema2Manifest.Target()
-	blobs := imh.Repository.Blobs(imh)
-	configJSON, err := blobs.Get(imh, targetDescriptor.Digest)
-	if err != nil {
-		if err == distribution.ErrBlobUnknown {
-			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithDetail(err))
-		} else {
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
-		}
-		return nil, err
-	}
-
-	ref := imh.Repository.Named()
-
-	if imh.Tag != "" {
-		ref, err = reference.WithTag(ref, imh.Tag)
-		if err != nil {
-			imh.Errors = append(imh.Errors, v2.ErrorCodeTagInvalid.WithDetail(err))
+		// First see if it looks like an image index
+		resIndex := &manifestlist.DeserializedManifestList{}
+		if err := resIndex.UnmarshalJSON(payload); err != nil {
 			return nil, err
 		}
-	}
+		if resIndex.Manifests != nil {
+			return resIndex, nil
+		}
 
-	builder := schema1.NewConfigManifestBuilder(imh.Repository.Blobs(imh), imh.Context.App.trustKey, ref, configJSON)
-	for _, d := range schema2Manifest.Layers {
-		if err := builder.AppendReference(d); err != nil {
-			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithDetail(err))
+		// Otherwise, assume it must be an image manifest
+		m := &ocischema.DeserializedManifest{}
+		if err := m.UnmarshalJSON(payload); err != nil {
 			return nil, err
 		}
-	}
-	manifest, err := builder.Build(imh)
-	if err != nil {
-		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithDetail(err))
-		return nil, err
-	}
-	imh.Digest = digest.FromBytes(manifest.(*schema1.SignedManifest).Canonical)
 
-	return manifest, nil
+		return m, nil
+	default:
+		return nil, distribution.ErrManifestVerification{fmt.Errorf("unrecognized manifest content type %s", mediaType)}
+	}
 }
 
 func etagMatch(r *http.Request, etag string) bool {
@@ -653,14 +566,19 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 }
 
 func (imh *manifestHandler) appendPutError(err error) {
-	if err == distribution.ErrUnsupported {
+	if errors.Is(err, distribution.ErrUnsupported) {
 		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
 		return
 	}
-	if err == distribution.ErrAccessDenied {
+	if errors.Is(err, distribution.ErrAccessDenied) {
 		imh.Errors = append(imh.Errors, errcode.ErrorCodeDenied)
 		return
 	}
+	if errors.Is(err, distribution.ErrSchemaV1Unsupported) {
+		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithDetail("manifest type unsupported"))
+		return
+	}
+
 	switch err := err.(type) {
 	case distribution.ErrManifestVerification:
 		for _, verificationError := range err {
@@ -688,8 +606,6 @@ func (imh *manifestHandler) appendPutError(err error) {
 
 func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload []byte) error {
 	switch reqManifest := manifest.(type) {
-	case *schema1.SignedManifest:
-		return dbPutManifestSchema1(imh, reqManifest)
 	case *schema2.DeserializedManifest:
 		return dbPutManifestSchema2(imh, reqManifest, payload)
 	case *ocischema.DeserializedManifest:
@@ -697,9 +613,8 @@ func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload
 	case *manifestlist.DeserializedManifestList:
 		return dbPutManifestList(imh, reqManifest, payload)
 	default:
-		dcontext.GetLoggerWithField(imh, "manifest_class", fmt.Sprintf("%T", reqManifest)).Warn("database does not support manifest class")
+		return v2.ErrorCodeManifestInvalid.WithDetail("manifest type unsupported")
 	}
-	return nil
 }
 
 func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, tagName, path string) error {
@@ -896,64 +811,6 @@ func dbFindManifestListManifest(
 	return dbManifest, nil
 }
 
-func dbPutManifestSchema1(imh *manifestHandler, manifest *schema1.SignedManifest) error {
-	repoPath := imh.Repository.Named().Name()
-
-	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
-		"repository":      repoPath,
-		"manifest_digest": imh.Digest,
-		"schema_version":  manifest.Versioned.SchemaVersion,
-	})
-	log.Debug("putting manifest")
-
-	// create or find target repository
-	repositoryStore := datastore.NewRepositoryStore(imh.db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(imh.Context, repoPath)
-	if err != nil {
-		return err
-	}
-
-	dbManifest, err := repositoryStore.FindManifestByDigest(imh.Context, dbRepo, imh.Digest)
-	if err != nil {
-		return err
-	}
-	if dbManifest == nil {
-		log.Debug("manifest not found in database")
-
-		m := &models.Manifest{
-			RepositoryID:  dbRepo.ID,
-			SchemaVersion: manifest.SchemaVersion,
-			MediaType:     schema1.MediaTypeSignedManifest,
-			Digest:        imh.Digest,
-			Payload:       manifest.Canonical,
-		}
-
-		mStore := datastore.NewManifestStore(imh.db)
-		if err := mStore.Create(imh.Context, m); err != nil {
-			return err
-		}
-
-		dbManifest = m
-
-		// find and associate manifest layer blobs
-		for _, layer := range manifest.FSLayers {
-			dbBlob, err := dbFindRepositoryBlob(imh.Context, imh.db, distribution.Descriptor{Digest: layer.BlobSum}, dbRepo.Path)
-			if err != nil {
-				return err
-			}
-
-			// TODO: update the layer blob media_type here, it was set to "application/octet-stream" during the upload
-			// 		 but now we know its concrete type (reqLayer.MediaType).
-
-			if err := mStore.AssociateLayerBlob(imh.Context, dbManifest, dbBlob); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.DeserializedManifestList, payload []byte) error {
 	repoPath := imh.Repository.Named().Name()
 
@@ -1028,8 +885,6 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 
 	var class string
 	switch m := manifest.(type) {
-	case *schema1.SignedManifest:
-		class = imageClass
 	case *schema2.DeserializedManifest:
 		switch m.Config.MediaType {
 		case schema2.MediaTypeImageConfig:

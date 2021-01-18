@@ -317,10 +317,6 @@ proxy:
   remoteurl: https://registry-1.docker.io
   username: [username]
   password: [password]
-compatibility:
-  schema1:
-    signingkeyfile: /etc/registry/key.json
-    enabled: true
 validation:
   manifests:
     urls:
@@ -1267,29 +1263,6 @@ username (such as `batman`) and the password for that username.
 
 > **Note**: These private repositories are stored in the proxy cache's storage.
 > Take appropriate measures to protect access to the proxy cache.
-
-## `compatibility`
-
-```none
-compatibility:
-  schema1:
-    signingkeyfile: /etc/registry/key.json
-    enabled: true
-```
-
-Use the `compatibility` structure to configure handling of older and deprecated
-features. Each subsection defines such a feature with configurable behavior.
-
-### `schema1`
-
-**DEPRECATED:** Docker Schema v1 compatibility is deprecated and will be removed by January 22nd, 2021. Please update
-Docker Engine to 17.12 or later and rebuild and push any v1 images you might still have. See 
-https://gitlab.com/gitlab-org/container-registry/-/issues/213 for more details.
-
-| Parameter | Required | Description                                           |
-|-----------|----------|-------------------------------------------------------|
-| `signingkeyfile` | no | The signing private key used to add signatures to `schema1` manifests. If no signing key is provided, a new ECDSA key is generated when the registry starts. |
-| `enabled` | no | If this is not set to true, `schema1` manifests cannot be pushed. |
 
 ## `validation`
 
