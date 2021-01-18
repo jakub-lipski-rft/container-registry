@@ -913,6 +913,8 @@ section.
 
 #### Pagination
 
+**CAUTION**: Pagination is only supported when using the metadata database.
+
 Paginated catalog results can be retrieved by adding an `n` parameter to the
 request URL, declaring that the response should be limited to `n` results.
 Starting a paginated flow begins as follows:
@@ -1019,6 +1021,8 @@ For repositories with a large number of tags, this response may be quite
 large. If such a response is expected, one should use the pagination.
 
 #### Pagination
+
+**CAUTION**: Pagination is only supported when using the metadata database.
 
 Paginated tag results can be retrieved by adding the appropriate parameters to
 the request URL described above. The behavior of tag pagination is identical
