@@ -18,7 +18,7 @@ require (
 	github.com/lib/pq v1.9.0
 	github.com/marstr/guid v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
-	github.com/ncw/swift v1.0.40
+	github.com/ncw/swift v1.0.52
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/opencontainers/image-spec v1.0.0
