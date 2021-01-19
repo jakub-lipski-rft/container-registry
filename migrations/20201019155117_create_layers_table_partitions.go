@@ -7,7 +7,7 @@ func init() {
 		Migration: &migrate.Migration{
 			Id: "20201019155117_create_layers_table_partitions",
 			Up: []string{
-				`CREATE TABLE partitions.layers_default PARTITION OF public.layers
+				`CREATE TABLE IF NOT EXISTS partitions.layers_default PARTITION OF public.layers
 				FOR VALUES WITH (MODULUS 1, REMAINDER 0)`,
 			},
 			Down: []string{

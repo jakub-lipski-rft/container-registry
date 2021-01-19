@@ -7,7 +7,7 @@ func init() {
 		Migration: &migrate.Migration{
 			Id: "20201019155236_create_repository_blobs_table_partitions",
 			Up: []string{
-				`CREATE TABLE partitions.repository_blobs_default PARTITION OF public.repository_blobs
+				`CREATE TABLE IF NOT EXISTS partitions.repository_blobs_default PARTITION OF public.repository_blobs
 				FOR VALUES WITH (MODULUS 1, REMAINDER 0)`,
 			},
 			Down: []string{
