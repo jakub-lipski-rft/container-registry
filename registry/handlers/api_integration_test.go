@@ -159,9 +159,9 @@ type catalogAPIResponse struct {
 	Repositories []string `json:"repositories"`
 }
 
-// TestCatalogAPI tests the /v2/_catalog endpoint
-func TestCatalogAPI(t *testing.T) {
-	env := newTestEnv(t)
+// catalog_Get tests the /v2/_catalog endpoint
+func catalog_Get(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	sortedRepos := []string{
@@ -301,7 +301,7 @@ func TestCatalogAPI(t *testing.T) {
 
 	// If the database is enabled, disable it and rerun the tests again with the
 	// database to check that the filesystem mirroring worked correctly.
-	if env.config.Database.Enabled {
+	if env.config.Database.Enabled && !env.config.Migration.DisableMirrorFS {
 		env.config.Database.Enabled = false
 		defer func() { env.config.Database.Enabled = true }()
 
@@ -328,8 +328,8 @@ func TestCatalogAPI(t *testing.T) {
 	}
 }
 
-func TestCatalogAPI_Empty(t *testing.T) {
-	env := newTestEnv(t)
+func catalog_Get_Empty(t *testing.T, opts ...configOpt) {
+	env := newTestEnv(t, opts...)
 	defer env.Shutdown()
 
 	catalogURL, err := env.builder.BuildCatalogURL()
@@ -1486,6 +1486,9 @@ func TestAPIConformance(t *testing.T) {
 		tags_Delete_Unknown,
 		tags_Delete_UnknownRepository,
 		tags_Delete_WithSameImageID,
+
+		catalog_Get,
+		catalog_Get_Empty,
 	}
 
 	type envOpt struct {
