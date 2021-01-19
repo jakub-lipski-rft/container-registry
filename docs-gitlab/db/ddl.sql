@@ -156,6 +156,16 @@ CREATE TABLE blob_review_queue (
     digest bytea NOT NULL,
     CONSTRAINT pk_blob_review_queue PRIMARY KEY (digest)
 );
+CREATE INDEX index_blob_review_queue_on_review_after ON blob_review_queue USING btree (review_after);
+
+CREATE TABLE manifest_review_queue (
+    repository_id bigint NOT NULL,
+    manifest_id bigint NOT NULL,
+    review_after timestamp with time zone NOT NULL DEFAULT now() + interval '1 day',
+    review_count integer NOT NULL DEFAULT 0,
+    CONSTRAINT pk_manifest_review_queue PRIMARY KEY (repository_id, manifest_id)
+);
+CREATE INDEX index_manifest_review_queue_on_review_after ON manifest_review_queue USING btree (review_after);
 
 CREATE SCHEMA partitions;
 
