@@ -913,6 +913,8 @@ section.
 
 #### Pagination
 
+**CAUTION**: Pagination is only supported when using the metadata database.
+
 Paginated catalog results can be retrieved by adding an `n` parameter to the
 request URL, declaring that the response should be limited to `n` results.
 Starting a paginated flow begins as follows:
@@ -1019,6 +1021,8 @@ For repositories with a large number of tags, this response may be quite
 large. If such a response is expected, one should use the pagination.
 
 #### Pagination
+
+**CAUTION**: Pagination is only supported when using the metadata database.
 
 Paginated tag results can be retrieved by adding the appropriate parameters to
 the request URL described above. The behavior of tag pagination is identical
@@ -1129,7 +1133,7 @@ A list of methods and URIs are covered in the table below:
 |------|----|------|-----------|
 | GET | `/v2/` | Base | Check that the endpoint implements Docker Registry API V2. |
 | GET | `/v2/<name>/tags/list` | Tags | Fetch the tags under the repository identified by `name`. |
-| DELETE | `/v2/<name>/tags/reference/<reference>` | Tags | Delete a tag identified by `name` and `reference`, where reference can be the tag name. This method never deletes a manifest the tag references. |
+| DELETE | `/v2/<name>/tags/reference/<tag>` | Tag | Delete a tag identified by `name` and `reference`, where reference can be the tag name. This method never deletes a manifest the tag references. |
 | GET | `/v2/<name>/manifests/<reference>` | Manifest | Fetch the manifest identified by `name` and `reference` where `reference` can be a tag or digest. A `HEAD` request can also be issued to this endpoint to obtain resource information without receiving all data. |
 | PUT | `/v2/<name>/manifests/<reference>` | Manifest | Put the manifest identified by `name` and `reference` where `reference` can be a tag or digest. |
 | DELETE | `/v2/<name>/manifests/<reference>` | Manifest | Delete the manifest identified by `name` and `reference`. Note that a manifest can _only_ be deleted by `digest`. |
@@ -1153,7 +1157,7 @@ The error codes encountered via the API are enumerated in the following table:
 |----|-------|-----------|
  `BLOB_UNKNOWN` | blob unknown to registry | This error may be returned when a blob is unknown to the registry in a specified repository. This can be returned with a standard get or if a manifest references an unknown layer during upload.
  `BLOB_UPLOAD_INVALID` | blob upload invalid | The blob upload encountered an error and can no longer proceed.
- `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been cancelled or was never started, this error code may be returned.
+ `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been canceled or was never started, this error code may be returned.
  `DIGEST_INVALID` | provided digest did not match uploaded content | When a blob is uploaded, the registry will check that the content matches the digest provided by the client. The error may include a detail structure with the key "digest", including the invalid digest string. This error may also be returned when a manifest includes an invalid layer digest.
  `MANIFEST_BLOB_UNKNOWN` | blob unknown to registry | This error may be returned when a manifest blob is  unknown to the registry.
  `MANIFEST_INVALID` | manifest invalid | During upload, manifests undergo several checks ensuring validity. If those checks fail, this error may be returned, unless a more specific error is included. The detail will contain information the failed validation.
@@ -1204,9 +1208,18 @@ The following parameters should be specified on the request:
 
 ```
 200 OK
+Gitlab-Container-Registry-Version: <semantic version>
+Gitlab-Container-Registry-Features: <comma separated list of features>
 ```
 
 The API implements V2 protocol and is accessible.
+
+The following headers will be returned with the response:
+
+|Name|Description|
+|----|-----------|
+|`Gitlab-Container-Registry-Version`|The semantic version of the GitLab Container Registry.|
+|`Gitlab-Container-Registry-Features`|A list of features supported by the GitLab Container Registry API.|
 
 
 
@@ -1692,8 +1705,6 @@ Content-Type: application/json
 
 The client made too many requests within a time interval.
 
-### Deleting an Image
-
 The following headers will be returned on the response:
 
 |Name|Description|
@@ -1709,14 +1720,23 @@ The error codes that may be included in the response body are enumerated below:
 | `TOOMANYREQUESTS` | too many requests | Returned when a client attempts to contact a service too many times |
 
 
-#### DELETE Tags
+
+
+
+### Tag
+
+Delete tags.
+
+
+
+#### DELETE Tag
 
 Delete a tag identified by `name` and `reference`, where reference can be the tag name. This method never deletes a manifest the tag references.
 
 
 
 ```
-DELETE /v2/<name>/tags/reference/<reference>
+DELETE /v2/<name>/tags/reference/<tag>
 Host: <registry host>
 Authorization: <scheme> <token>
 ```
@@ -1752,6 +1772,7 @@ The following parameters should be specified on the request:
 ```
 400 Bad Request
 Content-Type: application/json; charset=utf-8
+
 {
 	"errors:" [
 	    {
@@ -1783,7 +1804,8 @@ The error codes that may be included in the response body are enumerated below:
 401 Unauthorized
 WWW-Authenticate: <scheme> realm="<realm>", ..."
 Content-Length: <length>
-Content-Type: application/json; charset=utf-8
+Content-Type: application/json
+
 {
 	"errors:" [
 	    {
@@ -1820,7 +1842,8 @@ The error codes that may be included in the response body are enumerated below:
 ```
 404 Not Found
 Content-Length: <length>
-Content-Type: application/json; charset=utf-8
+Content-Type: application/json
+
 {
 	"errors:" [
 	    {
@@ -1856,7 +1879,8 @@ The error codes that may be included in the response body are enumerated below:
 ```
 403 Forbidden
 Content-Length: <length>
-Content-Type: application/json; charset=utf-8
+Content-Type: application/json
+
 {
 	"errors:" [
 	    {
@@ -1892,7 +1916,8 @@ The error codes that may be included in the response body are enumerated below:
 ```
 429 Too Many Requests
 Content-Length: <length>
-Content-Type: application/json; charset=utf-8
+Content-Type: application/json
+
 {
 	"errors:" [
 	    {
@@ -1928,6 +1953,7 @@ The error codes that may be included in the response body are enumerated below:
 ```
 404 Not Found
 Content-Type: application/json; charset=utf-8
+
 {
 	"errors:" [
 	    {
@@ -4440,7 +4466,7 @@ The error codes that may be included in the response body are enumerated below:
 
 |Code|Message|Description|
 |----|-------|-----------|
-| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been cancelled or was never started, this error code may be returned. |
+| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been canceled or was never started, this error code may be returned. |
 
 
 
@@ -4708,7 +4734,7 @@ The error codes that may be included in the response body are enumerated below:
 
 |Code|Message|Description|
 |----|-------|-----------|
-| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been cancelled or was never started, this error code may be returned. |
+| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been canceled or was never started, this error code may be returned. |
 
 
 
@@ -4974,7 +5000,7 @@ The error codes that may be included in the response body are enumerated below:
 
 |Code|Message|Description|
 |----|-------|-----------|
-| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been cancelled or was never started, this error code may be returned. |
+| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been canceled or was never started, this error code may be returned. |
 
 
 
@@ -5255,7 +5281,7 @@ The error codes that may be included in the response body are enumerated below:
 
 |Code|Message|Description|
 |----|-------|-----------|
-| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been cancelled or was never started, this error code may be returned. |
+| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been canceled or was never started, this error code may be returned. |
 
 
 
@@ -5514,7 +5540,7 @@ The error codes that may be included in the response body are enumerated below:
 
 |Code|Message|Description|
 |----|-------|-----------|
-| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been cancelled or was never started, this error code may be returned. |
+| `BLOB_UPLOAD_UNKNOWN` | blob upload unknown to registry | If a blob upload has been canceled or was never started, this error code may be returned. |
 
 
 
