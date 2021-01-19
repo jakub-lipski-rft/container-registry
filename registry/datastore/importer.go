@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution"
+	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/manifest/schema1"
@@ -221,7 +222,38 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 	return nil
 }
 
-func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *schema2.DeserializedManifest, dgst digest.Digest) (*models.Manifest, error) {
+type v2Manifest interface {
+	distribution.Manifest
+	version() manifest.Versioned
+	config() distribution.Descriptor
+	layers() []distribution.Descriptor
+}
+
+type schema2Extended struct {
+	*schema2.DeserializedManifest
+}
+
+func (m *schema2Extended) version() manifest.Versioned       { return m.Versioned }
+func (m *schema2Extended) config() distribution.Descriptor   { return m.Config }
+func (m *schema2Extended) layers() []distribution.Descriptor { return m.Layers }
+
+type ociExtended struct {
+	*ocischema.DeserializedManifest
+}
+
+func (m *ociExtended) version() manifest.Versioned {
+	// Helm chart manifests do not include a mediatype, set them to oci.
+	if m.Versioned.MediaType == "" {
+		m.Versioned.MediaType = v1.MediaTypeImageManifest
+	}
+
+	return m.Versioned
+}
+
+func (m *ociExtended) config() distribution.Descriptor   { return m.Config }
+func (m *ociExtended) layers() []distribution.Descriptor { return m.Layers }
+
+func (imp *Importer) importV2Manifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m v2Manifest, dgst digest.Digest) (*models.Manifest, error) {
 	_, payload, err := m.Payload()
 	if err != nil {
 		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
@@ -229,12 +261,12 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 
 	// get configuration blob payload
 	blobStore := fsRepo.Blobs(ctx)
-	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
+	configPayload, err := blobStore.Get(ctx, m.config().Digest)
 	if err != nil {
 		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
 	}
 
-	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.Config, configPayload)
+	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.config(), configPayload)
 	if err != nil {
 		return nil, err
 	}
@@ -247,8 +279,8 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 	// find or create DB manifest
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
 		RepositoryID:  dbRepo.ID,
-		SchemaVersion: m.SchemaVersion,
-		MediaType:     m.MediaType,
+		SchemaVersion: m.version().SchemaVersion,
+		MediaType:     m.version().MediaType,
 		Digest:        dgst,
 		Payload:       payload,
 		Configuration: &models.Configuration{
@@ -262,55 +294,7 @@ func (imp *Importer) importSchema2Manifest(ctx context.Context, fsRepo distribut
 	}
 
 	// import manifest layers
-	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.Layers); err != nil {
-		return nil, fmt.Errorf("error importing layers: %w", err)
-	}
-
-	return dbManifest, nil
-}
-
-func (imp *Importer) importOCIManifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, m *ocischema.DeserializedManifest, dgst digest.Digest) (*models.Manifest, error) {
-	_, payload, err := m.Payload()
-	if err != nil {
-		return nil, fmt.Errorf("error parsing manifest payload: %w", err)
-	}
-
-	// get configuration blob payload
-	blobStore := fsRepo.Blobs(ctx)
-	configPayload, err := blobStore.Get(ctx, m.Config.Digest)
-	if err != nil {
-		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
-	}
-
-	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.Config, configPayload)
-	if err != nil {
-		return nil, err
-	}
-
-	// link configuration blob to repository
-	if err := imp.repositoryStore.LinkBlob(ctx, dbRepo, dbConfigBlob.Digest); err != nil {
-		return nil, fmt.Errorf("error associating configuration blob with repository: %w", err)
-	}
-
-	// find or create DB manifest
-	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
-		RepositoryID:  dbRepo.ID,
-		SchemaVersion: m.SchemaVersion,
-		MediaType:     v1.MediaTypeImageManifest,
-		Digest:        dgst,
-		Payload:       payload,
-		Configuration: &models.Configuration{
-			MediaType: dbConfigBlob.MediaType,
-			Digest:    dbConfigBlob.Digest,
-			Payload:   configPayload,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// import manifest layers
-	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.Layers); err != nil {
+	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.layers()); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
 	}
 
@@ -383,11 +367,11 @@ func (imp *Importer) importManifest(ctx context.Context, fsRepo distribution.Rep
 	case *schema1.SignedManifest:
 		return nil, distribution.ErrSchemaV1Unsupported
 	case *schema2.DeserializedManifest:
-		return imp.importSchema2Manifest(ctx, fsRepo, dbRepo, fsManifest, dgst)
+		return imp.importV2Manifest(ctx, fsRepo, dbRepo, &schema2Extended{fsManifest}, dgst)
 	case *ocischema.DeserializedManifest:
-		return imp.importOCIManifest(ctx, fsRepo, dbRepo, fsManifest, dgst)
+		return imp.importV2Manifest(ctx, fsRepo, dbRepo, &ociExtended{fsManifest}, dgst)
 	default:
-		return nil, fmt.Errorf("unknown manifest class: %T", fsManifest)
+		return nil, fmt.Errorf("unknown manifest class")
 	}
 }
 
