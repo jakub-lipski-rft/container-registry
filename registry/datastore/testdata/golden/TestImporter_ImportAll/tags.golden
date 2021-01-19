@@ -7,6 +7,5 @@
  {"id":7,"repository_id":8,"manifest_id":8,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"3.11.5"}, 
  {"id":8,"repository_id":8,"manifest_id":7,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"3.11.5-amd64"}, 
  {"id":9,"repository_id":8,"manifest_id":6,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"3.11.5-arm64"}, 
- {"id":10,"repository_id":9,"manifest_id":9,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"latest"}, 
- {"id":11,"repository_id":10,"manifest_id":10,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"latest"}, 
- {"id":12,"repository_id":11,"manifest_id":13,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"latest"}]
+ {"id":10,"repository_id":10,"manifest_id":9,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"latest"}, 
+ {"id":11,"repository_id":11,"manifest_id":12,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"latest"}]
