@@ -218,7 +218,9 @@ var MigrateUpCmd = &cobra.Command{
 		}
 
 		plan, err := m.UpNPlan(*maxNumMigrations)
-		fmt.Println(strings.Join(plan, "\n"))
+		if len(plan) > 0 {
+			fmt.Println(strings.Join(plan, "\n"))
+		}
 
 		if !dryRun {
 			n, err := m.UpN(*maxNumMigrations)
@@ -259,7 +261,9 @@ var MigrateDownCmd = &cobra.Command{
 
 		m := migrations.NewMigrator(db.DB)
 		plan, err := m.DownNPlan(*maxNumMigrations)
-		fmt.Println(strings.Join(plan, "\n"))
+		if len(plan) > 0 {
+			fmt.Println(strings.Join(plan, "\n"))
+		}
 
 		if !dryRun && len(plan) > 0 {
 			if !force {
