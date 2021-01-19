@@ -24,7 +24,7 @@ There is no direct communication between the main registry process and the garba
 
 ### Blobs
 
-A table named `blob_review_queue` is used as a review queue for blobs that may be eligible for deletion in the deduplicated storage backend. This table has three primary columns:
+A table named `gc_blob_review_queue` is used as a review queue for blobs that may be eligible for deletion in the deduplicated storage backend. This table has three primary columns:
 
 - `digest`: The digest of the blob that may be eligible for deletion. This is used to query the database to determine if a blob is eligible for deletion and delete it from the storage backend.
 - `review_after`: The minimum amount of time after which the garbage collector should pick up a record for review. Defaults to one day.
@@ -32,7 +32,7 @@ A table named `blob_review_queue` is used as a review queue for blobs that may b
 
 ### Manifests
 
-A table named `manifest_review_queue` is used as a review queue for manifest records that may be eligible for deletion in the database. For example, when deleting a tag that points to manifest `M` in repository `R`, manifest `M` should also be deleted **if** no other tag **and** no manifest list in repository `R` references manifest `M`.
+A table named `gc_manifest_review_queue` is used as a review queue for manifest records that may be eligible for deletion in the database. For example, when deleting a tag that points to manifest `M` in repository `R`, manifest `M` should also be deleted **if** no other tag **and** no manifest list in repository `R` references manifest `M`.
 
 Instead of handling this conditional cascade on delete logic at the application or database level in realtime (which increases complexity and the chances for race conditions), the review table is used to delegate that to the garbage collector.
 
@@ -51,7 +51,7 @@ To know which configuration and layer blobs can be garbage collected, we need to
 
 Although it would be possible to obtain the list of deduplicated configuration and layer blobs not referenced by any manifest across all repositories, doing so would require scanning multiple (perhaps entire) tables on the database every time the garbage collector runs. Doing so would incur a significant performance penalty, which would only worsen as the database grows. Furthermore, the longer it takes to determine blobs eligible for deletion, the higher the chances for race conditions while operating online, leading to potential false positives/negatives.
 
-For this purpose, a separate set of "global" tables (not partitioned by repository) is used to record the association between configuration and layer blobs with repositories: `blobs_configurations` and `blobs_layers`, respectively. These tables must be updated every time a blob is associated with or dissociated with a repository to maintain consistency. We can then narrow down lookup queries to these two tables to determine if a given blob is being used or not (i.e. if it should be garbage collected).
+For this purpose, a separate set of "global" tables (not partitioned by repository) is used to record the association between configuration and layer blobs with repositories: `gc_blobs_configurations` and `gc_blobs_layers`, respectively. These tables must be updated every time a blob is associated with or dissociated with a repository to maintain consistency. We can then narrow down lookup queries to these two tables to determine if a given blob is being used or not (i.e. if it should be garbage collected).
 
 This section details how we can keep track of blob associations during the relevant API operations.
 
@@ -61,14 +61,14 @@ When pushing an image to the registry, the client must first upload all blobs (i
 
 Considering this, the repository will be left in an inconsistent state if an image push is canceled between the dependent blob uploads and the manifest upload: the configuration and/or layer blobs were uploaded and linked to the target repository, but the manifest that references those blobs was never uploaded. This means they are _potentially_ dangling (both in the database and storage backend) and should therefore be analyzed and garbage collected if necessary.
 
-Because the manifest upload never occurred in these situations, there are no inserts in `blobs_configurations` and/or `blobs_layers` for the configuration and/or layer blobs. Considering this, to keep track of blobs uploaded during a failed/canceled image push, a row should be inserted in `blob_review_queue` for every uploaded blob. This is accomplished with a trigger for inserts on the `blobs` table:
+Because the manifest upload never occurred in these situations, there are no inserts in `gc_blobs_configurations` and/or `gc_blobs_layers` for the configuration and/or layer blobs. Considering this, to keep track of blobs uploaded during a failed/canceled image push, a row should be inserted in `gc_blob_review_queue` for every uploaded blob. This is accomplished with a trigger for inserts on the `blobs` table:
 
 ```sql
 CREATE FUNCTION public.gc_track_blob_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO blob_review_queue (digest)
+    INSERT INTO gc_blob_review_queue (digest)
         VALUES (NEW.digest)
     ON CONFLICT (digest)
         DO UPDATE SET
@@ -100,7 +100,7 @@ Whenever a manifest `M` is uploaded to repository `R`, we must record the associ
 
 **Note:** This is only applicable for manifests that reference a configuration, such as [Docker's Schema 2](https://docs.docker.com/registry/spec/manifest-v2-2/).
 
-Once a manifest is inserted in the `manifests` table, a corresponding row must be inserted in `blobs_configurations`. This is done by a trigger:
+Once a manifest is inserted in the `manifests` table, a corresponding row must be inserted in `gc_blobs_configurations`. This is done by a trigger:
 
 ```sql
 CREATE FUNCTION public.gc_track_configuration_blobs ()
@@ -108,7 +108,7 @@ CREATE FUNCTION public.gc_track_configuration_blobs ()
     AS $$
 BEGIN
     IF NEW.configuration_blob_digest IS NOT NULL THEN -- not all manifests have a configuration
-        INSERT INTO blobs_configurations (repository_id, manifest_id, digest)
+        INSERT INTO gc_blobs_configurations (repository_id, manifest_id, digest)
             VALUES (NEW.repository_id, NEW.id, NEW.configuration_blob_digest)
         ON CONFLICT (digest, manifest_id)
             DO NOTHING;
@@ -126,14 +126,14 @@ CREATE TRIGGER gc_track_configuration_blobs_trigger
 
 ##### Layer blobs
 
-The insertion of a manifest in the `manifests` table is followed by `N` inserts in the `layers` table, where `N` is the number of layers referenced by the manifest. A row should be inserted in `blobs_layers` for each insert in the layers table to keep track of layer blobs:
+The insertion of a manifest in the `manifests` table is followed by `N` inserts in the `layers` table, where `N` is the number of layers referenced by the manifest. A row should be inserted in `gc_blobs_layers` for each insert in the layers table to keep track of layer blobs:
 
 ```sql
 CREATE FUNCTION public.gc_track_layer_blobs ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO blobs_layers (repository_id, layer_id, digest)
+    INSERT INTO gc_blobs_layers (repository_id, layer_id, digest)
         VALUES (NEW.repository_id, NEW.id, NEW.digest)
     ON CONFLICT (digest, layer_id)
         DO NOTHING;
@@ -156,14 +156,14 @@ A manifest pushed by digest (without a tag) is considered dangling and should be
 
 We need to keep track of manifests pushed by digest and have the garbage collector analyze if they are dangling. If so, the corresponding row in the `manifests` table should be deleted, and the configuration and layer blobs of that manifest should be queued for review by the garbage collector.
 
-For this reason, similar to how blob uploads are tracked, whenever a manifest is uploaded, we should insert a row in the `manifest_review_queue` table. This can be accomplished with a trigger for inserts on `manifests`:
+For this reason, similar to how blob uploads are tracked, whenever a manifest is uploaded, we should insert a row in the `gc_manifest_review_queue` table. This can be accomplished with a trigger for inserts on `manifests`:
 
 ```sql
 CREATE FUNCTION public.gc_track_manifest_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO manifest_review_queue (repository_id, manifest_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
         VALUES (NEW.repository_id, NEW.id)
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
@@ -199,7 +199,7 @@ To mitigate these race conditions, we would have to synchronize all involved pro
 
 ## Tracking dangling blobs and manifests
 
-Besides tracking blob associations, we also need to track dissociations to detect _potentially_ dangling blobs in the deduplicated storage. A blob that is no longer referenced in a particular repository **may** be referenced in another one. However, the database is scoped and partitioned by repository, which means that each repository must take care of flagging potentially dangling blobs internally. The garbage collector is the only one with visibility across repositories (using the `blobs_configurations` and `blobs_layers` tables) and determines if any repository no longer references a blob.
+Besides tracking blob associations, we also need to track dissociations to detect _potentially_ dangling blobs in the deduplicated storage. A blob that is no longer referenced in a particular repository **may** be referenced in another one. However, the database is scoped and partitioned by repository, which means that each repository must take care of flagging potentially dangling blobs internally. The garbage collector is the only one with visibility across repositories (using the `gc_blobs_configurations` and `gc_blobs_layers` tables) and determines if any repository no longer references a blob.
 
 A manifest that is no longer tagged and referenced by any manifest list within a repository is also eligible for deletion. The garbage collector is responsible for looking at the `tags` and `manifest_references` tables to determine whether a manifest is still referenced and, if not, delete it in the database, which in turn will cause its blobs to be queued for review as well.
 
@@ -219,7 +219,7 @@ CREATE FUNCTION public.gc_track_deleted_manifests ()
     AS $$
 BEGIN
     IF OLD.configuration_blob_digest IS NOT NULL THEN -- not all manifests have a configuration
-        INSERT INTO blob_review_queue (digest)
+        INSERT INTO gc_blob_review_queue (digest)
             VALUES (OLD.configuration_blob_digest)
         ON CONFLICT (digest)
             DO UPDATE SET
@@ -234,7 +234,7 @@ CREATE FUNCTION public.gc_track_deleted_layers ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO blob_review_queue (digest)
+    INSERT INTO gc_blob_review_queue (digest)
         VALUES (OLD.digest)
     ON CONFLICT (digest)
         DO UPDATE SET
@@ -268,7 +268,7 @@ CREATE FUNCTION public.gc_track_deleted_manifest_lists ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO manifest_review_queue (repository_id, manifest_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
         VALUES (OLD.repository_id, OLD.child_id)
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
@@ -301,7 +301,7 @@ CREATE FUNCTION public.gc_track_deleted_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO manifest_review_queue (repository_id, manifest_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
         VALUES (OLD.repository_id, OLD.manifest_id)
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
@@ -345,7 +345,7 @@ CREATE FUNCTION public.gc_track_switched_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO manifest_review_queue (repository_id, manifest_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
         VALUES (OLD.repository_id, OLD.manifest_id)
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
@@ -414,7 +414,7 @@ The process of reviewing and possibly deleting a blob is the following:
    SELECT
        digest
    FROM
-       blob_review_queue
+       gc_blob_review_queue
    WHERE
        review_after < NOW()
    ORDER BY
@@ -424,7 +424,7 @@ The process of reviewing and possibly deleting a blob is the following:
    LIMIT 1;
    ```
 
-2. Determine if blob is eligible for deletion. With the extensive work done on tracking associations and dissociations, the only thing needed is a query by digest across `blobs_configurations` and `blobs_layers`:
+2. Determine if blob is eligible for deletion. With the extensive work done on tracking associations and dissociations, the only thing needed is a query by digest across `gc_blobs_configurations` and `gc_blobs_layers`:
 
    ```sql
    SELECT
@@ -432,14 +432,14 @@ The process of reviewing and possibly deleting a blob is the following:
            SELECT
                1
            FROM
-               blobs_configurations
+               gc_blobs_configurations
            WHERE
                digest = decode($1, 'hex')
            UNION
            SELECT
                1
            FROM
-               blobs_layers
+               gc_blobs_layers
            WHERE
                digest = decode($1, 'hex'));
    ```
@@ -447,7 +447,7 @@ The process of reviewing and possibly deleting a blob is the following:
 3. If the result from 2. is `true`, the blob is still referenced by a manifest, and it is not eligible for deletion. Therefore, we should remove it from the blob review queue and commit the transaction:
 
    ```sql
-   DELETE FROM blob_review_queue
+   DELETE FROM gc_blob_review_queue
    WHERE digest = decode($1, 'hex');
    
    COMMIT;
@@ -466,10 +466,10 @@ The process of reviewing and possibly deleting a blob is the following:
 
       This will cascade to `repository_blobs`, deleting any remaining links between the deleted blob and any repositories.
 
-   3. Delete the corresponding row from `blob_review_queue` and commit the transaction:
+   3. Delete the corresponding row from `gc_blob_review_queue` and commit the transaction:
 
       ```sql
-      DELETE FROM blob_review_queue
+      DELETE FROM gc_blob_review_queue
       WHERE digest = decode($1, 'hex');
       
       COMMIT;
@@ -493,7 +493,7 @@ Regardless, to avoid this, we need to synchronize the API and the garbage collec
   SELECT
       *
   FROM
-      blob_review_queue
+      gc_blob_review_queue
   WHERE
       review_after < NOW()
   ORDER BY
@@ -509,7 +509,7 @@ Regardless, to avoid this, we need to synchronize the API and the garbage collec
   SELECT
       *
   FROM
-      blob_review_queue
+      gc_blob_review_queue
   WHERE
       digest = ?
       AND review_after < NOW() + INTERVAL '1 hour'
@@ -522,9 +522,9 @@ With synchronization in place, depending on which process acquires the lock firs
 
 - The garbage collector acquires the lock first, stopping the API from performing existence checks until the blob is determined to be eligible for deletion (and deleted) or not:
 
-  - The blob is not dangling. The garbage collector deletes the review record from `blob_review_queue` and commits the transaction. Once unlocked, the API will be able to find the blob as expected;
+  - The blob is not dangling. The garbage collector deletes the review record from `gc_blob_review_queue` and commits the transaction. Once unlocked, the API will be able to find the blob as expected;
 
-  - The blob is considered dangling. The garbage collector deletes the blob from the storage backend and the corresponding rows from `blobs` and `blob_review_queue` on the database. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `blobs` will not find the blob as expected.
+  - The blob is considered dangling. The garbage collector deletes the blob from the storage backend and the corresponding rows from `blobs` and `gc_blob_review_queue` on the database. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `blobs` will not find the blob as expected.
 
 - The API acquires the lock first, stopping the garbage collector from reviewing the blob:
 
@@ -532,7 +532,7 @@ With synchronization in place, depending on which process acquires the lock firs
         
       ```sql
       UPDATE
-          blob_review_queue
+          gc_blob_review_queue
       SET
           review_after = review_after + INTERVAL '1 day'
       WHERE
@@ -544,9 +544,9 @@ With synchronization in place, depending on which process acquires the lock firs
 
     1. The API can then search for the blob in `blobs` and find it as expected.
 
-    1. Possibly in parallel with (2), the garbage collector attempts to pick and lock a record from `blob_review_queue`. This query would either return nothing or a record that is not the one postponed in (1).
+    1. Possibly in parallel with (2), the garbage collector attempts to pick and lock a record from `gc_blob_review_queue`. This query would either return nothing or a record that is not the one postponed in (1).
 
-Serializing operations with locks on `blob_review_queue` instead of `blobs` ensures that we do not need to acquire a lock for a blob unless it is in the process of being reviewed by the garbage collector. Because the review queue only contains references to a small subset of `blobs`, lookups are also faster this way.
+Serializing operations with locks on `gc_blob_review_queue` instead of `blobs` ensures that we do not need to acquire a lock for a blob unless it is in the process of being reviewed by the garbage collector. Because the review queue only contains references to a small subset of `blobs`, lookups are also faster this way.
 
 As a downside, the garbage collector needs to keep a transaction open (and the review record locked) for the run's duration, including the possible deletion from the remote storage backend. For this reason, we must ensure that the garbage collector will timeout and postpone the blob review if the delete from the storage backend takes more time than ideal. This will avoid keeping database transactions open and holding existence checks for too long. This timeout will be configurable and default to 2 seconds.
 
@@ -562,7 +562,7 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
        repository_id,
        manifest_id
    FROM
-       manifest_review_queue
+       gc_manifest_review_queue
    WHERE
        review_after < NOW()
    ORDER BY
@@ -597,7 +597,7 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
 3. If it's not eligible for deletion, remove it from the review queue and commit the transaction:
 
    ```sql
-   DELETE FROM manifest_review_queue
+   DELETE FROM gc_manifest_review_queue
    WHERE repository_id = $1
        AND manifest_id = $2;
    
@@ -619,7 +619,7 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
    2. Remove it from the review queue and commit the transaction:
 
       ```sql
-      DELETE FROM manifest_review_queue
+      DELETE FROM gc_manifest_review_queue
       WHERE repository_id = $1
           AND manifest_id = $2;
       
@@ -642,7 +642,7 @@ To avoid this, we need to synchronize the API and the garbage collector with exp
   SELECT
       *
   FROM
-      manifest_review_queue
+      gc_manifest_review_queue
   WHERE
       repository_id = ?
       AND manifest_id = ?
@@ -656,9 +656,9 @@ With synchronization in place, depending on which process acquires the lock firs
 
 - The garbage collector acquires the lock first, stopping the API from deleting a related tag until the manifest is determined to be eligible for deletion (and deleted) or not:
 
-  - The manifest is not dangling. The garbage collector deletes the review record from `manifest_review_queue` and commits the transaction. Once unlocked, the API will be able to delete the tag as expected;
+  - The manifest is not dangling. The garbage collector deletes the review record from `gc_manifest_review_queue` and commits the transaction. Once unlocked, the API will be able to delete the tag as expected;
 
-  - The manifest is considered dangling. The garbage collector deletes the corresponding rows from `manifests` and `manifest_review_queue` on the database. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `tags` will not find an entry as expected (deletes on `manifests` cascade to `tags`).
+  - The manifest is considered dangling. The garbage collector deletes the corresponding rows from `manifests` and `gc_manifest_review_queue` on the database. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `tags` will not find an entry as expected (deletes on `manifests` cascade to `tags`).
 
 - The API acquires the lock first, stopping the garbage collector from reviewing the manifest. The API can then delete the tag from `tags` and commit the transaction.
 
@@ -676,7 +676,7 @@ To avoid this, we need to synchronize the API and the garbage collector with exp
   SELECT
       *
   FROM
-      manifest_review_queue
+      gc_manifest_review_queue
   WHERE
       repository_id = ?
       AND manifest_id IN (?)
