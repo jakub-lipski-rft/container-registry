@@ -3,6 +3,9 @@
 - registry: Experimental PostgreSQL metadata database (incomplete, in progress)
 - registry/storage/cache/redis: Add size and maxlifetime pool settings
 
+### Changed
+- registry/storage: Upgrade Swift client to v1.0.52
+
 ### Fixed
 - registry/api: Fix tag delete response body
 
