@@ -1,6 +1,8 @@
 ## [Unreleased]
+
+## [v3.0.0-gitlab] - 2021-01-20
 ### Added
-- registry: Experimental PostgreSQL metadata database (incomplete, in progress)
+- registry: Experimental PostgreSQL metadata database (disabled by default)
 - registry/storage/cache/redis: Add size and maxlifetime pool settings
 
 ### Changed
