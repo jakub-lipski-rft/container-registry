@@ -91,7 +91,7 @@ func (ms *manifestStore) Get(ctx context.Context, dgst digest.Digest, options ..
 
 	var versioned manifest.Versioned
 	if err = json.Unmarshal(content, &versioned); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal manifest payload: %w", err)
 	}
 
 	switch versioned.SchemaVersion {
