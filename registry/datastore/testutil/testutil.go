@@ -20,6 +20,12 @@ import (
 // table represents a table in the test database.
 type table string
 
+// trigger represents a trigger in the test database.
+type trigger struct {
+	name  string
+	table table
+}
+
 const (
 	RepositoriesTable       table = "repositories"
 	MediaTypesTable         table = "media_types"
@@ -29,18 +35,27 @@ const (
 	RepositoryBlobsTable    table = "repository_blobs"
 	LayersTable             table = "layers"
 	TagsTable               table = "tags"
+	GCBlobReviewQueueTable  table = "gc_blob_review_queue"
 )
 
 // AllTables represents all tables in the test database.
-var AllTables = []table{
-	RepositoriesTable,
-	ManifestsTable,
-	ManifestReferencesTable,
-	BlobsTable,
-	RepositoryBlobsTable,
-	LayersTable,
-	TagsTable,
-}
+var (
+	AllTables = []table{
+		RepositoriesTable,
+		ManifestsTable,
+		ManifestReferencesTable,
+		BlobsTable,
+		RepositoryBlobsTable,
+		LayersTable,
+		TagsTable,
+		GCBlobReviewQueueTable,
+	}
+
+	GCTrackBlobUploadsTrigger = trigger{
+		name:  "gc_track_blob_uploads_trigger",
+		table: BlobsTable,
+	}
+)
 
 // truncate truncates t in the test database.
 func (t table) truncate(db *datastore.DB) error {
@@ -89,6 +104,15 @@ func (t table) DumpAsJSON(ctx context.Context, db datastore.Queryer) ([]byte, er
 	}
 
 	return dump, nil
+}
+
+// Disable disables a trigger in the test database. Returns a function that can be deferred to re-enable the trigger.
+func (t trigger) Disable(db *datastore.DB) (func() error, error) {
+	_, err := db.Exec(fmt.Sprintf("ALTER TABLE %s DISABLE TRIGGER %s", t.table, t.name))
+	return func() error {
+		_, err := db.Exec(fmt.Sprintf("ALTER TABLE %s ENABLE TRIGGER %s", t.table, t.name))
+		return err
+	}, err
 }
 
 // NewDSNFromEnv generates a new DSN for the test database based on environment variable configurations.

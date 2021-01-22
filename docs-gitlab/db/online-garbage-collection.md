@@ -64,7 +64,7 @@ Considering this, the repository will be left in an inconsistent state if an ima
 Because the manifest upload never occurred in these situations, there are no inserts in `gc_blobs_configurations` and/or `gc_blobs_layers` for the configuration and/or layer blobs. Considering this, to keep track of blobs uploaded during a failed/canceled image push, a row should be inserted in `gc_blob_review_queue` for every uploaded blob. This is accomplished with a trigger for inserts on the `blobs` table:
 
 ```sql
-CREATE FUNCTION public.gc_track_blob_uploads ()
+CREATE FUNCTION gc_track_blob_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -79,9 +79,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_blob_uploads_trigger
-    AFTER INSERT ON public.blobs
+    AFTER INSERT ON blobs
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_blob_uploads ();
+    EXECUTE PROCEDURE gc_track_blob_uploads ();
 ```
 
 As mentioned previously, by default, `review_after` is set to one day for all uploaded blobs, which means that clients have up to one day to complete an image upload. Otherwise, blobs will be garbage collected.

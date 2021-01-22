@@ -68,6 +68,10 @@ func overrideDynamicData(tb testing.TB, actual []byte) []byte {
 	re := regexp.MustCompile(`"created_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d*\+\d{2}:\d{2}"`)
 	actual = re.ReplaceAllLiteral(actual, []byte(`"created_at":"2020-04-15T12:04:28.95584"`))
 
+	// the review_after timestamps for the GC review queue entities change with every test run
+	re = regexp.MustCompile(`"review_after":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d*\+\d{2}:\d{2}"`)
+	actual = re.ReplaceAllLiteral(actual, []byte(`"review_after":"2020-04-16T12:04:28.95584"`))
+
 	// schema 1 manifests have `signature` and `protected` attributes that changes with every test run
 	re = regexp.MustCompile(`"signature": ".*"`)
 	actual = re.ReplaceAllLiteral(actual, []byte(`"signature": "lBzn6_e7f0mdqQXKhkRMdI"`))
