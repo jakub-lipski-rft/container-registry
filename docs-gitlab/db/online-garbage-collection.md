@@ -164,10 +164,7 @@ CREATE FUNCTION public.gc_track_manifest_uploads ()
     AS $$
 BEGIN
     INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (NEW.repository_id, NEW.id)
-    ON CONFLICT (repository_id, manifest_id)
-        DO UPDATE SET
-            review_after = now() + interval '1 day';
+        VALUES (NEW.repository_id, NEW.id);
     RETURN NULL;
 END;
 $$
