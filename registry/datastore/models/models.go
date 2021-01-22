@@ -61,3 +61,10 @@ type Blob struct {
 
 // Blobs is a slice of Blob pointers.
 type Blobs []*Blob
+
+// GCBlobTask represents a row in the gc_blob_review_queue table.
+type GCBlobTask struct {
+	ReviewAfter time.Time
+	ReviewCount int
+	Digest      digest.Digest
+}
