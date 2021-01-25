@@ -601,27 +601,19 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
    COMMIT;
    ```
 
-4. If it's eligible for deletion:
+4. If it's eligible for deletion, delete the corresponding row in the `manifests` table and commit the transaction:
 
-   1. Delete the corresponding row in the `manifests` table:
-
-      ```sql
-      DELETE FROM manifests
-      WHERE repository_id = $1
-          AND id = $2;
-      ```
+   ```sql
+   DELETE FROM manifests
+   WHERE repository_id = $1
+       AND id = $2;
+  
+   COMMIT;
+   ```
 
       The triggers described in [deleting a manifest](#deleting-a-manifest) will take care of queueing all the related blobs and child manifests (if deleting a manifest list) for review by the garbage collector.
-
-   2. Remove it from the review queue and commit the transaction:
-
-      ```sql
-      DELETE FROM gc_manifest_review_queue
-      WHERE repository_id = $1
-          AND manifest_id = $2;
-      
-      COMMIT;
-      ```
+    
+      Additionally, deletes on `manifests` cascade to `gc_manifest_review_queue`, so we do not need to manually delete the record from the review queue.
 
 #### Race conditions
 
@@ -655,7 +647,7 @@ With synchronization in place, depending on which process acquires the lock firs
 
   - The manifest is not dangling. The garbage collector deletes the review record from `gc_manifest_review_queue` and commits the transaction. Once unlocked, the API will be able to delete the tag as expected;
 
-  - The manifest is considered dangling. The garbage collector deletes the corresponding rows from `manifests` and `gc_manifest_review_queue` on the database. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `tags` will not find an entry as expected (deletes on `manifests` cascade to `tags`).
+  - The manifest is considered dangling. The garbage collector deletes the corresponding rows from `manifests` on the database, which cascades to `gc_manifest_review_queue`. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `tags` will not find an entry as expected (deletes on `manifests` cascade to `tags`).
 
 - The API acquires the lock first, stopping the garbage collector from reviewing the manifest. The API can then delete the tag from `tags` and commit the transaction.
 
