@@ -15,7 +15,8 @@ require (
 	github.com/go-redis/redis/v8 v8.4.8
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
-	github.com/lib/pq v1.9.0
+	github.com/jackc/pgx/v4 v4.10.1
+	github.com/lib/pq v1.9.0 // indirect
 	github.com/marstr/guid v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/ncw/swift v1.0.52
@@ -24,7 +25,6 @@ require (
 	github.com/opencontainers/image-spec v1.0.0
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rubenv/sql-migrate v0.0.0-20200616145509-8d140a17f351
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.6.1

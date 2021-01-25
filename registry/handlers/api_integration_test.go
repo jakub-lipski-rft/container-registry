@@ -2565,7 +2565,7 @@ func TestManifestAPI_Get_Schema1(t *testing.T) {
 			SchemaVersion: 1,
 			MediaType:     schema1.MediaTypeManifest,
 			Digest:        preseededSchema1Digest,
-			Payload:       nil,
+			Payload:       json.RawMessage{},
 		}
 
 		err = mStore.Create(env.ctx, dbManifest)

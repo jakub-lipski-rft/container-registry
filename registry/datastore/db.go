@@ -3,7 +3,6 @@ package datastore
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -12,11 +11,13 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/docker/distribution/configuration"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
 	"github.com/sirupsen/logrus"
 )
 
-const driverName = "postgres"
+const driverName = "pgx"
 
 // Queryer is the common interface to execute queries on a database.
 type Queryer interface {
@@ -30,42 +31,13 @@ type Queryer interface {
 type DB struct {
 	*sql.DB
 	dsn *DSN
-	log *statementLogger
-}
-
-func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	reportTime := db.log.statement(query, args...)
-	defer reportTime()
-
-	return db.DB.QueryContext(ctx, query, args...)
-}
-
-func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	reportTime := db.log.statement(query, args...)
-	defer reportTime()
-
-	return db.DB.QueryRowContext(ctx, query, args...)
-}
-
-func (db *DB) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
-	reportTime := db.log.statement(query)
-	defer reportTime()
-
-	return db.DB.PrepareContext(ctx, query)
-}
-
-func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	reportTime := db.log.statement(query)
-	defer reportTime()
-
-	return db.DB.ExecContext(ctx, query, args...)
 }
 
 // BeginTx wraps sql.Tx from the innner sql.DB within a datastore.Tx.
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 	tx, err := db.DB.BeginTx(ctx, opts)
 
-	return &Tx{tx, db.log}, err
+	return &Tx{tx}, err
 }
 
 // Begin wraps sql.Tx from the inner sql.DB within a datastore.Tx.
@@ -76,35 +48,6 @@ func (db *DB) Begin() (*Tx, error) {
 // Tx is a database transaction that implements Querier.
 type Tx struct {
 	*sql.Tx
-	log *statementLogger
-}
-
-func (tx *Tx) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-	reportTime := tx.log.statement(query, args...)
-	defer reportTime()
-
-	return tx.Tx.QueryContext(ctx, query, args...)
-}
-
-func (tx *Tx) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-	reportTime := tx.log.statement(query, args...)
-	defer reportTime()
-
-	return tx.Tx.QueryRowContext(ctx, query, args...)
-}
-
-func (tx *Tx) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
-	reportTime := tx.log.statement(query)
-	defer reportTime()
-
-	return tx.Tx.PrepareContext(ctx, query)
-}
-
-func (tx *Tx) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	reportTime := tx.log.statement(query, args...)
-	defer reportTime()
-
-	return tx.Tx.ExecContext(ctx, query, args...)
 }
 
 // DSN represents the Data Source Name parameters for a DB connection.
@@ -164,43 +107,10 @@ func (dsn *DSN) Address() string {
 	return net.JoinHostPort(dsn.Host, strconv.Itoa(dsn.Port))
 }
 
-// statementLogger allows queries to be pretty printed in debug mode without
-// incuring a significant performance penalty in production environments.
-type statementLogger struct {
-	*logrus.Entry
-}
-
-// statement logs the statement and its args returning a function which may
-// be deferred to log the execution time of the query.
-func (sl *statementLogger) statement(statement string, args ...interface{}) func() {
-	if !sl.Logger.IsLevelEnabled(logrus.DebugLevel) {
-		return func() {}
-	}
-
-	a := make([]interface{}, len(args))
-	whitespace := regexp.MustCompile(`\s+|\t+|\n+`)
-
-	// Copy args to prevent mutating the real payload as it is formatted.
-	for i := range args {
-		a[i] = args[i]
-
-		if payload, ok := a[i].(json.RawMessage); ok {
-			a[i] = whitespace.ReplaceAllString(string(payload), " ")
-		}
-	}
-
-	s := whitespace.ReplaceAllString(statement, " ")
-	l := sl.WithFields(logrus.Fields{"statement": s, "args": a})
-	start := time.Now()
-
-	return func() {
-		l.WithFields(logrus.Fields{"duration_us": time.Since(start).Microseconds()}).Debug("query")
-	}
-}
-
 type openOpts struct {
-	logger *logrus.Entry
-	pool   *PoolConfig
+	logger   *logrus.Entry
+	logLevel pgx.LogLevel
+	pool     *PoolConfig
 }
 
 type PoolConfig struct {
@@ -212,10 +122,31 @@ type PoolConfig struct {
 // OpenOption is used to pass options to Open.
 type OpenOption func(*openOpts)
 
-// WithLogger configures the logger for the database connection handler.
+// WithLogger configures the logger for the database connection driver.
 func WithLogger(l *logrus.Entry) OpenOption {
 	return func(opts *openOpts) {
 		opts.logger = l
+	}
+}
+
+// WithLogLevel configures the logger level for the database connection driver.
+func WithLogLevel(l configuration.Loglevel) OpenOption {
+	var lvl pgx.LogLevel
+	switch l {
+	case configuration.LogLevelTrace:
+		lvl = pgx.LogLevelTrace
+	case configuration.LogLevelDebug:
+		lvl = pgx.LogLevelDebug
+	case configuration.LogLevelInfo:
+		lvl = pgx.LogLevelInfo
+	case configuration.LogLevelWarn:
+		lvl = pgx.LogLevelWarn
+	default:
+		lvl = pgx.LogLevelError
+	}
+
+	return func(opts *openOpts) {
+		opts.logLevel = lvl
 	}
 }
 
@@ -225,8 +156,6 @@ func WithPoolConfig(c *PoolConfig) OpenOption {
 		opts.pool = c
 	}
 }
-
-var defaultLogger = logrus.New()
 
 func applyOptions(opts []OpenOption) openOpts {
 	log := logrus.New()
@@ -244,11 +173,74 @@ func applyOptions(opts []OpenOption) openOpts {
 	return config
 }
 
+type logger struct {
+	*logrus.Entry
+}
+
+// used to minify SQL statements on log entries by removing multiple spaces, tabs and new lines.
+var logMinifyPattern = regexp.MustCompile(`\s+|\t+|\n+`)
+
+// Log implements the pgx.Logger interface.
+func (l *logger) Log(_ context.Context, level pgx.LogLevel, msg string, data map[string]interface{}) {
+	// silence if debug level is not enabled, unless it's a warn or error
+	if !l.Logger.IsLevelEnabled(logrus.DebugLevel) && level != pgx.LogLevelWarn && level != pgx.LogLevelError {
+		return
+	}
+	var log *logrus.Entry
+	if data != nil {
+		// minify SQL statement, if any
+		if _, ok := data["sql"]; ok {
+			raw := fmt.Sprintf("%v", data["sql"])
+			data["sql"] = logMinifyPattern.ReplaceAllString(raw, " ")
+		}
+		// use milliseconds for query duration
+		if _, ok := data["time"]; ok {
+			raw := fmt.Sprintf("%v", data["time"])
+			d, err := time.ParseDuration(raw)
+			if err == nil { // this should never happen, but lets make sure to avoid panics and missing log entries
+				data["duration_ms"] = d.Milliseconds()
+				delete(data, "time")
+			}
+		}
+		// convert known keys to snake_case notation for consistency
+		if _, ok := data["rowCount"]; ok {
+			data["row_count"] = data["rowCount"]
+			delete(data, "rowCount")
+		}
+		log = l.WithFields(data)
+	} else {
+		log = l.Entry
+	}
+
+	switch level {
+	case pgx.LogLevelTrace:
+		log.Trace(msg)
+	case pgx.LogLevelDebug:
+		log.Debug(msg)
+	case pgx.LogLevelInfo:
+		log.Info(msg)
+	case pgx.LogLevelWarn:
+		log.Warn(msg)
+	case pgx.LogLevelError:
+		log.Error(msg)
+	default:
+		// this should never happen, but if it does, something went wrong and we need to notice it
+		log.WithField("invalid_log_level", level).Error(msg)
+	}
+}
+
 // Open creates a database connection handler.
 func Open(dsn *DSN, opts ...OpenOption) (*DB, error) {
 	config := applyOptions(opts)
+	pgxConfig, err := pgx.ParseConfig(dsn.String())
+	if err != nil {
+		return nil, err
+	}
+	pgxConfig.Logger = &logger{config.logger}
+	pgxConfig.LogLevel = config.logLevel
 
-	db, err := sql.Open(driverName, dsn.String())
+	connStr := stdlib.RegisterConnConfig(pgxConfig)
+	db, err := sql.Open(driverName, connStr)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +252,5 @@ func Open(dsn *DSN, opts ...OpenOption) (*DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
-
-	return &DB{db, dsn, &statementLogger{config.logger}}, nil
+	return &DB{db, dsn}, nil
 }

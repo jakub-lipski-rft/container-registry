@@ -277,6 +277,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			ConnectTimeout: config.Database.ConnectTimeout,
 		},
 			datastore.WithLogger(log.WithFields(logrus.Fields{"database": config.Database.DBName})),
+			datastore.WithLogLevel(config.Log.Level),
 			datastore.WithPoolConfig(&datastore.PoolConfig{
 				MaxIdle:     config.Database.Pool.MaxIdle,
 				MaxOpen:     config.Database.Pool.MaxOpen,
