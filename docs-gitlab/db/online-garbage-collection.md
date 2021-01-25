@@ -103,7 +103,7 @@ Whenever a manifest `M` is uploaded to repository `R`, we must record the associ
 Once a manifest is inserted in the `manifests` table, a corresponding row must be inserted in `gc_blobs_configurations`. This is done by a trigger:
 
 ```sql
-CREATE FUNCTION public.gc_track_configuration_blobs ()
+CREATE FUNCTION gc_track_configuration_blobs ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -119,9 +119,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_configuration_blobs_trigger
-    AFTER INSERT ON public.manifests
+    AFTER INSERT ON manifests
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_configuration_blobs ();
+    EXECUTE PROCEDURE gc_track_configuration_blobs ();
 ```
 
 ##### Layer blobs
