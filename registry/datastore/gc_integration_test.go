@@ -211,3 +211,75 @@ func TestGC_TrackConfigurationBlobs_DoesNothingIfTriggerDisabled(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, count)
 }
+
+func TestGC_TrackLayerBlobs(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err := rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create layer blob
+	bs := datastore.NewBlobStore(suite.db)
+	b := randomBlob(t)
+	err = bs.Create(suite.ctx, b)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// associate layer with manifest
+	err = ms.AssociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// Check that a corresponding row was created. This is done by the `gc_track_layer_blobs` trigger/function
+	brs := datastore.NewGCLayerLinkStore(suite.db)
+	ll, err := brs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ll))
+	require.NotEmpty(t, ll[0].ID)
+	require.Equal(t, r.ID, ll[0].RepositoryID)
+	require.Equal(t, int64(1), ll[0].LayerID)
+	require.Equal(t, b.Digest, ll[0].Digest)
+}
+
+func TestGC_TrackLayerBlobs_DoesNothingIfTriggerDisabled(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	enable, err := testutil.GCTrackLayerBlobsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create layer blob
+	bs := datastore.NewBlobStore(suite.db)
+	b := randomBlob(t)
+	err = bs.Create(suite.ctx, b)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// associate layer with manifest
+	err = ms.AssociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// check that no records were created
+	brs := datastore.NewGCConfigLinkStore(suite.db)
+	count, err := brs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
