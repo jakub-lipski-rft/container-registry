@@ -27,15 +27,16 @@ type trigger struct {
 }
 
 const (
-	RepositoriesTable       table = "repositories"
-	MediaTypesTable         table = "media_types"
-	ManifestsTable          table = "manifests"
-	ManifestReferencesTable table = "manifest_references"
-	BlobsTable              table = "blobs"
-	RepositoryBlobsTable    table = "repository_blobs"
-	LayersTable             table = "layers"
-	TagsTable               table = "tags"
-	GCBlobReviewQueueTable  table = "gc_blob_review_queue"
+	RepositoriesTable          table = "repositories"
+	MediaTypesTable            table = "media_types"
+	ManifestsTable             table = "manifests"
+	ManifestReferencesTable    table = "manifest_references"
+	BlobsTable                 table = "blobs"
+	RepositoryBlobsTable       table = "repository_blobs"
+	LayersTable                table = "layers"
+	TagsTable                  table = "tags"
+	GCBlobReviewQueueTable     table = "gc_blob_review_queue"
+	GCBlobsConfigurationsTable table = "gc_blobs_configurations"
 )
 
 // AllTables represents all tables in the test database.
@@ -49,11 +50,16 @@ var (
 		LayersTable,
 		TagsTable,
 		GCBlobReviewQueueTable,
+		GCBlobsConfigurationsTable,
 	}
 
 	GCTrackBlobUploadsTrigger = trigger{
 		name:  "gc_track_blob_uploads_trigger",
 		table: BlobsTable,
+	}
+	GCTrackConfigurationBlobsTrigger = trigger{
+		name:  "gc_track_configuration_blobs_trigger",
+		table: ManifestsTable,
 	}
 )
 

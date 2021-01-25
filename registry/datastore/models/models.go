@@ -68,3 +68,11 @@ type GCBlobTask struct {
 	ReviewCount int
 	Digest      digest.Digest
 }
+
+// GCConfigLink represents a row in the gc_blobs_configurations table.
+type GCConfigLink struct {
+	ID           int64
+	RepositoryID int64
+	ManifestID   int64
+	Digest       digest.Digest
+}
