@@ -521,6 +521,7 @@ func dbFromConfig(config *configuration.Configuration) (*datastore.DB, error) {
 		SSLRootCert: config.Database.SSLRootCert,
 	},
 		datastore.WithLogger(log.WithFields(log.Fields{"database": config.Database.DBName})),
+		datastore.WithLogLevel(config.Log.Level),
 		datastore.WithPoolConfig(&datastore.PoolConfig{
 			MaxIdle:     config.Database.Pool.MaxIdle,
 			MaxOpen:     config.Database.Pool.MaxOpen,
