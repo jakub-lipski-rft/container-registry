@@ -76,3 +76,11 @@ type GCConfigLink struct {
 	ManifestID   int64
 	Digest       digest.Digest
 }
+
+// GCLayerLink represents a row in the gc_blobs_layers table.
+type GCLayerLink struct {
+	ID           int64
+	RepositoryID int64
+	LayerID      int64
+	Digest       digest.Digest
+}

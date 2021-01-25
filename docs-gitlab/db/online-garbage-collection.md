@@ -129,7 +129,7 @@ CREATE TRIGGER gc_track_configuration_blobs_trigger
 The insertion of a manifest in the `manifests` table is followed by `N` inserts in the `layers` table, where `N` is the number of layers referenced by the manifest. A row should be inserted in `gc_blobs_layers` for each insert in the layers table to keep track of layer blobs:
 
 ```sql
-CREATE FUNCTION public.gc_track_layer_blobs ()
+CREATE FUNCTION gc_track_layer_blobs ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -143,9 +143,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_layer_blobs_trigger
-    AFTER INSERT ON public.layers
+    AFTER INSERT ON layers
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_layer_blobs ();
+    EXECUTE PROCEDURE gc_track_layer_blobs ();
 ```
 
 ##### Manifest

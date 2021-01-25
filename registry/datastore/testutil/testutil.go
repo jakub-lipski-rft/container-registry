@@ -37,6 +37,7 @@ const (
 	TagsTable                  table = "tags"
 	GCBlobReviewQueueTable     table = "gc_blob_review_queue"
 	GCBlobsConfigurationsTable table = "gc_blobs_configurations"
+	GCBlobsLayersTable         table = "gc_blobs_layers"
 )
 
 // AllTables represents all tables in the test database.
@@ -51,6 +52,7 @@ var (
 		TagsTable,
 		GCBlobReviewQueueTable,
 		GCBlobsConfigurationsTable,
+		GCBlobsLayersTable,
 	}
 
 	GCTrackBlobUploadsTrigger = trigger{
@@ -60,6 +62,10 @@ var (
 	GCTrackConfigurationBlobsTrigger = trigger{
 		name:  "gc_track_configuration_blobs_trigger",
 		table: ManifestsTable,
+	}
+	GCTrackLayerBlobsTrigger = trigger{
+		name:  "gc_track_layer_blobs_trigger",
+		table: LayersTable,
 	}
 )
 
