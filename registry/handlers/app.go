@@ -749,12 +749,12 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 				dcontext.GetLogger(context).Errorf("error serving error json: %v (from %v)", err, context.Errors)
 			}
 
-			app.logError(context, context.Errors)
+			app.logError(context, r, context.Errors)
 		}
 	})
 }
 
-func (app *App) logError(ctx context.Context, errors errcode.Errors) {
+func (app *App) logError(ctx context.Context, r *http.Request, errors errcode.Errors) {
 	for _, e := range errors {
 		var code errcode.ErrorCode
 		var message, detail string
@@ -790,7 +790,7 @@ func (app *App) logError(ctx context.Context, errors errcode.Errors) {
 				detailSuffix = fmt.Sprintf(": %s", detail)
 			}
 			err := errcode.ErrorCodeUnknown.WithMessage(fmt.Sprintf("%s%s", message, detailSuffix))
-			errortracking.Capture(err, errortracking.WithContext(ctx))
+			errortracking.Capture(err, errortracking.WithContext(ctx), errortracking.WithRequest(r))
 		}
 	}
 }
