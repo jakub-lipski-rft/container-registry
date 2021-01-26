@@ -88,97 +88,38 @@ type manifestHandler struct {
 // GetManifest fetches the image manifest from the storage backend, if it exists.
 func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) {
 	dcontext.GetLogger(imh).Debug("GetImageManifest")
-	manifestService, err := imh.Repository.Manifests(imh)
+
+	manifestGetter, err := imh.newManifestGetter(r)
 	if err != nil {
 		imh.Errors = append(imh.Errors, err)
 		return
 	}
-	var supports [numStorageTypes]bool
 
-	// this parsing of Accept headers is not quite as full-featured as godoc.org's parser, but we don't care about "q=" values
-	// https://github.com/golang/gddo/blob/e91d4165076d7474d20abda83f92d15c7ebc3e81/httputil/header/header.go#L165-L202
-	for _, acceptHeader := range r.Header["Accept"] {
-		// r.Header[...] is a slice in case the request contains the same header more than once
-		// if the header isn't set, we'll get the zero value, which "range" will handle gracefully
-
-		// we need to split each header value on "," to get the full list of "Accept" values (per RFC 2616)
-		// https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
-		for _, mediaType := range strings.Split(acceptHeader, ",") {
-			if mediaType, _, err = mime.ParseMediaType(mediaType); err != nil {
-				continue
-			}
-
-			if mediaType == schema2.MediaTypeManifest {
-				supports[manifestSchema2] = true
-			}
-			if mediaType == manifestlist.MediaTypeManifestList {
-				supports[manifestlistSchema] = true
-			}
-			if mediaType == v1.MediaTypeImageManifest {
-				supports[ociImageManifestSchema] = true
-			}
-			if mediaType == v1.MediaTypeImageIndex {
-				supports[ociImageIndexSchema] = true
-			}
-		}
-	}
-
-	var manifest distribution.Manifest
+	var (
+		manifest distribution.Manifest
+		getErr   error
+	)
 
 	if imh.Tag != "" {
-		var dgst digest.Digest
-		var dbErr error
-
-		if imh.Config.Database.Enabled {
-			manifest, dgst, dbErr = dbGetManifestByTag(imh.Context, imh.App.db, imh.Tag, imh.Repository.Named().Name())
-			if dbErr != nil {
-				// Use the common error handling code below.
-				err = dbErr
-			}
-		}
-
-		if !imh.Config.Database.Enabled || dbErr != nil {
-			var desc distribution.Descriptor
-
-			tags := imh.Repository.Tags(imh)
-			desc, err = tags.Get(imh, imh.Tag)
-			dgst = desc.Digest
-		}
-
-		if err != nil {
-			if errors.As(err, &distribution.ErrTagUnknown{}) ||
-				errors.Is(err, digest.ErrDigestInvalidFormat) ||
-				errors.As(err, &distribution.ErrManifestUnknown{}) {
-				// not found or with broken current/link (invalid digest)
-				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
-			} else {
-				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
-			}
-			return
-		}
-		imh.Digest = dgst
+		manifest, imh.Digest, getErr = manifestGetter.GetByTag(imh.Context, imh.Tag)
+	} else {
+		manifest, getErr = manifestGetter.GetByDigest(imh.Context, imh.Digest)
 	}
-
-	if etagMatch(r, imh.Digest.String()) {
-		w.WriteHeader(http.StatusNotModified)
+	if getErr != nil {
+		switch {
+		case errors.Is(getErr, errETagMatches):
+			w.WriteHeader(http.StatusNotModified)
+		case errors.As(getErr, &distribution.ErrManifestUnknownRevision{}),
+			errors.As(getErr, &distribution.ErrManifestUnknown{}),
+			errors.Is(getErr, digest.ErrDigestInvalidFormat),
+			errors.As(getErr, &distribution.ErrTagUnknown{}):
+			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(getErr))
+		case errors.Is(getErr, distribution.ErrSchemaV1Unsupported):
+			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithMessage("Schema 1 manifest not supported"))
+		default:
+			imh.Errors = append(imh.Errors, errcode.FromUnknownError(getErr))
+		}
 		return
-	}
-
-	// The manifest will be nil if we retrieved the tag from the filesystem or
-	// the manifest is being referenced by digest.
-	if manifest == nil {
-		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, imh.Digest, imh.Tag, imh.Repository.Named().Name(), imh.Config.Database.Enabled)
-		if err != nil {
-			switch {
-			case errors.As(err, &distribution.ErrManifestUnknownRevision{}):
-				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
-			case errors.Is(err, distribution.ErrSchemaV1Unsupported):
-				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithMessage("Schema 1 manifest not supported"))
-			default:
-				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
-			}
-			return
-		}
 	}
 
 	// determine the type of the returned manifest
@@ -201,51 +142,30 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestInvalid.WithMessage("Schema 1 manifest not supported"))
 		return
 	}
-	if manifestType == ociImageManifestSchema && !supports[ociImageManifestSchema] {
+	if manifestType == ociImageManifestSchema && !supports(r, ociImageManifestSchema) {
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithMessage("OCI manifest found, but accept header does not support OCI manifests"))
 		return
 	}
-	if manifestType == ociImageIndexSchema && !supports[ociImageIndexSchema] {
+	if manifestType == ociImageIndexSchema && !supports(r, ociImageIndexSchema) {
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithMessage("OCI index found, but accept header does not support OCI indexes"))
 		return
 	}
 
 	// Only rewrite manifests lists when they are being fetched by tag. If they
 	// are being fetched by digest, we can't return something not matching the digest.
-	if imh.Tag != "" && manifestType == manifestlistSchema && !supports[manifestlistSchema] {
-		log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
-			"manifest_list_digest": imh.Digest.String(),
-			"default_arch":         defaultArch,
-			"default_os":           defaultOS})
-		log.Info("client does not advertise support for manifest lists, selecting a manifest image for the default arch and os")
-
-		// Find the image manifest corresponding to the default platform.
-		var manifestDigest digest.Digest
-		for _, manifestDescriptor := range manifestList.Manifests {
-			if manifestDescriptor.Platform.Architecture == defaultArch && manifestDescriptor.Platform.OS == defaultOS {
-				manifestDigest = manifestDescriptor.Digest
-				break
-			}
-		}
-
-		if manifestDigest == "" {
-			imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(
-				fmt.Errorf("manifest list %s does not contain a manifest image for the platform %s/%s",
-					imh.Digest, defaultOS, defaultArch)))
-			return
-		}
-
-		manifest, err = dbGetManifestFilesystemFallback(imh.Context, imh.App.db, manifestService, manifestDigest, "", imh.Repository.Named().Name(), imh.Config.Database.Enabled)
+	if imh.Tag != "" && manifestType == manifestlistSchema && !supports(r, manifestlistSchema) {
+		manifest, err = imh.rewriteManifestList(manifestList)
 		if err != nil {
-			if _, ok := err.(distribution.ErrManifestUnknownRevision); ok {
+			switch err := err.(type) {
+			case distribution.ErrManifestUnknownRevision:
 				imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown.WithDetail(err))
-			} else {
+			case errcode.Error:
+				imh.Errors = append(imh.Errors, err)
+			default:
 				imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
 			}
 			return
 		}
-
-		imh.Digest = manifestDigest
 	}
 
 	ct, p, err := manifest.Payload()
@@ -260,82 +180,140 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 	w.Write(p)
 }
 
-// dbGetManifestFilesystemFallback returns a distribution manifest by digest
-// for the given repository. Reads from the database if enabled, otherwise the
-// manifest will be retrieved from the filesytem.
-func dbGetManifestFilesystemFallback(
-	ctx context.Context,
-	db datastore.Queryer,
-	fsManifests distribution.ManifestService,
-	dgst digest.Digest,
-	tag, path string,
-	dbEnabled bool) (distribution.Manifest, error) {
-	if dbEnabled {
-		return dbGetManifest(ctx, db, dgst, path)
-	}
+func supports(req *http.Request, st storageType) bool {
+	// this parsing of Accept headers is not quite as full-featured as godoc.org's parser, but we don't care about "q=" values
+	// https://github.com/golang/gddo/blob/e91d4165076d7474d20abda83f92d15c7ebc3e81/httputil/header/header.go#L165-L202
+	for _, acceptHeader := range req.Header["Accept"] {
+		// r.Header[...] is a slice in case the request contains the same header more than once
+		// if the header isn't set, we'll get the zero value, which "range" will handle gracefully
 
-	var options []distribution.ManifestServiceOption
-	if tag != "" {
-		options = append(options, distribution.WithTag(tag))
-	}
+		// we need to split each header value on "," to get the full list of "Accept" values (per RFC 2616)
+		// https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1
+		for _, rawMT := range strings.Split(acceptHeader, ",") {
+			mediaType, _, err := mime.ParseMediaType(rawMT)
+			if err != nil {
+				continue
+			}
 
-	return fsManifests.Get(ctx, dgst, options...)
-}
-
-func dbGetManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, path string) (distribution.Manifest, error) {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "digest": dgst})
-	log.Debug("getting manifest by digest from database")
-
-	repositoryStore := datastore.NewRepositoryStore(db)
-	r, err := repositoryStore.FindByPath(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	if r == nil {
-		log.Warn("repository not found in database")
-		return nil, distribution.ErrManifestUnknownRevision{
-			Name:     path,
-			Revision: dgst,
+			switch st {
+			// Schema2 manifests are supported by default, so there's no need to
+			// confirm support for them.
+			case manifestSchema2:
+				return true
+			case manifestlistSchema:
+				if mediaType == manifestlist.MediaTypeManifestList {
+					return true
+				}
+			case ociImageManifestSchema:
+				if mediaType == v1.MediaTypeImageManifest {
+					return true
+				}
+			case ociImageIndexSchema:
+				if mediaType == v1.MediaTypeImageIndex {
+					return true
+				}
+			}
 		}
 	}
 
-	// Find manifest by its digest
-	dbManifest, err := repositoryStore.FindManifestByDigest(ctx, r, dgst)
-	if err != nil {
-		return nil, err
-	}
-	if dbManifest == nil {
-		return nil, distribution.ErrManifestUnknownRevision{
-			Name:     path,
-			Revision: dgst,
+	return false
+}
+
+func (imh *manifestHandler) rewriteManifestList(manifestList *manifestlist.DeserializedManifestList) (distribution.Manifest, error) {
+	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
+		"manifest_list_digest": imh.Digest.String(),
+		"default_arch":         defaultArch,
+		"default_os":           defaultOS})
+	log.Info("client does not advertise support for manifest lists, selecting a manifest image for the default arch and os")
+
+	// Find the image manifest corresponding to the default platform.
+	var manifestDigest digest.Digest
+	for _, manifestDescriptor := range manifestList.Manifests {
+		if manifestDescriptor.Platform.Architecture == defaultArch && manifestDescriptor.Platform.OS == defaultOS {
+			manifestDigest = manifestDescriptor.Digest
+			break
 		}
 	}
 
-	return dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion)
+	if manifestDigest == "" {
+		return nil, v2.ErrorCodeManifestUnknown.WithDetail(
+			fmt.Errorf("manifest list %s does not contain a manifest image for the platform %s/%s",
+				imh.Digest, defaultOS, defaultArch))
+	}
+
+	// TODO: We're passing an empty request here to skip etag matching logic.
+	// This should be handled more cleanly.
+	manifestGetter, err := imh.newManifestGetter(&http.Request{})
+	if err != nil {
+		return nil, err
+	}
+
+	manifest, err := manifestGetter.GetByDigest(imh.Context, manifestDigest)
+	if err != nil {
+		return nil, err
+	}
+
+	imh.Digest = manifestDigest
+
+	return manifest, nil
 }
 
-func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName string, path string) (distribution.Manifest, digest.Digest, error) {
-	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "tag": tagName})
+var errETagMatches = errors.New("etag matches")
+
+func (imh *manifestHandler) newManifestGetter(req *http.Request) (manifestGetter, error) {
+	if imh.Config.Database.Enabled {
+		return newDBManifestGetter(imh, req)
+	}
+
+	return newFSManifestGetter(imh, req)
+}
+
+type manifestGetter interface {
+	GetByTag(context.Context, string) (distribution.Manifest, digest.Digest, error)
+	GetByDigest(context.Context, digest.Digest) (distribution.Manifest, error)
+}
+
+type dbManifestGetter struct {
+	datastore.RepositoryStore
+	repoPath string
+	req      *http.Request
+}
+
+func newDBManifestGetter(imh *manifestHandler, req *http.Request) (*dbManifestGetter, error) {
+	return &dbManifestGetter{
+		RepositoryStore: datastore.NewRepositoryStore(imh.App.db),
+		repoPath:        imh.Repository.Named().Name(),
+		req:             req,
+	}, nil
+}
+
+func (g *dbManifestGetter) GetByTag(ctx context.Context, tagName string) (distribution.Manifest, digest.Digest, error) {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": g.repoPath, "tag": tagName})
 	log.Debug("getting manifest by tag from database")
 
-	repositoryStore := datastore.NewRepositoryStore(db)
-	r, err := repositoryStore.FindByPath(ctx, path)
+	dbRepo, err := g.FindByPath(ctx, g.repoPath)
 	if err != nil {
 		return nil, "", err
 	}
-	if r == nil {
+
+	if dbRepo == nil {
 		log.Warn("repository not found in database")
 		return nil, "", distribution.ErrTagUnknown{Tag: tagName}
 	}
 
-	dbManifest, err := repositoryStore.FindManifestByTagName(ctx, r, tagName)
+	dbManifest, err := g.FindManifestByTagName(ctx, dbRepo, tagName)
 	if err != nil {
 		return nil, "", err
 	}
+
 	// at the DB level a tag has a FK to manifests, so a tag cannot exist unless it points to an existing manifest
 	if dbManifest == nil {
 		log.Warn("tag not found in database")
 		return nil, "", distribution.ErrTagUnknown{Tag: tagName}
+	}
+
+	if etagMatch(g.req, dbManifest.Digest.String()) {
+		return nil, dbManifest.Digest, errETagMatches
 	}
 
 	manifest, err := dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion)
@@ -344,6 +322,87 @@ func dbGetManifestByTag(ctx context.Context, db datastore.Queryer, tagName strin
 	}
 
 	return manifest, dbManifest.Digest, nil
+}
+
+func (g *dbManifestGetter) GetByDigest(ctx context.Context, dgst digest.Digest) (distribution.Manifest, error) {
+	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": g.repoPath, "digest": dgst})
+	log.Debug("getting manifest by digest from database")
+
+	if etagMatch(g.req, dgst.String()) {
+		return nil, errETagMatches
+	}
+
+	dbRepo, err := g.FindByPath(ctx, g.repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if dbRepo == nil {
+		log.Warn("repository not found in database")
+		return nil, distribution.ErrManifestUnknownRevision{
+			Name:     g.repoPath,
+			Revision: dgst,
+		}
+	}
+
+	// Find manifest by its digest
+	dbManifest, err := g.FindManifestByDigest(ctx, dbRepo, dgst)
+	if err != nil {
+		return nil, err
+	}
+	if dbManifest == nil {
+		return nil, distribution.ErrManifestUnknownRevision{
+			Name:     g.repoPath,
+			Revision: dgst,
+		}
+	}
+
+	return dbPayloadToManifest(dbManifest.Payload, dbManifest.MediaType, dbManifest.SchemaVersion)
+}
+
+type fsManifestGetter struct {
+	ms  distribution.ManifestService
+	ts  distribution.TagService
+	req *http.Request
+}
+
+func newFSManifestGetter(imh *manifestHandler, r *http.Request) (*fsManifestGetter, error) {
+	manifestService, err := imh.Repository.Manifests(imh)
+	if err != nil {
+		return nil, err
+	}
+
+	return &fsManifestGetter{
+		ts:  imh.Repository.Tags(imh),
+		ms:  manifestService,
+		req: r,
+	}, nil
+}
+
+func (g *fsManifestGetter) GetByTag(ctx context.Context, tagName string) (distribution.Manifest, digest.Digest, error) {
+	desc, err := g.ts.Get(ctx, tagName)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if etagMatch(g.req, desc.Digest.String()) {
+		return nil, desc.Digest, errETagMatches
+	}
+
+	mfst, err := g.GetByDigest(ctx, desc.Digest)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return mfst, desc.Digest, nil
+}
+
+func (g *fsManifestGetter) GetByDigest(ctx context.Context, dgst digest.Digest) (distribution.Manifest, error) {
+	if etagMatch(g.req, dgst.String()) {
+		return nil, errETagMatches
+	}
+
+	return g.ms.Get(ctx, dgst)
 }
 
 func dbPayloadToManifest(payload []byte, mediaType string, schemaVersion int) (distribution.Manifest, error) {
