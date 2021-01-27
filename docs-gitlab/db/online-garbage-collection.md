@@ -227,7 +227,7 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE FUNCTION public.gc_track_deleted_layers ()
+CREATE FUNCTION gc_track_deleted_layers ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -247,9 +247,9 @@ CREATE TRIGGER gc_track_deleted_manifests_trigger
     EXECUTE PROCEDURE gc_track_deleted_manifests ();
 
 CREATE TRIGGER gc_track_deleted_layers_trigger
-    AFTER DELETE ON public.layers
+    AFTER DELETE ON layers
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_deleted_layers ();
+    EXECUTE PROCEDURE gc_track_deleted_layers ();
 ```
 
 #### Manifest lists
