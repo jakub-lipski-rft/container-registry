@@ -163,7 +163,8 @@ CREATE TABLE gc_manifest_review_queue (
     manifest_id bigint NOT NULL,
     review_after timestamp with time zone NOT NULL DEFAULT now() + interval '1 day',
     review_count integer NOT NULL DEFAULT 0,
-    CONSTRAINT pk_gc_manifest_review_queue PRIMARY KEY (repository_id, manifest_id)
+    CONSTRAINT pk_gc_manifest_review_queue PRIMARY KEY (repository_id, manifest_id),
+    CONSTRAINT fk_gc_manifest_review_queue_repo_id_and_manifest_id_manifests FOREIGN KEY (repository_id, manifest_id) REFERENCES manifests (repository_id, id) ON DELETE CASCADE
 );
 CREATE INDEX index_gc_manifest_review_queue_on_review_after ON gc_manifest_review_queue USING btree (review_after);
 
