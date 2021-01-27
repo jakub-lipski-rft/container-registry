@@ -77,6 +77,10 @@ var (
 		name:  "gc_track_deleted_manifests_trigger",
 		table: ManifestsTable,
 	}
+	GCTrackDeletedLayersTrigger = trigger{
+		name:  "gc_track_deleted_layers_trigger",
+		table: LayersTable,
+	}
 )
 
 // truncate truncates t in the test database.

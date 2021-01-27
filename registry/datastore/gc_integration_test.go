@@ -481,3 +481,149 @@ func TestGC_TrackDeletedManifests_DoesNothingIfTriggerDisabled(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, count)
 }
+
+func TestGC_TrackDeletedLayers(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// disable other triggers that also insert on gc_blob_review_queue so that they don't interfere with this test
+	enable, err := testutil.GCTrackBlobUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create layer blob
+	bs := datastore.NewBlobStore(suite.db)
+	b := randomBlob(t)
+	err = bs.Create(suite.ctx, b)
+	require.NoError(t, err)
+	err = rs.LinkBlob(suite.ctx, r, b.Digest)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// associate layer with manifest
+	err = ms.AssociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// confirm that the review queue remains empty
+	brs := datastore.NewGCBlobTaskStore(suite.db)
+	count, err := brs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+
+	// dissociate layer blob
+	err = ms.DissociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// check that a corresponding task was created for the layer blob and scheduled for 1 day ahead
+	tt, err := brs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(tt))
+	require.Equal(t, 0, tt[0].ReviewCount)
+	require.Equal(t, b.Digest, tt[0].Digest)
+	// ignore the few milliseconds between blob creation and queueing for review in response to the layer dissociation
+	require.WithinDuration(t, tt[0].ReviewAfter, b.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+}
+
+func TestGC_TrackDeletedLayers_PostponeReviewOnConflict(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err := rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create layer blob
+	bs := datastore.NewBlobStore(suite.db)
+	b := randomBlob(t)
+	err = bs.Create(suite.ctx, b)
+	require.NoError(t, err)
+	err = rs.LinkBlob(suite.ctx, r, b.Digest)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// associate layer with manifest
+	err = ms.AssociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// grab existing review record (created by the gc_track_blob_uploads_trigger trigger)
+	brs := datastore.NewGCBlobTaskStore(suite.db)
+	rr, err := brs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr))
+
+	// dissociate layer blob
+	err = ms.DissociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// check that we still have only one review record but its due date was postponed to now (delete time) + 1 day
+	rr2, err := brs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr2))
+	require.Equal(t, rr[0].ReviewCount, rr2[0].ReviewCount)
+	require.Equal(t, rr[0].Digest, rr2[0].Digest)
+	// this is fast, so review_after is only a few milliseconds ahead of the original time
+	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
+	require.LessOrEqual(t, rr2[0].ReviewAfter.Sub(rr[0].ReviewAfter).Milliseconds(), int64(100))
+}
+
+func TestGC_TrackDeletedLayers_DoesNothingIfTriggerDisabled(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	enable, err := testutil.GCTrackDeletedLayersTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+	// disable other triggers that also insert on gc_blob_review_queue so that they don't interfere with this test
+	enable, err = testutil.GCTrackBlobUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create layer blob
+	bs := datastore.NewBlobStore(suite.db)
+	b := randomBlob(t)
+	err = bs.Create(suite.ctx, b)
+	require.NoError(t, err)
+	err = rs.LinkBlob(suite.ctx, r, b.Digest)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// associate layer with manifest
+	err = ms.AssociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// dissociate layer blob
+	err = ms.DissociateLayerBlob(suite.ctx, m, b)
+	require.NoError(t, err)
+
+	// check that no review records were created
+	brs := datastore.NewGCBlobTaskStore(suite.db)
+	count, err := brs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
