@@ -84,3 +84,11 @@ type GCLayerLink struct {
 	LayerID      int64
 	Digest       digest.Digest
 }
+
+// GCManifestTask represents a row in the gc_manifest_review_queue table.
+type GCManifestTask struct {
+	RepositoryID int64
+	ManifestID   int64
+	ReviewAfter  time.Time
+	ReviewCount  int
+}
