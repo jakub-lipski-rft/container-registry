@@ -211,7 +211,7 @@ When deleting a manifest in a repository, the configuration (if any) and layer b
 This can be accomplished with a trigger for deletes on `manifests` and `layers`:
 
 ```sql
-CREATE FUNCTION public.gc_track_deleted_manifests ()
+CREATE FUNCTION gc_track_deleted_manifests ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -242,9 +242,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_deleted_manifests_trigger
-    AFTER DELETE ON public.manifests
+    AFTER DELETE ON manifests
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_deleted_manifests ();
+    EXECUTE PROCEDURE gc_track_deleted_manifests ();
 
 CREATE TRIGGER gc_track_deleted_layers_trigger
     AFTER DELETE ON public.layers
