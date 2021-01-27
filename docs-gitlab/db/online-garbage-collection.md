@@ -159,7 +159,7 @@ We need to keep track of manifests pushed by digest and have the garbage collect
 For this reason, similar to how blob uploads are tracked, whenever a manifest is uploaded, we should insert a row in the `gc_manifest_review_queue` table. This can be accomplished with a trigger for inserts on `manifests`:
 
 ```sql
-CREATE FUNCTION public.gc_track_manifest_uploads ()
+CREATE FUNCTION gc_track_manifest_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -171,9 +171,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_manifest_uploads_trigger
-    AFTER INSERT ON public.manifests
+    AFTER INSERT ON manifests
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_manifest_uploads ();
+    EXECUTE PROCEDURE gc_track_manifest_uploads ();
 ```
 
 By default, `review_after` is set to one day, which means that users have up to one day to tag that manifest or reference it in a manifest list. Otherwise, the manifest will be deleted, and its referenced blobs **may** be as well.

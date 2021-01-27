@@ -124,7 +124,7 @@ func TestGC_TrackBlobUploads_PostponeReviewOnConflict(t *testing.T) {
 	require.Equal(t, rr[0].Digest, rr2[0].Digest)
 	// this is fast, so review_after is only a few milliseconds ahead of the original time
 	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
-	require.LessOrEqual(t, rr2[0].ReviewAfter.Sub(rr[0].ReviewAfter).Milliseconds(), int64(100))
+	require.WithinDuration(t, rr[0].ReviewAfter, rr2[0].ReviewAfter, 100*time.Millisecond)
 }
 
 func TestGC_TrackBlobUploads_DoesNothingIfTriggerDisabled(t *testing.T) {
@@ -280,6 +280,61 @@ func TestGC_TrackLayerBlobs_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// check that no records were created
 	brs := datastore.NewGCConfigLinkStore(suite.db)
 	count, err := brs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
+
+func TestGC_TrackManifestUploads(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// create repository
+	rs := datastore.NewRepositoryStore(suite.db)
+	r := randomRepository(t)
+	err := rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// Check that a corresponding task was created and scheduled for 1 day ahead. This is done by the
+	// `gc_track_manifest_uploads` trigger/function
+	brs := datastore.NewGCManifestTaskStore(suite.db)
+	tt, err := brs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(tt))
+	require.Equal(t, &models.GCManifestTask{
+		RepositoryID: r.ID,
+		ManifestID:   m.ID,
+		ReviewAfter:  m.CreatedAt.Add(24 * time.Hour),
+		ReviewCount:  0,
+	}, tt[0])
+}
+
+func TestGC_TrackManifestUploads_DoesNothingIfTriggerDisabled(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	enable, err := testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repository
+	rs := datastore.NewRepositoryStore(suite.db)
+	r := randomRepository(t)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// check that no review records were created
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	count, err := mrs.Count(suite.ctx)
 	require.NoError(t, err)
 	require.Zero(t, count)
 }

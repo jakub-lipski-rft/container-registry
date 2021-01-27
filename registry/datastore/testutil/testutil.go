@@ -38,6 +38,7 @@ const (
 	GCBlobReviewQueueTable     table = "gc_blob_review_queue"
 	GCBlobsConfigurationsTable table = "gc_blobs_configurations"
 	GCBlobsLayersTable         table = "gc_blobs_layers"
+	GCManifestReviewQueueTable table = "gc_manifest_review_queue"
 )
 
 // AllTables represents all tables in the test database.
@@ -53,6 +54,7 @@ var (
 		GCBlobReviewQueueTable,
 		GCBlobsConfigurationsTable,
 		GCBlobsLayersTable,
+		GCManifestReviewQueueTable,
 	}
 
 	GCTrackBlobUploadsTrigger = trigger{
@@ -66,6 +68,10 @@ var (
 	GCTrackLayerBlobsTrigger = trigger{
 		name:  "gc_track_layer_blobs_trigger",
 		table: LayersTable,
+	}
+	GCTrackManifestUploadsTrigger = trigger{
+		name:  "gc_track_manifest_uploads_trigger",
+		table: ManifestsTable,
 	}
 	GCTrackDeletedManifestsTrigger = trigger{
 		name:  "gc_track_deleted_manifests_trigger",
