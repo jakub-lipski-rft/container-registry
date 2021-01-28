@@ -15,7 +15,6 @@ import (
 )
 
 func reloadManifestFixtures(tb testing.TB) {
-	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.GCManifestReviewQueueTable)) // TODO: Remove once https://gitlab.com/gitlab-org/container-registry/-/merge_requests/497 is merged.
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		// Manifest has a relationship with Repository and ManifestLayer (insert order matters)
