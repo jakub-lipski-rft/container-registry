@@ -627,6 +627,147 @@ func TestGC_TrackDeletedLayers_DoesNothingIfTriggerDisabled(t *testing.T) {
 	require.Zero(t, count)
 }
 
+func TestGC_TrackDeletedManifestLists(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// disable other triggers that also insert on gc_manifest_review_queue so that they don't interfere with this test
+	enable, err := testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// create manifest list
+	ml := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, ml)
+	require.NoError(t, err)
+	err = ms.AssociateManifest(suite.ctx, ml, m)
+	require.NoError(t, err)
+
+	// confirm that the review queue remains empty
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	count, err := mrs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+
+	// delete manifest list
+	ok, err := rs.DeleteManifest(suite.ctx, r, ml.Digest)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// Check that a corresponding task was created and scheduled for 1 day ahead. This is done by the
+	// `gc_track_deleted_manifest_lists` trigger/function
+	rr, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr))
+	require.Equal(t, r.ID, rr[0].RepositoryID)
+	require.Equal(t, m.ID, rr[0].ManifestID)
+	require.Equal(t, 0, rr[0].ReviewCount)
+	// ignore the few milliseconds between now and queueing for review in response to the manifest list delete
+	require.WithinDuration(t, rr[0].ReviewAfter, time.Now().Add(24*time.Hour), 100*time.Millisecond)
+}
+
+func TestGC_TrackDeletedManifestLists_PostponeReviewOnConflict(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err := rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// create manifest list
+	ml := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, ml)
+	require.NoError(t, err)
+	err = ms.AssociateManifest(suite.ctx, ml, m)
+	require.NoError(t, err)
+
+	// Grab existing review records, one for the manifest and another for the manifest list (created by the
+	// gc_track_manifest_uploads trigger)
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	rr, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(rr))
+
+	// Grab the review record for the child manifest
+	require.Equal(t, m.ID, rr[0].ManifestID)
+
+	// delete manifest list
+	ok, err := rs.DeleteManifest(suite.ctx, r, ml.Digest)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// check that we still have only one review record for m but its due date was postponed to now (delete time) + 1 day
+	rr2, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr2)) // the manifest list delete cascaded and deleted its review record as well
+	require.Equal(t, rr[0].RepositoryID, rr2[0].RepositoryID)
+	require.Equal(t, rr[0].ManifestID, rr2[0].ManifestID)
+	require.Equal(t, rr[0].ReviewCount, rr2[0].ReviewCount)
+	// review_after should be a few milliseconds ahead of the original time
+	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
+	require.WithinDuration(t, rr2[0].ReviewAfter, rr[0].ReviewAfter, 100*time.Millisecond)
+}
+
+func TestGC_TrackDeletedManifestLists_DoesNothingIfTriggerDisabled(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	enable, err := testutil.GCTrackDeletedManifestListsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+	// disable other triggers that also insert on gc_manifest_review_queue so that they don't interfere with this test
+	enable, err = testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// create manifest list
+	ml := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, ml)
+	require.NoError(t, err)
+	err = ms.AssociateManifest(suite.ctx, ml, m)
+	require.NoError(t, err)
+
+	// delete manifest list
+	ok, err := rs.DeleteManifest(suite.ctx, r, ml.Digest)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// check that no review records were created
+	brs := datastore.NewGCManifestTaskStore(suite.db)
+	count, err := brs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
+
 func TestGC_TrackSwitchedTags(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
