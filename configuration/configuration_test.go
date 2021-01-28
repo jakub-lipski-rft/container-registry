@@ -1197,6 +1197,22 @@ database:
 	testParameter(t, yml, "REGISTRY_DATABASE_SSLROOTCERT", tt, validator)
 }
 
+func TestParseDatabase_PreparedStatements(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  preparedstatements: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Database.PreparedStatements))
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_PREPAREDSTATEMENTS", tt, validator)
+}
+
 func TestParseDatabasePool_MaxIdle(t *testing.T) {
 	yml := `
 version: 0.1

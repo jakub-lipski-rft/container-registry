@@ -3,7 +3,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/docker/distribution/manifest/schema2"
@@ -32,7 +31,7 @@ func TestDeleteTagDB(t *testing.T) {
 		SchemaVersion: 2,
 		MediaType:     schema2.MediaTypeManifest,
 		Digest:        "sha256:bca3c0bf2ca0cde987ad9cab2dac986047a0ccff282f1b23df282ef05e3a10a6",
-		Payload:       json.RawMessage{},
+		Payload:       models.Payload{},
 	}
 	err = mStore.Create(env.ctx, m)
 	require.NoError(t, err)

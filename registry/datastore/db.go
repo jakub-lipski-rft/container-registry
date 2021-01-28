@@ -108,9 +108,10 @@ func (dsn *DSN) Address() string {
 }
 
 type openOpts struct {
-	logger   *logrus.Entry
-	logLevel pgx.LogLevel
-	pool     *PoolConfig
+	logger               *logrus.Entry
+	logLevel             pgx.LogLevel
+	pool                 *PoolConfig
+	preferSimpleProtocol bool
 }
 
 type PoolConfig struct {
@@ -154,6 +155,15 @@ func WithLogLevel(l configuration.Loglevel) OpenOption {
 func WithPoolConfig(c *PoolConfig) OpenOption {
 	return func(opts *openOpts) {
 		opts.pool = c
+	}
+}
+
+// WithPreparedStatements configures the settings to allow the database
+// driver to use prepared statements.
+func WithPreparedStatements(b bool) OpenOption {
+	return func(opts *openOpts) {
+		// Registry configuration uses opposite semantics as pgx for prepared statements.
+		opts.preferSimpleProtocol = !b
 	}
 }
 
@@ -238,6 +248,7 @@ func Open(dsn *DSN, opts ...OpenOption) (*DB, error) {
 	}
 	pgxConfig.Logger = &logger{config.logger}
 	pgxConfig.LogLevel = config.logLevel
+	pgxConfig.PreferSimpleProtocol = config.preferSimpleProtocol
 
 	connStr := stdlib.RegisterConnConfig(pgxConfig)
 	db, err := sql.Open(driverName, connStr)

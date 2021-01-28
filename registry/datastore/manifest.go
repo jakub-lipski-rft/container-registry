@@ -3,7 +3,6 @@ package datastore
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -50,7 +49,7 @@ func NewManifestStore(db Queryer) *manifestStore {
 func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 	var dgst Digest
 	var cfgDigest, cfgMediaType sql.NullString
-	var cfgPayload *json.RawMessage
+	var cfgPayload *models.Payload
 	m := new(models.Manifest)
 
 	err := row.Scan(&m.ID, &m.RepositoryID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &cfgMediaType, &cfgDigest, &cfgPayload, &m.CreatedAt)
@@ -90,7 +89,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 	for rows.Next() {
 		var dgst Digest
 		var cfgDigest, cfgMediaType sql.NullString
-		var cfgPayload *json.RawMessage
+		var cfgPayload *models.Payload
 		m := new(models.Manifest)
 
 		err := rows.Scan(&m.ID, &m.RepositoryID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &cfgMediaType, &cfgDigest, &cfgPayload, &m.CreatedAt)
@@ -319,7 +318,7 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 
 	var configDgst sql.NullString
 	var configMediaTypeID sql.NullInt32
-	var configPayload *json.RawMessage
+	var configPayload *models.Payload
 	if m.Configuration != nil {
 		dgst, err := NewDigest(m.Configuration.Digest)
 		if err != nil {

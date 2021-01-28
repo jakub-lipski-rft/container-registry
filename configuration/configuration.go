@@ -321,6 +321,8 @@ type Database struct {
 	} `yaml:"pool,omitempty"`
 	// Maximum time to wait for a connection. Zero or not specified means waiting indefinitely.
 	ConnectTimeout time.Duration `yaml:"connecttimeout,omitempty"`
+	// PreparedStatements can be used to enable prepared statements. Defaults to false.
+	PreparedStatements bool `yaml:"preparedstatements,omitempty"`
 }
 
 // Regexp wraps regexp.Regexp to implement the encoding.TextMarshaler interface.
