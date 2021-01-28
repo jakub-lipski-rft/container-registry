@@ -169,6 +169,7 @@ database:
   sslkey: /path/to/client.key
   sslrootcert: /path/to/root.crt
   connecttimeout: 5s
+  preparedstatements: false
   pool:
     maxidle: 25
     maxopen: 25
@@ -597,6 +598,7 @@ database:
   sslkey: /path/to/client.key
   sslrootcert: /path/to/root.crt
   connecttimeout: 5s
+  preparedstatements: false
   pool:
     maxidle: 25
     maxopen: 25
@@ -617,6 +619,7 @@ database:
 | `sslkey`   | no       | The PEM encoded key file path. |
 | `sslrootcert`  | no       | The PEM encoded root certificate file path. |
 | `connecttimeout`  | no       | Maximum time to wait for a connection. Zero or not specified means waiting indefinitely. |
+| `preparedstatements`  | no       | When set to `true`, prepared statements may be used. Defaults to `false` for compatibility with PgBouncer.
 
 ### `pool`
 

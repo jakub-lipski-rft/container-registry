@@ -3,7 +3,6 @@
 package datastore_test
 
 import (
-	"encoding/json"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -58,13 +57,13 @@ func randomManifest(t testing.TB, r *models.Repository, configBlob *models.Blob)
 		SchemaVersion: 2,
 		MediaType:     schema2.MediaTypeManifest,
 		Digest:        randomDigest(t),
-		Payload:       json.RawMessage(`{"foo": "bar"}`),
+		Payload:       models.Payload(`{"foo": "bar"}`),
 	}
 	if configBlob != nil {
 		m.Configuration = &models.Configuration{
 			MediaType: schema2.MediaTypeImageConfig,
 			Digest:    configBlob.Digest,
-			Payload:   json.RawMessage(`{"foo": "bar"}`),
+			Payload:   models.Payload(`{"foo": "bar"}`),
 		}
 	}
 

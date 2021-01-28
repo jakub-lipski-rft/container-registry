@@ -2,11 +2,21 @@ package models
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"time"
 
 	"github.com/opencontainers/go-digest"
 )
+
+// Payload implements sql/driver.Valuer interfance, allowing pgx to use
+// the PostgreSQL simple protocol.
+type Payload json.RawMessage
+
+// Value returns the payload serialized as a []byte.
+func (p Payload) Value() (driver.Value, error) {
+	return json.RawMessage(p).MarshalJSON()
+}
 
 type Repository struct {
 	ID        int64
@@ -23,7 +33,7 @@ type Repositories []*Repository
 type Configuration struct {
 	MediaType string
 	Digest    digest.Digest
-	Payload   json.RawMessage
+	Payload   Payload
 }
 
 type Manifest struct {
@@ -32,7 +42,7 @@ type Manifest struct {
 	SchemaVersion int
 	MediaType     string
 	Digest        digest.Digest
-	Payload       json.RawMessage
+	Payload       Payload
 	Configuration *Configuration
 	CreatedAt     time.Time
 }

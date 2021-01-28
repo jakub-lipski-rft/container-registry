@@ -1,4 +1,9 @@
 ## [Unreleased]
+### Added
+- configuration: Add `preparedstatements` option to toggle prepared statements for the metadata database
+
+### Changed
+- registry/datastore: Metadata database does not use prepared statements by default
 
 ## [v3.0.0-gitlab] - 2021-01-20
 ### Added
