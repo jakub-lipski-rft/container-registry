@@ -39,6 +39,7 @@ const (
 	GCBlobsConfigurationsTable table = "gc_blobs_configurations"
 	GCBlobsLayersTable         table = "gc_blobs_layers"
 	GCManifestReviewQueueTable table = "gc_manifest_review_queue"
+	GCTmpBlobsManifestsTable   table = "gc_tmp_blobs_manifests"
 )
 
 // AllTables represents all tables in the test database.
@@ -55,6 +56,7 @@ var (
 		GCBlobsConfigurationsTable,
 		GCBlobsLayersTable,
 		GCManifestReviewQueueTable,
+		GCTmpBlobsManifestsTable,
 	}
 
 	GCTrackBlobUploadsTrigger = trigger{

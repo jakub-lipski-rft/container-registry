@@ -146,6 +146,7 @@ CREATE TABLE gc_blobs_configurations (
 PARTITION BY HASH (digest);
 
 CREATE TABLE gc_tmp_blobs_manifests (
+    created_at timestamp WITH time zone NOT NULL DEFAULT now(),
     digest bytea NOT NULL,
     CONSTRAINT pk_gc_tmp_blobs_manifests PRIMARY KEY (digest)
 );
