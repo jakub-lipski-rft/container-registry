@@ -316,6 +316,25 @@ CREATE TRIGGER gc_track_deleted_layers_trigger
     FOR EACH ROW
     EXECUTE PROCEDURE gc_track_deleted_layers ();
 
+CREATE FUNCTION gc_track_switched_tags ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
+        VALUES (OLD.repository_id, OLD.manifest_id)
+    ON CONFLICT (repository_id, manifest_id)
+        DO UPDATE SET
+            review_after = now() + interval '1 day';
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_switched_tags_trigger
+    AFTER UPDATE OF manifest_id ON tags
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_switched_tags ();
+
 CREATE SCHEMA partitions;
 
 SET search_path = partitions;
