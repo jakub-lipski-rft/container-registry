@@ -11,6 +11,7 @@ CREATE TABLE repositories (
     CONSTRAINT check_repositories_name_length CHECK ((char_length(name) <= 255)),
     CONSTRAINT check_repositories_path_length CHECK ((char_length(path) <= 255))
 );
+
 CREATE INDEX index_repositories_on_parent_id ON repositories (parent_id);
 
 CREATE TABLE media_types (
@@ -31,6 +32,7 @@ CREATE TABLE blobs (
     CONSTRAINT fk_blobs_media_type_id_media_types FOREIGN KEY (media_type_id) REFERENCES media_types (id)
 )
 PARTITION BY HASH (digest);
+
 CREATE INDEX index_blobs_on_media_type_id ON blobs (media_type_id);
 
 CREATE TABLE repository_blobs (
@@ -44,7 +46,9 @@ CREATE TABLE repository_blobs (
     CONSTRAINT unique_repository_blobs_repository_id_and_blob_digest UNIQUE (repository_id, blob_digest)
 )
 PARTITION BY HASH (repository_id);
+
 CREATE INDEX index_repository_blobs_on_repository_id ON repository_blobs (repository_id);
+
 CREATE INDEX index_repository_blobs_on_blob_digest ON repository_blobs (blob_digest);
 
 CREATE TABLE manifests (
@@ -66,9 +70,13 @@ CREATE TABLE manifests (
     CONSTRAINT unique_manifests_repository_id_and_digest UNIQUE (repository_id, digest)
 )
 PARTITION BY HASH (repository_id);
+
 CREATE INDEX index_manifests_on_repository_id ON manifests (repository_id);
+
 CREATE INDEX index_manifests_on_media_type_id ON manifests (media_type_id);
+
 CREATE INDEX index_manifests_on_configuration_media_type_id ON manifests (configuration_media_type_id);
+
 CREATE INDEX index_manifests_on_configuration_blob_digest ON manifests (configuration_blob_digest);
 
 CREATE TABLE manifest_references (
@@ -84,7 +92,9 @@ CREATE TABLE manifest_references (
     CONSTRAINT check_manifest_references_parent_id_and_child_id_differ CHECK (parent_id <> child_id)
 )
 PARTITION BY HASH (repository_id);
+
 CREATE INDEX index_manifest_references_on_repository_id_and_parent_id ON manifest_references (repository_id, parent_id);
+
 CREATE INDEX index_manifest_references_on_repository_id_and_child_id ON manifest_references (repository_id, child_id);
 
 CREATE TABLE layers (
@@ -102,8 +112,11 @@ CREATE TABLE layers (
     CONSTRAINT unique_layers_repository_id_and_manifest_id_and_digest UNIQUE (repository_id, manifest_id, digest)
 )
 PARTITION BY HASH (repository_id);
+
 CREATE INDEX index_layers_on_repository_id_and_manifest_id ON layers (repository_id, manifest_id);
+
 CREATE INDEX index_layers_on_media_type_id ON layers (media_type_id);
+
 CREATE INDEX index_layers_on_digest ON layers (digest);
 
 CREATE TABLE tags (
@@ -119,6 +132,7 @@ CREATE TABLE tags (
     CONSTRAINT check_tags_name_length CHECK ((char_length(name) <= 255))
 )
 PARTITION BY HASH (repository_id);
+
 CREATE INDEX index_tags_on_repository_id_and_manifest_id ON tags (repository_id, manifest_id);
 
 CREATE TABLE gc_blobs_layers (
@@ -152,22 +166,155 @@ CREATE TABLE gc_tmp_blobs_manifests (
 );
 
 CREATE TABLE gc_blob_review_queue (
-    review_after timestamp with time zone NOT NULL DEFAULT now() + interval '1 day',
+    review_after timestamp WITH time zone NOT NULL DEFAULT now() + interval '1 day',
     review_count integer NOT NULL DEFAULT 0,
     digest bytea NOT NULL,
     CONSTRAINT pk_gc_blob_review_queue PRIMARY KEY (digest)
 );
+
 CREATE INDEX index_gc_blob_review_queue_on_review_after ON gc_blob_review_queue USING btree (review_after);
 
 CREATE TABLE gc_manifest_review_queue (
     repository_id bigint NOT NULL,
     manifest_id bigint NOT NULL,
-    review_after timestamp with time zone NOT NULL DEFAULT now() + interval '1 day',
+    review_after timestamp WITH time zone NOT NULL DEFAULT now() + interval '1 day',
     review_count integer NOT NULL DEFAULT 0,
     CONSTRAINT pk_gc_manifest_review_queue PRIMARY KEY (repository_id, manifest_id),
     CONSTRAINT fk_gc_manifest_review_queue_repo_id_and_manifest_id_manifests FOREIGN KEY (repository_id, manifest_id) REFERENCES manifests (repository_id, id) ON DELETE CASCADE
 );
+
 CREATE INDEX index_gc_manifest_review_queue_on_review_after ON gc_manifest_review_queue USING btree (review_after);
+
+CREATE FUNCTION gc_track_blob_uploads ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    INSERT INTO gc_blob_review_queue (digest)
+        VALUES (NEW.digest)
+    ON CONFLICT (digest)
+        DO UPDATE SET
+            review_after = now() + interval '1 day';
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_blob_uploads_trigger
+    AFTER INSERT ON blobs
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_blob_uploads ();
+
+CREATE FUNCTION gc_track_manifest_uploads ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
+        VALUES (NEW.repository_id, NEW.id);
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_manifest_uploads_trigger
+    AFTER INSERT ON manifests
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_manifest_uploads ();
+
+CREATE FUNCTION gc_track_configuration_blobs ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF NEW.configuration_blob_digest IS NOT NULL THEN
+        INSERT INTO gc_blobs_configurations (repository_id, manifest_id, digest)
+            VALUES (NEW.repository_id, NEW.id, NEW.configuration_blob_digest)
+        ON CONFLICT (digest, manifest_id)
+            DO NOTHING;
+    END IF;
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_configuration_blobs_trigger
+    AFTER INSERT ON manifests
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_configuration_blobs ();
+
+CREATE FUNCTION gc_track_layer_blobs ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    INSERT INTO gc_blobs_layers (repository_id, layer_id, digest)
+        VALUES (NEW.repository_id, NEW.id, NEW.digest)
+    ON CONFLICT (digest, layer_id)
+        DO NOTHING;
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_layer_blobs_trigger
+    AFTER INSERT ON layers
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_layer_blobs ();
+
+CREATE FUNCTION gc_track_tmp_blobs_manifests ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    INSERT INTO gc_tmp_blobs_manifests (digest)
+        VALUES (NEW.digest)
+    ON CONFLICT (digest)
+        DO NOTHING;
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_tmp_blobs_manifests_trigger
+    AFTER INSERT ON manifests
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_tmp_blobs_manifests ();
+
+CREATE FUNCTION gc_track_deleted_manifests ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF OLD.configuration_blob_digest IS NOT NULL THEN
+        INSERT INTO gc_blob_review_queue (digest)
+            VALUES (OLD.configuration_blob_digest)
+        ON CONFLICT (digest)
+            DO UPDATE SET
+                review_after = now() + interval '1 day';
+    END IF;
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_deleted_manifests_trigger
+    AFTER DELETE ON manifests
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_deleted_manifests ();
+
+CREATE FUNCTION gc_track_deleted_layers ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    INSERT INTO gc_blob_review_queue (digest)
+        VALUES (OLD.digest)
+    ON CONFLICT (digest)
+        DO UPDATE SET
+            review_after = now() + interval '1 day';
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_deleted_layers_trigger
+    AFTER DELETE ON layers
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_deleted_layers ();
 
 CREATE SCHEMA partitions;
 
