@@ -1872,10 +1872,7 @@ func manifest_Put_Schema2_MissingConfig(t *testing.T, opts ...configOpt) {
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef)
 		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
@@ -1953,10 +1950,7 @@ func manifest_Put_Schema2_MissingLayers(t *testing.T, opts ...configOpt) {
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		_, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		_, dgst := createRandomSmallLayer()
 
 		manifest.Layers[i] = distribution.Descriptor{
 			Digest:    dgst,
@@ -2023,11 +2017,10 @@ func manifest_Put_Schema2_MissingConfigAndLayers(t *testing.T, opts ...configOpt
 	repoRef, err := reference.WithName(repoPath)
 	require.NoError(t, err)
 
-	rs, dgstStr, err := testutil.CreateRandomTarFile()
-	require.NoError(t, err)
+	rs, dgst := createRandomSmallLayer()
 
 	uploadURLBase, _ := startPushLayer(t, env, repoRef)
-	pushLayer(t, env.builder, repoRef, digest.Digest(dgstStr), uploadURLBase, rs)
+	pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
 
 	// Create a manifest config, but do not push up its content.
 	_, cfgDesc := schema2Config()
@@ -2037,10 +2030,7 @@ func manifest_Put_Schema2_MissingConfigAndLayers(t *testing.T, opts ...configOpt
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		_, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		_, dgst = createRandomSmallLayer()
 
 		manifest.Layers[i] = distribution.Descriptor{
 			Digest:    dgst,
@@ -2124,14 +2114,11 @@ func TestManifestAPI_Put_Schema2LayersNotAssociatedWithRepositoryButArePresentIn
 	require.NoError(t, err)
 
 	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
+		rs, dgst := createRandomSmallLayer()
 
 		// Save the layer content as pushLayer exhausts the io.ReadSeeker
 		layerBytes, err := ioutil.ReadAll(rs)
 		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
 
 		uploadURLBase, _ := startPushLayer(t, env, fakeRepoRef)
 		pushLayer(t, env.builder, fakeRepoRef, dgst, uploadURLBase, bytes.NewReader(layerBytes))
@@ -2362,10 +2349,7 @@ func manifest_Put_Schema2_ByDigest_LayersNotAssociatedWithRepository(t *testing.
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef2)
 		pushLayer(t, env.builder, repoRef2, dgst, uploadURLBase, rs)
@@ -2416,10 +2400,7 @@ func manifest_Put_Schema2_ByDigest_ConfigNotAssociatedWithRepository(t *testing.
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef1)
 		pushLayer(t, env.builder, repoRef1, dgst, uploadURLBase, rs)
@@ -2470,10 +2451,7 @@ func manifest_Put_Schema1_ByTag(t *testing.T, opts ...configOpt) {
 	unsignedManifest.FSLayers = make([]schema1.FSLayer, 2)
 
 	for i := range unsignedManifest.FSLayers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef)
 		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
@@ -2524,10 +2502,7 @@ func manifest_Put_Schema1_ByDigest(t *testing.T, opts ...configOpt) {
 	unsignedManifest.FSLayers = make([]schema1.FSLayer, 2)
 
 	for i := range unsignedManifest.FSLayers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef)
 		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
@@ -3740,10 +3715,7 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string, opts
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef)
 		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)
@@ -3777,6 +3749,16 @@ func seedRandomSchema2Manifest(t *testing.T, env *testEnv, repoPath string, opts
 	}
 
 	return deserializedManifest
+}
+
+func createRandomSmallLayer() (io.ReadSeeker, digest.Digest) {
+	b := make([]byte, rand.Intn(20))
+	rand.Read(b)
+
+	dgst := digest.FromBytes(b)
+	rs := bytes.NewReader(b)
+
+	return rs, dgst
 }
 
 func ociConfig() ([]byte, distribution.Descriptor) {
@@ -3872,10 +3854,7 @@ func seedRandomOCIManifest(t *testing.T, env *testEnv, repoPath string, opts ...
 	manifest.Layers = make([]distribution.Descriptor, 2)
 
 	for i := range manifest.Layers {
-		rs, dgstStr, err := testutil.CreateRandomTarFile()
-		require.NoError(t, err)
-
-		dgst := digest.Digest(dgstStr)
+		rs, dgst := createRandomSmallLayer()
 
 		uploadURLBase, _ := startPushLayer(t, env, repoRef)
 		pushLayer(t, env.builder, repoRef, dgst, uploadURLBase, rs)

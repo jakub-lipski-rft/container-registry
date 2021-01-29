@@ -98,7 +98,7 @@ static-analysis:
 .api:
   stage: integration
   needs: []
-  script: go test -timeout 35m -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/handlers
+  script: go test -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/handlers
 
 .database: &database
   stage: integration
@@ -117,7 +117,7 @@ static-analysis:
   services:
     - name: postgres:12-alpine
       alias: "db"
-  script: go test -timeout 35m -v -coverprofile=coverage.out -tags=integration $PACKAGE
+  script: go test -v -coverprofile=coverage.out -tags=integration $PACKAGE
 
 .database:migrations:
   <<: *database
