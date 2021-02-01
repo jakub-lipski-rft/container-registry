@@ -133,4 +133,14 @@ var (
 		longer proceed.`,
 		HTTPStatusCode: http.StatusNotFound,
 	})
+
+	// ErrorCodeManifestReferencedInList is returned when attempting to delete a manifest that is still referenced by at
+	// least one manifest list.
+	ErrorCodeManifestReferencedInList = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:   "MANIFEST_REFERENCED",
+		Message: "manifest referenced by a manifest list",
+		Description: `The manifest is still referenced by at least one manifest list and therefore the delete cannot
+		proceed.`,
+		HTTPStatusCode: http.StatusConflict,
+	})
 )

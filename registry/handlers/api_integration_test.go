@@ -3046,6 +3046,33 @@ func TestManifestAPI_Delete_Schema2ManifestNotInDatabase(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
+func TestManifestAPI_Delete_ManifestReferencedByList(t *testing.T) {
+	env := newTestEnv(t, withDelete)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	repoPath := "test"
+	ml := seedRandomOCIImageIndex(t, env, repoPath, putByDigest)
+	m := ml.References()[0]
+
+	repoRef, err := reference.WithName(repoPath)
+	require.NoError(t, err)
+	digestRef, err := reference.WithDigest(repoRef, m.Digest)
+	require.NoError(t, err)
+	u, err := env.builder.BuildManifestURL(digestRef)
+	require.NoError(t, err)
+
+	resp, err := httpDelete(u)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusConflict, resp.StatusCode)
+	checkBodyHasErrorCodes(t, "", resp, v2.ErrorCodeManifestReferencedInList)
+}
+
 func manifest_Put_OCI_ByTag(t *testing.T, opts ...configOpt) {
 	env := newTestEnv(t, opts...)
 	defer env.Shutdown()

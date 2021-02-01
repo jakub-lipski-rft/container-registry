@@ -1081,18 +1081,16 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 }
 
 func (imh *manifestHandler) appendManifestDeleteError(err error) {
-	switch err {
-	case digest.ErrDigestUnsupported, digest.ErrDigestInvalidFormat:
+	switch {
+	case errors.Is(err, digest.ErrDigestUnsupported), errors.Is(err, digest.ErrDigestInvalidFormat):
 		imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
-		return
-	case distribution.ErrBlobUnknown, errManifestNotFoundDB:
+	case errors.Is(err, distribution.ErrBlobUnknown), errors.Is(err, errManifestNotFoundDB):
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown)
-		return
-	case distribution.ErrUnsupported:
+	case errors.Is(err, distribution.ErrUnsupported):
 		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
-		return
+	case errors.Is(err, datastore.ErrManifestReferencedInList):
+		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestReferencedInList)
 	default:
 		imh.Errors = append(imh.Errors, errcode.FromUnknownError(err))
-		return
 	}
 }

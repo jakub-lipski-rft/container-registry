@@ -4,6 +4,7 @@ package datastore_test
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -1596,8 +1597,8 @@ func TestRepositoryStore_DeleteManifest(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/manifests.sql
-	r := &models.Repository{ID: 3}
-	d := digest.Digest("sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155")
+	r := &models.Repository{ID: 4}
+	d := digest.Digest("sha256:ea1650093606d9e76dfc78b986d57daea6108af2d5a9114a98d7198548bfdfc7")
 
 	found, err := s.DeleteManifest(suite.ctx, r, d)
 	require.NoError(t, err)
@@ -1606,6 +1607,25 @@ func TestRepositoryStore_DeleteManifest(t *testing.T) {
 	m, err := s.FindManifestByDigest(suite.ctx, r, d)
 	require.NoError(t, err)
 	require.Nil(t, m)
+}
+
+func TestRepositoryStore_DeleteManifest_FailsIfReferencedInList(t *testing.T) {
+	reloadManifestFixtures(t)
+
+	s := datastore.NewRepositoryStore(suite.db)
+
+	// see testdata/fixtures/manifests.sql
+	r := &models.Repository{ID: 3}
+	d := digest.Digest("sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155")
+
+	ok, err := s.DeleteManifest(suite.ctx, r, d)
+	require.EqualError(t, err, fmt.Errorf("deleting manifest: %w", datastore.ErrManifestReferencedInList).Error())
+	require.False(t, ok)
+
+	// make sure the manifest was not deleted
+	m, err := s.FindManifestByDigest(suite.ctx, r, d)
+	require.NoError(t, err)
+	require.NotNil(t, m)
 }
 
 func TestRepositoryStore_DeleteManifest_NotFoundDoesNotFail(t *testing.T) {
