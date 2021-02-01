@@ -1071,22 +1071,8 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		tx, err := imh.db.BeginTx(imh.Context, nil)
-		if err != nil {
-			e := fmt.Errorf("failed to create database transaction: %w", err)
-			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
-			return
-		}
-		defer tx.Rollback()
-
-		if err = dbDeleteManifest(imh.Context, tx, imh.Repository.Named().String(), imh.Digest); err != nil {
+		if err := dbDeleteManifest(imh.Context, imh.db, imh.Repository.Named().String(), imh.Digest); err != nil {
 			imh.appendManifestDeleteError(err)
-			return
-		}
-
-		if err = tx.Commit(); err != nil {
-			e := fmt.Errorf("failed to commit database transaction: %w", err)
-			imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
 			return
 		}
 	}
