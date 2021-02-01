@@ -1,6 +1,7 @@
 ## [Unreleased]
 ### Added
 - configuration: Add `preparedstatements` option to toggle prepared statements for the metadata database
+- configuration: Add `draintimeout` to database stanza to set optional connection close timeout on shutdown
 
 ### Changed
 - registry/datastore: Metadata database does not use prepared statements by default

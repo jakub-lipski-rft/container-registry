@@ -217,7 +217,11 @@ func (registry *Registry) ListenAndServe() error {
 	case err := <-serveErr:
 		return err
 	case s := <-quit:
-		log := log.WithFields(log.Fields{"quit_signal": s, "http_drain_timeout": registry.config.HTTP.DrainTimeout})
+		log := log.WithFields(log.Fields{
+			"quit_signal":            s,
+			"http_drain_timeout":     registry.config.HTTP.DrainTimeout,
+			"database_drain_timeout": registry.config.Database.DrainTimeout,
+		})
 		log.Info("attempting to stop server gracefully...")
 
 		// shutdown the server with a grace period of configured timeout
@@ -233,8 +237,16 @@ func (registry *Registry) ListenAndServe() error {
 		if registry.config.Database.Enabled {
 			log.Info("closing database connections")
 
-			// TODO: Put database shutdown on a configurable timeout.
-			if err := registry.app.GracefulShutdown(context.Background()); err != nil {
+			ctx := context.Background()
+			var cancel context.CancelFunc
+
+			// Drain database with grace period, rather than waiting indefinitely.
+			if registry.config.Database.DrainTimeout != 0 {
+				ctx, cancel = context.WithTimeout(ctx, registry.config.Database.DrainTimeout)
+				defer cancel()
+			}
+
+			if err := registry.app.GracefulShutdown(ctx); err != nil {
 				return err
 			}
 		}

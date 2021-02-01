@@ -1099,9 +1099,23 @@ func startUploadPurger(ctx context.Context, storageDriver storagedriver.StorageD
 	}()
 }
 
-// GracefulShutdown allows the app to free any resources befefore shutdown.
+// GracefulShutdown allows the app to free any resources before shutdown.
 func (app *App) GracefulShutdown(ctx context.Context) error {
-	return app.db.Close()
+	errors := make(chan error)
+
+	go func() {
+		errors <- app.db.Close()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("app shutdown failed: %w", ctx.Err())
+	case err := <-errors:
+		if err != nil {
+			return fmt.Errorf("app shutdown failed: %w", err)
+		}
+		return nil
+	}
 }
 
 // DBStats returns the sql.DBStats for the metadata database connection handle.
