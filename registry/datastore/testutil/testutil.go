@@ -83,6 +83,10 @@ var (
 		name:  "gc_track_deleted_layers_trigger",
 		table: LayersTable,
 	}
+	GCTrackSwitchedTagsTrigger = trigger{
+		name:  "gc_track_switched_tags_trigger",
+		table: TagsTable,
+	}
 )
 
 // truncate truncates t in the test database.

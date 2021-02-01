@@ -338,7 +338,7 @@ When the registry receives manifest `B`, it finds out that another manifest, `A`
 Tag switches can be tracked with a trigger for updates on `tags.manifest_id`, pushing the old manifest to the review queue.
 
 ```sql
-CREATE FUNCTION public.gc_track_switched_tags ()
+CREATE FUNCTION gc_track_switched_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -353,9 +353,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_switched_tags_trigger
-    AFTER UPDATE OF manifest_id ON public.tags
+    AFTER UPDATE OF manifest_id ON tags
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_switched_tags ();
+    EXECUTE PROCEDURE gc_track_switched_tags ();
 ```
 
 #### Manifest lists
