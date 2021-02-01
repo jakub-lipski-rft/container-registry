@@ -1213,6 +1213,32 @@ database:
 	testParameter(t, yml, "REGISTRY_DATABASE_PREPAREDSTATEMENTS", tt, validator)
 }
 
+func TestParseDatabase_DrainTimeout(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+database:
+  draintimeout: %s
+`
+	tt := []parameterTest{
+		{
+			name:  "sample",
+			value: "300s",
+			want:  300 * time.Second,
+		},
+		{
+			name: "empty",
+			want: time.Duration(0),
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Database.DrainTimeout)
+	}
+
+	testParameter(t, yml, "REGISTRY_DATABASE_DRAINTIMEOUT", tt, validator)
+}
+
 func TestParseDatabasePool_MaxIdle(t *testing.T) {
 	yml := `
 version: 0.1
