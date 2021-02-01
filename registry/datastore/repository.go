@@ -11,6 +11,8 @@ import (
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/registry/datastore/metrics"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -928,8 +930,11 @@ func (s *repositoryStore) DeleteTagByName(ctx context.Context, r *models.Reposit
 	return count == 1, nil
 }
 
+var ErrManifestReferencedInList = errors.New("manifest referenced by manifest list")
+
 // DeleteManifest deletes a manifest from a repository. A boolean is returned to denote whether the manifest was deleted
-// or not. This avoids the need for a separate preceding `SELECT` to find if it exists.
+// or not. This avoids the need for a separate preceding `SELECT` to find if it exists. A manifest cannot be deleted if
+// it is referenced by a manifest list.
 func (s *repositoryStore) DeleteManifest(ctx context.Context, r *models.Repository, d digest.Digest) (bool, error) {
 	defer metrics.StatementDuration("repository_delete_manifest")()
 	q := "DELETE FROM manifests WHERE repository_id = $1 AND digest = decode($2, 'hex')"
@@ -941,6 +946,10 @@ func (s *repositoryStore) DeleteManifest(ctx context.Context, r *models.Reposito
 
 	res, err := s.db.ExecContext(ctx, q, r.ID, dgst)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation && pgErr.TableName == "manifest_references" {
+			return false, fmt.Errorf("deleting manifest: %w", ErrManifestReferencedInList)
+		}
 		return false, fmt.Errorf("deleting manifest: %w", err)
 	}
 

@@ -2,6 +2,7 @@
 ### Added
 - configuration: Add `preparedstatements` option to toggle prepared statements for the metadata database
 - configuration: Add `draintimeout` to database stanza to set optional connection close timeout on shutdown
+- registry/api/v2: Disallow manifest delete if referenced by manifest lists (metadata database only).
 
 ### Changed
 - registry/datastore: Metadata database does not use prepared statements by default

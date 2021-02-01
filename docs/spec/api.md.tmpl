@@ -1103,6 +1103,11 @@ issued:
 If the image had already been deleted or did not exist, a `404 Not Found`
 response will be issued instead.
 
+A `409 Conflict` response will be issued if the manifest exists but is
+referenced by at least one manifest list. The referencing manifest lists must
+be deleted before deleting the manifest. This integrity constraint is only
+enforced when using the metadata database.
+
 > **Note**  When deleting a manifest from a registry version 2.3 or later, the
 > following header must be used when `HEAD` or `GET`-ing the manifest to obtain
 > the correct digest to delete:

@@ -87,7 +87,7 @@ CREATE TABLE manifest_references (
     created_at timestamp WITH time zone NOT NULL DEFAULT now(),
     CONSTRAINT pk_manifest_references PRIMARY KEY (repository_id, id),
     CONSTRAINT fk_manifest_references_repository_id_and_parent_id_manifests FOREIGN KEY (repository_id, parent_id) REFERENCES manifests (repository_id, id) ON DELETE CASCADE,
-    CONSTRAINT fk_manifest_references_repository_id_and_child_id_manifests FOREIGN KEY (repository_id, child_id) REFERENCES manifests (repository_id, id) ON DELETE CASCADE,
+    CONSTRAINT fk_manifest_references_repository_id_and_child_id_manifests FOREIGN KEY (repository_id, child_id) REFERENCES manifests (repository_id, id) ON DELETE RESTRICT,
     CONSTRAINT unique_manifest_references_repository_id_and_parent_id_child_id UNIQUE (repository_id, parent_id, child_id),
     CONSTRAINT check_manifest_references_parent_id_and_child_id_differ CHECK (parent_id <> child_id)
 )

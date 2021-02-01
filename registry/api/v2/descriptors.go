@@ -789,6 +789,18 @@ var routeDescriptors = []RouteDescriptor{
 									errcode.ErrorCodeUnsupported,
 								},
 							},
+							{
+								Name:        "Manifest referenced by manifest list",
+								Description: "The manifest is still referenced by at least one manifest list and therefore the delete cannot proceed.",
+								StatusCode:  http.StatusConflict,
+								ErrorCodes: []errcode.ErrorCode{
+									ErrorCodeManifestReferencedInList,
+								},
+								Body: BodyDescriptor{
+									ContentType: "application/json",
+									Format:      errorsBody,
+								},
+							},
 						},
 					},
 				},
