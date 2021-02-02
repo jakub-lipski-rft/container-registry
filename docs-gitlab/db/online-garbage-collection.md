@@ -261,7 +261,7 @@ This is achieved by pushing the child manifests to the manifest review queue. In
 This can be accomplished with a trigger for deletes on `manifest_references` (deleting the manifest list in `manifests` cascades to `manifest_references` by `parent_id`).
 
 ```sql
-CREATE FUNCTION public.gc_track_deleted_manifest_lists ()
+CREATE FUNCTION gc_track_deleted_manifest_lists ()
     RETURNS TRIGGER
     AS $$
 BEGIN
@@ -276,9 +276,9 @@ $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_deleted_manifest_lists_trigger
-    AFTER DELETE ON public.manifest_references
+    AFTER DELETE ON manifest_references
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_deleted_manifest_lists ();
+    EXECUTE PROCEDURE gc_track_deleted_manifest_lists ();
 ```
 
 We could do a pre-validation before queueing manifests for review to check if there are any remaining tags or manifest list references for that manifest within the repository. However, this would create more opportunities for race conditions, leading to possible tracking misses and making it harder to debug issues. Concentrating all the validation logic in the garbage collector should help create a clear separation of concerns and reduce the tracking logic's complexity. The downside is that it'll generate more tasks to be processed by the garbage collector, and it drastically increases the number of false positives. However, the database load should be identical because the only difference is that instead of doing a pre-validation, we're doing it during GC.

@@ -83,6 +83,10 @@ var (
 		name:  "gc_track_deleted_layers_trigger",
 		table: LayersTable,
 	}
+	GCTrackDeletedManifestListsTrigger = trigger{
+		name:  "gc_track_deleted_manifest_lists_trigger",
+		table: ManifestReferencesTable,
+	}
 	GCTrackSwitchedTagsTrigger = trigger{
 		name:  "gc_track_switched_tags_trigger",
 		table: TagsTable,
