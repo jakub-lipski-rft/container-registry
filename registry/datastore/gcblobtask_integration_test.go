@@ -4,6 +4,7 @@ package datastore_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
@@ -144,4 +145,32 @@ func TestGcBlobTaskStore_Next_None(t *testing.T) {
 	tx, b := nextGCBlobTask(t)
 	defer tx.Rollback()
 	require.Nil(t, b)
+}
+
+func TestGcBlobTaskStore_Postpone(t *testing.T) {
+	// see testdata/fixtures/gc_blob_review_queue.sql
+	reloadGCBlobTaskFixtures(t)
+
+	tx, b := nextGCBlobTask(t)
+	defer tx.Rollback()
+
+	oldReviewAfter := b.ReviewAfter
+	oldReviewCount := b.ReviewCount
+	d := 24 * time.Hour
+
+	s := datastore.NewGCBlobTaskStore(tx)
+	err := s.Postpone(suite.ctx, b, d)
+	require.NoError(t, err)
+	require.Equal(t, oldReviewAfter.Add(d), b.ReviewAfter)
+	require.Equal(t, oldReviewCount+1, b.ReviewCount)
+}
+
+func TestGcBlobTaskStore_Postpone_NotFound(t *testing.T) {
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	s := datastore.NewGCBlobTaskStore(tx)
+	err = s.Postpone(suite.ctx, &models.GCBlobTask{Digest: randomDigest(t)}, 0)
+	require.EqualError(t, err, "GC blob task not found")
 }
