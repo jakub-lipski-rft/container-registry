@@ -291,27 +291,36 @@ When deleting a tag in a repository, if no other tag points to the same manifest
 
 Similarly, if no other tag points to the same manifest or no manifest list reference it, the manifest record should also be deleted from the database.
 
-This can be accomplished with a trigger for deletes on `tags`:
+This can be accomplished with a trigger for deletes on `tags`. Note that because deleting a manifest cascades to `tags`, and the manifest review queue has a foreign key constraint for `manifests`, we need to check that the corresponding manifest still exists. When triggered due to a manifest delete (which cascades to `tags` and in turn fires this trigger) the corresponding manifest will not exist anymore and as such we must skip the insert attempt on the review queue to avoid a foreign key violation error. When triggered due to a simple tag delete this is not a concern as the underlying manifest still exists:
 
 ```sql
-CREATE FUNCTION public.gc_track_deleted_tags ()
+CREATE FUNCTION gc_track_deleted_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (OLD.repository_id, OLD.manifest_id)
-    ON CONFLICT (repository_id, manifest_id)
-        DO UPDATE SET
-            review_after = now() + interval '1 day';
+    IF EXISTS (
+        SELECT
+            1
+        FROM
+            manifests
+        WHERE
+            repository_id = OLD.repository_id
+            AND id = OLD.manifest_id) THEN
+        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
+            VALUES (OLD.repository_id, OLD.manifest_id)
+        ON CONFLICT (repository_id, manifest_id)
+            DO UPDATE SET
+                review_after = now() + interval '1 day';
+    END IF;
     RETURN NULL;
 END;
 $$
 LANGUAGE plpgsql;
 
 CREATE TRIGGER gc_track_deleted_tags_trigger
-    AFTER DELETE ON public.tags
+    AFTER DELETE ON tags
     FOR EACH ROW
-    EXECUTE PROCEDURE public.gc_track_deleted_tags ();
+    EXECUTE PROCEDURE gc_track_deleted_tags ();
 ```
 
 Suppose GC finds out that the manifest is untagged/unreferenced. In that case, the row from `manifests` is deleted (together with all the layers that reference it), and the previously described `gc_track_deleted_manifests_trigger` and `gc_track_deleted_layers_trigger` triggers would fire and automatically take care of queuing the configuration and layer blobs for review.

@@ -335,6 +335,34 @@ CREATE TRIGGER gc_track_switched_tags_trigger
     FOR EACH ROW
     EXECUTE PROCEDURE gc_track_switched_tags ();
 
+CREATE FUNCTION gc_track_deleted_tags ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF EXISTS (
+        SELECT
+            1
+        FROM
+            manifests
+        WHERE
+            repository_id = OLD.repository_id
+            AND id = OLD.manifest_id) THEN
+        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
+            VALUES (OLD.repository_id, OLD.manifest_id)
+        ON CONFLICT (repository_id, manifest_id)
+            DO UPDATE SET
+                review_after = now() + interval '1 day';
+    END IF;
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_deleted_tags_trigger
+    AFTER DELETE ON tags
+    FOR EACH ROW
+    EXECUTE PROCEDURE gc_track_deleted_tags ();
+
 CREATE SCHEMA partitions;
 
 SET search_path = partitions;

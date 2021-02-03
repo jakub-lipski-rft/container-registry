@@ -91,6 +91,10 @@ var (
 		name:  "gc_track_switched_tags_trigger",
 		table: TagsTable,
 	}
+	GCTrackDeletedTagsTrigger = trigger{
+		name:  "gc_track_deleted_tags_trigger",
+		table: TagsTable,
+	}
 )
 
 // truncate truncates t in the test database.
