@@ -827,7 +827,7 @@ func TestGC_TrackSwitchedTags(t *testing.T) {
 	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
 }
 
-func TestGC_TrackDeletedTags_PostponeReviewOnConflict(t *testing.T) {
+func TestGC_TrackSwitchedTags_PostponeReviewOnConflict(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
 	// create repo
@@ -887,7 +887,7 @@ func TestGC_TrackDeletedTags_PostponeReviewOnConflict(t *testing.T) {
 	require.WithinDuration(t, rr[0].ReviewAfter, rr2[0].ReviewAfter, 100*time.Millisecond)
 }
 
-func TestGC_TrackDeletedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
+func TestGC_TrackSwitchedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 	require.NoError(t, testutil.TruncateAllTables(suite.db))
 
 	enable, err := testutil.GCTrackSwitchedTagsTrigger.Disable(suite.db)
@@ -931,6 +931,245 @@ func TestGC_TrackDeletedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 		ManifestID:   m2.ID,
 	})
 	require.NoError(t, err)
+
+	// check that no review records were created
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	count, err := mrs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+}
+
+func TestGC_TrackDeletedTags(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// disable other triggers that also insert on gc_manifest_review_queue so that they don't interfere with this test
+	enable, err := testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// tag manifest
+	ts := datastore.NewTagStore(suite.db)
+	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
+		Name:         "latest",
+		RepositoryID: r.ID,
+		ManifestID:   m.ID,
+	})
+	require.NoError(t, err)
+
+	// confirm that the review queue remains empty
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	count, err := mrs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+
+	// delete tag
+	ok, err := rs.DeleteTagByName(suite.ctx, r, "latest")
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// check that a corresponding task was created for the manifest and scheduled for 1 day ahead
+	rr, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr))
+	require.Equal(t, r.ID, rr[0].RepositoryID)
+	require.Equal(t, m.ID, rr[0].ManifestID)
+	require.Equal(t, 0, rr[0].ReviewCount)
+	// ignore the few milliseconds between manifest creation and queueing for review in response to the tag deletion
+	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+}
+
+func TestGC_TrackDeletedTags_MultipleTags(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// disable other triggers that also insert on gc_manifest_review_queue so that they don't interfere with this test
+	enable, err := testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// tag manifest twice
+	ts := datastore.NewTagStore(suite.db)
+	tags := []string{"1.0.0", "latest"}
+	for _, tag := range tags {
+		err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
+			Name:         tag,
+			RepositoryID: r.ID,
+			ManifestID:   m.ID,
+		})
+		require.NoError(t, err)
+	}
+
+	// confirm that the review queue remains empty
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	count, err := mrs.Count(suite.ctx)
+	require.NoError(t, err)
+	require.Zero(t, count)
+
+	// delete tags
+	for _, tag := range tags {
+		ok, err := rs.DeleteTagByName(suite.ctx, r, tag)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	// check that a single corresponding task was created for the manifest and scheduled for 1 day ahead
+	rr, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr))
+	require.Equal(t, r.ID, rr[0].RepositoryID)
+	require.Equal(t, m.ID, rr[0].ManifestID)
+	require.Equal(t, 0, rr[0].ReviewCount)
+	// ignore the few milliseconds between manifest creation and queueing for review in response to the tag deletion
+	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+}
+
+func TestGC_TrackDeletedTags_ManifestDeleteCascade(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// disable other triggers that also insert on gc_manifest_review_queue so that they don't interfere with this test
+	enable, err := testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// tag manifest
+	ts := datastore.NewTagStore(suite.db)
+	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
+		Name:         "latest",
+		RepositoryID: r.ID,
+		ManifestID:   m.ID,
+	})
+	require.NoError(t, err)
+
+	// delete manifest (cascades to tags)
+	ok, err := rs.DeleteManifest(suite.ctx, r, m.Digest)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// check that no task was created, as the corresponding manifest no longer exists
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	rr, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Empty(t, rr)
+}
+
+func TestGC_TrackDeletedTags_PostponeReviewOnConflict(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err := rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// tag manifest
+	ts := datastore.NewTagStore(suite.db)
+	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
+		Name:         "latest",
+		RepositoryID: r.ID,
+		ManifestID:   m.ID,
+	})
+	require.NoError(t, err)
+
+	// grab existing review record (created by the gc_track_manifest_uploads trigger)
+	mrs := datastore.NewGCManifestTaskStore(suite.db)
+	rr, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr))
+
+	// delete tag
+	ok, err := rs.DeleteTagByName(suite.ctx, r, "latest")
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// check that we still have only one review record but its due date was postponed to now (delete time) + 1 day
+	rr2, err := mrs.FindAll(suite.ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rr2))
+	require.Equal(t, rr[0].RepositoryID, rr2[0].RepositoryID)
+	require.Equal(t, rr[0].ManifestID, rr2[0].ManifestID)
+	require.Equal(t, 0, rr2[0].ReviewCount)
+	// review_after is only a few milliseconds ahead of the original time
+	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
+	require.WithinDuration(t, rr[0].ReviewAfter, rr2[0].ReviewAfter, 100*time.Millisecond)
+}
+
+func TestGC_TrackDeletedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	enable, err := testutil.GCTrackDeletedTagsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+	// disable other triggers that also insert on gc_manifest_review_queue so that they don't interfere with this test
+	enable, err = testutil.GCTrackManifestUploadsTrigger.Disable(suite.db)
+	require.NoError(t, err)
+	defer enable()
+
+	// create repo
+	r := randomRepository(t)
+	rs := datastore.NewRepositoryStore(suite.db)
+	err = rs.Create(suite.ctx, r)
+	require.NoError(t, err)
+
+	// create manifest
+	ms := datastore.NewManifestStore(suite.db)
+	m := randomManifest(t, r, nil)
+	err = ms.Create(suite.ctx, m)
+	require.NoError(t, err)
+
+	// tag manifest
+	ts := datastore.NewTagStore(suite.db)
+	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
+		Name:         "latest",
+		RepositoryID: r.ID,
+		ManifestID:   m.ID,
+	})
+	require.NoError(t, err)
+
+	// delete tag
+	ok, err := rs.DeleteTagByName(suite.ctx, r, "latest")
+	require.NoError(t, err)
+	require.True(t, ok)
 
 	// check that no review records were created
 	mrs := datastore.NewGCManifestTaskStore(suite.db)
