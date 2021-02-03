@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/docker/distribution/registry/datastore/models"
 )
@@ -94,9 +95,9 @@ func (s *gcBlobTaskStore) Count(ctx context.Context) (int, error) {
 
 // Next reads and locks the blob review queue row with the oldest review_after before the current date. In case of a
 // draw (multiple unlocked records with the same review_after) the returned row is the one that was first inserted.
-// This method may be called safely from multiple concurrent goroutines or processes. A `SELECT FOR UPDATE` is used to ensure that callers
-// don't get the same record. The operation does not block, and no error is returned if there are no rows or none is
-// available (i.e., all locked by other processes). A `nil` record is returned in this situation.
+// This method may be called safely from multiple concurrent goroutines or processes. A `SELECT FOR UPDATE` is used to
+// ensure that callers don't get the same record. The operation does not block, and no error is returned if there are
+// no rows or none is available (i.e., all locked by other processes). A `nil` record is returned in this situation.
 func (s *gcBlobTaskStore) Next(ctx context.Context) (*models.GCBlobTask, error) {
 	q := `SELECT
 			review_after,
@@ -122,4 +123,40 @@ func (s *gcBlobTaskStore) Next(ctx context.Context) (*models.GCBlobTask, error) 
 	}
 
 	return b, nil
+}
+
+// Postpone moves the review_after of a blob task forward by a given amount of time. The review_count is automatically
+// incremented.
+func (s *gcBlobTaskStore) Postpone(ctx context.Context, b *models.GCBlobTask, d time.Duration) error {
+	q := `UPDATE
+			gc_blob_review_queue
+		SET
+			review_after = $1,
+			review_count = $2
+		WHERE
+			digest = decode($3, 'hex')`
+
+	ra := b.ReviewAfter.Add(d)
+	rc := b.ReviewCount + 1
+	dgst, err := NewDigest(b.Digest)
+	if err != nil {
+		return err
+	}
+
+	res, err := s.db.ExecContext(ctx, q, ra, rc, dgst)
+	if err != nil {
+		return fmt.Errorf("postponing GC blob task: %w", err)
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("postponing GC blob task: %w", err)
+	}
+	if count == 0 {
+		return fmt.Errorf("GC blob task not found")
+	}
+
+	b.ReviewAfter = ra
+	b.ReviewCount = rc
+
+	return nil
 }
