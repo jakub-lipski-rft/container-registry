@@ -3,6 +3,7 @@ package datastore
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/models"
@@ -45,6 +46,24 @@ func scanFullGCBlobTasks(rows *sql.Rows) ([]*models.GCBlobTask, error) {
 	return rr, nil
 }
 
+func scanFullGCBlobTask(row *sql.Row) (*models.GCBlobTask, error) {
+	b := new(models.GCBlobTask)
+	var dgst Digest
+
+	err := row.Scan(&b.ReviewAfter, &b.ReviewCount, &dgst)
+	if err != nil {
+		return nil, fmt.Errorf("scanning GC blob task: %w", err)
+	}
+
+	d, err := dgst.Parse()
+	if err != nil {
+		return nil, err
+	}
+	b.Digest = d
+
+	return b, nil
+}
+
 // FindAll finds all GC blob tasks.
 func (s *gcBlobTaskStore) FindAll(ctx context.Context) ([]*models.GCBlobTask, error) {
 	q := `SELECT
@@ -71,4 +90,36 @@ func (s *gcBlobTaskStore) Count(ctx context.Context) (int, error) {
 	}
 
 	return count, nil
+}
+
+// Next reads and locks the blob review queue row with the oldest review_after before the current date. In case of a
+// draw (multiple unlocked records with the same review_after) the returned row is the one that was first inserted.
+// This method may be called safely from multiple concurrent goroutines or processes. A `SELECT FOR UPDATE` is used to ensure that callers
+// don't get the same record. The operation does not block, and no error is returned if there are no rows or none is
+// available (i.e., all locked by other processes). A `nil` record is returned in this situation.
+func (s *gcBlobTaskStore) Next(ctx context.Context) (*models.GCBlobTask, error) {
+	q := `SELECT
+			review_after,
+			review_count,
+			encode(digest, 'hex') AS digest
+		FROM
+			gc_blob_review_queue
+		WHERE
+			review_after < NOW()
+		ORDER BY
+    		review_after
+		FOR UPDATE
+			SKIP LOCKED
+		LIMIT 1`
+
+	row := s.db.QueryRowContext(ctx, q)
+	b, err := scanFullGCBlobTask(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("fetching next GC blob task: %w", err)
+	}
+
+	return b, nil
 }
