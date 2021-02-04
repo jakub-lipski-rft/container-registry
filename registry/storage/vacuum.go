@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"math"
 	"path"
 	"time"
 
@@ -155,7 +156,7 @@ func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
 
 	maxBatchSize := 100
 	totalToDelete := len(mm)
-	totalBatches := totalToDelete / maxBatchSize
+	totalBatches := math.Ceil(float64(totalToDelete) / float64(maxBatchSize))
 
 	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
 		"batch_count":    totalBatches,
