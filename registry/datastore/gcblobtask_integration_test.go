@@ -9,6 +9,7 @@ import (
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/docker/distribution/registry/datastore/testutil"
+	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -172,5 +173,57 @@ func TestGcBlobTaskStore_Postpone_NotFound(t *testing.T) {
 
 	s := datastore.NewGCBlobTaskStore(tx)
 	err = s.Postpone(suite.ctx, &models.GCBlobTask{Digest: randomDigest(t)}, 0)
+	require.EqualError(t, err, "GC blob task not found")
+}
+
+func existsGCBlobTaskByDigest(t *testing.T, db datastore.Queryer, d digest.Digest) bool {
+	t.Helper()
+
+	q := `SELECT
+			EXISTS (
+				SELECT
+					1
+				FROM
+					gc_blob_review_queue
+				WHERE
+					digest = decode($1, 'hex'))`
+
+	dgst, err := datastore.NewDigest(d)
+	require.NoError(t, err)
+
+	var exists bool
+	require.NoError(t, db.QueryRowContext(suite.ctx, q, dgst).Scan(&exists))
+
+	return exists
+}
+
+func TestExistsGCBlobTaskByDigest(t *testing.T) {
+	// see testdata/fixtures/gc_blob_review_queue.sql
+	reloadGCBlobTaskFixtures(t)
+
+	require.True(t, existsGCBlobTaskByDigest(t, suite.db, "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"))
+	require.False(t, existsGCBlobTaskByDigest(t, suite.db, randomDigest(t)))
+}
+
+func TestGcBlobTaskStore_Delete(t *testing.T) {
+	// see testdata/fixtures/gc_blob_review_queue.sql
+	reloadGCBlobTaskFixtures(t)
+
+	tx, b := nextGCBlobTask(t)
+	defer tx.Rollback()
+
+	s := datastore.NewGCBlobTaskStore(tx)
+	err := s.Delete(suite.ctx, b)
+	require.NoError(t, err)
+	require.False(t, existsGCBlobTaskByDigest(t, tx, b.Digest))
+}
+
+func TestGcBlobTaskStore_Delete_NotFound(t *testing.T) {
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	s := datastore.NewGCBlobTaskStore(tx)
+	err = s.Delete(suite.ctx, &models.GCBlobTask{Digest: randomDigest(t)})
 	require.EqualError(t, err, "GC blob task not found")
 }
