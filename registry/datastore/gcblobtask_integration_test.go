@@ -3,6 +3,8 @@
 package datastore_test
 
 import (
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -205,6 +207,51 @@ func TestExistsGCBlobTaskByDigest(t *testing.T) {
 	require.False(t, existsGCBlobTaskByDigest(t, suite.db, randomDigest(t)))
 }
 
+func pickGCBlobTaskByDigest(t *testing.T, db datastore.Queryer, d digest.Digest) *models.GCBlobTask {
+	t.Helper()
+
+	q := `SELECT
+			review_after,
+			review_count
+		FROM
+			gc_blob_review_queue
+		WHERE
+			digest = decode($1, 'hex')
+		FOR UPDATE`
+
+	dgst, err := datastore.NewDigest(d)
+	require.NoError(t, err)
+
+	b := &models.GCBlobTask{Digest: d}
+
+	if err := db.QueryRowContext(suite.ctx, q, dgst).Scan(&b.ReviewAfter, &b.ReviewCount); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		t.Error(err)
+	}
+
+	return b
+}
+
+func TestPickGCBlobTaskByDigest(t *testing.T) {
+	// see testdata/fixtures/gc_blob_review_queue.sql
+	reloadGCBlobTaskFixtures(t)
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	d := digest.Digest("sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	b := pickGCBlobTaskByDigest(t, tx, d)
+	require.Equal(t, &models.GCBlobTask{
+		ReviewAfter: testutil.ParseTimestamp(t, "2020-03-05 20:05:35.338639", b.ReviewAfter.Location()),
+		ReviewCount: 0,
+		Digest:      d,
+	}, b)
+	require.Nil(t, pickGCBlobTaskByDigest(t, tx, randomDigest(t)))
+}
+
 func TestGcBlobTaskStore_Delete(t *testing.T) {
 	// see testdata/fixtures/gc_blob_review_queue.sql
 	reloadGCBlobTaskFixtures(t)
@@ -226,4 +273,47 @@ func TestGcBlobTaskStore_Delete_NotFound(t *testing.T) {
 	s := datastore.NewGCBlobTaskStore(tx)
 	err = s.Delete(suite.ctx, &models.GCBlobTask{Digest: randomDigest(t)})
 	require.EqualError(t, err, "GC blob task not found")
+}
+
+func TestGcBlobTaskStore_IsDangling_Yes(t *testing.T) {
+	s := datastore.NewGCBlobTaskStore(suite.db)
+	yn, err := s.IsDangling(suite.ctx, &models.GCBlobTask{Digest: randomDigest(t)})
+	require.NoError(t, err)
+	require.True(t, yn)
+}
+
+func TestGcBlobTaskStore_IsDangling_No_ConfigInUse(t *testing.T) {
+	// see testdata/fixtures/[gc_blob_review_queue|gc_blobs_configurations].sql
+	reloadGCConfigLinkFixtures(t)
+	reloadGCBlobTaskFixtures(t)
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	d := digest.Digest("sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9")
+	b := pickGCBlobTaskByDigest(t, tx, d)
+
+	s := datastore.NewGCBlobTaskStore(tx)
+	yn, err := s.IsDangling(suite.ctx, b)
+	require.NoError(t, err)
+	require.False(t, yn)
+}
+
+func TestGcBlobTaskStore_IsDangling_No_LayerInUse(t *testing.T) {
+	// see testdata/fixtures/[gc_blob_review_queue|gc_blobs_layers].sql
+	reloadManifestFixtures(t)
+	reloadGCBlobTaskFixtures(t)
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	d := digest.Digest("sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
+	b := pickGCBlobTaskByDigest(t, tx, d)
+
+	s := datastore.NewGCBlobTaskStore(tx)
+	yn, err := s.IsDangling(suite.ctx, b)
+	require.NoError(t, err)
+	require.False(t, yn)
 }
