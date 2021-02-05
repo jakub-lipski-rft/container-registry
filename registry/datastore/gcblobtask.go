@@ -193,3 +193,36 @@ func (s *gcBlobTaskStore) Delete(ctx context.Context, b *models.GCBlobTask) erro
 
 	return nil
 }
+
+// IsDangling determines if the blob referenced by the GC blob task is eligible for deletion or not.
+func (s *gcBlobTaskStore) IsDangling(ctx context.Context, b *models.GCBlobTask) (bool, error) {
+	defer metrics.StatementDuration("gc_blob_task_is_dangling")()
+
+	q := `SELECT
+			EXISTS (
+				SELECT
+					1
+				FROM
+					gc_blobs_configurations
+				WHERE
+					digest = decode($1, 'hex')
+				UNION
+				SELECT
+					1
+				FROM
+					gc_blobs_layers
+				WHERE
+					digest = decode($1, 'hex'))`
+
+	dgst, err := NewDigest(b.Digest)
+	if err != nil {
+		return false, err
+	}
+
+	var referenced bool
+	if err := s.db.QueryRowContext(ctx, q, dgst).Scan(&referenced); err != nil {
+		return false, fmt.Errorf("determining blob eligibily for deletion: %w", err)
+	}
+
+	return !referenced, nil
+}
