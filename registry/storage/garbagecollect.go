@@ -275,10 +275,10 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	sweepStart := time.Now()
 	dcontext.GetLogger(ctx).Info("starting sweep stage")
 
-	vacuum := NewVacuum(ctx, storageDriver)
+	vacuum := NewVacuum(storageDriver, VacuumWithLogger(dcontext.GetLogger(ctx)))
 
 	if len(manifestArr.manifestDels) > 0 {
-		if err := vacuum.RemoveManifests(manifestArr.manifestDels); err != nil {
+		if err := vacuum.RemoveManifests(ctx, manifestArr.manifestDels); err != nil {
 			return fmt.Errorf("failed to delete manifests: %v", err)
 		}
 	}
@@ -292,7 +292,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 		dgsts = append(dgsts, dgst)
 	}
 	if len(dgsts) > 0 {
-		if err := vacuum.RemoveBlobs(dgsts); err != nil {
+		if err := vacuum.RemoveBlobs(ctx, dgsts); err != nil {
 			return fmt.Errorf("failed to delete blobs: %v", err)
 		}
 	}

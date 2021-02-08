@@ -1612,14 +1612,14 @@ func (suite *DriverSuite) TestRemoveBlob(c *check.C) {
 
 	registry := suite.createRegistry(c)
 	repo := suite.makeRepository(c, registry, randomFilename(5))
-	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	v := storage.NewVacuum(suite.StorageDriver)
 
 	// build two blobs, one more than the number to delete, otherwise there will be no /docker/registry/v2/blobs path
 	// for validation after delete
 	blobs := suite.buildBlobs(c, repo, 2)
 	blob := blobs[0]
 
-	err := v.RemoveBlob(blob)
+	err := v.RemoveBlob(suite.ctx, blob)
 	c.Assert(err, check.IsNil)
 
 	blobService := registry.Blobs()
@@ -1643,7 +1643,7 @@ func (suite *DriverSuite) benchmarkRemoveBlob(c *check.C, numBlobs int) {
 
 	registry := suite.createRegistry(c)
 	repo := suite.makeRepository(c, registry, randomFilename(5))
-	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	v := storage.NewVacuum(suite.StorageDriver)
 
 	for n := 0; n < c.N; n++ {
 		c.StopTimer()
@@ -1651,7 +1651,7 @@ func (suite *DriverSuite) benchmarkRemoveBlob(c *check.C, numBlobs int) {
 		c.StartTimer()
 
 		for _, b := range blobs {
-			err := v.RemoveBlob(b)
+			err := v.RemoveBlob(suite.ctx, b)
 			c.Assert(err, check.IsNil)
 		}
 	}
@@ -1678,14 +1678,14 @@ func (suite *DriverSuite) TestRemoveBlobs(c *check.C) {
 
 	registry := suite.createRegistry(c)
 	repo := suite.makeRepository(c, registry, randomFilename(5))
-	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	v := storage.NewVacuum(suite.StorageDriver)
 
 	// build some blobs and remove half of them, otherwise there will be no /docker/registry/v2/blobs path to look at
 	// for validation if there are no blobs left
 	blobs := suite.buildBlobs(c, repo, 4)
 	blobs = blobs[:2]
 
-	err := v.RemoveBlobs(blobs)
+	err := v.RemoveBlobs(suite.ctx, blobs)
 	c.Assert(err, check.IsNil)
 
 	// assert that blobs were deleted
@@ -1712,14 +1712,14 @@ func (suite *DriverSuite) benchmarkRemoveBlobs(c *check.C, numBlobs int) {
 
 	registry := suite.createRegistry(c)
 	repo := suite.makeRepository(c, registry, randomFilename(5))
-	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	v := storage.NewVacuum(suite.StorageDriver)
 
 	for n := 0; n < c.N; n++ {
 		c.StopTimer()
 		blobs := suite.buildBlobs(c, repo, numBlobs)
 		c.StartTimer()
 
-		err := v.RemoveBlobs(blobs)
+		err := v.RemoveBlobs(suite.ctx, blobs)
 		c.Assert(err, check.IsNil)
 	}
 }
@@ -1789,14 +1789,14 @@ func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
 	// build some manifests
 	manifests := suite.buildManifests(c, repo, 3, 1)
 
-	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	v := storage.NewVacuum(suite.StorageDriver)
 
 	// remove all manifests except one, otherwise there will be no `_manifests/revisions` folder to look at for
 	// validation (empty "folders" are not preserved)
 	numToDelete := len(manifests) - 1
 	toDelete := manifests[:numToDelete]
 
-	err := v.RemoveManifests(toDelete)
+	err := v.RemoveManifests(suite.ctx, toDelete)
 	c.Assert(err, check.IsNil)
 
 	// assert that toDelete manifests were actually deleted
@@ -1827,7 +1827,7 @@ func (suite *DriverSuite) TestRemoveManifests(c *check.C) {
 }
 
 func (suite *DriverSuite) testRemoveManifestsPathBuild(c *check.C, numManifests, numTagsPerManifest int) {
-	v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+	v := storage.NewVacuum(suite.StorageDriver)
 
 	var tags []string
 	for i := 0; i < numTagsPerManifest; i++ {
@@ -1843,7 +1843,7 @@ func (suite *DriverSuite) testRemoveManifestsPathBuild(c *check.C, numManifests,
 		}
 		toDelete = append(toDelete, m)
 	}
-	err := v.RemoveManifests(toDelete)
+	err := v.RemoveManifests(suite.ctx, toDelete)
 	c.Assert(err, check.IsNil)
 }
 
@@ -1882,11 +1882,11 @@ func (suite *DriverSuite) benchmarkRemoveManifests(c *check.C, numManifests, num
 		c.StopTimer()
 
 		manifests := suite.buildManifests(c, repo, numManifests, numTagsPerManifest)
-		v := storage.NewVacuum(suite.ctx, suite.StorageDriver)
+		v := storage.NewVacuum(suite.StorageDriver)
 
 		c.StartTimer()
 
-		err := v.RemoveManifests(manifests)
+		err := v.RemoveManifests(suite.ctx, manifests)
 		c.Assert(err, check.IsNil)
 	}
 }

@@ -9,38 +9,52 @@ import (
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
+	"github.com/sirupsen/logrus"
 )
 
-// vacuum contains functions for cleaning up repositories and blobs
+// vacuum contains functions for cleaning up repositories and blobs on the storage backend.
 // These functions will only reliably work on strongly consistent
 // storage systems.
 // https://en.wikipedia.org/wiki/Consistency_model
 
-// NewVacuum creates a new Vacuum
-func NewVacuum(ctx context.Context, driver driver.StorageDriver) Vacuum {
-	return Vacuum{
-		ctx:    ctx,
-		driver: driver,
+// VacuumOption defines a functional option for Vacuum.
+type VacuumOption func(*Vacuum)
+
+// VacuumWithLogger sets the logger for a Vacuum.
+func VacuumWithLogger(l dcontext.Logger) VacuumOption {
+	return func(v *Vacuum) {
+		v.logger = l
 	}
+}
+
+// NewVacuum creates a new Vacuum
+func NewVacuum(driver driver.StorageDriver, opts ...VacuumOption) Vacuum {
+	v := Vacuum{
+		driver: driver,
+		logger: dcontext.GetLogger(context.Background()),
+	}
+	for _, opt := range opts {
+		opt(&v)
+	}
+
+	return v
 }
 
 // Vacuum removes content from the filesystem
 type Vacuum struct {
 	driver driver.StorageDriver
-	ctx    context.Context
+	logger dcontext.Logger
 }
 
 // RemoveBlob removes a blob from the filesystem
-func (v Vacuum) RemoveBlob(dgst digest.Digest) error {
+func (v Vacuum) RemoveBlob(ctx context.Context, dgst digest.Digest) error {
 	blobPath, err := pathFor(blobPathSpec{digest: dgst})
 	if err != nil {
 		return err
 	}
 
-	dcontext.GetLogger(v.ctx).Infof("Deleting blob: %s", blobPath)
-
-	err = v.driver.Delete(v.ctx, blobPath)
-	if err != nil {
+	v.logger.WithFields(logrus.Fields{"digest": dgst, "path": blobPath}).Info("deleting blob")
+	if err := v.driver.Delete(ctx, blobPath); err != nil {
 		return err
 	}
 
@@ -49,7 +63,7 @@ func (v Vacuum) RemoveBlob(dgst digest.Digest) error {
 
 // RemoveBlobs removes a list of blobs from the filesystem. This is used exclusively by the garbage collector and
 // the intention is to leverage on bulk delete requests whenever supported by the storage backend.
-func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
+func (v Vacuum) RemoveBlobs(ctx context.Context, dgsts []digest.Digest) error {
 	start := time.Now()
 	blobPaths := make([]string, 0, len(dgsts))
 	for _, d := range dgsts {
@@ -58,7 +72,7 @@ func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
 		if err != nil {
 			return err
 		}
-		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		v.logger.WithFields(logrus.Fields{
 			"digest": d,
 			"path":   p,
 		}).Debug("preparing to delete blob")
@@ -66,11 +80,11 @@ func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
 	}
 
 	total := len(blobPaths)
-	dcontext.GetLoggerWithField(v.ctx, "count", total).Info("deleting blobs")
+	v.logger.WithField("count", total).Info("deleting blobs")
 
-	count, err := v.driver.DeleteFiles(v.ctx, blobPaths)
+	count, err := v.driver.DeleteFiles(ctx, blobPaths)
 
-	l := dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+	l := v.logger.WithFields(logrus.Fields{
 		"count":      count,
 		"duration_s": time.Since(start).Seconds(),
 	})
@@ -83,10 +97,10 @@ func (v Vacuum) RemoveBlobs(dgsts []digest.Digest) error {
 	return err
 }
 
-func (v Vacuum) removeManifestsBatch(batchNo int, mm []ManifestDel) error {
+func (v Vacuum) removeManifestsBatch(ctx context.Context, batchNo int, mm []ManifestDel) error {
 	defer func() {
 		if r := recover(); r != nil {
-			dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+			v.logger.WithFields(logrus.Fields{
 				"batch_number": batchNo,
 				"r":            r,
 			}).Error("recovered batch deletion, attempting next one")
@@ -115,16 +129,16 @@ func (v Vacuum) removeManifestsBatch(batchNo int, mm []ManifestDel) error {
 		return nil
 	}
 
-	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+	v.logger.WithFields(logrus.Fields{
 		"batch_number": batchNo,
 		"manifests":    len(manifestLinks),
 		"tags":         len(tagLinks),
 		"total":        total,
 	}).Info("deleting batch")
 
-	count, err := v.driver.DeleteFiles(v.ctx, allLinks)
+	count, err := v.driver.DeleteFiles(ctx, allLinks)
 
-	l := dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+	l := v.logger.WithFields(logrus.Fields{
 		"batch_number": batchNo,
 		"count":        count,
 		"duration_s":   time.Since(start).Seconds(),
@@ -151,14 +165,14 @@ func min(a, b int) int {
 // amount of manifests and tags eligible for deletion can be really high, which would generate a considerable amount of
 // memory pressure. For this reason, manifests eligible for deletion are processed in batches of maxBatchSize, allowing
 // the Go GC to kick in and free the space required to save their full paths between batches.
-func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
+func (v Vacuum) RemoveManifests(ctx context.Context, mm []ManifestDel) error {
 	start := time.Now()
 
 	maxBatchSize := 100
 	totalToDelete := len(mm)
 	totalBatches := math.Ceil(float64(totalToDelete) / float64(maxBatchSize))
 
-	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+	v.logger.WithFields(logrus.Fields{
 		"batch_count":    totalBatches,
 		"batch_max_size": maxBatchSize,
 	}).Info("deleting manifests in batches")
@@ -166,18 +180,18 @@ func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
 	batchNo := 0
 	for i := 0; i < totalToDelete; i += maxBatchSize {
 		batchNo++
-		dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+		v.logger.WithFields(logrus.Fields{
 			"batch_number": batchNo,
 			"batch_total":  totalBatches,
 		}).Info("preparing batch")
 
 		batch := mm[i:min(i+maxBatchSize, totalToDelete)]
-		if err := v.removeManifestsBatch(batchNo, batch); err != nil {
+		if err := v.removeManifestsBatch(ctx, batchNo, batch); err != nil {
 			return err
 		}
 	}
 
-	dcontext.GetLoggerWithFields(v.ctx, map[interface{}]interface{}{
+	v.logger.WithFields(logrus.Fields{
 		"duration_s": time.Since(start).Seconds(),
 	}).Info("manifests deleted")
 
@@ -186,14 +200,14 @@ func (v Vacuum) RemoveManifests(mm []ManifestDel) error {
 
 // RemoveRepository removes a repository directory from the
 // filesystem
-func (v Vacuum) RemoveRepository(repoName string) error {
+func (v Vacuum) RemoveRepository(ctx context.Context, repoName string) error {
 	rootForRepository, err := pathFor(repositoriesRootPathSpec{})
 	if err != nil {
 		return err
 	}
 	repoDir := path.Join(rootForRepository, repoName)
-	dcontext.GetLogger(v.ctx).Infof("Deleting repo: %s", repoDir)
-	err = v.driver.Delete(v.ctx, repoDir)
+	v.logger.WithFields(logrus.Fields{"name": repoName, "path": repoDir}).Info("deleting repository")
+	err = v.driver.Delete(ctx, repoDir)
 	if err != nil {
 		return err
 	}
