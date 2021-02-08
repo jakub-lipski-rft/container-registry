@@ -35,7 +35,7 @@ func NewRegistryPullThroughCache(ctx context.Context, registry distribution.Name
 		return nil, err
 	}
 
-	v := storage.NewVacuum(ctx, driver)
+	v := storage.NewVacuum(driver, storage.VacuumWithLogger(dcontext.GetLogger(ctx)))
 	s := scheduler.New(ctx, driver, "/scheduler-state.json")
 	s.OnBlobExpire(func(ref reference.Reference) error {
 		var r reference.Canonical
@@ -57,7 +57,7 @@ func NewRegistryPullThroughCache(ctx context.Context, registry distribution.Name
 			return err
 		}
 
-		err = v.RemoveBlob(r.Digest())
+		err = v.RemoveBlob(ctx, r.Digest())
 		if err != nil {
 			return err
 		}
