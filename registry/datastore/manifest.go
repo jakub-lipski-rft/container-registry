@@ -8,14 +8,13 @@ import (
 
 	"github.com/docker/distribution/registry/datastore/metrics"
 	"github.com/docker/distribution/registry/datastore/models"
-	"github.com/opencontainers/go-digest"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 )
 
 // ManifestReader is the interface that defines read operations for a Manifest store.
 type ManifestReader interface {
 	FindAll(ctx context.Context) (models.Manifests, error)
-	FindByID(ctx context.Context, id int64) (*models.Manifest, error)
-	FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error)
 	Count(ctx context.Context) (int, error)
 	LayerBlobs(ctx context.Context, m *models.Manifest) (models.Blobs, error)
 	References(ctx context.Context, m *models.Manifest) (models.Manifests, error)
@@ -28,6 +27,7 @@ type ManifestWriter interface {
 	DissociateManifest(ctx context.Context, ml *models.Manifest, m *models.Manifest) error
 	AssociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error
 	DissociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error
+	Delete(ctx context.Context, m *models.Manifest) (bool, error)
 }
 
 // ManifestStore is the interface that a Manifest store should conform to.
@@ -123,62 +123,6 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 	}
 
 	return mm, nil
-}
-
-// FindByID finds a Manifest by ID.
-func (s *manifestStore) FindByID(ctx context.Context, id int64) (*models.Manifest, error) {
-	defer metrics.StatementDuration("manifest_find_by_id")()
-	q := `SELECT
-			m.id,
-			m.repository_id,
-			m.schema_version,
-			mt.media_type,
-			encode(m.digest, 'hex') as digest,
-			m.payload,
-			mtc.media_type as configuration_media_type,
-			encode(m.configuration_blob_digest, 'hex') as configuration_blob_digest,
-			m.configuration_payload,
-			m.created_at
-		FROM
-			manifests AS m
-			JOIN media_types AS mt ON mt.id = m.media_type_id
-			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
-		WHERE
-			m.id = $1`
-
-	row := s.db.QueryRowContext(ctx, q, id)
-
-	return scanFullManifest(row)
-}
-
-// FindByDigest finds a Manifest by the digest.
-func (s *manifestStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Manifest, error) {
-	defer metrics.StatementDuration("manifest_find_by_digest")()
-	q := `SELECT
-			m.id,
-			m.repository_id,
-			m.schema_version,
-			mt.media_type,
-			encode(m.digest, 'hex') as digest,
-			m.payload,
-			mtc.media_type as configuration_media_type,
-			encode(m.configuration_blob_digest, 'hex') as configuration_blob_digest,
-			m.configuration_payload,
-			m.created_at
-		FROM
-			manifests AS m
-			JOIN media_types AS mt ON mt.id = m.media_type_id
-			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
-		WHERE
-			m.digest = decode($1, 'hex')`
-
-	dgst, err := NewDigest(d)
-	if err != nil {
-		return nil, err
-	}
-	row := s.db.QueryRowContext(ctx, q, dgst)
-
-	return scanFullManifest(row)
 }
 
 // FindAll finds all manifests.
@@ -423,4 +367,28 @@ func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manif
 	}
 
 	return nil
+}
+
+// Delete deletes a manifest. A boolean is returned to denote whether the manifest was deleted or not. This avoids the
+// need for a separate preceding `SELECT` to find if it exists. A manifest cannot be deleted if it is referenced by a
+// manifest list.
+func (s *manifestStore) Delete(ctx context.Context, m *models.Manifest) (bool, error) {
+	defer metrics.StatementDuration("manifest_delete")()
+	q := "DELETE FROM manifests WHERE repository_id = $1 AND id = $2"
+
+	res, err := s.db.ExecContext(ctx, q, m.RepositoryID, m.ID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation && pgErr.TableName == "manifest_references" {
+			return false, fmt.Errorf("deleting manifest: %w", ErrManifestReferencedInList)
+		}
+		return false, fmt.Errorf("deleting manifest: %w", err)
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("deleting manifest: %w", err)
+	}
+
+	return count == 1, nil
 }
