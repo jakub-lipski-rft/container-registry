@@ -11,6 +11,15 @@ import (
 	"github.com/docker/distribution/registry/datastore/models"
 )
 
+type GCBlobTaskStore interface {
+	FindAll(ctx context.Context) ([]*models.GCBlobTask, error)
+	Count(ctx context.Context) (int, error)
+	Next(ctx context.Context) (*models.GCBlobTask, error)
+	Postpone(ctx context.Context, b *models.GCBlobTask, d time.Duration) error
+	IsDangling(ctx context.Context, b *models.GCBlobTask) (bool, error)
+	Delete(ctx context.Context, b *models.GCBlobTask) error
+}
+
 type gcBlobTaskStore struct {
 	db Queryer
 }

@@ -11,6 +11,15 @@ import (
 	"github.com/docker/distribution/registry/datastore/models"
 )
 
+type GCManifestTaskStore interface {
+	FindAll(ctx context.Context) ([]*models.GCManifestTask, error)
+	Count(ctx context.Context) (int, error)
+	Next(ctx context.Context) (*models.GCManifestTask, error)
+	Postpone(ctx context.Context, b *models.GCManifestTask, d time.Duration) error
+	IsDangling(ctx context.Context, b *models.GCManifestTask) (bool, error)
+	Delete(ctx context.Context, b *models.GCManifestTask) error
+}
+
 type gcManifestTaskStore struct {
 	db Queryer
 }
