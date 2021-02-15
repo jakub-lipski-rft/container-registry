@@ -275,7 +275,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	sweepStart := time.Now()
 	dcontext.GetLogger(ctx).Info("starting sweep stage")
 
-	vacuum := NewVacuum(storageDriver, VacuumWithLogger(dcontext.GetLogger(ctx)))
+	vacuum := NewVacuum(storageDriver)
 
 	if len(manifestArr.manifestDels) > 0 {
 		if err := vacuum.RemoveManifests(ctx, manifestArr.manifestDels); err != nil {
