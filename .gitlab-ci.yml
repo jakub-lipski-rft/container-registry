@@ -42,6 +42,14 @@ static-analysis:
     paths:
       - gl-code-quality-report.json
 
+modules:
+  cache: {}
+  stage: validate
+  needs: []
+  script:
+    - go mod tidy
+    - git diff --exit-code go.mod go.sum
+
 .verify:
   stage: test
   needs: []
