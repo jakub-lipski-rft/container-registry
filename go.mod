@@ -33,7 +33,6 @@ require (
 	gitlab.com/gitlab-org/labkit v1.2.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.32.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
