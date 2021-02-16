@@ -17,27 +17,9 @@ import (
 // storage systems.
 // https://en.wikipedia.org/wiki/Consistency_model
 
-// VacuumOption defines a functional option for Vacuum.
-type VacuumOption func(*Vacuum)
-
-// VacuumWithLogger sets the logger for a Vacuum.
-func VacuumWithLogger(l dcontext.Logger) VacuumOption {
-	return func(v *Vacuum) {
-		v.logger = l
-	}
-}
-
 // NewVacuum creates a new Vacuum
-func NewVacuum(driver driver.StorageDriver, opts ...VacuumOption) Vacuum {
-	v := Vacuum{
-		driver: driver,
-		logger: dcontext.GetLogger(context.Background()),
-	}
-	for _, opt := range opts {
-		opt(&v)
-	}
-
-	return v
+func NewVacuum(driver driver.StorageDriver) *Vacuum {
+	return &Vacuum{driver: driver}
 }
 
 // Vacuum removes content from the filesystem
@@ -53,7 +35,10 @@ func (v Vacuum) RemoveBlob(ctx context.Context, dgst digest.Digest) error {
 		return err
 	}
 
-	v.logger.WithFields(logrus.Fields{"digest": dgst, "path": blobPath}).Info("deleting blob")
+	dcontext.GetLogger(ctx).WithFields(logrus.Fields{
+		"digest": dgst,
+		"path":   blobPath,
+	}).Info("deleting blob")
 	if err := v.driver.Delete(ctx, blobPath); err != nil {
 		return err
 	}
@@ -66,13 +51,15 @@ func (v Vacuum) RemoveBlob(ctx context.Context, dgst digest.Digest) error {
 func (v Vacuum) RemoveBlobs(ctx context.Context, dgsts []digest.Digest) error {
 	start := time.Now()
 	blobPaths := make([]string, 0, len(dgsts))
+
+	log := dcontext.GetLogger(ctx)
 	for _, d := range dgsts {
 		// get the full path of the blob's data file
 		p, err := pathFor(blobDataPathSpec{digest: d})
 		if err != nil {
 			return err
 		}
-		v.logger.WithFields(logrus.Fields{
+		dcontext.GetLogger(ctx).WithFields(logrus.Fields{
 			"digest": d,
 			"path":   p,
 		}).Debug("preparing to delete blob")
@@ -80,11 +67,11 @@ func (v Vacuum) RemoveBlobs(ctx context.Context, dgsts []digest.Digest) error {
 	}
 
 	total := len(blobPaths)
-	v.logger.WithField("count", total).Info("deleting blobs")
+	log.WithField("count", total).Info("deleting blobs")
 
 	count, err := v.driver.DeleteFiles(ctx, blobPaths)
 
-	l := v.logger.WithFields(logrus.Fields{
+	l := log.WithFields(logrus.Fields{
 		"count":      count,
 		"duration_s": time.Since(start).Seconds(),
 	})
@@ -98,9 +85,10 @@ func (v Vacuum) RemoveBlobs(ctx context.Context, dgsts []digest.Digest) error {
 }
 
 func (v Vacuum) removeManifestsBatch(ctx context.Context, batchNo int, mm []ManifestDel) error {
+	log := dcontext.GetLogger(ctx)
 	defer func() {
 		if r := recover(); r != nil {
-			v.logger.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
 				"batch_number": batchNo,
 				"r":            r,
 			}).Error("recovered batch deletion, attempting next one")
@@ -129,7 +117,7 @@ func (v Vacuum) removeManifestsBatch(ctx context.Context, batchNo int, mm []Mani
 		return nil
 	}
 
-	v.logger.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"batch_number": batchNo,
 		"manifests":    len(manifestLinks),
 		"tags":         len(tagLinks),
@@ -138,7 +126,7 @@ func (v Vacuum) removeManifestsBatch(ctx context.Context, batchNo int, mm []Mani
 
 	count, err := v.driver.DeleteFiles(ctx, allLinks)
 
-	l := v.logger.WithFields(logrus.Fields{
+	l := log.WithFields(logrus.Fields{
 		"batch_number": batchNo,
 		"count":        count,
 		"duration_s":   time.Since(start).Seconds(),
@@ -172,7 +160,8 @@ func (v Vacuum) RemoveManifests(ctx context.Context, mm []ManifestDel) error {
 	totalToDelete := len(mm)
 	totalBatches := math.Ceil(float64(totalToDelete) / float64(maxBatchSize))
 
-	v.logger.WithFields(logrus.Fields{
+	log := dcontext.GetLogger(ctx)
+	log.WithFields(logrus.Fields{
 		"batch_count":    totalBatches,
 		"batch_max_size": maxBatchSize,
 	}).Info("deleting manifests in batches")
@@ -180,7 +169,7 @@ func (v Vacuum) RemoveManifests(ctx context.Context, mm []ManifestDel) error {
 	batchNo := 0
 	for i := 0; i < totalToDelete; i += maxBatchSize {
 		batchNo++
-		v.logger.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"batch_number": batchNo,
 			"batch_total":  totalBatches,
 		}).Info("preparing batch")
@@ -191,7 +180,7 @@ func (v Vacuum) RemoveManifests(ctx context.Context, mm []ManifestDel) error {
 		}
 	}
 
-	v.logger.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"duration_s": time.Since(start).Seconds(),
 	}).Info("manifests deleted")
 
@@ -206,7 +195,7 @@ func (v Vacuum) RemoveRepository(ctx context.Context, repoName string) error {
 		return err
 	}
 	repoDir := path.Join(rootForRepository, repoName)
-	v.logger.WithFields(logrus.Fields{"name": repoName, "path": repoDir}).Info("deleting repository")
+	dcontext.GetLogger(ctx).WithFields(logrus.Fields{"name": repoName, "path": repoDir}).Info("deleting repository")
 	err = v.driver.Delete(ctx, repoDir)
 	if err != nil {
 		return err
