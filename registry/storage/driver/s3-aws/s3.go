@@ -1264,6 +1264,10 @@ func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.
 	return nil
 }
 
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
+	return storagedriver.ErrUnsupportedMethod{}
+}
+
 type walkInfoContainer struct {
 	storagedriver.FileInfoFields
 	prefix *string

@@ -2,6 +2,7 @@ package inmemory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -273,6 +274,61 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 // from the given path, calling f on each file.
 func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.WalkFn) error {
 	return storagedriver.WalkFallbackParallel(ctx, d, maxWalkConcurrency, path, f)
+}
+
+// TransferTo writes the content from the source driver and the source path, to
+// the destination driver at the destination path.
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, srcPath, destPath string) error {
+	if d.Name() != destDriver.Name() {
+		return errors.New("destDriver must be an inmemory Driver")
+	}
+
+	if _, err := destDriver.Stat(ctx, destPath); err != nil {
+		switch err := err.(type) {
+		case storagedriver.PathNotFoundError:
+			// Continue with transfer.
+			break
+		default:
+			return err
+		}
+	} else {
+		// If the path exists, we can assume that the content has already
+		// been uploaded, since the blob storage is content-addressable.
+		// While it may be corrupted, detection of such corruption belongs
+		// elsewhere.
+		return nil
+	}
+
+	src, err := d.Reader(ctx, srcPath, 0)
+	if err != nil {
+		return err
+	}
+
+	dest, err := destDriver.Writer(ctx, destPath, false)
+	if err != nil {
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if _, err = io.Copy(dest, src); err != nil {
+		dest.Cancel()
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if err = dest.Commit(); err != nil {
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	fi, err := destDriver.Stat(ctx, srcPath)
+	if err != nil {
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if fi.Size() != dest.Size() {
+		err = fmt.Errorf("post-transfer size mismatch: src %d, dest %d", fi.Size(), dest.Size())
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	return nil
 }
 
 type writer struct {

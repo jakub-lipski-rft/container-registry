@@ -23,13 +23,13 @@ import (
 // Importer populates the registry database with filesystem metadata. This is only meant to be used for an initial
 // one-off migration, starting with an empty database.
 type Importer struct {
-	storageDriver   driver.StorageDriver
-	registry        distribution.Namespace
-	db              *DB
-	repositoryStore *repositoryStore
-	manifestStore   *manifestStore
-	tagStore        *tagStore
-	blobStore       *blobStore
+	registry            distribution.Namespace
+	blobTransferService distribution.BlobTransferService
+	db                  *DB
+	repositoryStore     *repositoryStore
+	manifestStore       *manifestStore
+	tagStore            *tagStore
+	blobStore           *blobStore
 
 	importDanglingManifests bool
 	importDanglingBlobs     bool
@@ -64,12 +64,18 @@ func WithDryRun(imp *Importer) {
 	imp.dryRun = true
 }
 
+// WithBlobTransferService configures the Importer to use the passed BlobTransferService.
+func WithBlobTransferService(bts distribution.BlobTransferService) ImporterOption {
+	return func(imp *Importer) {
+		imp.blobTransferService = bts
+	}
+}
+
 // NewImporter creates a new Importer.
-func NewImporter(db *DB, storageDriver driver.StorageDriver, registry distribution.Namespace, opts ...ImporterOption) *Importer {
+func NewImporter(db *DB, registry distribution.Namespace, opts ...ImporterOption) *Importer {
 	imp := &Importer{
-		storageDriver: storageDriver,
-		registry:      registry,
-		db:            db,
+		registry: registry,
+		db:       db,
 	}
 
 	for _, o := range opts {
@@ -193,6 +199,10 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 		return fmt.Errorf("linking layer blob to repository: %w", err)
 	}
 
+	if err := imp.transferBlob(ctx, l.Digest); err != nil {
+		return fmt.Errorf("transferring layer blob: %w", err)
+	}
+
 	return nil
 }
 
@@ -217,6 +227,14 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 			log.WithError(err).Error("importing layer")
 			continue
 		}
+	}
+
+	return nil
+}
+
+func (imp *Importer) transferBlob(ctx context.Context, d digest.Digest) error {
+	if !imp.dryRun && imp.blobTransferService != nil {
+		return imp.blobTransferService.Transfer(ctx, d)
 	}
 
 	return nil
@@ -269,6 +287,10 @@ func (imp *Importer) importV2Manifest(ctx context.Context, fsRepo distribution.R
 	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.config(), configPayload)
 	if err != nil {
 		return nil, err
+	}
+
+	if err = imp.transferBlob(ctx, m.config().Digest); err != nil {
+		return nil, fmt.Errorf("transferring config blob: %w", err)
 	}
 
 	// link configuration to repository
@@ -609,6 +631,13 @@ func (imp *Importer) ImportAll(ctx context.Context) error {
 					return err
 				}
 			}
+
+			// Even if we found the blob in the database, try to transfer in case it's
+			// not present in blob storage on the transfer side.
+			if err = imp.transferBlob(ctx, desc.Digest); err != nil {
+				return fmt.Errorf("transferring blob: %w", err)
+			}
+
 			return nil
 		})
 		if err != nil {

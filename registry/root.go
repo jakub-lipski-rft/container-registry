@@ -448,7 +448,7 @@ var ImportCmd = &cobra.Command{
 			opts = append(opts, datastore.WithRequireEmptyDatabase)
 		}
 
-		p := datastore.NewImporter(db, driver, registry, opts...)
+		p := datastore.NewImporter(db, registry, opts...)
 
 		if repoPath == "" {
 			err = p.ImportAll(ctx)

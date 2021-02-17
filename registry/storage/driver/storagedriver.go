@@ -106,6 +106,8 @@ type StorageDriver interface {
 	// parallel. This enables improved performance, but the order which files are
 	// processed is not stable and WalkFn must be thread-safe.
 	WalkParallel(ctx context.Context, path string, f WalkFn) error
+
+	TransferTo(ctx context.Context, destDriver StorageDriver, src, dest string) error
 }
 
 // FileWriter provides an abstraction for an opened writable file-like object in
@@ -205,4 +207,16 @@ func (e MultiError) Error() string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
+}
+
+// PartialTransferError is returned when a transfer operation has left the
+// destination path in an unknown state.
+type PartialTransferError struct {
+	SourcePath      string
+	DestinationPath string
+	Cause           error
+}
+
+func (err PartialTransferError) Error() string {
+	return fmt.Sprintf("partial transfer from %s to %s: %s", err.SourcePath, err.DestinationPath, err.Cause)
 }

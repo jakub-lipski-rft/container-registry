@@ -518,6 +518,10 @@ func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.
 	return d.Walk(ctx, path, f)
 }
 
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
+	return storagedriver.ErrUnsupportedMethod{}
+}
+
 func (d *driver) ossPath(path string) string {
 	return strings.TrimLeft(strings.TrimRight(d.RootDirectory, "/")+path, "/")
 }
