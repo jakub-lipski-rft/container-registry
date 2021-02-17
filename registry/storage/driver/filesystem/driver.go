@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -343,6 +344,84 @@ func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.
 	// TODO: Verify that this driver can reliably handle parallel workloads before
 	// using storagedriver.WalkFallbackParallel
 	return d.Walk(ctx, path, f)
+}
+
+// TransferTo writes the content from the source driver and the source path, to
+// the destination driver at the destination path.
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, srcPath, destPath string) error {
+	if err := d.canTransferTo(destDriver); err != nil {
+		return fmt.Errorf("unable to begin transfer: %w", err)
+	}
+
+	if _, err := destDriver.Stat(ctx, destPath); err != nil {
+		switch err := err.(type) {
+		case storagedriver.PathNotFoundError:
+			// Continue with transfer.
+			break
+		default:
+			return err
+		}
+	} else {
+		// If the path exists, we can assume that the content has already
+		// been uploaded, since the blob storage is content-addressable.
+		// While it may be corrupted, detection of such corruption belongs
+		// elsewhere.
+		return nil
+	}
+
+	src, err := d.Reader(ctx, srcPath, 0)
+	if err != nil {
+		return err
+	}
+
+	dest, err := destDriver.Writer(ctx, destPath, false)
+	if err != nil {
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if _, err = io.Copy(dest, src); err != nil {
+		dest.Cancel()
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if err = dest.Commit(); err != nil {
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	fi, err := destDriver.Stat(ctx, srcPath)
+	if err != nil {
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if fi.Size() != dest.Size() {
+		err = fmt.Errorf("post-transfer size mismatch: src %d, dest %d", fi.Size(), dest.Size())
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	return nil
+}
+
+func (d *driver) canTransferTo(destDriver storagedriver.StorageDriver) error {
+	dd, ok := destDriver.(*Driver)
+	if !ok {
+		return errors.New("destDriver must be a filesystem Driver")
+	}
+
+	r, ok := dd.StorageDriver.(*base.Regulator)
+	if !ok {
+		return errors.New("destDriver base driver must be a Regulator")
+	}
+
+	innerDriver, ok := r.StorageDriver.(*driver)
+	if !ok {
+		return errors.New("destDriver base driver must be a filesystem driver")
+	}
+
+	if innerDriver.rootDirectory == d.rootDirectory {
+		return errors.New("srcDriver and destDriver must not have the same root directory")
+	}
+
+	return nil
 }
 
 // fullPath returns the absolute path of a key within the Driver's storage.

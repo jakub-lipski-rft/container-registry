@@ -10,7 +10,7 @@ import (
 func TestRegulatorEnterExit(t *testing.T) {
 	const limit = 500
 
-	r := NewRegulator(nil, limit).(*regulator)
+	r := NewRegulator(nil, limit).(*Regulator)
 
 	for try := 0; try < 50; try++ {
 		run := make(chan struct{})

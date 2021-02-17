@@ -975,6 +975,10 @@ func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.
 	return storagedriver.WalkFallbackParallel(ctx, d, maxWalkConcurrency, path, f)
 }
 
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
+	return storagedriver.ErrUnsupportedMethod{}
+}
+
 func startSession(client *http.Client, bucket string, name string) (uri string, err error) {
 	u := &url.URL{
 		Scheme:   "https",

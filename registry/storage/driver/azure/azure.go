@@ -389,6 +389,10 @@ func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.
 	return d.Walk(ctx, path, f)
 }
 
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
+	return storagedriver.ErrUnsupportedMethod{}
+}
+
 // directDescendants will find direct descendants (blobs or virtual containers)
 // of from list of blob paths and will return their full paths. Elements in blobs
 // list must be prefixed with a "/" and

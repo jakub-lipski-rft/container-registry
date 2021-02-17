@@ -5,7 +5,9 @@ package datastore_test
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -15,9 +17,11 @@ import (
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/testutil"
 	"github.com/docker/distribution/registry/storage"
+	"github.com/docker/distribution/registry/storage/driver"
 	storageDriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/filesystem"
 	"github.com/docker/libtrust"
+	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,7 +97,19 @@ func newImporterWithRoot(t *testing.T, db *datastore.DB, root string, opts ...da
 	driver := newFilesystemStorageDriverWithRoot(t, root)
 	registry := newRegistry(t, driver)
 
-	return datastore.NewImporter(db, driver, registry, opts...)
+	return datastore.NewImporter(db, registry, opts...)
+}
+
+func newTempDirDriver(t *testing.T) (*filesystem.Driver, func()) {
+	rootDir, err := ioutil.TempDir("", "driver-")
+	require.NoError(t, err)
+
+	d, err := filesystem.FromParameters(map[string]interface{}{
+		"rootdirectory": rootDir,
+	})
+	require.NoError(t, err)
+
+	return d, func() { os.Remove(rootDir) }
 }
 
 // Dump each table as JSON and compare the output against reference snapshots (.golden files)
@@ -111,6 +127,40 @@ func validateImport(t *testing.T, db *datastore.DB) {
 			testutil.CompareWithGoldenFile(t, p, actual, *create, *update)
 		})
 	}
+}
+
+// Check that the blobs in the database match the blobs in the driver exactly.
+func validateBlobTransfer(t *testing.T, driver driver.StorageDriver) {
+	t.Helper()
+
+	blobStore := datastore.NewBlobStore(suite.db)
+	dbBlobs, err := blobStore.FindAll(suite.ctx)
+	require.NoError(t, err)
+
+	var dbDigests []digest.Digest
+	for _, b := range dbBlobs {
+		dbDigests = append(dbDigests, b.Digest)
+	}
+
+	registry := newRegistry(t, driver)
+	blobService := registry.Blobs()
+
+	var fsDigests []digest.Digest
+
+	err = blobService.Enumerate(suite.ctx, func(desc distribution.Descriptor) error {
+		fsDigests = append(fsDigests, desc.Digest)
+		return nil
+	})
+
+	// If there are no blobs in the database, such as after a dry run, we expect
+	// the blob data path to not exist.
+	if len(dbDigests) == 0 {
+		require.True(t, errors.As(err, &storageDriver.PathNotFoundError{}))
+	} else {
+		require.NoError(t, err)
+	}
+
+	require.ElementsMatch(t, dbDigests, fsDigests)
 }
 
 func TestImporter_ImportAll(t *testing.T) {
@@ -165,7 +215,7 @@ func TestImporter_ImportAll_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	// load some fixtures
 	reloadRepositoryFixtures(t)
 
-	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
+	imp := datastore.NewImporter(suite.db, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
 	err := imp.ImportAll(suite.ctx)
 	require.EqualError(t, err, "non-empty database")
 }
@@ -200,6 +250,42 @@ func TestImporter_ImportAll_DanglingBlobs_StopsOnError(t *testing.T) {
 	imp := newImporterWithRoot(t, suite.db, "invalid-blob", datastore.WithImportDanglingBlobs)
 	require.Error(t, imp.ImportAll(suite.ctx))
 	validateImport(t, suite.db)
+}
+
+func TestImporter_ImportAll_BlobTransfer(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	srcPath := "happy-path"
+	srcDriver := newFilesystemStorageDriverWithRoot(t, srcPath)
+
+	destDriver, cleanup := newTempDirDriver(t)
+	defer cleanup()
+
+	bts, err := storage.NewBlobTransferService(srcDriver, destDriver)
+	require.NoError(t, err)
+
+	imp := newImporterWithRoot(t, suite.db, srcPath, datastore.WithBlobTransferService(bts))
+	require.NoError(t, imp.ImportAll(suite.ctx))
+	validateImport(t, suite.db)
+	validateBlobTransfer(t, destDriver)
+}
+
+func TestImporter_ImportAll_BlobTransfer_DryRun(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	srcPath := "happy-path"
+	srcDriver := newFilesystemStorageDriverWithRoot(t, srcPath)
+
+	destDriver, cleanup := newTempDirDriver(t)
+	defer cleanup()
+
+	bts, err := storage.NewBlobTransferService(srcDriver, destDriver)
+	require.NoError(t, err)
+
+	imp := newImporterWithRoot(t, suite.db, srcPath, datastore.WithBlobTransferService(bts), datastore.WithDryRun)
+	require.NoError(t, imp.ImportAll(suite.ctx))
+	validateImport(t, suite.db)
+	validateBlobTransfer(t, destDriver)
 }
 
 func TestImporter_Import(t *testing.T) {
@@ -243,7 +329,7 @@ func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	// load some fixtures
 	reloadRepositoryFixtures(t)
 
-	imp := datastore.NewImporter(suite.db, driver, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
+	imp := datastore.NewImporter(suite.db, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
 	err := imp.Import(suite.ctx, "a-simple")
 	require.EqualError(t, err, "non-empty database")
 }

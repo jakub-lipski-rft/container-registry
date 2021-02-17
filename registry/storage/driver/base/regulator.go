@@ -11,7 +11,11 @@ import (
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 )
 
-type regulator struct {
+// Regulator wraps the given driver and is used to regulate concurrent calls
+// to the given storage driver to a maximum of the given limit. This is useful
+// for storage drivers that would otherwise create an unbounded number of OS
+// threads if allowed to be called unregulated.
+type Regulator struct {
 	storagedriver.StorageDriver
 	*sync.Cond
 
@@ -58,19 +62,16 @@ func GetLimitFromParameter(param interface{}, min, def uint64) (uint64, error) {
 	return limit, nil
 }
 
-// NewRegulator wraps the given driver and is used to regulate concurrent calls
-// to the given storage driver to a maximum of the given limit. This is useful
-// for storage drivers that would otherwise create an unbounded number of OS
-// threads if allowed to be called unregulated.
+// NewRegulator returns the storage driver restricted to the provided limit.
 func NewRegulator(driver storagedriver.StorageDriver, limit uint64) storagedriver.StorageDriver {
-	return &regulator{
+	return &Regulator{
 		StorageDriver: driver,
 		Cond:          sync.NewCond(&sync.Mutex{}),
 		available:     limit,
 	}
 }
 
-func (r *regulator) enter() {
+func (r *Regulator) enter() {
 	r.L.Lock()
 	for r.available == 0 {
 		r.Wait()
@@ -79,7 +80,7 @@ func (r *regulator) enter() {
 	r.L.Unlock()
 }
 
-func (r *regulator) exit() {
+func (r *Regulator) exit() {
 	r.L.Lock()
 	r.Signal()
 	r.available++
@@ -89,7 +90,7 @@ func (r *regulator) exit() {
 // Name returns the human-readable "name" of the driver, useful in error
 // messages and logging. By convention, this will just be the registration
 // name, but drivers may provide other information here.
-func (r *regulator) Name() string {
+func (r *Regulator) Name() string {
 	r.enter()
 	defer r.exit()
 
@@ -98,7 +99,7 @@ func (r *regulator) Name() string {
 
 // GetContent retrieves the content stored at "path" as a []byte.
 // This should primarily be used for small objects.
-func (r *regulator) GetContent(ctx context.Context, path string) ([]byte, error) {
+func (r *Regulator) GetContent(ctx context.Context, path string) ([]byte, error) {
 	r.enter()
 	defer r.exit()
 
@@ -107,7 +108,7 @@ func (r *regulator) GetContent(ctx context.Context, path string) ([]byte, error)
 
 // PutContent stores the []byte content at a location designated by "path".
 // This should primarily be used for small objects.
-func (r *regulator) PutContent(ctx context.Context, path string, content []byte) error {
+func (r *Regulator) PutContent(ctx context.Context, path string, content []byte) error {
 	r.enter()
 	defer r.exit()
 
@@ -117,7 +118,7 @@ func (r *regulator) PutContent(ctx context.Context, path string, content []byte)
 // Reader retrieves an io.ReadCloser for the content stored at "path"
 // with a given byte offset.
 // May be used to resume reading a stream by providing a nonzero offset.
-func (r *regulator) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
+func (r *Regulator) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
 	r.enter()
 	defer r.exit()
 
@@ -128,7 +129,7 @@ func (r *regulator) Reader(ctx context.Context, path string, offset int64) (io.R
 // location designated by the given path.
 // May be used to resume writing a stream by providing a nonzero offset.
 // The offset must be no larger than the CurrentSize for this path.
-func (r *regulator) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
+func (r *Regulator) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
 	r.enter()
 	defer r.exit()
 
@@ -137,7 +138,7 @@ func (r *regulator) Writer(ctx context.Context, path string, append bool) (stora
 
 // Stat retrieves the FileInfo for the given path, including the current
 // size in bytes and the creation time.
-func (r *regulator) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
+func (r *Regulator) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
 	r.enter()
 	defer r.exit()
 
@@ -146,7 +147,7 @@ func (r *regulator) Stat(ctx context.Context, path string) (storagedriver.FileIn
 
 // List returns a list of the objects that are direct descendants of the
 //given path.
-func (r *regulator) List(ctx context.Context, path string) ([]string, error) {
+func (r *Regulator) List(ctx context.Context, path string) ([]string, error) {
 	r.enter()
 	defer r.exit()
 
@@ -157,7 +158,7 @@ func (r *regulator) List(ctx context.Context, path string) ([]string, error) {
 // original object.
 // Note: This may be no more efficient than a copy followed by a delete for
 // many implementations.
-func (r *regulator) Move(ctx context.Context, sourcePath string, destPath string) error {
+func (r *Regulator) Move(ctx context.Context, sourcePath string, destPath string) error {
 	r.enter()
 	defer r.exit()
 
@@ -165,7 +166,7 @@ func (r *regulator) Move(ctx context.Context, sourcePath string, destPath string
 }
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.
-func (r *regulator) Delete(ctx context.Context, path string) error {
+func (r *Regulator) Delete(ctx context.Context, path string) error {
 	r.enter()
 	defer r.exit()
 
@@ -176,7 +177,7 @@ func (r *regulator) Delete(ctx context.Context, path string) error {
 // the given path, possibly using the given options.
 // May return an ErrUnsupportedMethod in certain StorageDriver
 // implementations.
-func (r *regulator) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
+func (r *Regulator) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
 	r.enter()
 	defer r.exit()
 
