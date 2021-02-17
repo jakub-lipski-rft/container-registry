@@ -8,7 +8,7 @@ workflow:
     - if: '$CI_COMMIT_TAG'
 
 default:
-  image: golang:1.13-buster
+  image: golang:1.14-buster
   tags:
     - gitlab-org
   cache:
@@ -157,10 +157,6 @@ modules:
       alias: "toxiproxy"
   script: go test -v -coverprofile=coverage.out -tags=integration,toxiproxy $PACKAGE -run ^TestDBFaultTolerance
 
-database:migrations Go 1.13:
-  extends: .database:migrations
-  image: golang:1.13-buster
-
 database:migrations Go 1.14:
   extends: .database:migrations
   image: golang:1.14-buster
@@ -168,10 +164,6 @@ database:migrations Go 1.14:
 database:migrations Go 1.15:
   extends: .database:migrations
   image: golang:1.15-buster
-
-database:datastore Go 1.13:
-  extends: .database:datastore
-  image: golang:1.13-buster
 
 database:datastore Go 1.14:
   extends: .database:datastore
@@ -181,10 +173,6 @@ database:datastore Go 1.15:
   extends: .database:datastore
   image: golang:1.15-buster
 
-database:api Go 1.13:
-  extends: .database:api
-  image: golang:1.13-buster
-
 database:api Go 1.14:
   extends: .database:api
   image: golang:1.14-buster
@@ -192,10 +180,6 @@ database:api Go 1.14:
 database:api Go 1.15:
   extends: .database:api
   image: golang:1.15-buster
-
-database:api-fault-tolerance Go 1.13:
-  extends: .database:api-fault-tolerance
-  image: golang:1.13-buster
 
 database:api-fault-tolerance Go 1.14:
   extends: .database:api-fault-tolerance
@@ -205,10 +189,6 @@ database:api-fault-tolerance Go 1.15:
   extends: .database:api-fault-tolerance
   image: golang:1.15-buster
 
-api Go 1.13:
-  extends: .api
-  image: golang:1.13-buster
-
 api Go 1.14:
   extends: .api
   image: golang:1.14-buster
@@ -216,10 +196,6 @@ api Go 1.14:
 api Go 1.15:
   extends: .api
   image: golang:1.15-buster
-
-filesystem storage driver Go 1.13:
-  extends: .filesystem
-  image: golang:1.13-buster
 
 filesystem storage driver Go 1.14:
   extends: .filesystem
@@ -229,10 +205,6 @@ filesystem storage driver Go 1.15:
   extends: .filesystem
   image: golang:1.15-buster
 
-inmemory storage driver Go 1.13:
-  extends: .inmemory
-  image: golang:1.13-buster
-
 inmemory storage driver Go 1.14:
   extends: .inmemory
   image: golang:1.14-buster
@@ -240,10 +212,6 @@ inmemory storage driver Go 1.14:
 inmemory storage driver Go 1.15:
   extends: .inmemory
   image: golang:1.15-buster
-
-swift storage driver Go 1.13:
-  extends: .swift
-  image: golang:1.13-buster
 
 swift storage driver Go 1.14:
   extends: .swift
@@ -253,10 +221,6 @@ swift storage driver Go 1.15:
   extends: .swift
   image: golang:1.15-buster
 
-s3 storage driver Go 1.13:
-  extends: .s3-aws
-  image: golang:1.13-buster
-
 s3 storage driver Go 1.14:
   extends: .s3-aws
   image: golang:1.14-buster
@@ -264,10 +228,6 @@ s3 storage driver Go 1.14:
 s3 storage driver Go 1.15:
   extends: .s3-aws
   image: golang:1.15-buster
-
-verify Go 1.13:
-  extends: .verify
-  image: golang:1.13-buster
 
 verify Go 1.14:
   extends: .verify
@@ -286,10 +246,6 @@ verify Go 1.15:
     - name: redis:alpine
       alias: "redis"
   script: go test -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/storage/cache/redis
-
-cache:redis Go 1.13:
-  extends: .cache:redis
-  image: golang:1.13-buster
 
 cache:redis Go 1.14:
   extends: .cache:redis
@@ -315,10 +271,6 @@ cache:redis Go 1.15:
       alias: "redis"
     - name: bitnami/redis-sentinel
       alias: "redis-sentinel"
-
-cache:redis-sentinel Go 1.13:
-  extends: .cache:redis-sentinel
-  image: golang:1.13-buster
 
 cache:redis-sentinel Go 1.14:
   extends: .cache:redis-sentinel
