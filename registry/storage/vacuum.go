@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/vacuum.go . BlobRemover
+
 package storage
 
 import (
@@ -18,13 +20,20 @@ import (
 // https://en.wikipedia.org/wiki/Consistency_model
 
 // NewVacuum creates a new Vacuum
-func NewVacuum(driver driver.StorageDriver) *Vacuum {
+func NewVacuum(driver driver.StorageDeleter) *Vacuum {
 	return &Vacuum{driver: driver}
 }
 
-// Vacuum removes content from the filesystem
+// BlobRemover defines methods that Vacuum must implement to delete blobs from the storage backend.
+// This allows mocking Vacuum for online garbage collection, where blob removal is the only required operation.
+type BlobRemover interface {
+	RemoveBlob(ctx context.Context, dgst digest.Digest) error
+	RemoveBlobs(ctx context.Context, dgsts []digest.Digest) error
+}
+
+// Vacuum removes content from the filesystem. Implements BlobRemover.
 type Vacuum struct {
-	driver driver.StorageDriver
+	driver driver.StorageDeleter
 	logger dcontext.Logger
 }
 

@@ -78,7 +78,7 @@ func TestGcBlobTaskStore_Count(t *testing.T) {
 	require.Equal(t, 4, count)
 }
 
-func nextGCBlobTask(t *testing.T) (*datastore.Tx, *models.GCBlobTask) {
+func nextGCBlobTask(t *testing.T) (datastore.Transactor, *models.GCBlobTask) {
 	t.Helper()
 
 	tx, err := suite.db.BeginTx(suite.ctx, nil)

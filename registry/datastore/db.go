@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/db.go . Handler,Transactor
+
 package datastore
 
 import (
@@ -27,25 +29,40 @@ type Queryer interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
-// DB is a database handle that implements Querier.
+// Handler represents a database connection handler.
+type Handler interface {
+	Queryer
+	Stats() sql.DBStats
+	Close() error
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (Transactor, error)
+}
+
+// Transactor represents a database transaction.
+type Transactor interface {
+	Queryer
+	Commit() error
+	Rollback() error
+}
+
+// DB implements Handler.
 type DB struct {
 	*sql.DB
 	dsn *DSN
 }
 
 // BeginTx wraps sql.Tx from the innner sql.DB within a datastore.Tx.
-func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
+func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (Transactor, error) {
 	tx, err := db.DB.BeginTx(ctx, opts)
 
 	return &Tx{tx}, err
 }
 
 // Begin wraps sql.Tx from the inner sql.DB within a datastore.Tx.
-func (db *DB) Begin() (*Tx, error) {
+func (db *DB) Begin() (Transactor, error) {
 	return db.BeginTx(context.Background(), nil)
 }
 
-// Tx is a database transaction that implements Querier.
+// Tx implements Transactor.
 type Tx struct {
 	*sql.Tx
 }

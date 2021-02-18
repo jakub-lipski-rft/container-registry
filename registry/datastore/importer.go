@@ -26,10 +26,10 @@ type Importer struct {
 	registry            distribution.Namespace
 	blobTransferService distribution.BlobTransferService
 	db                  *DB
-	repositoryStore     *repositoryStore
-	manifestStore       *manifestStore
-	tagStore            *tagStore
-	blobStore           *blobStore
+	repositoryStore     RepositoryStore
+	manifestStore       ManifestStore
+	tagStore            TagStore
+	blobStore           BlobStore
 
 	importDanglingManifests bool
 	importDanglingBlobs     bool
@@ -87,7 +87,7 @@ func NewImporter(db *DB, registry distribution.Namespace, opts ...ImporterOption
 	return imp
 }
 
-func (imp *Importer) beginTx(ctx context.Context) (*Tx, error) {
+func (imp *Importer) beginTx(ctx context.Context) (Transactor, error) {
 	tx, err := imp.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -586,7 +586,7 @@ func (imp *Importer) isDatabaseEmpty(ctx context.Context) (bool, error) {
 
 // ImportAll populates the registry database with metadata from all repositories in the storage backend.
 func (imp *Importer) ImportAll(ctx context.Context) error {
-	var tx *Tx
+	var tx Transactor
 	var err error
 
 	// Create a single transaction and roll it back at the end for dry runs.

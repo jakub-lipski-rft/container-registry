@@ -50,9 +50,19 @@ modules:
     - go mod tidy
     - git diff --exit-code go.mod go.sum
 
+mocks:
+  cache: {}
+  stage: validate
+  needs: []
+  before_script:
+    - go get -u github.com/golang/mock/mockgen
+  script:
+    - go generate ./...
+    - git diff --exit-code **/mocks/*.go
+
 .verify:
   stage: test
-  needs: []
+  needs: [mocks]
   script:
     - go build -i .
     - make build
