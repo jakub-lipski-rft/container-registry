@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/blob.go . BlobStore
+
 package datastore
 
 import (
@@ -35,7 +37,7 @@ type blobStore struct {
 }
 
 // NewBlobStore builds a new blobStore.
-func NewBlobStore(db Queryer) *blobStore {
+func NewBlobStore(db Queryer) BlobStore {
 	return &blobStore{db: db}
 }
 
@@ -217,7 +219,7 @@ func (s *blobStore) Delete(ctx context.Context, d digest.Digest) error {
 		return fmt.Errorf("deleting blob: %w", err)
 	}
 	if n == 0 {
-		return fmt.Errorf("blob not found")
+		return ErrNotFound
 	}
 
 	return nil

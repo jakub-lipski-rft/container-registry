@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/manifest.go . ManifestStore
+
 package datastore
 
 import (
@@ -42,7 +44,7 @@ type manifestStore struct {
 }
 
 // NewManifestStore builds a new manifest store.
-func NewManifestStore(db Queryer) *manifestStore {
+func NewManifestStore(db Queryer) ManifestStore {
 	return &manifestStore{db: db}
 }
 

@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/gcmanifesttask.go . GCManifestTaskStore
+
 package datastore
 
 import (
@@ -25,7 +27,7 @@ type gcManifestTaskStore struct {
 }
 
 // NewGCManifestTaskStore builds a new gcManifestTaskStore.
-func NewGCManifestTaskStore(db Queryer) *gcManifestTaskStore {
+func NewGCManifestTaskStore(db Queryer) GCManifestTaskStore {
 	return &gcManifestTaskStore{db: db}
 }
 

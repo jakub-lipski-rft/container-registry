@@ -223,5 +223,5 @@ func TestBlobStore_Delete(t *testing.T) {
 func TestBlobStore_Delete_NotFound(t *testing.T) {
 	s := datastore.NewBlobStore(suite.db)
 	err := s.Delete(suite.ctx, "sha256:b9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9")
-	require.EqualError(t, err, "blob not found")
+	require.EqualError(t, err, datastore.ErrNotFound.Error())
 }

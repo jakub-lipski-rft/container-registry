@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/storagedriver.go . StorageDeleter
+
 package driver
 
 import (
@@ -39,6 +41,8 @@ const CurrentVersion Version = "0.1"
 // Please see the aforementioned factory package for example code showing how to get an instance
 // of a StorageDriver
 type StorageDriver interface {
+	StorageDeleter
+
 	// Name returns the human-readable "name" of the driver, useful in error
 	// messages and logging. By convention, this will just be the registration
 	// name, but drivers may provide other information here.
@@ -75,19 +79,6 @@ type StorageDriver interface {
 	// many implementations.
 	Move(ctx context.Context, sourcePath string, destPath string) error
 
-	// Delete recursively deletes all objects stored at "path" and its subpaths.
-	Delete(ctx context.Context, path string) error
-
-	// DeleteFiles deletes a set of files in bulk when supported by the
-	// underlying storage system. If not supported, DeleteFiles iterates over
-	// the path list and calls Delete for each one. The intention is to provide
-	// a more efficient method to remove files directly by their full path and
-	// in batches whenever possible. This should only be used for regular files
-	// and not for directories. Returns the number of successfully deleted
-	// files and any errors. This method is idempotent, no error is returned if
-	// a file does not exist.
-	DeleteFiles(ctx context.Context, paths []string) (int, error)
-
 	// URLFor returns a URL which may be used to retrieve the content stored at
 	// the given path, possibly using the given options.
 	// May return an ErrUnsupportedMethod in certain StorageDriver
@@ -108,6 +99,24 @@ type StorageDriver interface {
 	WalkParallel(ctx context.Context, path string, f WalkFn) error
 
 	TransferTo(ctx context.Context, destDriver StorageDriver, src, dest string) error
+}
+
+// StorageDeleter defines methods that a Storage Driver must implement to delete objects.
+// This allows using a narrower interface than StorageDriver when we only need the delete functionality, such as when
+// mocking a storage driver for testing online garbage collection.
+type StorageDeleter interface {
+	// Delete recursively deletes all objects stored at "path" and its subpaths.
+	Delete(ctx context.Context, path string) error
+
+	// DeleteFiles deletes a set of files in bulk when supported by the
+	// underlying storage system. If not supported, DeleteFiles iterates over
+	// the path list and calls Delete for each one. The intention is to provide
+	// a more efficient method to remove files directly by their full path and
+	// in batches whenever possible. This should only be used for regular files
+	// and not for directories. Returns the number of successfully deleted
+	// files and any errors. This method is idempotent, no error is returned if
+	// a file does not exist.
+	DeleteFiles(ctx context.Context, paths []string) (int, error)
 }
 
 // FileWriter provides an abstraction for an opened writable file-like object in

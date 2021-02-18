@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/gcblobtask.go . GCBlobTaskStore
+
 package datastore
 
 import (
@@ -25,7 +27,7 @@ type gcBlobTaskStore struct {
 }
 
 // NewGCBlobTaskStore builds a new gcBlobTaskStore.
-func NewGCBlobTaskStore(db Queryer) *gcBlobTaskStore {
+func NewGCBlobTaskStore(db Queryer) GCBlobTaskStore {
 	return &gcBlobTaskStore{db: db}
 }
 

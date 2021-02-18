@@ -76,7 +76,7 @@ func TestGcManifestTaskStore_Count(t *testing.T) {
 	require.Equal(t, 3, count)
 }
 
-func nextGCManifestTask(t *testing.T) (*datastore.Tx, *models.GCManifestTask) {
+func nextGCManifestTask(t *testing.T) (datastore.Transactor, *models.GCManifestTask) {
 	t.Helper()
 
 	tx, err := suite.db.BeginTx(suite.ctx, nil)
