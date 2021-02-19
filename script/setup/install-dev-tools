@@ -1,8 +1,0 @@
-#!/usr/bin/env sh
-
-#
-# Install developer tools to $GOBIN (or $GOPATH/bin if unset)
-#
-set -eu
-
-go get -u github.com/cpuguy83/go-md2man

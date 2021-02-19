@@ -1,15 +1,27 @@
-# Container Registry
+# GitLab Container Registry
 
 ## Guides
 
-- [Standalone Development Registry](standalone-dev-registry.md)
+### Development
+
+- [Development Environment Setup](development-environment-setup.md)
 - [Local Integration Testing](storage-driver-integration-testing-guide.md)
-- [Cleanup Invalid Link Files](cleanup-invalid-link-files.md)
-- [Database Migrations](database-migrations.md)
+- [Offline Garbage Collection Testing](garbage-collection-testing-guide.md)
 - [Database Development Guidelines](database-dev-guidelines.md)
-- [Push/pull request flow](push-pull-request-flow.md)
-- [Database Import](database-import-tool.md)
-- [Authentication request flow](auth-request-flow.md)
+- [Database Migrations](database-migrations.md)
+
+### Technical Documentation
+
+- [Metadata Import](database-import-tool.md)
+- [Push/pull Request Flow](push-pull-request-flow.md)
+- [Authentication Request Flow](auth-request-flow.md)
+- [Online Garbage Collection](db/online-garbage-collection.md)
+- [HTTP API Queries](db/http-api-queries.md)
+- [Migration Proxy Mode](migration-proxy.md)
+
+### Troubleshooting
+
+- [Cleanup Invalid Link Files](cleanup-invalid-link-files.md)
 
 ## Differences From Upstream
 
@@ -134,17 +146,13 @@ Registry is released, this issue should have a due date set to one week before
 the milestone. This should allow enough time for the related merge requests to
 go through, especially if feedback is received.
 
-`release.sh`, located at the root of this repository, can be ran to aid in the
-tagging a new release. It will automatically suggest the next release version,
-and create the appropriate tag, and will prompt the user to make a changelog
-entry if the chosen release version is not present in the changelog. Once the
-changelog entry is made, the release tag will be pushed upstream.
-
 ## Contributing
 
-Merge requests which make change that will impact users of this project
-should have an accompanying [changelog](../CHANGELOG.md) entry in the same
-merge request. These entries should be added under the `[Unreleased]` header.
+Merge requests which make change that will impact users of this project should
+have an accompanying [changelog](../CHANGELOG.md) entry in the same merge
+request. These entries should be added under the `[Unreleased]` header. The
+changelog follows the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+specification.
 
 ### Golang Version Support
 
