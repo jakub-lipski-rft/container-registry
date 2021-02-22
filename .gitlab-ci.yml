@@ -8,7 +8,7 @@ workflow:
     - if: '$CI_COMMIT_TAG'
 
 default:
-  image: golang:1.14-buster
+  image: golang:1.16-buster
   tags:
     - gitlab-org
   cache:
@@ -55,7 +55,7 @@ mocks:
   stage: validate
   needs: []
   before_script:
-    - go get -u github.com/golang/mock/mockgen
+    - go install github.com/golang/mock/mockgen
   script:
     - go generate ./...
     - git diff --exit-code **/mocks/*.go
@@ -175,6 +175,9 @@ database:migrations Go 1.15:
   extends: .database:migrations
   image: golang:1.15-buster
 
+database:migrations Go 1.16:
+  extends: .database:migrations
+
 database:datastore Go 1.14:
   extends: .database:datastore
   image: golang:1.14-buster
@@ -182,6 +185,9 @@ database:datastore Go 1.14:
 database:datastore Go 1.15:
   extends: .database:datastore
   image: golang:1.15-buster
+
+database:datastore Go 1.16:
+  extends: .database:datastore
 
 database:api Go 1.14:
   extends: .database:api
@@ -191,6 +197,9 @@ database:api Go 1.15:
   extends: .database:api
   image: golang:1.15-buster
 
+database:api Go 1.16:
+  extends: .database:api
+
 database:api-fault-tolerance Go 1.14:
   extends: .database:api-fault-tolerance
   image: golang:1.14-buster
@@ -198,6 +207,9 @@ database:api-fault-tolerance Go 1.14:
 database:api-fault-tolerance Go 1.15:
   extends: .database:api-fault-tolerance
   image: golang:1.15-buster
+
+database:api-fault-tolerance Go 1.16:
+  extends: .database:api-fault-tolerance
 
 api Go 1.14:
   extends: .api
@@ -207,6 +219,9 @@ api Go 1.15:
   extends: .api
   image: golang:1.15-buster
 
+api Go 1.16:
+  extends: .api
+
 filesystem storage driver Go 1.14:
   extends: .filesystem
   image: golang:1.14-buster
@@ -214,6 +229,9 @@ filesystem storage driver Go 1.14:
 filesystem storage driver Go 1.15:
   extends: .filesystem
   image: golang:1.15-buster
+
+filesystem storage driver Go 1.16:
+  extends: .filesystem
 
 inmemory storage driver Go 1.14:
   extends: .inmemory
@@ -223,6 +241,9 @@ inmemory storage driver Go 1.15:
   extends: .inmemory
   image: golang:1.15-buster
 
+inmemory storage driver Go 1.16:
+  extends: .inmemory
+
 swift storage driver Go 1.14:
   extends: .swift
   image: golang:1.14-buster
@@ -230,6 +251,9 @@ swift storage driver Go 1.14:
 swift storage driver Go 1.15:
   extends: .swift
   image: golang:1.15-buster
+
+swift storage driver Go 1.16:
+  extends: .swift
 
 s3 storage driver Go 1.14:
   extends: .s3-aws
@@ -239,6 +263,9 @@ s3 storage driver Go 1.15:
   extends: .s3-aws
   image: golang:1.15-buster
 
+s3 storage driver Go 1.16:
+  extends: .s3-aws
+
 verify Go 1.14:
   extends: .verify
   image: golang:1.14-buster
@@ -246,6 +273,9 @@ verify Go 1.14:
 verify Go 1.15:
   extends: .verify
   image: golang:1.15-buster
+
+verify Go 1.16:
+  extends: .verify
 
 .cache:redis: &cache-redis
   stage: integration
@@ -264,6 +294,9 @@ cache:redis Go 1.14:
 cache:redis Go 1.15:
   extends: .cache:redis
   image: golang:1.15-buster
+
+cache:redis Go 1.16:
+  extends: .cache:redis
 
 .cache:redis-sentinel:
   <<: *cache-redis
@@ -289,3 +322,6 @@ cache:redis-sentinel Go 1.14:
 cache:redis-sentinel Go 1.15:
   extends: .cache:redis-sentinel
   image: golang:1.15-buster
+
+cache:redis-sentinel Go 1.16:
+  extends: .cache:redis-sentinel
