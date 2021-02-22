@@ -1248,20 +1248,20 @@ func (suite *DriverSuite) TestWalkParallelError(c *check.C) {
 		c.Assert(err, check.IsNil)
 	}
 
-	wantedError := errors.New("walk: expected test error")
+	innerErr := errors.New("walk: expected test error")
 	errorFile := wantedFiles[0]
 
 	err := suite.StorageDriver.WalkParallel(suite.ctx, rootDirectory, func(fInfo storagedriver.FileInfo) error {
 		if fInfo.Path() == errorFile {
-			return wantedError
+			return innerErr
 		}
 
 		return nil
 	})
 
-	// The storage driver will prepend extra information on the error,
-	// look for an error that ends with the one that we want.
-	c.Assert(err, check.ErrorMatches, fmt.Sprintf(".*%s$", wantedError.Error()))
+	// Drivers may or may not return a multierror here, check that the innerError
+	// is present in the error returned by walk.
+	c.Assert(strings.Contains(err.Error(), innerErr.Error()), check.Equals, true)
 }
 
 // TestWalkParallelStopsProcessingOnError ensures that walk stops processing when an error is encountered.

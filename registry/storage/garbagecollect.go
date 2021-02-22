@@ -7,6 +7,7 @@ import (
 	"time"
 
 	dcontext "github.com/docker/distribution/context"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
@@ -206,8 +207,8 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 			// If we encounter a MultiError, check each underlying error, returning
 			// nil only if all errors are of type PathNotFound.
 			switch err := err.(type) {
-			case driver.MultiError:
-				for _, e := range err {
+			case *multierror.Error:
+				for _, e := range err.Errors {
 					if _, ok := e.(driver.PathNotFoundError); !ok {
 						return err
 					}

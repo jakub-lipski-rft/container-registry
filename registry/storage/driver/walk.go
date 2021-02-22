@@ -6,6 +6,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,7 +65,7 @@ func WalkFallback(ctx context.Context, driver StorageDriver, from string, f Walk
 // WalkFallbackParallel is similar to WalkFallback, but processes files and
 // directories in their own goroutines
 func WalkFallbackParallel(ctx context.Context, driver StorageDriver, maxConcurrency uint64, from string, f WalkFn) error {
-	var retError MultiError
+	var retError error
 	errors := make(chan error)
 	quit := make(chan struct{})
 	errDone := make(chan struct{})
@@ -85,7 +86,9 @@ func WalkFallbackParallel(ctx context.Context, driver StorageDriver, maxConcurre
 				closed = true
 			}
 
-			retError = append(retError, err)
+			if err != nil {
+				retError = multierror.Append(retError, err)
+			}
 		}
 		errDone <- struct{}{}
 	}()
@@ -101,11 +104,7 @@ func WalkFallbackParallel(ctx context.Context, driver StorageDriver, maxConcurre
 	close(errors)
 	<-errDone
 
-	if len(retError) > 0 {
-		return retError
-	}
-
-	return nil
+	return retError
 }
 
 func doWalkParallel(ctx context.Context, driver StorageDriver, semaphore chan struct{}, wg *sync.WaitGroup, quit <-chan struct{}, errors chan<- error, from string, f WalkFn) {

@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	log "github.com/sirupsen/logrus"
 
 	"golang.org/x/time/rate"
@@ -1038,12 +1039,12 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	}
 
 	// collect errors from concurrent DeleteObjects requests
-	var errs storagedriver.MultiError
-	errCh := make(chan storagedriver.MultiError)
+	var errs error
+	errCh := make(chan error)
 	errDone := make(chan struct{})
 	go func() {
 		for err := range errCh {
-			errs = append(errs, err...)
+			errs = multierror.Append(errs, err)
 		}
 		errDone <- struct{}{}
 	}()
@@ -1075,7 +1076,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 				},
 			})
 			if err != nil {
-				errCh <- storagedriver.MultiError{err}
+				errCh <- err
 				return
 			}
 
@@ -1086,10 +1087,10 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 			// we need to check the []*s3.Error slice within the S3 response and make sure it's empty
 			if len(resp.Errors) > 0 {
 				// parse s3.Error errors and return a single storagedriver.MultiError
-				errs := make(storagedriver.MultiError, 0, len(resp.Errors))
+				var errs error
 				for _, s3e := range resp.Errors {
 					err := fmt.Errorf("failed to delete file '%s': '%s'", *s3e.Key, *s3e.Message)
-					errs = append(errs, err)
+					errs = multierror.Append(errs, err)
 				}
 				errCh <- errs
 			}
@@ -1102,10 +1103,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	close(countCh)
 	<-countDone
 
-	if len(errs) > 0 {
-		return count, errs
-	}
-	return count, nil
+	return count, errs
 }
 
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
@@ -1204,7 +1202,7 @@ func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.
 	}
 
 	var objectCount int64
-	var retError storagedriver.MultiError
+	var retError error
 	countChan := make(chan int64)
 	countDone := make(chan struct{})
 	errors := make(chan error)
@@ -1232,7 +1230,9 @@ func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.
 				closed = true
 			}
 
-			retError = append(retError, err)
+			if err != nil {
+				retError = multierror.Append(retError, err)
+			}
 		}
 		errDone <- struct{}{}
 	}()
@@ -1257,11 +1257,7 @@ func (d *driver) WalkParallel(ctx context.Context, from string, f storagedriver.
 		return storagedriver.PathNotFoundError{Path: from}
 	}
 
-	if len(retError) > 0 {
-		return retError
-	}
-
-	return nil
+	return retError
 }
 
 func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
