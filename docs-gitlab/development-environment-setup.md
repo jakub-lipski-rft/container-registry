@@ -75,12 +75,6 @@ docker build -t registry:dev .
 This command will start the registry in a docker container, with the API
 listening at `localhost:5000`.
 
-The configuration file [`config/example.yml`](../config/example.yml) is a sample
-configuration file with the minimum required settings, plus some recommended
-ones for a better development experience. Please see the [configuration
-documentation](../docs/configuration.md) for more details and additional
-settings.
-
 The registry name, `dev-registry`, can be used to easily reference the container
 in docker commands and is arbitrary.
 
@@ -97,6 +91,12 @@ docker run -d \
     -v `pwd`/config/example.yml:/etc/docker/registry/config.yml \
     registry:dev
 ```
+
+The configuration file [`config/example.yml`](../config/example.yml) is a sample
+configuration file with the minimum required settings, plus some recommended
+ones for a better development experience. Please see the [configuration
+documentation](../docs/configuration.md) for more details and additional
+settings.
 
 ### Logs
 
@@ -130,6 +130,9 @@ curl localhost:5000/v2/_catalog
 You can now try to build and push/pull images to/from your development registry,
 for example:
 
-```shell docker pull alpine:latest docker tag alpine:latest
-localhost:5000/alpine:latest docker push localhost:5000/alpine:latest docker
-pull localhost:5000/alpine:latest ```
+```bash
+docker pull alpine:latest
+docker tag alpine:latest localhost:5000/alpine:latest
+docker push localhost:5000/alpine:latest
+docker pull localhost:5000/alpine:latest
+```
