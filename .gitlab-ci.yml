@@ -60,6 +60,15 @@ mocks:
     - go generate ./...
     - git diff --exit-code **/mocks/*.go
 
+dependencies:outdated:
+  cache: {}
+  stage: validate
+  needs: []
+  allow_failure: true
+  before_script:
+    - go install github.com/psampaz/go-mod-outdated
+  script: go list -u -m -json all | go-mod-outdated -update -direct -ci
+
 .verify:
   stage: test
   needs: [mocks]
