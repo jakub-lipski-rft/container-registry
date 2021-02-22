@@ -9,15 +9,14 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/hashicorp/go-multierror"
 
 	"gopkg.in/check.v1"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/docker/distribution/context"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -478,16 +477,16 @@ func TestDeleteFilesError(t *testing.T) {
 		t.Errorf("expected the deleted files count to be 0, got %d", count)
 	}
 
-	errs, ok := err.(storagedriver.MultiError)
+	errs, ok := err.(*multierror.Error)
 	if !ok {
-		t.Errorf("expected error to be of type storagedriver.MultiError, got %T", err)
+		t.Errorf("expected error to be of type multierror.Error, got %T", err)
 	}
-	if len(errs) != 2 {
-		t.Errorf("expected the number of spawned goroutines to be 2, got %d", len(errs))
+	if errs.Len() != 2 {
+		t.Errorf("expected the number of spawned goroutines to be 2, got %d", errs.Len())
 	}
 
 	expected := awserr.New(request.ErrCodeSerialization, "failed reading response body", nil).Error()
-	for _, e := range errs {
+	for _, e := range errs.Errors {
 		if e.Error() != expected {
 			t.Errorf("expected error %q, got %q", expected, e)
 		}
@@ -536,16 +535,16 @@ func TestDeleteFilesPartialError(t *testing.T) {
 		t.Errorf("expected the deleted files count to be %d, got %d", half, count)
 	}
 
-	errs, ok := err.(storagedriver.MultiError)
+	errs, ok := err.(*multierror.Error)
 	if !ok {
-		t.Errorf("expected error to be of type storagedriver.MultiError, got %T", err)
+		t.Errorf("expected error to be of type multierror.Error, got %T", err)
 	}
-	if len(errs) != half {
-		t.Errorf("expected the number of errors to be %d, got %d", half, len(errs))
+	if errs.Len() != half {
+		t.Errorf("expected the number of errors to be %d, got %d", half, errs.Len())
 	}
 
 	p := `failed to delete file '.*': 'Access Denied'`
-	for _, e := range errs {
+	for _, e := range errs.Errors {
 		matched, err := regexp.MatchString(p, e.Error())
 		if err != nil {
 			t.Errorf("unexpected error matching pattern: %v", err)

@@ -9,7 +9,7 @@
 //
 // Note that the contents of incomplete uploads are not accessible even though
 // Stat returns their length
-//
+
 // +build include_gcs
 
 package gcs
@@ -38,6 +38,7 @@ import (
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	"github.com/docker/distribution/registry/storage/driver/factory"
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -823,12 +824,14 @@ func (d *driver) Delete(context context.Context, path string) error {
 // error is returned if a file does not exist.
 func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	// collect errors from concurrent requests
-	var errs storagedriver.MultiError
-	errCh := make(chan storagedriver.MultiError)
+	var errs error
+	errCh := make(chan error)
 	errDone := make(chan struct{})
 	go func() {
 		for err := range errCh {
-			errs = append(errs, err...)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
 		}
 		errDone <- struct{}{}
 	}()
@@ -839,7 +842,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	countDone := make(chan struct{})
 	go func() {
 		for range countCh {
-			count += 1
+			count++
 		}
 		countDone <- struct{}{}
 	}()
@@ -862,7 +865,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 
 			if err := storageDeleteObject(d.storageClient, ctx, d.bucket, d.pathToKey(p)); err != nil {
 				if err != storage.ErrObjectNotExist {
-					errCh <- storagedriver.MultiError{err}
+					errCh <- err
 					return
 				}
 			}
@@ -878,10 +881,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	close(countCh)
 	<-countDone
 
-	if len(errs) > 0 {
-		return count, errs
-	}
-	return count, nil
+	return count, errs
 }
 
 func storageDeleteObject(client *storage.Client, context context.Context, bucket string, name string) error {
