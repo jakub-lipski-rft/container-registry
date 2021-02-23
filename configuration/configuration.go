@@ -296,8 +296,6 @@ type Database struct {
 	Password string `yaml:"password"`
 	// Name is the database name
 	DBName string `yaml:"dbname"`
-	// Schema is the database schema (e.g. `public`)
-	Schema string `yaml:"schema"`
 	// SSLMode is the SSL mode:
 	// http://www.postgresql.cn/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS
 	SSLMode string `yaml:"sslmode"`

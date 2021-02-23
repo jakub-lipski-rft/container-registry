@@ -163,7 +163,6 @@ database:
   user: postgres
   password:
   dbname: registry
-  schema: public
   sslmode: verify-full
   sslcert: /path/to/client.crt
   sslkey: /path/to/client.key
@@ -593,7 +592,6 @@ database:
   user: postgres
   password:
   dbname: registry
-  schema: public
   sslmode: verify-full
   sslcert: /path/to/client.crt
   sslkey: /path/to/client.key
@@ -615,7 +613,6 @@ database:
 | `user`     | yes      | The database username.                                                                                                                                                                                                                               |
 | `password` | yes      | The database password.                                                                                                                                                                                                                               |
 | `dbname`   | yes      | The database name.                                                                                                                                                                                                                                   |
-| `schema`   | yes      | The database schema.                                                                                                                                                                                                                                 |
 | `sslmode`  | yes      | The SSL mode. Can be one of `disable`, `allow`, `prefer`, `require`, `verify-ca` or `verify-full`. See the [PostgreSQL documentation](http://www.postgresql.cn/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS) for additional information. |
 | `sslcert`  | no       | The PEM encoded certificate file path. |
 | `sslkey`   | no       | The PEM encoded key file path. |
