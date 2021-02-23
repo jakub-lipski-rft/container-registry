@@ -35,6 +35,8 @@ func init() {
 	GCCmd.Flags().StringVarP(&debugAddr, "debug-server", "s", "", "run a pprof debug server at <address:port>")
 
 	MigrateCmd.AddCommand(MigrateVersionCmd)
+	MigrateStatusCmd.Flags().BoolVarP(&upToDateCheck, "up-to-date", "u", false, "check if all known migrations are applied")
+	MigrateStatusCmd.Flags().BoolVarP(&skipPostDeployment, "skip-post-deployment", "s", false, "ignore post deployment migrations")
 	MigrateCmd.AddCommand(MigrateStatusCmd)
 	MigrateUpCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	MigrateUpCmd.Flags().VarP(nullableInt{&maxNumMigrations}, "limit", "n", "limit the number of migrations (all by default)")
@@ -66,6 +68,7 @@ var (
 	repoPath                string
 	showVersion             bool
 	skipPostDeployment      bool
+	upToDateCheck           bool
 )
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
@@ -348,6 +351,20 @@ var MigrateStatusCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		if upToDateCheck {
+			upToDate := true
+			for _, s := range statuses {
+				if s.AppliedAt == nil {
+					if !s.PostDeployment || !skipPostDeployment {
+						upToDate = false
+						break
+					}
+				}
+			}
+			fmt.Println(upToDate)
+			return
+		}
+
 		table := tablewriter.NewWriter(os.Stdout)
 		table.SetHeader([]string{"Migration", "Applied"})
 		table.SetColWidth(80)
@@ -360,6 +377,9 @@ var MigrateStatusCmd = &cobra.Command{
 		sort.Strings(ids)
 
 		for _, id := range ids {
+			if statuses[id].PostDeployment && skipPostDeployment {
+				continue
+			}
 			name := id
 			if statuses[id].Unknown {
 				name += " (unknown)"
