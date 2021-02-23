@@ -209,10 +209,30 @@ OK: applied 12 migrations
 
 ### Status
 
+To check the status of database migrations use the `status` sub-command:
+
+```text
+$ registry database migrate status --help config.yml
+Show migration status
+
+Usage:
+  registry database migrate status [flags]
+
+Flags:
+  -h, --help                   help for status
+  -s, --skip-post-deployment   ignore post deployment migrations
+  -u, --up-to-date             check if all known migrations are applied
+```
+
 The `status` sub-command displays a list of all migrations, including known (the
 ones packaged in the executing `registry` binary) and unknown (the ones not
 packaged in the `registry` binary but somehow applied in the database). The
 applied timestamp (if any) is also displayed.
+
+To facilitate programmatic state checks, when using the `--up-to-date` flag,
+the output is simply `true` or `false`, depending on whether all known
+migrations are applied or not. The `--skip-post-deployment` flag can be used
+to ignore post-deployment migrations.
 
 #### Example
 
@@ -234,6 +254,11 @@ $ registry database migrate status config.yml
 | 20200527132906_create_repository_blobs_table (unknown) | 2020-07-13 14:49:22.639496 +0100 WEST |
 | 20200713143615_create_users_table                      |                                       |
 +--------------------------------------------------------+---------------------------------------+
+```
+
+```text
+$ registry database migrate status --up-to-date config.yml
+false
 ```
 
 ### Version
