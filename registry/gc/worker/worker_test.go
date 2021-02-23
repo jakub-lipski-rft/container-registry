@@ -67,6 +67,11 @@ var (
 	fakeErrorB = errors.New("error B")
 )
 
+func Test_baseWorker_Name(t *testing.T) {
+	w := &baseWorker{name: "foo"}
+	require.Equal(t, "foo", w.Name())
+}
+
 func Test_baseWorker_rollbackOnExit_PanicRecover(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	txMock := dbmock.NewMockTransactor(ctrl)
