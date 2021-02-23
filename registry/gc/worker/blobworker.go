@@ -15,46 +15,58 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const defaultStorageDeadline = 5 * time.Second
+const defaultStorageTimeout = 5 * time.Second
 
 var (
+	// for test purposes (mocking)
 	blobTaskStoreConstructor = datastore.NewGCBlobTaskStore
 	blobStoreConstructor     = datastore.NewBlobStore
 )
 
+var _ Worker = (*BlobWorker)(nil)
+
+// BlobWorker is the online GC worker responsible for processing tasks related with blobs. It consumes tasks from the
+// blob review queue, identifies if the corresponding blob is eligible for deletion, and if so, deletes it from storage
+// and database backends, in this order.
 type BlobWorker struct {
 	*baseWorker
-	vacuum          *storage.Vacuum
-	storageDeadline time.Duration
+	vacuum         *storage.Vacuum
+	storageTimeout time.Duration
 }
 
+// BlobWorkerOption provides functional options for NewBlobWorker.
 type BlobWorkerOption func(*BlobWorker)
 
+// WithBlobLogger sets the logger.
 func WithBlobLogger(l dcontext.Logger) BlobWorkerOption {
 	return func(w *BlobWorker) {
 		w.logger = l
 	}
 }
 
-func WithBlobTxDeadline(d time.Duration) BlobWorkerOption {
+// WithBlobDBTxTimeout sets the database transaction timeout for each run. Defaults to 10 seconds.
+func WithBlobDBTxTimeout(d time.Duration) BlobWorkerOption {
 	return func(w *BlobWorker) {
-		w.dbTxDeadline = d
+		w.dbTxTimeout = d
 	}
 }
 
-func WithBlobStorageDeadline(d time.Duration) BlobWorkerOption {
+// WithBlobStorageTimeout sets the timeout for storage operations. This is currently used to limit the duration of
+// requests to delete dangling blobs on the storage backend. Defaults to 5 seconds.
+func WithBlobStorageTimeout(d time.Duration) BlobWorkerOption {
 	return func(w *BlobWorker) {
-		w.storageDeadline = d
+		w.storageTimeout = d
 	}
 }
 
 func (w *BlobWorker) applyDefaults() {
 	w.baseWorker.applyDefaults()
-	if w.storageDeadline == 0 {
-		w.storageDeadline = defaultStorageDeadline
+	if w.storageTimeout == 0 {
+		w.storageTimeout = defaultStorageTimeout
 	}
 }
 
+// NewBlobWorker creates a new BlobWorker.
 func NewBlobWorker(db datastore.Handler, storageDeleter driver.StorageDeleter, opts ...BlobWorkerOption) *BlobWorker {
 	w := &BlobWorker{
 		baseWorker: &baseWorker{db: db},
@@ -70,31 +82,32 @@ func NewBlobWorker(db datastore.Handler, storageDeleter driver.StorageDeleter, o
 	return w
 }
 
-func (w *BlobWorker) Run(ctx context.Context) error {
+// Run implements Worker.
+func (w *BlobWorker) Run(ctx context.Context) (bool, error) {
 	return w.run(ctx, w)
 }
 
-func (w *BlobWorker) processTask(ctx context.Context) error {
+func (w *BlobWorker) processTask(ctx context.Context) (bool, error) {
 	log := dcontext.GetLogger(ctx)
 
-	// don't let the database transaction run for longer than w.dbTxDeadline
-	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.dbTxDeadline))
+	// don't let the database transaction run for longer than w.dbTxTimeout
+	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.dbTxTimeout))
 	defer cancel()
 
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("creating database transaction: %w", err)
+		return false, fmt.Errorf("creating database transaction: %w", err)
 	}
 	defer w.rollbackOnExit(ctx, tx)
 
 	bts := blobTaskStoreConstructor(tx)
 	t, err := bts.Next(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if t == nil {
 		log.Info("no task available")
-		return nil
+		return false, nil
 	}
 	log.WithFields(logrus.Fields{
 		"review_after": t.ReviewAfter.UTC(),
@@ -106,7 +119,7 @@ func (w *BlobWorker) processTask(ctx context.Context) error {
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			// The transaction duration exceeded w.dbTxDeadline and therefore the connection was closed, just return
+			// The transaction duration exceeded w.dbTxTimeout and therefore the connection was closed, just return
 			// because the task was unlocked on close and therefore we can't postpone the next review
 		default:
 			// we don't know how to react here, so just try to postpone the task review and return
@@ -114,13 +127,13 @@ func (w *BlobWorker) processTask(ctx context.Context) error {
 				err = multierror.Append(err, innerErr)
 			}
 		}
-		return err
+		return true, err
 	}
 
 	if dangling {
 		log.Info("the blob is dangling")
 		if err := w.deleteBlob(ctx, tx, t); err != nil {
-			return err
+			return true, err
 		}
 	} else {
 		log.Info("the blob is not dangling")
@@ -128,20 +141,20 @@ func (w *BlobWorker) processTask(ctx context.Context) error {
 
 	log.Info("deleting task")
 	if err := bts.Delete(ctx, t); err != nil {
-		return err
+		return true, err
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing database transaction: %w", err)
+		return true, fmt.Errorf("committing database transaction: %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t *models.GCBlobTask) error {
 	log := dcontext.GetLogger(ctx)
 
 	// delete blob from storage
-	ctx2, cancel := context.WithDeadline(ctx, timeNow().Add(w.storageDeadline))
+	ctx2, cancel := context.WithDeadline(ctx, timeNow().Add(w.storageTimeout))
 	defer cancel()
 
 	if err := w.vacuum.RemoveBlob(ctx2, t.Digest); err != nil {
@@ -168,7 +181,7 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 			log.Warn("blob no longer exists on database")
 			return nil
 		case errors.Is(err, context.DeadlineExceeded):
-			// the transaction duration exceeded w.dbTxDeadline and therefore the connection was closed, just return
+			// the transaction duration exceeded w.dbTxTimeout and therefore the connection was closed, just return
 		default:
 			// we don't know how to react here, so just try to postpone the task review and return
 			if innerErr := w.postponeTaskAndCommit(ctx, tx, t); innerErr != nil {

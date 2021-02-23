@@ -17,18 +17,33 @@ import (
 )
 
 const (
-	componentKey        = "component"
-	defaultDBTxDeadline = 10 * time.Second
+	componentKey       = "component"
+	defaultDBTxTimeout = 10 * time.Second
 )
+
+// Worker represents an online GC worker, which is responsible for processing review tasks, determining eligibility
+// for deletion and deleting artifacts from the backend if eligible.
+type Worker interface {
+	// Name returns the worker name for observability purposes.
+	Name() string
+	// Run executes the worker once, processing the next available GC task. A bool is returned to indicate whether
+	// there was a task available or not, regardless if processing it succeeded or not.
+	Run(context.Context) (bool, error)
+}
 
 // for test purposes (mocking)
 var timeNow = time.Now
 
 type baseWorker struct {
-	name         string
-	db           datastore.Handler
-	logger       dcontext.Logger
-	dbTxDeadline time.Duration
+	name        string
+	db          datastore.Handler
+	logger      dcontext.Logger
+	dbTxTimeout time.Duration
+}
+
+// Name implements Worker.
+func (w *baseWorker) Name() string {
+	return w.name
 }
 
 func (w *baseWorker) applyDefaults() {
@@ -37,32 +52,25 @@ func (w *baseWorker) applyDefaults() {
 		defaultLogger.SetOutput(ioutil.Discard)
 		w.logger = defaultLogger
 	}
-	if w.dbTxDeadline == 0 {
-		w.dbTxDeadline = defaultDBTxDeadline
+	if w.dbTxTimeout == 0 {
+		w.dbTxTimeout = defaultDBTxTimeout
 	}
 }
 
 type processor interface {
-	processTask(context.Context) error
+	processTask(context.Context) (bool, error)
 }
 
-func (w *baseWorker) run(ctx context.Context, p processor) error {
+func (w *baseWorker) run(ctx context.Context, p processor) (bool, error) {
 	ctx = injectCorrelationID(ctx, w.logger)
-	log := dcontext.GetLogger(ctx)
 
-	start := time.Now()
-	log.Info("running GC worker")
-	defer func() {
-		log.WithField("duration_ms", time.Since(start).Milliseconds()).Info("run complete")
-	}()
-
-	if err := p.processTask(ctx); err != nil {
+	found, err := p.processTask(ctx)
+	if err != nil {
 		err = fmt.Errorf("processing task: %w", err)
 		w.logAndReportErr(ctx, err)
-		return err
 	}
 
-	return nil
+	return found, err
 }
 
 func (w *baseWorker) logAndReportErr(ctx context.Context, err error) {

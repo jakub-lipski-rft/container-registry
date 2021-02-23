@@ -14,28 +14,38 @@ import (
 )
 
 var (
+	// for test purposes (mocking)
 	manifestTaskStoreConstructor = datastore.NewGCManifestTaskStore
 	manifestStoreConstructor     = datastore.NewManifestStore
 )
 
+var _ Worker = (*ManifestWorker)(nil)
+
+// ManifestWorker is the online GC worker responsible for processing tasks related with manifests. It consumes tasks
+// from the manifest review queue, identifies if the corresponding manifest is eligible for deletion, and if so,
+// deletes it from the database.
 type ManifestWorker struct {
 	*baseWorker
 }
 
+// ManifestWorkerOption provides functional options for NewManifestWorker.
 type ManifestWorkerOption func(*ManifestWorker)
 
+// WithManifestLogger sets the logger.
 func WithManifestLogger(l dcontext.Logger) ManifestWorkerOption {
 	return func(w *ManifestWorker) {
 		w.logger = l
 	}
 }
 
-func WithManifestTxDeadline(d time.Duration) ManifestWorkerOption {
+// WithManifestDBTxTimeout sets the database transaction timeout for each run. Defaults to 10 seconds.
+func WithManifestDBTxTimeout(d time.Duration) ManifestWorkerOption {
 	return func(w *ManifestWorker) {
-		w.dbTxDeadline = d
+		w.dbTxTimeout = d
 	}
 }
 
+// NewBlobWorker creates a new BlobWorker.
 func NewManifestWorker(db datastore.Handler, opts ...ManifestWorkerOption) *ManifestWorker {
 	w := &ManifestWorker{baseWorker: &baseWorker{db: db}}
 	w.name = "registry.gc.worker.ManifestWorker"
@@ -48,32 +58,33 @@ func NewManifestWorker(db datastore.Handler, opts ...ManifestWorkerOption) *Mani
 	return w
 }
 
-func (w *ManifestWorker) Run(ctx context.Context) error {
+// Run implements Worker.
+func (w *ManifestWorker) Run(ctx context.Context) (bool, error) {
 	ctx = dcontext.WithLogger(ctx, w.logger)
 	return w.run(ctx, w)
 }
 
-func (w *ManifestWorker) processTask(ctx context.Context) error {
+func (w *ManifestWorker) processTask(ctx context.Context) (bool, error) {
 	log := dcontext.GetLogger(ctx)
 
-	// don't let the database transaction run for longer than w.dbTxDeadline
-	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.dbTxDeadline))
+	// don't let the database transaction run for longer than w.dbTxTimeout
+	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.dbTxTimeout))
 	defer cancel()
 
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("creating database transaction: %w", err)
+		return false, fmt.Errorf("creating database transaction: %w", err)
 	}
 	defer w.rollbackOnExit(ctx, tx)
 
 	mts := manifestTaskStoreConstructor(tx)
 	t, err := mts.Next(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if t == nil {
 		log.Info("no task available")
-		return nil
+		return false, nil
 	}
 
 	log.WithFields(logrus.Fields{
@@ -87,7 +98,7 @@ func (w *ManifestWorker) processTask(ctx context.Context) error {
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			// The transaction duration exceeded w.dbTxDeadline and therefore the connection was closed, just return
+			// The transaction duration exceeded w.dbTxTimeout and therefore the connection was closed, just return
 			// because the task was unlocked on close and therefore we can't postpone the next review
 		default:
 			// we don't know how to react here, so just try to postpone the task review and return
@@ -95,28 +106,28 @@ func (w *ManifestWorker) processTask(ctx context.Context) error {
 				err = multierror.Append(err, innerErr)
 			}
 		}
-		return err
+		return true, err
 	}
 
 	if dangling {
 		log.Info("the manifest is dangling")
 		if err := w.deleteManifest(ctx, tx, t); err != nil {
-			return err
+			return true, err
 		}
 	} else {
 		log.Info("the manifest is not dangling")
 		// deleting the manifest cascades to the review queue, so we only delete the task directly if not dangling
 		log.Info("deleting task")
 		if err := mts.Delete(ctx, t); err != nil {
-			return err
+			return true, err
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing database transaction: %w", err)
+		return true, fmt.Errorf("committing database transaction: %w", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transactor, t *models.GCManifestTask) error {
@@ -127,7 +138,7 @@ func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transa
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			// The transaction duration exceeded w.dbTxDeadline and therefore the connection was closed, just return
+			// The transaction duration exceeded w.dbTxTimeout and therefore the connection was closed, just return
 			// because the task was unlocked on close and therefore we can't postpone the next review
 		default:
 			if innerErr := w.postponeTaskAndCommit(ctx, tx, t); innerErr != nil {
