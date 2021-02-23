@@ -66,7 +66,7 @@ dependencies:outdated:
   needs: []
   allow_failure: true
   before_script:
-    - go install github.com/psampaz/go-mod-outdated
+    - go install github.com/psampaz/go-mod-outdated@v0.7.0
   script: go list -u -m -json all | go-mod-outdated -update -direct -ci
 
 .verify:
