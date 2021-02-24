@@ -11,6 +11,7 @@ import (
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/api/errcode"
 	"github.com/docker/distribution/registry/storage"
+	"gitlab.com/gitlab-org/labkit/correlation"
 )
 
 type migrationHandler struct {
@@ -98,7 +99,6 @@ func (h migrationHandler) proxyNewRepositories(rw http.ResponseWriter, req *http
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(u)
-
 	// modify request before forwarding
 	defaultDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
@@ -106,6 +106,7 @@ func (h migrationHandler) proxyNewRepositories(rw http.ResponseWriter, req *http
 		defaultDirector(req)
 		// proxy.ServeHTTP will set X-Forwarded-For for us, but we should also set X-Forwarded-Host
 		req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
+		req.Header.Set("X-Request-ID", correlation.ExtractFromContext(h.Context))
 		req.Host = req.URL.Host
 	}
 

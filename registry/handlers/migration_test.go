@@ -15,6 +15,7 @@ import (
 	"github.com/docker/distribution/registry/api/errcode"
 	"github.com/docker/distribution/testutil"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gitlab-org/labkit/correlation"
 )
 
 type handlerMock struct {
@@ -113,6 +114,9 @@ func TestProxyNewRepositories_ProxiesRequests(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, remoteHost, req.Header.Get("X-Forwarded-For"))
 		require.Equal(t, reqBkp.Header.Get("Host"), req.Header.Get("X-Forwarded-Host"))
+                
+                // validate that the request correlation ID was propagated through the X-Request-ID header
+		require.Equal(t, correlation.ExtractFromContext(ctx.Context), req.Header.Get("X-Request-ID"))
 
 		// validate that custom headers are removed from response writer
 		require.Empty(t, res.Header().Get("Docker-Distribution-API-Version"))
