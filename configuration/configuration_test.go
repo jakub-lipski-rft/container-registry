@@ -64,7 +64,6 @@ var configStruct = Configuration{
 		User:     "postgres",
 		Password: "",
 		DBName:   "registry",
-		Schema:   "public",
 		SSLMode:  "disable",
 	},
 	Migration: Migration{
@@ -634,7 +633,6 @@ func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
 		User:     "user",
 		Password: "passwd",
 		DBName:   "foo",
-		Schema:   "bar",
 		SSLMode:  "allow",
 	}
 	suite.expectedConfig.Database = expected
@@ -645,7 +643,6 @@ func (suite *ConfigSuite) TestParseWithDifferentEnvDatabase(c *C) {
 	os.Setenv("REGISTRY_DATABASE_USER", expected.User)
 	os.Setenv("REGISTRY_DATABASE_PASSWORD", expected.Password)
 	os.Setenv("REGISTRY_DATABASE_DBNAME", expected.DBName)
-	os.Setenv("REGISTRY_DATABASE_SCHEMA", expected.Schema)
 	os.Setenv("REGISTRY_DATABASE_SSLMODE", expected.SSLMode)
 
 	config, err := Parse(bytes.NewReader([]byte(configYamlV0_1)))
