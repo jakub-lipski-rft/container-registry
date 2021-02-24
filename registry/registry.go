@@ -105,7 +105,7 @@ func NewRegistry(ctx context.Context, config *configuration.Configuration) (*Reg
 	if handler, err = configureAccessLogging(config, handler); err != nil {
 		return nil, fmt.Errorf("configuring access logger: %w", err)
 	}
-	handler = correlation.InjectCorrelationID(handler)
+	handler = correlation.InjectCorrelationID(handler, correlation.WithPropagation())
 
 	server := &http.Server{
 		Handler: handler,

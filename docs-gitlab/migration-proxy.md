@@ -57,13 +57,15 @@ migration:
     url: https://registry2.example.com
 ```
 
+For development purposes an already ready [configuration file](https://gitlab.com/gitlab-org/container-registry/-/blob/master/config/proxy.yml) is present in the config folder.
+
 ### Target instance(s)
 
 The migration proxy mode must _not_ be enabled in the new registry instance(s).
 
-It's required to set the [HTTP secret](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#http) configuration parameter (`http.secret`) to the same value as for the existing proxy registry, ensuring that both proxy and target registries share the same piece of data used to sign state. 
+It's required to set the [HTTP secret](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#http) configuration parameter (`http.secret`) to the same value as for the existing proxy registry, ensuring that both proxy and target registries share the same piece of data used to sign state.
 
-It's also required to set the [HTTP host](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#http) configuration parameter (`htt.host`) to the fully-qualified URL of the old/proxy registry. This is used to generate `Location` headers delivered to clients in response to write requests. These `Location` headers must point to the public proxy registry and not to the private target registry.
+It's also required to set the [HTTP host](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#http) configuration parameter (`http.host`) to the fully-qualified URL of the old/proxy registry. This is used to generate `Location` headers delivered to clients in response to write requests. These `Location` headers must point to the public proxy registry and not to the private target registry.
 
 #### Example
 
@@ -72,3 +74,5 @@ http:
   host: https://registry.example.com
   secret: registrysecret
 ```
+
+For development purposes an already ready [configuration file](https://gitlab.com/gitlab-org/container-registry/-/blob/master/config/proxied.yml) is present in the config folder
