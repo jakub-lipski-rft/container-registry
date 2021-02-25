@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"crypto/tls"
 	"database/sql"
+	"errors"
 	"expvar"
 	"fmt"
 	"math/rand"
@@ -15,8 +16,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"gitlab.com/gitlab-org/labkit/metrics/sqlmetrics"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/configuration"
@@ -31,6 +30,8 @@ import (
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/auth"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/gc"
+	"github.com/docker/distribution/registry/gc/worker"
 	registrymiddleware "github.com/docker/distribution/registry/middleware/registry"
 	repositorymiddleware "github.com/docker/distribution/registry/middleware/repository"
 	"github.com/docker/distribution/registry/proxy"
@@ -42,12 +43,14 @@ import (
 	storagemiddleware "github.com/docker/distribution/registry/storage/driver/middleware"
 	"github.com/docker/distribution/registry/storage/validation"
 	"github.com/docker/distribution/version"
+	"github.com/getsentry/sentry-go"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	promclient "github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/labkit/errortracking"
 	metricskit "gitlab.com/gitlab-org/labkit/metrics"
+	"gitlab.com/gitlab-org/labkit/metrics/sqlmetrics"
 )
 
 // randomSecretSize is the number of random bytes to generate if no secret
@@ -313,6 +316,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		if config.Migration.DisableMirrorFS {
 			options = append(options, storage.DisableMirrorFS)
 		}
+
+		startOnlineGC(app.Context, app.db, app.driver, config)
 	}
 
 	// configure storage caches
@@ -410,6 +415,89 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	}
 
 	return app
+}
+
+func startOnlineGC(ctx context.Context, db *datastore.DB, storageDriver storagedriver.StorageDriver, config *configuration.Configuration) {
+	if !config.Database.Enabled || config.GC.Disabled || (config.GC.Blobs.Disabled && config.GC.Manifests.Disabled) {
+		return
+	}
+
+	log := dcontext.GetLogger(ctx)
+
+	aOpts := []gc.AgentOption{
+		gc.WithLogger(log),
+	}
+	if config.GC.NoIdleBackoff {
+		aOpts = append(aOpts, gc.WithoutIdleBackoff())
+	}
+	if config.GC.MaxBackoff > 0 {
+		aOpts = append(aOpts, gc.WithMaxBackoff(config.GC.MaxBackoff))
+	}
+
+	var agents []*gc.Agent
+
+	if !config.GC.Blobs.Disabled {
+		bwOpts := []worker.BlobWorkerOption{
+			worker.WithBlobLogger(log),
+		}
+		if config.GC.TransactionTimeout > 0 {
+			bwOpts = append(bwOpts, worker.WithBlobTxTimeout(config.GC.TransactionTimeout))
+		}
+		if config.GC.Blobs.StorageTimeout > 0 {
+			bwOpts = append(bwOpts, worker.WithBlobStorageTimeout(config.GC.Blobs.StorageTimeout))
+		}
+		bw := worker.NewBlobWorker(db, storageDriver, bwOpts...)
+
+		baOpts := aOpts
+		if config.GC.Blobs.Interval > 0 {
+			baOpts = append(baOpts, gc.WithInitialInterval(config.GC.Blobs.Interval))
+		}
+		ba := gc.NewAgent(bw, baOpts...)
+		agents = append(agents, ba)
+	}
+
+	if !config.GC.Manifests.Disabled {
+		mwOpts := []worker.ManifestWorkerOption{
+			worker.WithManifestLogger(log),
+		}
+		if config.GC.TransactionTimeout > 0 {
+			mwOpts = append(mwOpts, worker.WithManifestTxTimeout(config.GC.TransactionTimeout))
+		}
+		mw := worker.NewManifestWorker(db, mwOpts...)
+
+		maOpts := aOpts
+		if config.GC.Manifests.Interval > 0 {
+			maOpts = append(maOpts, gc.WithInitialInterval(config.GC.Manifests.Interval))
+		}
+		ma := gc.NewAgent(mw, maOpts...)
+		agents = append(agents, ma)
+	}
+
+	for _, a := range agents {
+		go func(a *gc.Agent) {
+			// This function can only end in two situations: panic or context cancellation. If a panic occurs we should
+			// log, report to Sentry and then re-panic, as the instance would be in an inconsistent/unknown state. In
+			// case of context cancellation, the app is shutting down, so there is nothing to worry about.
+			defer func() {
+				if err := recover(); err != nil {
+					log.WithField("error", err).Error("online GC agent stopped with panic")
+					sentry.CurrentHub().Recover(err)
+					sentry.Flush(5 * time.Second)
+					panic(err)
+				}
+			}()
+			if err := a.Start(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					// leaving this here for now for additional confidence and improved observability
+					log.Warn("shutting down online GC agent due due to context cancellation")
+				} else {
+					// this should never happen, but leaving it here for future proofing against bugs within Agent.Start
+					errortracking.Capture(fmt.Errorf("online GC agent stopped with error: %w", err))
+					log.WithError(err).Error("online GC agent stopped")
+				}
+			}
+		}(a)
+	}
 }
 
 // RegisterHealthChecks is an awful hack to defer health check registration

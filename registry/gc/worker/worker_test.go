@@ -104,10 +104,8 @@ func Test_exponentialBackoff(t *testing.T) {
 		{"6", 6, 5*time.Hour + 20*time.Minute},
 		{"7", 7, 10*time.Hour + 40*time.Minute},
 		{"8", 8, 21*time.Hour + 20*time.Minute},
-		{"9", 9, 42*time.Hour + 40*time.Minute},
-		{"10", 10, 85*time.Hour + 20*time.Minute},
-		{"beyond max", 11, 168 * time.Hour},
-		{"int64 overflow", 31, 168 * time.Hour},
+		{"beyond max", 9, 24 * time.Hour},
+		{"int64 overflow", 31, 24 * time.Hour},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

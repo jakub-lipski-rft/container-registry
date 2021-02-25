@@ -1,3 +1,5 @@
+//go:generate mockgen -package mocks -destination mocks/worker.go . Worker
+
 package worker
 
 import (
@@ -17,8 +19,8 @@ import (
 )
 
 const (
-	componentKey       = "component"
-	defaultDBTxTimeout = 10 * time.Second
+	componentKey     = "component"
+	defaultTxTimeout = 10 * time.Second
 )
 
 // Worker represents an online GC worker, which is responsible for processing review tasks, determining eligibility
@@ -35,10 +37,10 @@ type Worker interface {
 var timeNow = time.Now
 
 type baseWorker struct {
-	name        string
-	db          datastore.Handler
-	logger      dcontext.Logger
-	dbTxTimeout time.Duration
+	name      string
+	db        datastore.Handler
+	logger    dcontext.Logger
+	txTimeout time.Duration
 }
 
 // Name implements Worker.
@@ -52,8 +54,8 @@ func (w *baseWorker) applyDefaults() {
 		defaultLogger.SetOutput(ioutil.Discard)
 		w.logger = defaultLogger
 	}
-	if w.dbTxTimeout == 0 {
-		w.dbTxTimeout = defaultDBTxTimeout
+	if w.txTimeout == 0 {
+		w.txTimeout = defaultTxTimeout
 	}
 }
 
@@ -111,7 +113,7 @@ func injectCorrelationID(ctx context.Context, logger dcontext.Logger) context.Co
 
 func exponentialBackoff(i int) time.Duration {
 	base := 5 * time.Minute
-	max := 7 * 24 * time.Hour
+	max := 24 * time.Hour
 
 	// this should never happen, but just in case...
 	if i < 0 {

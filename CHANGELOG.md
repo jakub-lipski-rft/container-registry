@@ -6,6 +6,7 @@
 - configuration: Add `draintimeout` to database stanza to set optional connection close timeout on shutdown
 - registry/api/v2: Disallow manifest delete if referenced by manifest lists (metadata database only).
 - registry: Add CLI flag to facilitate programmatic state checks for database migrations
+- registry: Add continuous online garbage collection
 
 ### Changed
 - registry/datastore: Metadata database does not use prepared statements by default
