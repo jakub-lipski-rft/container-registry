@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [v3.1.0-gitlab] - 2021-02-25
 ### Added
 - configuration: Add `preparedstatements` option to toggle prepared statements for the metadata database
 - configuration: Add `draintimeout` to database stanza to set optional connection close timeout on shutdown
