@@ -6,36 +6,37 @@ package mocks
 
 import (
 	context "context"
-	models "github.com/docker/distribution/registry/datastore/models"
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 	time "time"
+
+	models "github.com/docker/distribution/registry/datastore/models"
+	gomock "github.com/golang/mock/gomock"
 )
 
-// MockGCManifestTaskStore is a mock of GCManifestTaskStore interface
+// MockGCManifestTaskStore is a mock of GCManifestTaskStore interface.
 type MockGCManifestTaskStore struct {
 	ctrl     *gomock.Controller
 	recorder *MockGCManifestTaskStoreMockRecorder
 }
 
-// MockGCManifestTaskStoreMockRecorder is the mock recorder for MockGCManifestTaskStore
+// MockGCManifestTaskStoreMockRecorder is the mock recorder for MockGCManifestTaskStore.
 type MockGCManifestTaskStoreMockRecorder struct {
 	mock *MockGCManifestTaskStore
 }
 
-// NewMockGCManifestTaskStore creates a new mock instance
+// NewMockGCManifestTaskStore creates a new mock instance.
 func NewMockGCManifestTaskStore(ctrl *gomock.Controller) *MockGCManifestTaskStore {
 	mock := &MockGCManifestTaskStore{ctrl: ctrl}
 	mock.recorder = &MockGCManifestTaskStoreMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockGCManifestTaskStore) EXPECT() *MockGCManifestTaskStoreMockRecorder {
 	return m.recorder
 }
 
-// Count mocks base method
+// Count mocks base method.
 func (m *MockGCManifestTaskStore) Count(arg0 context.Context) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Count", arg0)
@@ -44,13 +45,13 @@ func (m *MockGCManifestTaskStore) Count(arg0 context.Context) (int, error) {
 	return ret0, ret1
 }
 
-// Count indicates an expected call of Count
+// Count indicates an expected call of Count.
 func (mr *MockGCManifestTaskStoreMockRecorder) Count(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Count", reflect.TypeOf((*MockGCManifestTaskStore)(nil).Count), arg0)
 }
 
-// Delete mocks base method
+// Delete mocks base method.
 func (m *MockGCManifestTaskStore) Delete(arg0 context.Context, arg1 *models.GCManifestTask) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", arg0, arg1)
@@ -58,13 +59,13 @@ func (m *MockGCManifestTaskStore) Delete(arg0 context.Context, arg1 *models.GCMa
 	return ret0
 }
 
-// Delete indicates an expected call of Delete
+// Delete indicates an expected call of Delete.
 func (mr *MockGCManifestTaskStoreMockRecorder) Delete(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockGCManifestTaskStore)(nil).Delete), arg0, arg1)
 }
 
-// FindAll mocks base method
+// FindAll mocks base method.
 func (m *MockGCManifestTaskStore) FindAll(arg0 context.Context) ([]*models.GCManifestTask, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindAll", arg0)
@@ -73,13 +74,13 @@ func (m *MockGCManifestTaskStore) FindAll(arg0 context.Context) ([]*models.GCMan
 	return ret0, ret1
 }
 
-// FindAll indicates an expected call of FindAll
+// FindAll indicates an expected call of FindAll.
 func (mr *MockGCManifestTaskStoreMockRecorder) FindAll(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAll", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAll), arg0)
 }
 
-// IsDangling mocks base method
+// IsDangling mocks base method.
 func (m *MockGCManifestTaskStore) IsDangling(arg0 context.Context, arg1 *models.GCManifestTask) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsDangling", arg0, arg1)
@@ -88,13 +89,13 @@ func (m *MockGCManifestTaskStore) IsDangling(arg0 context.Context, arg1 *models.
 	return ret0, ret1
 }
 
-// IsDangling indicates an expected call of IsDangling
+// IsDangling indicates an expected call of IsDangling.
 func (mr *MockGCManifestTaskStoreMockRecorder) IsDangling(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDangling", reflect.TypeOf((*MockGCManifestTaskStore)(nil).IsDangling), arg0, arg1)
 }
 
-// Next mocks base method
+// Next mocks base method.
 func (m *MockGCManifestTaskStore) Next(arg0 context.Context) (*models.GCManifestTask, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Next", arg0)
@@ -103,13 +104,13 @@ func (m *MockGCManifestTaskStore) Next(arg0 context.Context) (*models.GCManifest
 	return ret0, ret1
 }
 
-// Next indicates an expected call of Next
+// Next indicates an expected call of Next.
 func (mr *MockGCManifestTaskStoreMockRecorder) Next(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*MockGCManifestTaskStore)(nil).Next), arg0)
 }
 
-// Postpone mocks base method
+// Postpone mocks base method.
 func (m *MockGCManifestTaskStore) Postpone(arg0 context.Context, arg1 *models.GCManifestTask, arg2 time.Duration) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Postpone", arg0, arg1, arg2)
@@ -117,7 +118,7 @@ func (m *MockGCManifestTaskStore) Postpone(arg0 context.Context, arg1 *models.GC
 	return ret0
 }
 
-// Postpone indicates an expected call of Postpone
+// Postpone indicates an expected call of Postpone.
 func (mr *MockGCManifestTaskStoreMockRecorder) Postpone(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Postpone", reflect.TypeOf((*MockGCManifestTaskStore)(nil).Postpone), arg0, arg1, arg2)

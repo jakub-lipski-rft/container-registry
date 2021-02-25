@@ -7,35 +7,36 @@ package mocks
 import (
 	context "context"
 	sql "database/sql"
+	reflect "reflect"
+
 	datastore "github.com/docker/distribution/registry/datastore"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
-// MockHandler is a mock of Handler interface
+// MockHandler is a mock of Handler interface.
 type MockHandler struct {
 	ctrl     *gomock.Controller
 	recorder *MockHandlerMockRecorder
 }
 
-// MockHandlerMockRecorder is the mock recorder for MockHandler
+// MockHandlerMockRecorder is the mock recorder for MockHandler.
 type MockHandlerMockRecorder struct {
 	mock *MockHandler
 }
 
-// NewMockHandler creates a new mock instance
+// NewMockHandler creates a new mock instance.
 func NewMockHandler(ctrl *gomock.Controller) *MockHandler {
 	mock := &MockHandler{ctrl: ctrl}
 	mock.recorder = &MockHandlerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockHandler) EXPECT() *MockHandlerMockRecorder {
 	return m.recorder
 }
 
-// BeginTx mocks base method
+// BeginTx mocks base method.
 func (m *MockHandler) BeginTx(arg0 context.Context, arg1 *sql.TxOptions) (datastore.Transactor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BeginTx", arg0, arg1)
@@ -44,13 +45,13 @@ func (m *MockHandler) BeginTx(arg0 context.Context, arg1 *sql.TxOptions) (datast
 	return ret0, ret1
 }
 
-// BeginTx indicates an expected call of BeginTx
+// BeginTx indicates an expected call of BeginTx.
 func (mr *MockHandlerMockRecorder) BeginTx(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginTx", reflect.TypeOf((*MockHandler)(nil).BeginTx), arg0, arg1)
 }
 
-// Close mocks base method
+// Close mocks base method.
 func (m *MockHandler) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
@@ -58,13 +59,13 @@ func (m *MockHandler) Close() error {
 	return ret0
 }
 
-// Close indicates an expected call of Close
+// Close indicates an expected call of Close.
 func (mr *MockHandlerMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockHandler)(nil).Close))
 }
 
-// ExecContext mocks base method
+// ExecContext mocks base method.
 func (m *MockHandler) ExecContext(arg0 context.Context, arg1 string, arg2 ...interface{}) (sql.Result, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
@@ -77,14 +78,14 @@ func (m *MockHandler) ExecContext(arg0 context.Context, arg1 string, arg2 ...int
 	return ret0, ret1
 }
 
-// ExecContext indicates an expected call of ExecContext
+// ExecContext indicates an expected call of ExecContext.
 func (mr *MockHandlerMockRecorder) ExecContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecContext", reflect.TypeOf((*MockHandler)(nil).ExecContext), varargs...)
 }
 
-// PrepareContext mocks base method
+// PrepareContext mocks base method.
 func (m *MockHandler) PrepareContext(arg0 context.Context, arg1 string) (*sql.Stmt, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PrepareContext", arg0, arg1)
@@ -93,13 +94,13 @@ func (m *MockHandler) PrepareContext(arg0 context.Context, arg1 string) (*sql.St
 	return ret0, ret1
 }
 
-// PrepareContext indicates an expected call of PrepareContext
+// PrepareContext indicates an expected call of PrepareContext.
 func (mr *MockHandlerMockRecorder) PrepareContext(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareContext", reflect.TypeOf((*MockHandler)(nil).PrepareContext), arg0, arg1)
 }
 
-// QueryContext mocks base method
+// QueryContext mocks base method.
 func (m *MockHandler) QueryContext(arg0 context.Context, arg1 string, arg2 ...interface{}) (*sql.Rows, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
@@ -112,14 +113,14 @@ func (m *MockHandler) QueryContext(arg0 context.Context, arg1 string, arg2 ...in
 	return ret0, ret1
 }
 
-// QueryContext indicates an expected call of QueryContext
+// QueryContext indicates an expected call of QueryContext.
 func (mr *MockHandlerMockRecorder) QueryContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryContext", reflect.TypeOf((*MockHandler)(nil).QueryContext), varargs...)
 }
 
-// QueryRowContext mocks base method
+// QueryRowContext mocks base method.
 func (m *MockHandler) QueryRowContext(arg0 context.Context, arg1 string, arg2 ...interface{}) *sql.Row {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
@@ -131,14 +132,14 @@ func (m *MockHandler) QueryRowContext(arg0 context.Context, arg1 string, arg2 ..
 	return ret0
 }
 
-// QueryRowContext indicates an expected call of QueryRowContext
+// QueryRowContext indicates an expected call of QueryRowContext.
 func (mr *MockHandlerMockRecorder) QueryRowContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowContext", reflect.TypeOf((*MockHandler)(nil).QueryRowContext), varargs...)
 }
 
-// Stats mocks base method
+// Stats mocks base method.
 func (m *MockHandler) Stats() sql.DBStats {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Stats")
@@ -146,36 +147,36 @@ func (m *MockHandler) Stats() sql.DBStats {
 	return ret0
 }
 
-// Stats indicates an expected call of Stats
+// Stats indicates an expected call of Stats.
 func (mr *MockHandlerMockRecorder) Stats() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stats", reflect.TypeOf((*MockHandler)(nil).Stats))
 }
 
-// MockTransactor is a mock of Transactor interface
+// MockTransactor is a mock of Transactor interface.
 type MockTransactor struct {
 	ctrl     *gomock.Controller
 	recorder *MockTransactorMockRecorder
 }
 
-// MockTransactorMockRecorder is the mock recorder for MockTransactor
+// MockTransactorMockRecorder is the mock recorder for MockTransactor.
 type MockTransactorMockRecorder struct {
 	mock *MockTransactor
 }
 
-// NewMockTransactor creates a new mock instance
+// NewMockTransactor creates a new mock instance.
 func NewMockTransactor(ctrl *gomock.Controller) *MockTransactor {
 	mock := &MockTransactor{ctrl: ctrl}
 	mock.recorder = &MockTransactorMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockTransactor) EXPECT() *MockTransactorMockRecorder {
 	return m.recorder
 }
 
-// Commit mocks base method
+// Commit mocks base method.
 func (m *MockTransactor) Commit() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Commit")
@@ -183,13 +184,13 @@ func (m *MockTransactor) Commit() error {
 	return ret0
 }
 
-// Commit indicates an expected call of Commit
+// Commit indicates an expected call of Commit.
 func (mr *MockTransactorMockRecorder) Commit() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockTransactor)(nil).Commit))
 }
 
-// ExecContext mocks base method
+// ExecContext mocks base method.
 func (m *MockTransactor) ExecContext(arg0 context.Context, arg1 string, arg2 ...interface{}) (sql.Result, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
@@ -202,14 +203,14 @@ func (m *MockTransactor) ExecContext(arg0 context.Context, arg1 string, arg2 ...
 	return ret0, ret1
 }
 
-// ExecContext indicates an expected call of ExecContext
+// ExecContext indicates an expected call of ExecContext.
 func (mr *MockTransactorMockRecorder) ExecContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecContext", reflect.TypeOf((*MockTransactor)(nil).ExecContext), varargs...)
 }
 
-// PrepareContext mocks base method
+// PrepareContext mocks base method.
 func (m *MockTransactor) PrepareContext(arg0 context.Context, arg1 string) (*sql.Stmt, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PrepareContext", arg0, arg1)
@@ -218,13 +219,13 @@ func (m *MockTransactor) PrepareContext(arg0 context.Context, arg1 string) (*sql
 	return ret0, ret1
 }
 
-// PrepareContext indicates an expected call of PrepareContext
+// PrepareContext indicates an expected call of PrepareContext.
 func (mr *MockTransactorMockRecorder) PrepareContext(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareContext", reflect.TypeOf((*MockTransactor)(nil).PrepareContext), arg0, arg1)
 }
 
-// QueryContext mocks base method
+// QueryContext mocks base method.
 func (m *MockTransactor) QueryContext(arg0 context.Context, arg1 string, arg2 ...interface{}) (*sql.Rows, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
@@ -237,14 +238,14 @@ func (m *MockTransactor) QueryContext(arg0 context.Context, arg1 string, arg2 ..
 	return ret0, ret1
 }
 
-// QueryContext indicates an expected call of QueryContext
+// QueryContext indicates an expected call of QueryContext.
 func (mr *MockTransactorMockRecorder) QueryContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryContext", reflect.TypeOf((*MockTransactor)(nil).QueryContext), varargs...)
 }
 
-// QueryRowContext mocks base method
+// QueryRowContext mocks base method.
 func (m *MockTransactor) QueryRowContext(arg0 context.Context, arg1 string, arg2 ...interface{}) *sql.Row {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
@@ -256,14 +257,14 @@ func (m *MockTransactor) QueryRowContext(arg0 context.Context, arg1 string, arg2
 	return ret0
 }
 
-// QueryRowContext indicates an expected call of QueryRowContext
+// QueryRowContext indicates an expected call of QueryRowContext.
 func (mr *MockTransactorMockRecorder) QueryRowContext(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowContext", reflect.TypeOf((*MockTransactor)(nil).QueryRowContext), varargs...)
 }
 
-// Rollback mocks base method
+// Rollback mocks base method.
 func (m *MockTransactor) Rollback() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Rollback")
@@ -271,7 +272,7 @@ func (m *MockTransactor) Rollback() error {
 	return ret0
 }
 
-// Rollback indicates an expected call of Rollback
+// Rollback indicates an expected call of Rollback.
 func (mr *MockTransactorMockRecorder) Rollback() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rollback", reflect.TypeOf((*MockTransactor)(nil).Rollback))

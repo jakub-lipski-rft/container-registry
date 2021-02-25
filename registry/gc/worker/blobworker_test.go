@@ -667,17 +667,13 @@ func TestBlobWorker_Run_Error(t *testing.T) {
 	stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
-	txMock := storemock.NewMockTransactor(ctrl)
 	driverMock := drivermock.NewMockStorageDeleter(ctrl)
 
 	w := NewBlobWorker(dbMock, driverMock)
 
 	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 
-	gomock.InOrder(
-		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(nil, fakeErrorA).Times(1),
-		txMock.EXPECT().Rollback().Return(sql.ErrTxDone).Times(1),
-	)
+	dbMock.EXPECT().BeginTx(dbCtx, nil).Return(nil, fakeErrorA).Times(1)
 
 	found, err := w.Run(context.Background())
 	require.EqualError(t, err, fmt.Errorf("processing task: creating database transaction: %w", fakeErrorA).Error())
