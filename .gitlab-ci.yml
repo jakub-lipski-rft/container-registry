@@ -69,7 +69,14 @@ dependencies:outdated:
     - go install github.com/psampaz/go-mod-outdated@v0.7.0
   script: go list -u -m -json all | go-mod-outdated -update -direct -ci
 
-.verify:
+.go-version-matrix:
+  image: golang:${GO_VERSION}-buster
+  parallel:
+    matrix:
+      - GO_VERSION: [ "1.14", "1.15", "1.16" ]
+
+verify:
+  extends: .go-version-matrix
   stage: test
   needs: [mocks]
   script:
@@ -79,26 +86,27 @@ dependencies:outdated:
     - make coverage
 
 .storage-driver-test: &storage-driver-test
+  extends: .go-version-matrix
   stage: integration
   needs: []
   script: go test -v -coverprofile=coverage.out $PACKAGE -args -check.v -test.short
 
-.filesystem:
+filesystem:
   <<: *storage-driver-test
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/storage/driver/filesystem
 
-.inmemory:
+inmemory:
   <<: *storage-driver-test
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/storage/driver/inmemory
 
-.swift:
+swift:
   <<: *storage-driver-test
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/storage/driver/swift
 
-.s3-aws:
+s3-aws:
   <<: *storage-driver-test
   variables:
     AWS_ACCESS_KEY: "AKIAIOSFODNN7EXAMPLE"
@@ -122,12 +130,14 @@ dependencies:outdated:
     - ./mc config host add s3v4 $REGION_ENDPOINT $AWS_ACCESS_KEY $AWS_SECRET_KEY --api S3v4
     - ./mc mb s3v4/$S3_BUCKET
 
-.api:
+api:
+  extends: .go-version-matrix
   stage: integration
   needs: []
   script: go test -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/handlers
 
 .database: &database
+  extends: .go-version-matrix
   stage: integration
   needs: []
   variables:
@@ -146,23 +156,23 @@ dependencies:outdated:
       alias: "db"
   script: go test -v -coverprofile=coverage.out -tags=integration $PACKAGE
 
-.database:migrations:
+database:migrations:
   <<: *database
   before_script:
     - export PACKAGE=github.com/docker/distribution/migrations
 
-.database:datastore:
+database:datastore:
   <<: *database
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/datastore
 
-.database:api:
+database:api:
   <<: *database
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/handlers
 
 # Tests that simulate adverse network conditions/errors between the registry and its database.
-.database:api-fault-tolerance:
+database:api-fault-tolerance:
   <<: *database
   before_script:
     - export PACKAGE=github.com/docker/distribution/registry/handlers
@@ -176,117 +186,8 @@ dependencies:outdated:
       alias: "toxiproxy"
   script: go test -v -coverprofile=coverage.out -tags=integration,toxiproxy $PACKAGE -run ^TestDBFaultTolerance
 
-database:migrations Go 1.14:
-  extends: .database:migrations
-  image: golang:1.14-buster
-
-database:migrations Go 1.15:
-  extends: .database:migrations
-  image: golang:1.15-buster
-
-database:migrations Go 1.16:
-  extends: .database:migrations
-
-database:datastore Go 1.14:
-  extends: .database:datastore
-  image: golang:1.14-buster
-
-database:datastore Go 1.15:
-  extends: .database:datastore
-  image: golang:1.15-buster
-
-database:datastore Go 1.16:
-  extends: .database:datastore
-
-database:api Go 1.14:
-  extends: .database:api
-  image: golang:1.14-buster
-
-database:api Go 1.15:
-  extends: .database:api
-  image: golang:1.15-buster
-
-database:api Go 1.16:
-  extends: .database:api
-
-database:api-fault-tolerance Go 1.14:
-  extends: .database:api-fault-tolerance
-  image: golang:1.14-buster
-
-database:api-fault-tolerance Go 1.15:
-  extends: .database:api-fault-tolerance
-  image: golang:1.15-buster
-
-database:api-fault-tolerance Go 1.16:
-  extends: .database:api-fault-tolerance
-
-api Go 1.14:
-  extends: .api
-  image: golang:1.14-buster
-
-api Go 1.15:
-  extends: .api
-  image: golang:1.15-buster
-
-api Go 1.16:
-  extends: .api
-
-filesystem storage driver Go 1.14:
-  extends: .filesystem
-  image: golang:1.14-buster
-
-filesystem storage driver Go 1.15:
-  extends: .filesystem
-  image: golang:1.15-buster
-
-filesystem storage driver Go 1.16:
-  extends: .filesystem
-
-inmemory storage driver Go 1.14:
-  extends: .inmemory
-  image: golang:1.14-buster
-
-inmemory storage driver Go 1.15:
-  extends: .inmemory
-  image: golang:1.15-buster
-
-inmemory storage driver Go 1.16:
-  extends: .inmemory
-
-swift storage driver Go 1.14:
-  extends: .swift
-  image: golang:1.14-buster
-
-swift storage driver Go 1.15:
-  extends: .swift
-  image: golang:1.15-buster
-
-swift storage driver Go 1.16:
-  extends: .swift
-
-s3 storage driver Go 1.14:
-  extends: .s3-aws
-  image: golang:1.14-buster
-
-s3 storage driver Go 1.15:
-  extends: .s3-aws
-  image: golang:1.15-buster
-
-s3 storage driver Go 1.16:
-  extends: .s3-aws
-
-verify Go 1.14:
-  extends: .verify
-  image: golang:1.14-buster
-
-verify Go 1.15:
-  extends: .verify
-  image: golang:1.15-buster
-
-verify Go 1.16:
-  extends: .verify
-
 .cache:redis: &cache-redis
+  extends: .go-version-matrix
   stage: integration
   needs: []
   variables:
@@ -296,18 +197,10 @@ verify Go 1.16:
       alias: "redis"
   script: go test -v -coverprofile=coverage.out -tags=integration github.com/docker/distribution/registry/storage/cache/redis
 
-cache:redis Go 1.14:
-  extends: .cache:redis
-  image: golang:1.14-buster
-
-cache:redis Go 1.15:
-  extends: .cache:redis
-  image: golang:1.15-buster
-
-cache:redis Go 1.16:
+cache:redis:
   extends: .cache:redis
 
-.cache:redis-sentinel:
+cache:redis-sentinel:
   <<: *cache-redis
   variables:
     # create a Docker network per build so that services can talk with each other
@@ -323,14 +216,3 @@ cache:redis Go 1.16:
       alias: "redis"
     - name: bitnami/redis-sentinel
       alias: "redis-sentinel"
-
-cache:redis-sentinel Go 1.14:
-  extends: .cache:redis-sentinel
-  image: golang:1.14-buster
-
-cache:redis-sentinel Go 1.15:
-  extends: .cache:redis-sentinel
-  image: golang:1.15-buster
-
-cache:redis-sentinel Go 1.16:
-  extends: .cache:redis-sentinel
