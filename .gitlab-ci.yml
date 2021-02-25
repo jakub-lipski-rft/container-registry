@@ -42,13 +42,22 @@ static-analysis:
     paths:
       - gl-code-quality-report.json
 
-modules:
+modules:tidy:
   cache: {}
   stage: validate
   needs: []
   script:
     - go mod tidy
     - git diff --exit-code go.mod go.sum
+
+modules:outdated:
+  cache: {}
+  stage: validate
+  needs: []
+  allow_failure: true
+  before_script:
+    - go install github.com/psampaz/go-mod-outdated@v0.7.0
+  script: go list -u -m -json all | go-mod-outdated -update -direct -ci
 
 mocks:
   cache: {}
@@ -59,15 +68,6 @@ mocks:
   script:
     - go generate ./...
     - git diff --exit-code **/mocks/*.go
-
-dependencies:outdated:
-  cache: {}
-  stage: validate
-  needs: []
-  allow_failure: true
-  before_script:
-    - go install github.com/psampaz/go-mod-outdated@v0.7.0
-  script: go list -u -m -json all | go-mod-outdated -update -direct -ci
 
 .go-version-matrix:
   image: golang:${GO_VERSION}-buster
