@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -975,8 +976,78 @@ func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.
 	return storagedriver.WalkFallbackParallel(ctx, d, maxWalkConcurrency, path, f)
 }
 
-func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
-	return storagedriver.ErrUnsupportedMethod{}
+// TransferTo writes the content from the source driver and the source path, to
+// the destination driver at the destination path using the GCS storage client's
+// Copier object to transfer data without pulling it into local memory.
+func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, srcPath, destPath string) error {
+	targetDriver, err := convertToGCS(destDriver)
+	if err != nil {
+		return fmt.Errorf("unable to begin transfer: %w", err)
+	}
+
+	if targetDriver.bucket == d.bucket {
+		return errors.New("srcDriver and destDriver must not have the same bucket")
+	}
+
+	if _, err := targetDriver.Stat(ctx, destPath); err != nil {
+		switch err := err.(type) {
+		case storagedriver.PathNotFoundError:
+			// Continue with transfer.
+			break
+		default:
+			return err
+		}
+	} else {
+		// If the path exists, we can assume that the content has already
+		// been uploaded, since the blob storage is content-addressable.
+		// While it may be corrupted, detection of such corruption belongs
+		// elsewhere.
+		return nil
+	}
+
+	srcPath = d.pathToKey(srcPath)
+	destPath = targetDriver.pathToKey(destPath)
+
+	src := d.storageClient.Bucket(d.bucket).Object(srcPath)
+	dest := targetDriver.storageClient.Bucket(targetDriver.bucket).Object(destPath)
+
+	destAttrs, err := dest.CopierFrom(src).Run(ctx)
+	if err != nil {
+		err = fmt.Errorf("copying data from source to destination: %w", err)
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	srcAttrs, err := src.Attrs(ctx)
+	if err != nil {
+		err = fmt.Errorf("getting attrs for src object: %w", err)
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	if bytes.Compare(srcAttrs.MD5, destAttrs.MD5) != 0 {
+		err = fmt.Errorf("src %q and dest %q checksums do not match after transfer", src.ObjectName(), dest.ObjectName())
+		return storagedriver.PartialTransferError{SourcePath: srcPath, DestinationPath: destPath, Cause: err}
+	}
+
+	return nil
+}
+
+func convertToGCS(destDriver storagedriver.StorageDriver) (*driver, error) {
+	dd, ok := destDriver.(*Wrapper)
+	if !ok {
+		return nil, errors.New("destDriver must be a gcs Wrapper")
+	}
+
+	r, ok := dd.StorageDriver.(*base.Regulator)
+	if !ok {
+		return nil, errors.New("gcs.Wrapper base driver must be a Regulator")
+	}
+
+	innerDriver, ok := r.StorageDriver.(*driver)
+	if !ok {
+		return nil, errors.New("destDriver base driver must be a gcs driver")
+	}
+
+	return innerDriver, nil
 }
 
 func startSession(client *http.Client, bucket string, name string) (uri string, err error) {

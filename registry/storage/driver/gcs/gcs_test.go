@@ -3,8 +3,11 @@
 package gcs
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
@@ -12,26 +15,31 @@ import (
 	"testing"
 
 	"cloud.google.com/go/storage"
-	dcontext "github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/testsuites"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	"gopkg.in/check.v1"
+
+	dcontext "github.com/docker/distribution/context"
+	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/docker/distribution/registry/storage/driver/testsuites"
 )
 
 // Hook up gocheck into the "go test" runner.
 func Test(t *testing.T) { check.TestingT(t) }
 
 var gcsDriverConstructor func(rootDirectory string) (storagedriver.StorageDriver, error)
+var gcsTargetDriverConstructor func(rootDirectory string) (storagedriver.StorageDriver, error)
 var skipGCS func() string
+var skipGCSTransferTo func() string
 
 const maxConcurrency = 10
 
 func init() {
 	bucket := os.Getenv("REGISTRY_STORAGE_GCS_BUCKET")
+	migrationBucket := os.Getenv("REGISTRY_STORAGE_GCS_TARGET_BUCKET")
 	credentials := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	parallelWalk := os.Getenv("GCS_PARALLEL_WALK")
 
@@ -45,6 +53,13 @@ func init() {
 
 	if skipGCS() != "" {
 		return
+	}
+
+	skipGCSTransferTo = func() string {
+		if migrationBucket == "" {
+			return "The following environment variable must be set to enable these tests: REGISTRY_STORAGE_GCS_TARGET_BUCKET"
+		}
+		return ""
 	}
 
 	root, err := ioutil.TempDir("", "driver-")
@@ -93,6 +108,26 @@ func init() {
 	gcsDriverConstructor = func(rootDirectory string) (storagedriver.StorageDriver, error) {
 		parameters := driverParameters{
 			bucket:         bucket,
+			rootDirectory:  root,
+			email:          email,
+			privateKey:     privateKey,
+			client:         oauth2.NewClient(dcontext.Background(), ts),
+			storageClient:  storageClient,
+			chunkSize:      defaultChunkSize,
+			maxConcurrency: maxConcurrency,
+			parallelWalk:   parallelWalkBool,
+		}
+
+		return New(parameters)
+	}
+
+	gcsTargetDriverConstructor = func(rootDirectory string) (storagedriver.StorageDriver, error) {
+		if migrationBucket == "" {
+			return nil, errors.New("REGISTRY_STORAGE_GCS_TARGET_BUCKET must be set")
+		}
+
+		parameters := driverParameters{
+			bucket:         migrationBucket,
 			rootDirectory:  root,
 			email:          email,
 			privateKey:     privateKey,
@@ -398,4 +433,175 @@ func TestMoveDirectory(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Moving directory /parent/dir /parent/other should have return a non-nil error\n")
 	}
+}
+
+func TestTransferTo(t *testing.T) {
+	if skipGCS() != "" {
+		t.Skip(skipGCS())
+	}
+
+	if skipGCSTransferTo() != "" {
+		t.Skip(skipGCSTransferTo())
+	}
+
+	validRoot, err := ioutil.TempDir("", "driver-")
+	require.NoError(t, err)
+	defer os.Remove(validRoot)
+
+	srcDriver, err := gcsDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	destDriver, err := gcsTargetDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	b := make([]byte, 10)
+	rand.Read(b)
+
+	ctx := context.Background()
+	path := "/happy/data/path"
+
+	// Write content to source.
+	err = srcDriver.PutContent(ctx, path, b)
+	require.NoError(t, err)
+	_, err = srcDriver.Stat(ctx, path)
+	require.NoError(t, err)
+
+	// Destination should not have already have content at the path.
+	_, err = destDriver.Stat(ctx, path)
+	require.True(t, errors.As(err, &storagedriver.PathNotFoundError{}))
+
+	// Transfer to destination.
+	err = srcDriver.TransferTo(ctx, destDriver, path, path)
+	require.NoError(t, err)
+
+	// Reading from destination should work.
+	c, err := destDriver.GetContent(ctx, path)
+	require.NoError(t, err)
+	require.EqualValues(t, b, c)
+
+	// Source content should be unaltered.
+	c, err = srcDriver.GetContent(ctx, path)
+	require.NoError(t, err)
+	require.EqualValues(t, b, c)
+}
+
+func TestTransferToSameBucket(t *testing.T) {
+	if skipGCS() != "" {
+		t.Skip(skipGCS())
+	}
+
+	if skipGCSTransferTo() != "" {
+		t.Skip(skipGCSTransferTo())
+	}
+
+	validRoot, err := ioutil.TempDir("", "driver-")
+	require.NoError(t, err)
+	defer os.Remove(validRoot)
+
+	srcDriver, err := gcsDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	b := make([]byte, 10)
+	rand.Read(b)
+
+	ctx := context.Background()
+	path := "/same/bucket/data/path"
+
+	// Write content to source.
+	err = srcDriver.PutContent(ctx, path, b)
+	require.NoError(t, err)
+	_, err = srcDriver.Stat(ctx, path)
+	require.NoError(t, err)
+
+	// Transfer to destination should exit early with error.
+	err = srcDriver.TransferTo(ctx, srcDriver, path, path)
+	require.EqualError(t, err, "srcDriver and destDriver must not have the same bucket")
+}
+
+func TestTransferToInvalidPath(t *testing.T) {
+	if skipGCS() != "" {
+		t.Skip(skipGCS())
+	}
+
+	if skipGCSTransferTo() != "" {
+		t.Skip(skipGCSTransferTo())
+	}
+
+	validRoot, err := ioutil.TempDir("", "driver-")
+	require.NoError(t, err)
+	defer os.Remove(validRoot)
+
+	srcDriver, err := gcsDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	destDriver, err := gcsTargetDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	b := make([]byte, 10)
+	rand.Read(b)
+
+	ctx := context.Background()
+	srcPath := "/valid/utf8/path"
+	// Not a valid UTF-8 string, transfer will fail validating the path.
+	destPath := "\xC2\x7F\x80\x80"
+
+	// Write content to source.
+	err = srcDriver.PutContent(ctx, srcPath, b)
+	require.NoError(t, err)
+	_, err = srcDriver.Stat(ctx, srcPath)
+	require.NoError(t, err)
+
+	// Transfer to destination, we expect a partial transfer error here.
+	err = srcDriver.TransferTo(ctx, destDriver, srcPath, destPath)
+	e := &storagedriver.PartialTransferError{}
+	require.True(t, errors.As(err, e))
+
+	// Driver paths include the root, so check for the presence of the child paths.
+	require.Contains(t, e.SourcePath, srcPath)
+	require.Contains(t, e.DestinationPath, destPath)
+}
+
+func TestTransferToExistingDest(t *testing.T) {
+	if skipGCS() != "" {
+		t.Skip(skipGCS())
+	}
+
+	if skipGCSTransferTo() != "" {
+		t.Skip(skipGCSTransferTo())
+	}
+
+	validRoot, err := ioutil.TempDir("", "driver-")
+	require.NoError(t, err)
+	defer os.Remove(validRoot)
+
+	srcDriver, err := gcsDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	destDriver, err := gcsTargetDriverConstructor(validRoot)
+	require.NoError(t, err)
+
+	b := make([]byte, 10)
+	rand.Read(b)
+
+	ctx := context.Background()
+	path := "/existing/data/path"
+
+	// Write content only at dest.
+	err = destDriver.PutContent(ctx, path, b)
+	require.NoError(t, err)
+	_, err = destDriver.Stat(ctx, path)
+	require.NoError(t, err)
+
+	// Transfer should stat for content on destintation side and return without error.
+	err = srcDriver.TransferTo(ctx, destDriver, path, path)
+	require.NoError(t, err)
+
+	// Getting content from destination should match the original.
+	c, err := destDriver.GetContent(ctx, path)
+	require.NoError(t, err)
+	require.EqualValues(t, b, c)
+
+	// Source should not have been modified.
+	_, err = srcDriver.Stat(ctx, path)
+	require.True(t, errors.As(err, &storagedriver.PathNotFoundError{}))
 }
