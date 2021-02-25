@@ -29,6 +29,22 @@ func (s *BlobTransferService) Transfer(ctx context.Context, dgst digest.Digest) 
 		return distribution.ErrBlobTransferFailed{Digest: dgst, Reason: err}
 	}
 
+	if _, err = s.dest.Stat(ctx, blobDataPath); err != nil {
+		switch err := err.(type) {
+		case driver.PathNotFoundError:
+			// Continue with transfer.
+			break
+		default:
+			return err
+		}
+	} else {
+		// If the path exists, we can assume that the content has already
+		// been uploaded, since the blob storage is content-addressable.
+		// While it may be corrupted, detection of such corruption belongs
+		// elsewhere.
+		return nil
+	}
+
 	if err = s.src.TransferTo(ctx, s.dest, blobDataPath, blobDataPath); err != nil {
 		tErr := distribution.ErrBlobTransferFailed{Digest: dgst, Reason: err}
 

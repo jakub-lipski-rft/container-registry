@@ -989,22 +989,6 @@ func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.Storag
 		return errors.New("srcDriver and destDriver must not have the same bucket")
 	}
 
-	if _, err := targetDriver.Stat(ctx, destPath); err != nil {
-		switch err := err.(type) {
-		case storagedriver.PathNotFoundError:
-			// Continue with transfer.
-			break
-		default:
-			return err
-		}
-	} else {
-		// If the path exists, we can assume that the content has already
-		// been uploaded, since the blob storage is content-addressable.
-		// While it may be corrupted, detection of such corruption belongs
-		// elsewhere.
-		return nil
-	}
-
 	srcPath = d.pathToKey(srcPath)
 	destPath = targetDriver.pathToKey(destPath)
 
