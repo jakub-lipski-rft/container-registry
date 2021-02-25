@@ -256,6 +256,41 @@ type Configuration struct {
 			Classes []string `yaml:"classes"`
 		} `yaml:"repository,omitempty"`
 	} `yaml:"policy,omitempty"`
+
+	GC GC `yaml:"gc,omitempty"`
+}
+
+// GC configures online Garbage Collection.
+type GC struct {
+	// Disabled disables the online GC workers.
+	Disabled bool `yaml:"disabled,omitempty"`
+	// NoIdleBackoff disables exponential backoff between worker runs when there was no task to be processed.
+	NoIdleBackoff bool `yaml:"noidlebackoff,omitempty"`
+	// MaxBackoff is the maximum exponential backoff duration used to sleep between worker runs when an error occurs.
+	// Also applied when there are no tasks to be processed unless NoIdleBackoff is `true`. Please note that this is
+	// not the absolute maximum, as a randomized jitter factor of up to 33% is always added.
+	MaxBackoff time.Duration `yaml:"maxbackoff,omitempty"`
+	// TransactionTimeout is the database transaction timeout for each worker run. Each worker starts a database transaction
+	// at the start. The worker run is canceled if this timeout is exceeded to avoid stalled or long-running
+	// transactions.
+	TransactionTimeout time.Duration `yaml:"transactiontimeout,omitempty"`
+	// Blobs configures the blob worker.
+	Blobs struct {
+		// Disabled disables the blob worker.
+		Disabled bool `yaml:"disabled,omitempty"`
+		// Interval is the initial sleep interval between each worker run.
+		Interval time.Duration `yaml:"interval,omitempty"`
+		// StorageTimeout is the timeout for storage operations. Used to limit the duration of requests to delete
+		// dangling blobs on the storage backend.
+		StorageTimeout time.Duration `yaml:"storagetimeout,omitempty"`
+	} `yaml:"blobs,omitempty"`
+	// Manifests configures the manifest worker.
+	Manifests struct {
+		// Disabled disables the manifest worker.
+		Disabled bool `yaml:"disabled,omitempty"`
+		// Interval is the initial sleep interval between each worker run.
+		Interval time.Duration `yaml:"interval,omitempty"`
+	} `yaml:"manifests,omitempty"`
 }
 
 // Profiling configures external profiling services.

@@ -1304,6 +1304,64 @@ one of the `allow` regular expressions **and** one of the following holds:
 2.  `deny` is set but no URLs within the manifest match any of the `deny` regular
     expressions.
 
+## `gc`
+
+The `gc` subsection configures online Garbage Collection (GC). See the [specification](../docs-gitlab/db/online-garbage-collection.md) for an explanation of how it works. Please note that these configuration settings only apply to the last stage of online GC: processing blob and manifest tasks, determining eligibility for deletion and deleting from database and storage backends, if eligible.
+
+```yaml
+gc:
+  disabled: false
+  maxbackoff: 24h
+  noidlebackoff: false
+  transactiontimeout: 10s
+  manifests:
+    disabled: false
+    interval: 5s
+  blobs:
+    disabled: false
+    interval: 5s
+    storagetimeout: 5s
+```
+
+| Parameter       | Required | Description                                                                                                                                                                                                                                                                                                               |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`      | no       | When set to `true`, the online GC workers are disabled. Defaults to `false`.                                                                                                                                                                                                                                                           |
+| `noidlebackoff` | no       | When set to `true`, disables exponential backoffs between worker runs when there was no task to be processed. Defaults to `false`.                                                                                                                                                                                       |
+| `maxbackoff`    | no       | The maximum exponential backoff duration used to sleep between worker runs when an error occurs. Also applied when there are no tasks to be processed unless `noidlebackoff` is `true`. Please note that this is not the absolute maximum, as a randomized jitter factor of up to 33% is always added. Defaults to `24h`. |
+| `transactiontimeout`   | no       | The database transaction timeout for each worker run. Each worker starts a database transaction at the start. The worker run is canceled if this timeout is exceeded to avoid stalled or long-running transactions. Defaults to `10s`.                                                                                    |
+
+### `blobs`
+
+The `blobs` subsection configures the blob worker.
+
+```yaml
+blobs:
+  disabled: false
+  interval: 5s
+  storagetimeout: 5s
+```
+
+| Parameter        | Required | Description                                                                                                                                   |
+| ---------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disabled`       | no       | When set to `true`, the worker is disabled. Defaults to `false`.                                                                              |
+| `interval`       | no       | The initial sleep interval between each worker run. Defaults to `5s`.                                                                                 |
+| `storagetimeout` | no       | The timeout for storage operations. Used to limit the duration of requests to delete dangling blobs on the storage backend. Defaults to `5s`. |
+
+### `manifests`
+
+The `manifests` subsection configures the manifest worker.
+
+```yaml
+manifests:
+  disabled: false
+  interval: 5s
+```
+
+| Parameter  | Required | Description                                                      |
+| ---------- | -------- | ---------------------------------------------------------------- |
+| `disabled` | no       | When set to `true`, the worker is disabled. Defaults to `false`. |
+| `interval` | no       | The initial sleep interval between each worker run. Defaults to `5s`.    |
+
 ## Example: Development configuration
 
 You can use this simple example for local development:

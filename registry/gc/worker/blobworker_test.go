@@ -54,7 +54,7 @@ func Test_NewBlobWorker(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 	require.NotNil(t, w.logger)
-	require.Equal(t, defaultDBTxTimeout, w.dbTxTimeout)
+	require.Equal(t, defaultTxTimeout, w.txTimeout)
 	require.Equal(t, defaultStorageTimeout, w.storageTimeout)
 }
 
@@ -77,9 +77,9 @@ func Test_NewBlobWorker_WithTxDeadline(t *testing.T) {
 	d := 10 * time.Minute
 	dbMock := storemock.NewMockHandler(ctrl)
 	driverMock := drivermock.NewMockStorageDeleter(ctrl)
-	w := NewBlobWorker(dbMock, driverMock, WithBlobDBTxTimeout(d))
+	w := NewBlobWorker(dbMock, driverMock, WithBlobTxTimeout(d))
 
-	require.Equal(t, d, w.dbTxTimeout)
+	require.Equal(t, d, w.txTimeout)
 }
 
 func Test_NewBlobWorker_WithStorageDeadline(t *testing.T) {
@@ -111,7 +111,7 @@ func TestBlobWorker_processTask(t *testing.T) {
 	driverMock := drivermock.NewMockStorageDeleter(ctrl)
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 
@@ -139,7 +139,7 @@ func TestBlobWorker_processTask_BeginTxError(t *testing.T) {
 	driverMock := drivermock.NewMockStorageDeleter(ctrl)
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	dbMock.EXPECT().BeginTx(dbCtx, nil).Return(nil, fakeErrorA).Times(1)
 
 	found, err := w.processTask(context.Background())
@@ -158,7 +158,7 @@ func TestBlobWorker_processTask_NextError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
 		btsMock.EXPECT().Next(dbCtx).Return(nil, fakeErrorA).Times(1),
@@ -181,7 +181,7 @@ func TestBlobWorker_processTask_None(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
 		btsMock.EXPECT().Next(dbCtx).Return(nil, nil).Times(1),
@@ -204,7 +204,7 @@ func TestBlobWorker_processTask_IsDanglingError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -231,7 +231,7 @@ func TestBlobWorker_processTask_IsDanglingErrorAndPostponeError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -263,7 +263,7 @@ func TestBlobWorker_processTask_IsDanglingErrorAndPostponeCommitError(t *testing
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -296,7 +296,7 @@ func TestBlobWorker_processTask_IsDanglingDeadlineExceededError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -321,7 +321,7 @@ func TestBlobWorker_processTask_StoreDeleteNotFoundError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
@@ -351,7 +351,7 @@ func TestBlobWorker_processTask_StoreDeleteDeadlineExceededError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
@@ -379,7 +379,7 @@ func TestBlobWorker_processTask_StoreDeleteUnknownError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 
@@ -410,7 +410,7 @@ func TestBlobWorker_processTask_StoreDeleteUnknownErrorAndPostponeError(t *testi
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 
@@ -446,7 +446,7 @@ func TestBlobWorker_processTask_VacuumNotFoundError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 
@@ -477,7 +477,7 @@ func TestBlobWorker_processTask_VacuumUnknownError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 
@@ -507,7 +507,7 @@ func TestBlobWorker_processTask_VacuumUnknownErrorAndPostponeError(t *testing.T)
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	driverCtx := isContextWithDeadline{timeNow().Add(defaultStorageTimeout)}
 	bt := fakeBlobTask()
 
@@ -542,7 +542,7 @@ func TestBlobWorker_processTask_IsDanglingNo(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 
 	gomock.InOrder(
@@ -570,7 +570,7 @@ func TestBlobWorker_processTask_IsDanglingNo_DeleteTaskError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -596,7 +596,7 @@ func TestBlobWorker_processTask_IsDanglingNo_CommitError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 	bt := fakeBlobTask()
 
 	gomock.InOrder(
@@ -624,7 +624,7 @@ func TestBlobWorker_processTask_RollbackOnExitUnknownError(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -648,7 +648,7 @@ func TestBlobWorker_Run(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -672,7 +672,7 @@ func TestBlobWorker_Run_Error(t *testing.T) {
 
 	w := NewBlobWorker(dbMock, driverMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultDBTxTimeout)}
+	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(nil, fakeErrorA).Times(1),

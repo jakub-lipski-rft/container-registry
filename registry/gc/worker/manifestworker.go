@@ -38,10 +38,10 @@ func WithManifestLogger(l dcontext.Logger) ManifestWorkerOption {
 	}
 }
 
-// WithManifestDBTxTimeout sets the database transaction timeout for each run. Defaults to 10 seconds.
-func WithManifestDBTxTimeout(d time.Duration) ManifestWorkerOption {
+// WithManifestTxTimeout sets the database transaction timeout for each run. Defaults to 10 seconds.
+func WithManifestTxTimeout(d time.Duration) ManifestWorkerOption {
 	return func(w *ManifestWorker) {
-		w.dbTxTimeout = d
+		w.txTimeout = d
 	}
 }
 
@@ -67,8 +67,8 @@ func (w *ManifestWorker) Run(ctx context.Context) (bool, error) {
 func (w *ManifestWorker) processTask(ctx context.Context) (bool, error) {
 	log := dcontext.GetLogger(ctx)
 
-	// don't let the database transaction run for longer than w.dbTxTimeout
-	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.dbTxTimeout))
+	// don't let the database transaction run for longer than w.txTimeout
+	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.txTimeout))
 	defer cancel()
 
 	tx, err := w.db.BeginTx(ctx, nil)
@@ -98,7 +98,7 @@ func (w *ManifestWorker) processTask(ctx context.Context) (bool, error) {
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			// The transaction duration exceeded w.dbTxTimeout and therefore the connection was closed, just return
+			// The transaction duration exceeded w.txTimeout and therefore the connection was closed, just return
 			// because the task was unlocked on close and therefore we can't postpone the next review
 		default:
 			// we don't know how to react here, so just try to postpone the task review and return
@@ -138,7 +138,7 @@ func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transa
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
-			// The transaction duration exceeded w.dbTxTimeout and therefore the connection was closed, just return
+			// The transaction duration exceeded w.txTimeout and therefore the connection was closed, just return
 			// because the task was unlocked on close and therefore we can't postpone the next review
 		default:
 			if innerErr := w.postponeTaskAndCommit(ctx, tx, t); innerErr != nil {
