@@ -6,35 +6,36 @@ package mocks
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	digest "github.com/opencontainers/go-digest"
-	reflect "reflect"
 )
 
-// MockBlobRemover is a mock of BlobRemover interface
+// MockBlobRemover is a mock of BlobRemover interface.
 type MockBlobRemover struct {
 	ctrl     *gomock.Controller
 	recorder *MockBlobRemoverMockRecorder
 }
 
-// MockBlobRemoverMockRecorder is the mock recorder for MockBlobRemover
+// MockBlobRemoverMockRecorder is the mock recorder for MockBlobRemover.
 type MockBlobRemoverMockRecorder struct {
 	mock *MockBlobRemover
 }
 
-// NewMockBlobRemover creates a new mock instance
+// NewMockBlobRemover creates a new mock instance.
 func NewMockBlobRemover(ctrl *gomock.Controller) *MockBlobRemover {
 	mock := &MockBlobRemover{ctrl: ctrl}
 	mock.recorder = &MockBlobRemoverMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockBlobRemover) EXPECT() *MockBlobRemoverMockRecorder {
 	return m.recorder
 }
 
-// RemoveBlob mocks base method
+// RemoveBlob mocks base method.
 func (m *MockBlobRemover) RemoveBlob(arg0 context.Context, arg1 digest.Digest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveBlob", arg0, arg1)
@@ -42,13 +43,13 @@ func (m *MockBlobRemover) RemoveBlob(arg0 context.Context, arg1 digest.Digest) e
 	return ret0
 }
 
-// RemoveBlob indicates an expected call of RemoveBlob
+// RemoveBlob indicates an expected call of RemoveBlob.
 func (mr *MockBlobRemoverMockRecorder) RemoveBlob(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveBlob", reflect.TypeOf((*MockBlobRemover)(nil).RemoveBlob), arg0, arg1)
 }
 
-// RemoveBlobs mocks base method
+// RemoveBlobs mocks base method.
 func (m *MockBlobRemover) RemoveBlobs(arg0 context.Context, arg1 []digest.Digest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RemoveBlobs", arg0, arg1)
@@ -56,7 +57,7 @@ func (m *MockBlobRemover) RemoveBlobs(arg0 context.Context, arg1 []digest.Digest
 	return ret0
 }
 
-// RemoveBlobs indicates an expected call of RemoveBlobs
+// RemoveBlobs indicates an expected call of RemoveBlobs.
 func (mr *MockBlobRemoverMockRecorder) RemoveBlobs(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveBlobs", reflect.TypeOf((*MockBlobRemover)(nil).RemoveBlobs), arg0, arg1)

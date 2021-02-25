@@ -6,34 +6,35 @@ package mocks
 
 import (
 	context "context"
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
-// MockStorageDeleter is a mock of StorageDeleter interface
+// MockStorageDeleter is a mock of StorageDeleter interface.
 type MockStorageDeleter struct {
 	ctrl     *gomock.Controller
 	recorder *MockStorageDeleterMockRecorder
 }
 
-// MockStorageDeleterMockRecorder is the mock recorder for MockStorageDeleter
+// MockStorageDeleterMockRecorder is the mock recorder for MockStorageDeleter.
 type MockStorageDeleterMockRecorder struct {
 	mock *MockStorageDeleter
 }
 
-// NewMockStorageDeleter creates a new mock instance
+// NewMockStorageDeleter creates a new mock instance.
 func NewMockStorageDeleter(ctrl *gomock.Controller) *MockStorageDeleter {
 	mock := &MockStorageDeleter{ctrl: ctrl}
 	mock.recorder = &MockStorageDeleterMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStorageDeleter) EXPECT() *MockStorageDeleterMockRecorder {
 	return m.recorder
 }
 
-// Delete mocks base method
+// Delete mocks base method.
 func (m *MockStorageDeleter) Delete(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", arg0, arg1)
@@ -41,13 +42,13 @@ func (m *MockStorageDeleter) Delete(arg0 context.Context, arg1 string) error {
 	return ret0
 }
 
-// Delete indicates an expected call of Delete
+// Delete indicates an expected call of Delete.
 func (mr *MockStorageDeleterMockRecorder) Delete(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockStorageDeleter)(nil).Delete), arg0, arg1)
 }
 
-// DeleteFiles mocks base method
+// DeleteFiles mocks base method.
 func (m *MockStorageDeleter) DeleteFiles(arg0 context.Context, arg1 []string) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteFiles", arg0, arg1)
@@ -56,7 +57,7 @@ func (m *MockStorageDeleter) DeleteFiles(arg0 context.Context, arg1 []string) (i
 	return ret0, ret1
 }
 
-// DeleteFiles indicates an expected call of DeleteFiles
+// DeleteFiles indicates an expected call of DeleteFiles.
 func (mr *MockStorageDeleterMockRecorder) DeleteFiles(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFiles", reflect.TypeOf((*MockStorageDeleter)(nil).DeleteFiles), arg0, arg1)
