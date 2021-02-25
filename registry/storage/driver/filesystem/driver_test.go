@@ -215,28 +215,30 @@ func TestTransferToExistingDest(t *testing.T) {
 	destDriver, cleanup := newTempDirDriver(t)
 	defer cleanup()
 
-	b := make([]byte, 10)
-	rand.Read(b)
+	srcContent := make([]byte, 10)
+	rand.Read(srcContent)
+
+	destContent := make([]byte, 10)
+	rand.Read(destContent)
 
 	ctx := context.Background()
 	path := "/existing/data/path"
 
-	// Write content only at dest.
-	err := destDriver.PutContent(ctx, path, b)
+	// Write content in both locations.
+	err := srcDriver.PutContent(ctx, path, srcContent)
 	require.NoError(t, err)
 
-	// Transfer should stat for content on destintation side and return without error.
+	err = destDriver.PutContent(ctx, path, destContent)
+	require.NoError(t, err)
+
+	// Transfer should overwrite the path on the destDriver.
 	err = srcDriver.TransferTo(ctx, destDriver, path, path)
 	require.NoError(t, err)
 
-	// Getting content from destination should match the original.
+	// Getting content from destination after transfer should match the srcContent.
 	c, err := destDriver.GetContent(ctx, path)
 	require.NoError(t, err)
-	require.EqualValues(t, b, c)
-
-	// Source should not have been modified.
-	_, err = srcDriver.Stat(ctx, path)
-	require.True(t, errors.As(err, &storagedriver.PathNotFoundError{}))
+	require.EqualValues(t, srcContent, c)
 }
 
 func TestTransferToSameRootDir(t *testing.T) {

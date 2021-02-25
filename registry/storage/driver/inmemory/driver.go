@@ -283,22 +283,6 @@ func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.Storag
 		return errors.New("destDriver must be an inmemory Driver")
 	}
 
-	if _, err := destDriver.Stat(ctx, destPath); err != nil {
-		switch err := err.(type) {
-		case storagedriver.PathNotFoundError:
-			// Continue with transfer.
-			break
-		default:
-			return err
-		}
-	} else {
-		// If the path exists, we can assume that the content has already
-		// been uploaded, since the blob storage is content-addressable.
-		// While it may be corrupted, detection of such corruption belongs
-		// elsewhere.
-		return nil
-	}
-
 	src, err := d.Reader(ctx, srcPath, 0)
 	if err != nil {
 		return err
