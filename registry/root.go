@@ -50,6 +50,7 @@ func init() {
 
 	DBCmd.AddCommand(ImportCmd)
 	ImportCmd.Flags().StringVarP(&repoPath, "repository", "r", "", "import a specific repository (all by default)")
+	ImportCmd.Flags().StringVarP(&blobTransferDest, "blob-transfer-destination", "t", "", "copy imported blobs to separate bucket (GCS) or root directory (filesystem)")
 	ImportCmd.Flags().BoolVarP(&dryRun, "dry-run", "d", false, "do not commit changes to the database")
 	ImportCmd.Flags().BoolVarP(&importDanglingBlobs, "dangling-blobs", "b", false, "import all blobs, regardless of whether they are referenced by a manifest or not")
 	ImportCmd.Flags().BoolVarP(&importDanglingManifests, "dangling-manifests", "m", false, "import all manifests, regardless of whether they are tagged or not")
@@ -58,6 +59,7 @@ func init() {
 
 var (
 	requireEmptyDatabase    bool
+	blobTransferDest        string
 	debugAddr               string
 	dryRun                  bool
 	force                   bool
@@ -466,6 +468,33 @@ var ImportCmd = &cobra.Command{
 		}
 		if requireEmptyDatabase {
 			opts = append(opts, datastore.WithRequireEmptyDatabase)
+		}
+
+		if blobTransferDest != "" {
+			destParameters := parameters
+			switch driver.Name() {
+			case "gcs":
+				destParameters["bucket"] = blobTransferDest
+			case "filesystem":
+				destParameters["rootdirectory"] = blobTransferDest
+			default:
+				fmt.Fprintf(os.Stderr, "%s driver does not support blob transfer", driver.Name())
+				os.Exit(1)
+			}
+
+			destDriver, err := factory.Create(config.Storage.Type(), destParameters)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to construct %s driver for blob transfer: %v", config.Storage.Type(), err)
+				os.Exit(1)
+			}
+
+			bts, err := storage.NewBlobTransferService(driver, destDriver)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to construct blob transfer service: %v", err)
+				os.Exit(1)
+			}
+
+			opts = append(opts, datastore.WithBlobTransferService(bts))
 		}
 
 		p := datastore.NewImporter(db, registry, opts...)

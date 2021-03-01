@@ -233,9 +233,20 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 }
 
 func (imp *Importer) transferBlob(ctx context.Context, d digest.Digest) error {
-	if !imp.dryRun && imp.blobTransferService != nil {
-		return imp.blobTransferService.Transfer(ctx, d)
+	if imp.dryRun || imp.blobTransferService == nil {
+		return nil
 	}
+
+	start := time.Now()
+	if err := imp.blobTransferService.Transfer(ctx, d); err != nil {
+		return err
+	}
+
+	end := time.Since(start).Seconds()
+	logrus.WithFields(logrus.Fields{
+		"digest":     d,
+		"duration_s": end,
+	}).Info("blob transfer complete")
 
 	return nil
 }
