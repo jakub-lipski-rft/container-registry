@@ -456,6 +456,20 @@ var ImportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Skip postdeployment migrations to prevent pending post deployment
+		// migrations from preventing the registry from starting.
+		m := migrations.NewMigrator(db.DB, migrations.SkipPostDeployment)
+		pending, err := m.HasPending()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to check database migrations status: %v", err)
+			os.Exit(1)
+		}
+		if pending {
+			fmt.Fprintf(os.Stderr, "there are pending database migrations, use the 'registry database migrate' CLI "+
+				"command to check and apply them")
+			os.Exit(1)
+		}
+
 		var opts []datastore.ImporterOption
 		if importDanglingBlobs {
 			opts = append(opts, datastore.WithImportDanglingBlobs)
