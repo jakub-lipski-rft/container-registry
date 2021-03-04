@@ -185,15 +185,43 @@ CREATE TABLE gc_manifest_review_queue (
 
 CREATE INDEX index_gc_manifest_review_queue_on_review_after ON gc_manifest_review_queue USING btree (review_after);
 
+CREATE TABLE gc_review_after_defaults (
+    event text NOT NULL,
+    value interval NOT NULL,
+    CONSTRAINT pk_gc_review_after_defaults PRIMARY KEY (event),
+    CONSTRAINT check_gc_review_after_defaults_event_length CHECK ((char_length(event) <= 255))
+);
+
+CREATE FUNCTION gc_review_after (e text)
+    RETURNS timestamp WITH time zone VOLATILE
+    AS $$
+DECLARE
+    result timestamp WITH time zone;
+BEGIN
+    SELECT
+        (now() + value) INTO result
+    FROM
+        gc_review_after_defaults
+    WHERE
+        event = e;
+    IF result IS NULL THEN
+        RETURN now() + interval '1 day';
+    ELSE
+        RETURN result;
+    END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
 CREATE FUNCTION gc_track_blob_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_blob_review_queue (digest)
-        VALUES (NEW.digest)
+    INSERT INTO gc_blob_review_queue (digest, review_after)
+        VALUES (NEW.digest, gc_review_after('blob_upload'))
     ON CONFLICT (digest)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('blob_upload');
     RETURN NULL;
 END;
 $$
@@ -208,8 +236,8 @@ CREATE FUNCTION gc_track_manifest_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (NEW.repository_id, NEW.id);
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+        VALUES (NEW.repository_id, NEW.id, gc_review_after('manifest_upload'));
     RETURN NULL;
 END;
 $$
@@ -281,11 +309,11 @@ CREATE FUNCTION gc_track_deleted_manifests ()
     AS $$
 BEGIN
     IF OLD.configuration_blob_digest IS NOT NULL THEN
-        INSERT INTO gc_blob_review_queue (digest)
-            VALUES (OLD.configuration_blob_digest)
+        INSERT INTO gc_blob_review_queue (digest, review_after)
+            VALUES (OLD.configuration_blob_digest, gc_review_after('manifest_delete'))
         ON CONFLICT (digest)
             DO UPDATE SET
-                review_after = now() + interval '1 day';
+                review_after = gc_review_after('manifest_delete');
     END IF;
     RETURN NULL;
 END;
@@ -301,11 +329,11 @@ CREATE FUNCTION gc_track_deleted_layers ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_blob_review_queue (digest)
-        VALUES (OLD.digest)
+    INSERT INTO gc_blob_review_queue (digest, review_after)
+        VALUES (OLD.digest, gc_review_after('layer_delete'))
     ON CONFLICT (digest)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('layer_delete');
     RETURN NULL;
 END;
 $$
@@ -316,15 +344,34 @@ CREATE TRIGGER gc_track_deleted_layers_trigger
     FOR EACH ROW
     EXECUTE PROCEDURE gc_track_deleted_layers ();
 
+CREATE FUNCTION gc_track_deleted_manifest_lists ()
+    RETURNS TRIGGER
+AS $$
+BEGIN
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+        VALUES (OLD.repository_id, OLD.child_id, gc_review_after('manifest_list_delete'))
+    ON CONFLICT (repository_id, manifest_id)
+        DO UPDATE SET
+            review_after = gc_review_after('manifest_list_delete');
+    RETURN NULL;
+END;
+$$
+    LANGUAGE plpgsql;
+
+CREATE TRIGGER gc_track_deleted_manifest_lists_trigger
+    AFTER DELETE ON manifest_references
+    FOR EACH ROW
+EXECUTE PROCEDURE gc_track_deleted_manifest_lists ();
+
 CREATE FUNCTION gc_track_switched_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (OLD.repository_id, OLD.manifest_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+        VALUES (OLD.repository_id, OLD.manifest_id, gc_review_after('tag_switch'))
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('tag_switch');
     RETURN NULL;
 END;
 $$
@@ -347,11 +394,11 @@ BEGIN
         WHERE
             repository_id = OLD.repository_id
             AND id = OLD.manifest_id) THEN
-        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-            VALUES (OLD.repository_id, OLD.manifest_id)
+        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+            VALUES (OLD.repository_id, OLD.manifest_id, gc_review_after('tag_delete'))
         ON CONFLICT (repository_id, manifest_id)
             DO UPDATE SET
-                review_after = now() + interval '1 day';
+                review_after = gc_review_after('tag_delete');
     END IF;
     RETURN NULL;
 END;

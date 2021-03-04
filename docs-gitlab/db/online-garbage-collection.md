@@ -45,6 +45,17 @@ This table has four primary columns:
 - `review_after`: Same as for the blob review queue.
 - `review_count`: Same as for the blob review queue.
 
+### Review Delay
+
+As explained above, both review queues have a `review_after` column, used to define the time after which the garbage collector should pick up a record for review. The default for this column is 1 day for both queues and all kinds of events, but it is possible to set a different default value through application settings. This is done using a special `gc_review_after_defaults` table, which has two columns:
+
+- `event`: The name of the online GC event in response to which a record will be inserted in one of the queues (e.g., blob upload, tag delete, etc.);
+- `value`: The interval to add to `now()` when setting `review_after` during a review queue insert.
+
+This table gives us the flexibility to use different delays depending on the event that the online GC triggers are reacting to. We can also change them at runtime, either "permanently" (at boot time, in response to an application configuration change) or temporarily for testing purposes.
+
+Before inserting into the review queues, each online GC function will query this table through a special function, `gc_review_after (e text)`, using the name of the event that it is reacting to as input argument. As a result, the function will return the appropriate `review_after` value or the default value of 1 day in the future.
+
 ## Tracking blob and manifest uploads
 
 To know which configuration and layer blobs can be garbage collected, we need to keep track of those in use.
@@ -68,11 +79,11 @@ CREATE FUNCTION gc_track_blob_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_blob_review_queue (digest)
-        VALUES (NEW.digest)
+    INSERT INTO gc_blob_review_queue (digest, review_after)
+        VALUES (NEW.digest, gc_review_after('blob_upload'))
     ON CONFLICT (digest)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('blob_upload');
     RETURN NULL;
 END;
 $$
@@ -163,8 +174,8 @@ CREATE FUNCTION gc_track_manifest_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (NEW.repository_id, NEW.id);
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+        VALUES (NEW.repository_id, NEW.id, gc_review_after('manifest_upload'));
     RETURN NULL;
 END;
 $$
@@ -216,11 +227,11 @@ CREATE FUNCTION gc_track_deleted_manifests ()
     AS $$
 BEGIN
     IF OLD.configuration_blob_digest IS NOT NULL THEN -- not all manifests have a configuration
-        INSERT INTO gc_blob_review_queue (digest)
-            VALUES (OLD.configuration_blob_digest)
+        INSERT INTO gc_blob_review_queue (digest, review_after)
+            VALUES (OLD.configuration_blob_digest, gc_review_after('manifest_delete'))
         ON CONFLICT (digest)
             DO UPDATE SET
-                review_after = now() + interval '1 day';
+                review_after = gc_review_after('manifest_delete');
     END IF;
     RETURN NULL;
 END;
@@ -231,11 +242,11 @@ CREATE FUNCTION gc_track_deleted_layers ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_blob_review_queue (digest)
-        VALUES (OLD.digest)
+    INSERT INTO gc_blob_review_queue (digest, review_after)
+        VALUES (OLD.digest, gc_review_after('layer_delete'))
     ON CONFLICT (digest)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('layer_delete');
     RETURN NULL;
 END;
 $$
@@ -265,11 +276,11 @@ CREATE FUNCTION gc_track_deleted_manifest_lists ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (OLD.repository_id, OLD.child_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+        VALUES (OLD.repository_id, OLD.child_id, gc_review_after('manifest_list_delete'))
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('manifest_list_delete');
     RETURN NULL;
 END;
 $$
@@ -306,11 +317,11 @@ BEGIN
         WHERE
             repository_id = OLD.repository_id
             AND id = OLD.manifest_id) THEN
-        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-            VALUES (OLD.repository_id, OLD.manifest_id)
+        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+            VALUES (OLD.repository_id, OLD.manifest_id, gc_review_after('tag_delete'))
         ON CONFLICT (repository_id, manifest_id)
             DO UPDATE SET
-                review_after = now() + interval '1 day';
+                review_after = gc_review_after('tag_delete');
     END IF;
     RETURN NULL;
 END;
@@ -351,11 +362,11 @@ CREATE FUNCTION gc_track_switched_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id)
-        VALUES (OLD.repository_id, OLD.manifest_id)
+    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
+        VALUES (OLD.repository_id, OLD.manifest_id, gc_review_after('tag_switch'))
     ON CONFLICT (repository_id, manifest_id)
         DO UPDATE SET
-            review_after = now() + interval '1 day';
+            review_after = gc_review_after('tag_switch');
     RETURN NULL;
 END;
 $$
