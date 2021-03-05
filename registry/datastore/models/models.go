@@ -102,3 +102,9 @@ type GCManifestTask struct {
 	ReviewAfter  time.Time
 	ReviewCount  int
 }
+
+// GCReviewAfterDefault represents a row in the gc_review_after_defaults table.
+type GCReviewAfterDefault struct {
+	Event string
+	Value time.Duration
+}
