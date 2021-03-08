@@ -91,7 +91,7 @@ func (w *BlobWorker) processTask(ctx context.Context) (bool, error) {
 	log := dcontext.GetLogger(ctx)
 
 	// don't let the database transaction run for longer than w.txTimeout
-	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.txTimeout))
+	ctx, cancel := context.WithDeadline(ctx, systemClock.Now().Add(w.txTimeout))
 	defer cancel()
 
 	tx, err := w.db.BeginTx(ctx, nil)
@@ -154,7 +154,7 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 	log := dcontext.GetLogger(ctx)
 
 	// delete blob from storage
-	ctx2, cancel := context.WithDeadline(ctx, timeNow().Add(w.storageTimeout))
+	ctx2, cancel := context.WithDeadline(ctx, systemClock.Now().Add(w.storageTimeout))
 	defer cancel()
 
 	if err := w.vacuum.RemoveBlob(ctx2, t.Digest); err != nil {

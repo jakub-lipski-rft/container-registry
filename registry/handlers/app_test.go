@@ -1,22 +1,32 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/docker/distribution/configuration"
-	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/auth"
 	_ "github.com/docker/distribution/registry/auth/silly"
+	"github.com/docker/distribution/registry/datastore"
+	dbmock "github.com/docker/distribution/registry/datastore/mocks"
+	storemock "github.com/docker/distribution/registry/datastore/mocks"
+	"github.com/docker/distribution/registry/internal/mocks"
+	"github.com/docker/distribution/registry/internal/testutil"
 	"github.com/docker/distribution/registry/storage"
 	memorycache "github.com/docker/distribution/registry/storage/cache/memory"
 	"github.com/docker/distribution/registry/storage/driver/testdriver"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAppDispatcher builds an application with a test dispatcher and ensures
@@ -275,4 +285,242 @@ func TestAppendAccessRecords(t *testing.T) {
 	if ok := reflect.DeepEqual(result, expectedResult); !ok {
 		t.Fatalf("Actual access record differs from expected")
 	}
+}
+
+func Test_updateOnlineGCSettings_SkipIfDatabaseDisabled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+
+	config := &configuration.Configuration{}
+
+	// no expectations were set on mocks, so this asserts that no methods are called
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+func Test_updateOnlineGCSettings_SkipIfGCDisabled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			Disabled: true,
+		},
+	}
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+func Test_updateOnlineGCSettings_SkipIfAllGCWorkersDisabled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			Blobs: configuration.GCBlobs{
+				Disabled: true,
+			},
+			Manifests: configuration.GCManifests{
+				Disabled: true,
+			},
+		},
+	}
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+func Test_updateOnlineGCSettings_SkipIfReviewAfterNotSet(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+	}
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+var storeMock *storemock.MockGCSettingsStore
+
+func mockSettingsStore(tb testing.TB, ctrl *gomock.Controller) {
+	tb.Helper()
+
+	storeMock = storemock.NewMockGCSettingsStore(ctrl)
+	bkp := gcSettingsStoreConstructor
+	gcSettingsStoreConstructor = func(db datastore.Queryer) datastore.GCSettingsStore { return storeMock }
+
+	tb.Cleanup(func() { gcSettingsStoreConstructor = bkp })
+}
+
+func Test_updateOnlineGCSettings(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+	mockSettingsStore(t, ctrl)
+
+	clockMock := mocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			ReviewAfter: 10 * time.Minute,
+		},
+	}
+
+	// use fixed time for reproducible rand seeds (used to generate jitter durations)
+	now := time.Time{}
+	rand.Seed(now.UnixNano())
+	expectedJitter := time.Duration(rand.Intn(onlineGCUpdateJitterMaxSeconds)) * time.Second
+
+	startTime := now.Add(1 * time.Millisecond)
+
+	gomock.InOrder(
+		clockMock.EXPECT().Now().Return(now).Times(1),       // base for jitter
+		clockMock.EXPECT().Sleep(expectedJitter).Times(1),   // jitter sleep
+		clockMock.EXPECT().Now().Return(startTime).Times(1), // start time snapshot
+		storeMock.EXPECT().UpdateAllReviewAfterDefaults(
+			testutil.IsContextWithDeadline{Deadline: startTime.Add(onlineGCUpdateTimeout)},
+			config.GC.ReviewAfter,
+		).Return(true, nil).Times(1),
+		clockMock.EXPECT().Since(startTime).Return(1*time.Millisecond).Times(1), // elapsed time
+	)
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+func Test_updateOnlineGCSettings_NoReviewDelay(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+	mockSettingsStore(t, ctrl)
+
+	clockMock := mocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			ReviewAfter: -1,
+		},
+	}
+
+	gomock.InOrder(
+		// The value of the input arguments were already tested in Test_updateOnlineGCSettings, so here we can focus on
+		// testing the UpdateAllReviewAfterDefaults call result.
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		clockMock.EXPECT().Sleep(gomock.Any()).Times(1),
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		storeMock.EXPECT().UpdateAllReviewAfterDefaults(
+			gomock.Any(),
+			time.Duration(0), // -1 was converted to 0
+		).Return(true, nil).Times(1),
+		clockMock.EXPECT().Since(gomock.Any()).Return(time.Duration(0)).Times(1),
+	)
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+func Test_updateOnlineGCSettings_NoRowsUpdated(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+	mockSettingsStore(t, ctrl)
+
+	clockMock := mocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			ReviewAfter: 10 * time.Minute,
+		},
+	}
+
+	gomock.InOrder(
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		clockMock.EXPECT().Sleep(gomock.Any()).Times(1),
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		storeMock.EXPECT().UpdateAllReviewAfterDefaults(gomock.Any(), gomock.Any()).
+			Return(false, nil).Times(1),
+		clockMock.EXPECT().Since(gomock.Any()).Return(time.Duration(0)).Times(1),
+	)
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.NoError(t, err)
+}
+
+func Test_updateOnlineGCSettings_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+	mockSettingsStore(t, ctrl)
+
+	clockMock := mocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			ReviewAfter: 10 * time.Minute,
+		},
+	}
+
+	fakeErr := errors.New("foo")
+	gomock.InOrder(
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		clockMock.EXPECT().Sleep(gomock.Any()).Times(1),
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		storeMock.EXPECT().UpdateAllReviewAfterDefaults(gomock.Any(), gomock.Any()).
+			Return(false, fakeErr).Times(1),
+	)
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.EqualError(t, err, fakeErr.Error())
+}
+
+func Test_updateOnlineGCSettings_Timeout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	dbMock := dbmock.NewMockHandler(ctrl)
+	mockSettingsStore(t, ctrl)
+
+	clockMock := mocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	config := &configuration.Configuration{
+		Database: configuration.Database{
+			Enabled: true,
+		},
+		GC: configuration.GC{
+			ReviewAfter: 10 * time.Minute,
+		},
+	}
+
+	gomock.InOrder(
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		clockMock.EXPECT().Sleep(gomock.Any()).Times(1),
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+		storeMock.EXPECT().UpdateAllReviewAfterDefaults(gomock.Any(), gomock.Any()).
+			Return(false, context.Canceled).Times(1),
+	)
+
+	err := updateOnlineGCSettings(context.Background(), dbMock, config)
+	require.EqualError(t, err, context.Canceled.Error())
 }

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
@@ -32,6 +33,7 @@ import (
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/gc"
 	"github.com/docker/distribution/registry/gc/worker"
+	"github.com/docker/distribution/registry/internal"
 	registrymiddleware "github.com/docker/distribution/registry/middleware/registry"
 	repositorymiddleware "github.com/docker/distribution/registry/middleware/repository"
 	"github.com/docker/distribution/registry/proxy"
@@ -317,6 +319,13 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 			options = append(options, storage.DisableMirrorFS)
 		}
 
+		// update online GC settings (if needed) in the background to avoid delaying the app start
+		go func() {
+			if err := updateOnlineGCSettings(app.Context, app.db, config); err != nil {
+				errortracking.Capture(err, errortracking.WithContext(app.Context))
+				log.WithError(err).Error("failed to update online GC settings")
+			}
+		}()
 		startOnlineGC(app.Context, app.db, app.driver, config)
 	}
 
@@ -415,6 +424,59 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	}
 
 	return app
+}
+
+var (
+	onlineGCUpdateJitterMaxSeconds = 60
+	onlineGCUpdateTimeout          = 2 * time.Second
+	// for testing purposes (mocks)
+	systemClock                internal.Clock = clock.New()
+	gcSettingsStoreConstructor                = datastore.NewGCSettingsStore
+)
+
+func updateOnlineGCSettings(ctx context.Context, db datastore.Queryer, config *configuration.Configuration) error {
+	if !config.Database.Enabled || config.GC.Disabled || (config.GC.Blobs.Disabled && config.GC.Manifests.Disabled) {
+		return nil
+	}
+	if config.GC.ReviewAfter == 0 {
+		return nil
+	}
+
+	d := config.GC.ReviewAfter
+	// -1 means no review delay, so set it to 0 here
+	if d == -1 {
+		d = 0
+	}
+
+	log := dcontext.GetLogger(ctx)
+
+	// execute DB update after a randomized jitter of up to 60 seconds to ease concurrency in clustered environments
+	rand.Seed(systemClock.Now().UnixNano())
+	jitter := time.Duration(rand.Intn(onlineGCUpdateJitterMaxSeconds)) * time.Second
+
+	log.WithField("jitter_s", jitter.Seconds()).Info("preparing to update online GC settings")
+	systemClock.Sleep(jitter)
+
+	// set a tight timeout to avoid delaying the app start for too long, another instance is likely to succeed
+	start := systemClock.Now()
+	ctx2, cancel := context.WithDeadline(ctx, start.Add(onlineGCUpdateTimeout))
+	defer cancel()
+
+	// for now we use the same value for all events, so we simply update all rows in `gc_review_after_defaults`
+	s := gcSettingsStoreConstructor(db)
+	updated, err := s.UpdateAllReviewAfterDefaults(ctx2, d)
+	if err != nil {
+		return err
+	}
+
+	elapsed := systemClock.Since(start).Seconds()
+	if updated {
+		log.WithField("duration_s", elapsed).Info("online GC settings updated successfully")
+	} else {
+		log.WithField("duration_s", elapsed).Info("online GC settings are up to date")
+	}
+
+	return nil
 }
 
 func startOnlineGC(ctx context.Context, db *datastore.DB, storageDriver storagedriver.StorageDriver, config *configuration.Configuration) {

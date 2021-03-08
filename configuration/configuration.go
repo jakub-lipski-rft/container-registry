@@ -275,22 +275,31 @@ type GC struct {
 	// transactions.
 	TransactionTimeout time.Duration `yaml:"transactiontimeout,omitempty"`
 	// Blobs configures the blob worker.
-	Blobs struct {
-		// Disabled disables the blob worker.
-		Disabled bool `yaml:"disabled,omitempty"`
-		// Interval is the initial sleep interval between each worker run.
-		Interval time.Duration `yaml:"interval,omitempty"`
-		// StorageTimeout is the timeout for storage operations. Used to limit the duration of requests to delete
-		// dangling blobs on the storage backend.
-		StorageTimeout time.Duration `yaml:"storagetimeout,omitempty"`
-	} `yaml:"blobs,omitempty"`
+	Blobs GCBlobs `yaml:"blobs,omitempty"`
 	// Manifests configures the manifest worker.
-	Manifests struct {
-		// Disabled disables the manifest worker.
-		Disabled bool `yaml:"disabled,omitempty"`
-		// Interval is the initial sleep interval between each worker run.
-		Interval time.Duration `yaml:"interval,omitempty"`
-	} `yaml:"manifests,omitempty"`
+	Manifests GCManifests `yaml:"manifests,omitempty"`
+	// ReviewAfter is the minimum amount of time after which the garbage collector should pick up a record for review.
+	// -1 means no wait. Defaults to 24h.
+	ReviewAfter time.Duration `yaml:"reviewafter,omitempty"`
+}
+
+// GCBlobs configures the blob worker.
+type GCBlobs struct {
+	// Disabled disables the blob worker.
+	Disabled bool `yaml:"disabled,omitempty"`
+	// Interval is the initial sleep interval between each worker run.
+	Interval time.Duration `yaml:"interval,omitempty"`
+	// StorageTimeout is the timeout for storage operations. Used to limit the duration of requests to delete
+	// dangling blobs on the storage backend.
+	StorageTimeout time.Duration `yaml:"storagetimeout,omitempty"`
+}
+
+// GCManifests configures the manifest worker.
+type GCManifests struct {
+	// Disabled disables the manifest worker.
+	Disabled bool `yaml:"disabled,omitempty"`
+	// Interval is the initial sleep interval between each worker run.
+	Interval time.Duration `yaml:"interval,omitempty"`
 }
 
 // Profiling configures external profiling services.

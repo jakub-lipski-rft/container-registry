@@ -14,6 +14,8 @@ import (
 	"github.com/docker/distribution/registry/gc/internal/mocks"
 	"github.com/docker/distribution/registry/gc/worker"
 	wmocks "github.com/docker/distribution/registry/gc/worker/mocks"
+	regmocks "github.com/docker/distribution/registry/internal/mocks"
+	"github.com/docker/distribution/registry/internal/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -160,20 +162,12 @@ func stubBackoff(tb testing.TB, m *mocks.MockBackoff) {
 	tb.Cleanup(func() { backoffConstructor = bkp })
 }
 
-func stubSystemClock(tb testing.TB, m clock.Clock) {
-	tb.Helper()
-
-	bkp := systemClock
-	systemClock = m
-	tb.Cleanup(func() { systemClock = bkp })
-}
-
 func TestAgent_Start_Jitter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	workerMock := wmocks.NewMockWorker(ctrl)
 
-	clockMock := mocks.NewMockClock(ctrl)
-	stubSystemClock(t, clockMock)
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	agent := NewAgent(workerMock,
 		WithLogger(logrus.New()), // so that we can see the log output during test runs
@@ -208,8 +202,8 @@ func TestAgent_Start_NoTaskFound(t *testing.T) {
 	backoffMock := mocks.NewMockBackoff(ctrl)
 	stubBackoff(t, backoffMock)
 
-	clockMock := mocks.NewMockClock(ctrl)
-	stubSystemClock(t, clockMock)
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	agent := NewAgent(workerMock, WithLogger(logrus.New()))
 
@@ -243,8 +237,8 @@ func TestAgent_Start_NoTaskFoundWithoutIdleBackoff(t *testing.T) {
 	backoffMock := mocks.NewMockBackoff(ctrl)
 	stubBackoff(t, backoffMock)
 
-	clockMock := mocks.NewMockClock(ctrl)
-	stubSystemClock(t, clockMock)
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	agent := NewAgent(workerMock, WithLogger(logrus.New()), WithoutIdleBackoff())
 
@@ -279,8 +273,8 @@ func TestAgent_Start_RunFound(t *testing.T) {
 	backoffMock := mocks.NewMockBackoff(ctrl)
 	stubBackoff(t, backoffMock)
 
-	clockMock := mocks.NewMockClock(ctrl)
-	stubSystemClock(t, clockMock)
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	agent := NewAgent(workerMock, WithLogger(logrus.New()))
 
@@ -315,8 +309,8 @@ func TestAgent_Start_RunError(t *testing.T) {
 	backoffMock := mocks.NewMockBackoff(ctrl)
 	stubBackoff(t, backoffMock)
 
-	clockMock := mocks.NewMockClock(ctrl)
-	stubSystemClock(t, clockMock)
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	agent := NewAgent(workerMock, WithLogger(logrus.New()))
 
@@ -351,8 +345,8 @@ func TestAgent_Start_RunLoopSurvivesError(t *testing.T) {
 	backoffMock := mocks.NewMockBackoff(ctrl)
 	stubBackoff(t, backoffMock)
 
-	clockMock := mocks.NewMockClock(ctrl)
-	stubSystemClock(t, clockMock)
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	agent := NewAgent(workerMock, WithLogger(logrus.New()))
 
@@ -393,7 +387,7 @@ func TestAgent_Start_RunLoopSurvivesError(t *testing.T) {
 func Test_newBackoff(t *testing.T) {
 	clockMock := clock.NewMock()
 	clockMock.Set(time.Time{})
-	stubSystemClock(t, clockMock)
+	testutil.StubClock(t, &systemClock, clockMock)
 
 	initInterval := 5 * time.Minute
 	maxInterval := 24 * time.Hour

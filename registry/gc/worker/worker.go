@@ -10,8 +10,10 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/internal"
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/labkit/correlation"
@@ -34,7 +36,7 @@ type Worker interface {
 }
 
 // for test purposes (mocking)
-var timeNow = time.Now
+var systemClock internal.Clock = clock.New()
 
 type baseWorker struct {
 	name      string

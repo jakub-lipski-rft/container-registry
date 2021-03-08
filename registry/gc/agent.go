@@ -11,6 +11,7 @@ import (
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/gc/internal"
 	"github.com/docker/distribution/registry/gc/worker"
+	reginternal "github.com/docker/distribution/registry/internal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,8 +26,8 @@ var (
 	backoffJitterFactor    = 0.33
 	startJitterMaxSeconds  = 60
 	// for testing purposes (mocks)
-	backoffConstructor = newBackoff
-	systemClock        = clock.New()
+	backoffConstructor                   = newBackoff
+	systemClock        reginternal.Clock = clock.New()
 )
 
 // Agent manages a online garbage collection worker.

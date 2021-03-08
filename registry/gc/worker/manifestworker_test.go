@@ -10,6 +10,7 @@ import (
 	"github.com/docker/distribution/registry/datastore"
 	storemock "github.com/docker/distribution/registry/datastore/mocks"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/docker/distribution/registry/internal/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
@@ -83,13 +84,13 @@ func fakeManifestTask() *models.GCManifestTask {
 func TestManifestWorker_processTask(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	ctx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	ctx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 	m := &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID}
 
@@ -109,12 +110,12 @@ func TestManifestWorker_processTask(t *testing.T) {
 
 func TestManifestWorker_processTask_BeginTxError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	dbMock.EXPECT().BeginTx(dbCtx, nil).Return(nil, fakeErrorA).Times(1)
 
 	found, err := w.processTask(context.Background())
@@ -125,14 +126,14 @@ func TestManifestWorker_processTask_BeginTxError(t *testing.T) {
 func TestManifestWorker_processTask_NextError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -148,14 +149,14 @@ func TestManifestWorker_processTask_NextError(t *testing.T) {
 func TestManifestWorker_processTask_None(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -171,13 +172,13 @@ func TestManifestWorker_processTask_None(t *testing.T) {
 func TestManifestWorker_processTask_IsDanglingError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 
 	gomock.InOrder(
@@ -197,13 +198,13 @@ func TestManifestWorker_processTask_IsDanglingError(t *testing.T) {
 func TestManifestWorker_processTask_IsDanglingErrorAndPostponeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 
 	gomock.InOrder(
@@ -228,13 +229,13 @@ func TestManifestWorker_processTask_IsDanglingErrorAndPostponeError(t *testing.T
 func TestManifestWorker_processTask_IsDanglingDeadlineExceededError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 
 	gomock.InOrder(
@@ -252,13 +253,13 @@ func TestManifestWorker_processTask_IsDanglingDeadlineExceededError(t *testing.T
 func TestManifestWorker_processTask_StoreDeleteNotFoundError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 	m := &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID}
 
@@ -279,13 +280,13 @@ func TestManifestWorker_processTask_StoreDeleteNotFoundError(t *testing.T) {
 func TestManifestWorker_processTask_StoreDeleteDeadlineExceededError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 	m := &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID}
 
@@ -305,13 +306,13 @@ func TestManifestWorker_processTask_StoreDeleteDeadlineExceededError(t *testing.
 func TestManifestWorker_processTask_StoreDeleteUnknownError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 	m := &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID}
 
@@ -333,13 +334,13 @@ func TestManifestWorker_processTask_StoreDeleteUnknownError(t *testing.T) {
 func TestManifestWorker_processTask_StoreDeleteUnknownErrorAndPostponeError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 	m := &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID}
 
@@ -366,13 +367,13 @@ func TestManifestWorker_processTask_StoreDeleteUnknownErrorAndPostponeError(t *t
 func TestManifestWorker_processTask_StoreDeleteUnknownErrorAndCommitError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 	m := &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID}
 
@@ -400,13 +401,13 @@ func TestManifestWorker_processTask_StoreDeleteUnknownErrorAndCommitError(t *tes
 func TestManifestWorker_processTask_IsDanglingNo(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 
 	gomock.InOrder(
@@ -426,13 +427,13 @@ func TestManifestWorker_processTask_IsDanglingNo(t *testing.T) {
 func TestManifestWorker_processTask_IsDanglingNo_DeleteTaskError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 
 	gomock.InOrder(
@@ -451,13 +452,13 @@ func TestManifestWorker_processTask_IsDanglingNo_DeleteTaskError(t *testing.T) {
 func TestManifestWorker_processTask_IsDanglingNo_CommitError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 	mt := fakeManifestTask()
 
 	gomock.InOrder(
@@ -477,13 +478,13 @@ func TestManifestWorker_processTask_IsDanglingNo_CommitError(t *testing.T) {
 func TestManifestWorker_processTask_RollbackOnExitUnknownError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -499,13 +500,13 @@ func TestManifestWorker_processTask_RollbackOnExitUnknownError(t *testing.T) {
 func TestManifestWorker_Run(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	txMock := storemock.NewMockTransactor(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 
 	gomock.InOrder(
 		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
@@ -521,12 +522,12 @@ func TestManifestWorker_Run(t *testing.T) {
 func TestManifestWorker_Run_Error(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockManifestStores(t, ctrl)
-	stubClock(t, time.Now())
+	clockMock := stubClock(t, time.Now())
 
 	dbMock := storemock.NewMockHandler(ctrl)
 	w := NewManifestWorker(dbMock)
 
-	dbCtx := isContextWithDeadline{timeNow().Add(defaultTxTimeout)}
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
 
 	dbMock.EXPECT().BeginTx(dbCtx, nil).Return(nil, fakeErrorA).Times(1)
 

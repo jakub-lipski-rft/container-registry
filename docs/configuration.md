@@ -1314,6 +1314,7 @@ gc:
   maxbackoff: 24h
   noidlebackoff: false
   transactiontimeout: 10s
+  reviewafter: 24h
   manifests:
     disabled: false
     interval: 5s
@@ -1329,6 +1330,7 @@ gc:
 | `noidlebackoff` | no       | When set to `true`, disables exponential backoffs between worker runs when there was no task to be processed. Defaults to `false`.                                                                                                                                                                                       |
 | `maxbackoff`    | no       | The maximum exponential backoff duration used to sleep between worker runs when an error occurs. Also applied when there are no tasks to be processed unless `noidlebackoff` is `true`. Please note that this is not the absolute maximum, as a randomized jitter factor of up to 33% is always added. Defaults to `24h`. |
 | `transactiontimeout`   | no       | The database transaction timeout for each worker run. Each worker starts a database transaction at the start. The worker run is canceled if this timeout is exceeded to avoid stalled or long-running transactions. Defaults to `10s`.                                                                                    |
+| `reviewafter`   | no       | The minimum amount of time after which the garbage collector should pick up a record for review. `-1` means no wait. Defaults to `24h`. |
 
 ### `blobs`
 
