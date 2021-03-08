@@ -7,41 +7,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	dbmock "github.com/docker/distribution/registry/datastore/mocks"
+	"github.com/docker/distribution/registry/internal/testutil"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
-func stubClock(tb testing.TB, t time.Time) {
+func stubClock(tb testing.TB, t time.Time) clock.Clock {
 	tb.Helper()
 
-	bkp := timeNow
-	timeNow = func() time.Time { return t }
+	mock := clock.NewMock()
+	mock.Set(t)
+	testutil.StubClock(tb, &systemClock, mock)
 
-	tb.Cleanup(func() { timeNow = bkp })
-}
-
-type isContextWithDeadline struct {
-	deadline time.Time
-}
-
-// Matches implements gomock.Matcher.
-func (m isContextWithDeadline) Matches(x interface{}) bool {
-	ctx, ok := x.(context.Context)
-	if !ok {
-		return false
-	}
-	d, ok := ctx.Deadline()
-	if !ok {
-		return false
-	}
-
-	return d == m.deadline
-}
-
-// String implements gomock.Matcher.
-func (m isContextWithDeadline) String() string {
-	return fmt.Sprintf("is context.Context with a deadline of %q", m.deadline)
+	return mock
 }
 
 type isDuration struct {

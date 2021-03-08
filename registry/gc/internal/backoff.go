@@ -1,17 +1,8 @@
-//go:generate mockgen -package mocks -destination mocks/utils.go . Clock,Backoff
+//go:generate mockgen -package mocks -destination mocks/backoff.go . Backoff
 
 package internal
 
-import (
-	"time"
-
-	"github.com/benbjohnson/clock"
-)
-
-// Clock represents the functions in the standard library time package.
-type Clock interface {
-	clock.Clock
-}
+import "time"
 
 // Backoff represents a back off generator.
 type Backoff interface {

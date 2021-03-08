@@ -68,7 +68,7 @@ func (w *ManifestWorker) processTask(ctx context.Context) (bool, error) {
 	log := dcontext.GetLogger(ctx)
 
 	// don't let the database transaction run for longer than w.txTimeout
-	ctx, cancel := context.WithDeadline(ctx, timeNow().Add(w.txTimeout))
+	ctx, cancel := context.WithDeadline(ctx, systemClock.Now().Add(w.txTimeout))
 	defer cancel()
 
 	tx, err := w.db.BeginTx(ctx, nil)

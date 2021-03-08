@@ -72,8 +72,9 @@ func TestGCSettingsStore_UpdateAllReviewAfterDefaults(t *testing.T) {
 	reloadGCReviewAfterDefaultFixtures(t)
 
 	s := datastore.NewGCSettingsStore(suite.db)
-	err := s.UpdateAllReviewAfterDefaults(suite.ctx, 1*time.Minute)
+	updated, err := s.UpdateAllReviewAfterDefaults(suite.ctx, 1*time.Minute)
 	require.NoError(t, err)
+	require.True(t, updated)
 
 	// see testdata/fixtures/gc_review_after_defaults.sql
 	expected := []*models.GCReviewAfterDefault{
@@ -90,8 +91,9 @@ func TestGCSettingsStore_UpdateAllReviewAfterDefaults(t *testing.T) {
 	require.Equal(t, expected, actual)
 
 	// make sure it's idempotent
-	err = s.UpdateAllReviewAfterDefaults(suite.ctx, 1*time.Minute)
+	updated, err = s.UpdateAllReviewAfterDefaults(suite.ctx, 1*time.Minute)
 	require.NoError(t, err)
+	require.False(t, updated)
 
 	actual = findAllGCReviewAfterDefaults(t, suite.db)
 	require.Equal(t, expected, actual)
