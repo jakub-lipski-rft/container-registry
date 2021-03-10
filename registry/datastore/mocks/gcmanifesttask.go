@@ -80,6 +80,21 @@ func (mr *MockGCManifestTaskStoreMockRecorder) FindAll(arg0 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAll", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAll), arg0)
 }
 
+// FindAndLockBefore mocks base method.
+func (m *MockGCManifestTaskStore) FindAndLockBefore(arg0 context.Context, arg1, arg2 int64, arg3 time.Time) (*models.GCManifestTask, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindAndLockBefore", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*models.GCManifestTask)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindAndLockBefore indicates an expected call of FindAndLockBefore.
+func (mr *MockGCManifestTaskStoreMockRecorder) FindAndLockBefore(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndLockBefore", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAndLockBefore), arg0, arg1, arg2, arg3)
+}
+
 // IsDangling mocks base method.
 func (m *MockGCManifestTaskStore) IsDangling(arg0 context.Context, arg1 *models.GCManifestTask) (bool, error) {
 	m.ctrl.T.Helper()

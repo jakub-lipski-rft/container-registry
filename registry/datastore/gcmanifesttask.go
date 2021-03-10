@@ -15,6 +15,7 @@ import (
 
 type GCManifestTaskStore interface {
 	FindAll(ctx context.Context) ([]*models.GCManifestTask, error)
+	FindAndLockBefore(ctx context.Context, repositoryID, manifestID int64, date time.Time) (*models.GCManifestTask, error)
 	Count(ctx context.Context) (int, error)
 	Next(ctx context.Context) (*models.GCManifestTask, error)
 	Postpone(ctx context.Context, b *models.GCManifestTask, d time.Duration) error
@@ -53,9 +54,11 @@ func scanFullGCManifestTasks(rows *sql.Rows) ([]*models.GCManifestTask, error) {
 func scanFullGCManifestTask(row *sql.Row) (*models.GCManifestTask, error) {
 	r := new(models.GCManifestTask)
 
-	err := row.Scan(&r.RepositoryID, &r.ManifestID, &r.ReviewAfter, &r.ReviewCount)
-	if err != nil {
-		return nil, fmt.Errorf("scanning GC manifest task: %w", err)
+	if err := row.Scan(&r.RepositoryID, &r.ManifestID, &r.ReviewAfter, &r.ReviewCount); err != nil {
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("scanning GC manifest task: %w", err)
+		}
+		return nil, nil
 	}
 
 	return r, nil
@@ -77,6 +80,26 @@ func (s *gcManifestTaskStore) FindAll(ctx context.Context) ([]*models.GCManifest
 	}
 
 	return scanFullGCManifestTasks(rows)
+}
+
+// FindAndLockBefore finds a GC manifest task scheduled for review before date and locks it against writes. This query
+// blocks if the row exists but is already locked by another process.
+func (s *gcManifestTaskStore) FindAndLockBefore(ctx context.Context, repositoryID, manifestID int64, date time.Time) (*models.GCManifestTask, error) {
+	defer metrics.StatementDuration("gc_manifest_task_find_and_lock_before")()
+	q := `SELECT
+			repository_id,
+			manifest_id,
+			review_after,
+			review_count
+		FROM
+			gc_manifest_review_queue
+		WHERE
+			repository_id = $1
+			AND manifest_id = $2
+			AND review_after < $3
+		FOR UPDATE`
+	row := s.db.QueryRowContext(ctx, q, repositoryID, manifestID, date)
+	return scanFullGCManifestTask(row)
 }
 
 // Count counts all GC manifest tasks.
