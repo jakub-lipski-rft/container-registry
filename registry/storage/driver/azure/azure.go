@@ -31,8 +31,9 @@ const (
 )
 
 type driver struct {
-	client    azure.BlobStorageClient
-	container string
+	client        azure.BlobStorageClient
+	container     string
+	rootDirectory string
 }
 
 type baseEmbed struct{ base.Base }
@@ -104,7 +105,7 @@ func (d *driver) Name() string {
 
 // GetContent retrieves the content stored at "path" as a []byte.
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	blob, err := blobRef.Get(nil)
 	if err != nil {
 		if is404(err) {
@@ -137,7 +138,7 @@ func (d *driver) PutContent(ctx context.Context, path string, contents []byte) e
 	// losing the existing data while migrating it to BlockBlob type. However,
 	// expectation is the clients pushing will be retrying when they get an error
 	// response.
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	err := blobRef.GetProperties(nil)
 	if err != nil && !is404(err) {
 		return fmt.Errorf("failed to get blob properties: %v", err)
@@ -157,7 +158,7 @@ func (d *driver) PutContent(ctx context.Context, path string, contents []byte) e
 // Reader retrieves an io.ReadCloser for the content stored at "path" with a
 // given byte offset.
 func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	if ok, err := blobRef.Exists(); err != nil {
 		return nil, err
 	} else if !ok {
@@ -189,7 +190,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 // Writer returns a FileWriter which will store the content written to it
 // at the location designated by "path" after the call to Commit.
 func (d *driver) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	blobExists, err := blobRef.Exists()
 	if err != nil {
 		return nil, err
@@ -219,13 +220,13 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		}
 	}
 
-	return d.newWriter(path, size), nil
+	return d.newWriter(d.pathToKey(path), size), nil
 }
 
 // Stat retrieves the FileInfo for the given path, including the current size
 // in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	// Check if the path is a blob
 	if ok, err := blobRef.Exists(); err != nil {
 		return nil, err
@@ -245,14 +246,9 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	}
 
 	// Check if path is a virtual container
-	virtContainerPath := path
-	if !strings.HasSuffix(virtContainerPath, "/") {
-		virtContainerPath += "/"
-	}
-
 	containerRef := d.client.GetContainerReference(d.container)
 	blobs, err := containerRef.ListBlobs(azure.ListBlobsParameters{
-		Prefix:     virtContainerPath,
+		Prefix:     d.pathToDirKey(path),
 		MaxResults: 1,
 	})
 	if err != nil {
@@ -270,31 +266,32 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	return nil, storagedriver.PathNotFoundError{Path: path}
 }
 
-// List returns a list of the objects that are direct descendants of the given
-// path.
+// List returns a list of objects that are direct descendants of the given path.
 func (d *driver) List(ctx context.Context, path string) ([]string, error) {
+	prefix := d.pathToDirKey(path)
+
+	// Remove inital slash to list from the root of the container.
 	if path == "/" {
-		path = ""
+		prefix = strings.TrimPrefix(prefix, "/")
 	}
 
-	blobs, err := d.listBlobs(d.container, path)
+	list, err := d.list(prefix)
 	if err != nil {
-		return blobs, err
+		return nil, err
 	}
-
-	list := directDescendants(blobs, path)
-	if path != "" && len(list) == 0 {
+	if path != "/" && len(list) == 0 {
 		return nil, storagedriver.PathNotFoundError{Path: path}
 	}
+
 	return list, nil
 }
 
 // Move moves an object stored at sourcePath to destPath, removing the original
 // object.
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
-	srcBlobRef := d.client.GetContainerReference(d.container).GetBlobReference(sourcePath)
+	srcBlobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(sourcePath))
 	sourceBlobURL := srcBlobRef.GetURL()
-	destBlobRef := d.client.GetContainerReference(d.container).GetBlobReference(destPath)
+	destBlobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(destPath))
 	err := destBlobRef.Copy(sourceBlobURL, nil)
 	if err != nil {
 		if is404(err) {
@@ -308,7 +305,7 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 func (d *driver) Delete(ctx context.Context, path string) error {
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	ok, err := blobRef.DeleteIfExists(nil)
 	if err != nil {
 		return err
@@ -318,13 +315,13 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 	}
 
 	// Not a blob, see if path is a virtual container with blobs
-	blobs, err := d.listBlobs(d.container, path)
+	blobs, err := d.listBlobs(d.pathToDirKey(path))
 	if err != nil {
 		return err
 	}
 
 	for _, b := range blobs {
-		blobRef = d.client.GetContainerReference(d.container).GetBlobReference(b)
+		blobRef = d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(b))
 		if err = blobRef.Delete(nil); err != nil {
 			return err
 		}
@@ -342,7 +339,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	count := 0
 	for _, path := range paths {
-		if err := d.Delete(ctx, path); err != nil {
+		if err := d.Delete(ctx, d.pathToKey(path)); err != nil {
 			if _, ok := err.(storagedriver.PathNotFoundError); !ok {
 				return count, err
 			}
@@ -364,7 +361,7 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 			expiresTime = t
 		}
 	}
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)
+	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
 	return blobRef.GetSASURI(azure.BlobSASOptions{
 		BlobServiceSASPermissions: azure.BlobServiceSASPermissions{
 			Read: true,
@@ -378,7 +375,7 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 // Walk traverses a filesystem defined within driver, starting
 // from the given path, calling f on each file
 func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	return storagedriver.WalkFallback(ctx, d, path, f)
+	return storagedriver.WalkFallback(ctx, d, d.pathToDirKey(path), f)
 }
 
 // WalkParallel traverses a filesystem defined within driver in parallel, starting
@@ -386,59 +383,33 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.WalkFn) error {
 	// TODO: Verify that this driver can reliably handle parallel workloads before
 	// using storagedriver.WalkFallbackParallel
-	return d.Walk(ctx, path, f)
+	return d.Walk(ctx, d.pathToDirKey(path), f)
 }
 
 func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
 	return storagedriver.ErrUnsupportedMethod{}
 }
 
-// directDescendants will find direct descendants (blobs or virtual containers)
-// of from list of blob paths and will return their full paths. Elements in blobs
-// list must be prefixed with a "/" and
-//
-// Example: direct descendants of "/" in {"/foo", "/bar/1", "/bar/2"} is
-// {"/foo", "/bar"} and direct descendants of "bar" is {"/bar/1", "/bar/2"}
-func directDescendants(blobs []string, prefix string) []string {
-	if !strings.HasPrefix(prefix, "/") { // add trailing '/'
-		prefix = "/" + prefix
-	}
-	if !strings.HasSuffix(prefix, "/") { // containerify the path
-		prefix += "/"
-	}
-
-	out := make(map[string]bool)
-	for _, b := range blobs {
-		if strings.HasPrefix(b, prefix) {
-			rel := b[len(prefix):]
-			c := strings.Count(rel, "/")
-			if c == 0 {
-				out[b] = true
-			} else {
-				out[prefix+rel[:strings.Index(rel, "/")]] = true
-			}
-		}
-	}
-
-	var keys []string
-	for k := range out {
-		keys = append(keys, k)
-	}
-	return keys
+// list simulates a filesystem style list in which both files (blobs) and
+// directories (virtual containers) are returned for a given prefix.
+func (d *driver) list(prefix string) ([]string, error) {
+	return d.listWithDelimter(prefix, "/")
 }
 
-func (d *driver) listBlobs(container, virtPath string) ([]string, error) {
-	if virtPath != "" && !strings.HasSuffix(virtPath, "/") { // containerify the path
-		virtPath += "/"
-	}
+// listBlobs lists all blobs whose names begin with the specified prefix.
+func (d *driver) listBlobs(prefix string) ([]string, error) {
+	return d.listWithDelimter(prefix, "")
+}
 
+func (d *driver) listWithDelimter(prefix, delimiter string) ([]string, error) {
 	out := []string{}
 	marker := ""
 	containerRef := d.client.GetContainerReference(d.container)
 	for {
 		resp, err := containerRef.ListBlobs(azure.ListBlobsParameters{
-			Marker: marker,
-			Prefix: virtPath,
+			Marker:    marker,
+			Prefix:    prefix,
+			Delimiter: delimiter,
 		})
 
 		if err != nil {
@@ -446,10 +417,15 @@ func (d *driver) listBlobs(container, virtPath string) ([]string, error) {
 		}
 
 		for _, b := range resp.Blobs {
-			out = append(out, b.Name)
+			out = append(out, d.keyToPath(b.Name))
 		}
 
-		if len(resp.Blobs) == 0 || resp.NextMarker == "" {
+		for _, p := range resp.BlobPrefixes {
+			out = append(out, d.keyToPath(p))
+		}
+
+		if (len(resp.Blobs) == 0 && len(resp.BlobPrefixes) == 0) ||
+			resp.NextMarker == "" {
 			break
 		}
 		marker = resp.NextMarker
@@ -557,4 +533,27 @@ func (bw *blockWriter) Write(p []byte) (int, error) {
 	}
 
 	return n, nil
+}
+
+func (d *driver) pathToKey(path string) string {
+	p := strings.TrimSpace(strings.TrimRight(d.rootDirectory+strings.TrimLeft(path, "/"), "/"))
+
+	// The Azure driver as it was originally released did not strip the leading
+	// slash from directories, resulting in a a directory structure containing
+	// an extra leading slash compared to other object storage drivers. For
+	// example: `/<no-name>/docker/registry/v2`. We need to preserve this behavior
+	// by default to support historical deployments of the registry using azure.
+	if d.rootDirectory == "" {
+		return "/" + p
+	}
+
+	return p
+}
+
+func (d *driver) pathToDirKey(path string) string {
+	return d.pathToKey(path) + "/"
+}
+
+func (d *driver) keyToPath(key string) string {
+	return "/" + strings.Trim(strings.TrimPrefix(key, d.rootDirectory), "/")
 }
