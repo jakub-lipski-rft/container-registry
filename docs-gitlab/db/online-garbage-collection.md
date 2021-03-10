@@ -669,7 +669,9 @@ With synchronization in place, depending on which process acquires the lock firs
 
   - The manifest is considered dangling. The garbage collector deletes the corresponding rows from `manifests` on the database, which cascades to `gc_manifest_review_queue`. Once the garbage collector commits the transaction, the API is unblocked, and the subsequent query on `tags` will not find an entry as expected (deletes on `manifests` cascade to `tags`).
 
-- The API acquires the lock first, stopping the garbage collector from reviewing the manifest. The API can then delete the tag from `tags` and commit the transaction.
+- The API acquires the lock first, stopping the garbage collector from reviewing the manifest. The API can then delete the tag from `tags` and commit the transaction.  
+
+The `SELECT FOR UPDATE` on the review queue and the subsequent tag delete must be executed within the same transaction. The tag delete will trigger `gc_track_deleted_tags`, which will attempt to acquire the same row lock on the review queue in case of conflict. Not using the same transaction for both operations in this situation would result in a deadlock.
 
 ##### Deleting the last referencing manifest list
 
