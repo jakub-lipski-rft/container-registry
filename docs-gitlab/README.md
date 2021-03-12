@@ -57,6 +57,22 @@ S3: https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
 for use in production environments, as exceeding your request budget will result
 in errors from the Amazon S3 service.
 
+#### Azure Storage Driver
+
+##### Additional parameters
+
+`rootdirectory`
+
+This parameter specifies the root directory in which all registry files are
+stored. Defaults to the empty string (bucket root).
+
+`trimlegacyrootprefix`
+
+Orginally, the Azure driver would write to `//` as the root directory, also
+appearing in some places as `/<no-name>/` within the Azure UI. This legacy
+behavior must be preserved to support older deployments using this driver.
+Set to `true` to build root paths without an extra leading slash.
+
 #### GCS Storage Driver
 
 ##### Additional parameters

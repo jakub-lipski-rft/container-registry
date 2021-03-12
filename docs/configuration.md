@@ -85,6 +85,8 @@ storage:
     accountname: accountname
     accountkey: base64encodedaccountkey
     container: containername
+    rootdirectory: /azure/virtual/container
+    trimlegacyrootprefix: true
   gcs:
     bucket: bucketname
     keyfile: /path/to/keyfile
@@ -405,6 +407,8 @@ storage:
     accountname: accountname
     accountkey: base64encodedaccountkey
     container: containername
+    rootdirectory: /azure/virtual/container
+    trimlegacyrootprefix: true
   gcs:
     bucket: bucketname
     keyfile: /path/to/keyfile
