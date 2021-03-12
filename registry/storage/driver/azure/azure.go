@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,17 +24,26 @@ import (
 const driverName = "azure"
 
 const (
-	paramAccountName = "accountname"
-	paramAccountKey  = "accountkey"
-	paramContainer   = "container"
-	paramRealm       = "realm"
-	maxChunkSize     = 4 * 1024 * 1024
+	paramAccountName          = "accountname"
+	paramAccountKey           = "accountkey"
+	paramContainer            = "container"
+	paramRealm                = "realm"
+	paramRootDirectory        = "rootdirectory"
+	paramTrimLegacyRootPrefix = "trimlegacyrootprefix"
+	maxChunkSize              = 4 * 1024 * 1024
 )
 
 type driver struct {
 	client        azure.BlobStorageClient
 	container     string
 	rootDirectory string
+
+	// The Azure driver as it was originally released did not strip the leading
+	// slash from directories, resulting in a directory structure containing an
+	// extra leading slash compared to other object storage drivers. For example:
+	// `//docker/registry/v2`. We need to preserve this behavior by default to
+	// support historical deployments of the registry using azure.
+	legacyPath bool
 }
 
 type baseEmbed struct{ base.Base }
@@ -74,11 +84,26 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		realm = azure.DefaultBaseURL
 	}
 
-	return New(fmt.Sprint(accountName), fmt.Sprint(accountKey), fmt.Sprint(container), fmt.Sprint(realm))
+	root, ok := parameters[paramRootDirectory]
+	if !ok || fmt.Sprint(root) == "" {
+		root = ""
+	}
+
+	trimLegacyRootPrefixStr, ok := parameters[paramTrimLegacyRootPrefix]
+	if !ok || fmt.Sprint(trimLegacyRootPrefixStr) == "" {
+		trimLegacyRootPrefixStr = "false"
+	}
+	trimlegacyrootprefix, err := strconv.ParseBool(fmt.Sprint(trimLegacyRootPrefixStr))
+	if err != nil {
+		return nil, fmt.Errorf("the trimlegacyrootprefix parameter should be a boolean")
+	}
+	legacyPath := !trimlegacyrootprefix
+
+	return New(fmt.Sprint(accountName), fmt.Sprint(accountKey), fmt.Sprint(container), fmt.Sprint(realm), fmt.Sprint(root), legacyPath)
 }
 
 // New constructs a new Driver with the given Azure Storage Account credentials
-func New(accountName, accountKey, container, realm string) (*Driver, error) {
+func New(accountName, accountKey, container, realm, rootDirectory string, legacyPath bool) (*Driver, error) {
 	api, err := azure.NewClient(accountName, accountKey, realm, azure.DefaultAPIVersion, true)
 	if err != nil {
 		return nil, err
@@ -92,9 +117,18 @@ func New(accountName, accountKey, container, realm string) (*Driver, error) {
 		return nil, err
 	}
 
+	rootDirectory = strings.Trim(rootDirectory, "/")
+	if rootDirectory != "" {
+		rootDirectory += "/"
+	}
+
 	d := &driver{
-		client:    blobClient,
-		container: container}
+		client:        blobClient,
+		rootDirectory: rootDirectory,
+		legacyPath:    legacyPath,
+		container:     container,
+	}
+
 	return &Driver{baseEmbed: baseEmbed{Base: base.Base{StorageDriver: d}}}, nil
 }
 
@@ -226,23 +260,30 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 // Stat retrieves the FileInfo for the given path, including the current size
 // in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
-	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
-	// Check if the path is a blob
-	if ok, err := blobRef.Exists(); err != nil {
-		return nil, err
-	} else if ok {
-		err = blobRef.GetProperties(nil)
-		if err != nil {
+	// If we try to get "/" as a blob, pathToKey will return "" when no root
+	// directory is specified and we are not in legacy path mode, which causes
+	// Azure to return a **400** when that object doesn't exist. So we need to
+	// skip to trying to list the blobs under "/", which should result in zero
+	// blobs, so we can return the expected 404 if we don't find any.
+	if path != "/" {
+		blobRef := d.client.GetContainerReference(d.container).GetBlobReference(d.pathToKey(path))
+		// Check if the path is a blob
+		if ok, err := blobRef.Exists(); err != nil {
 			return nil, err
-		}
-		blobProperties := blobRef.Properties
+		} else if ok {
+			err = blobRef.GetProperties(nil)
+			if err != nil {
+				return nil, err
+			}
+			blobProperties := blobRef.Properties
 
-		return storagedriver.FileInfoInternal{FileInfoFields: storagedriver.FileInfoFields{
-			Path:    path,
-			Size:    blobProperties.ContentLength,
-			ModTime: time.Time(blobProperties.LastModified),
-			IsDir:   false,
-		}}, nil
+			return storagedriver.FileInfoInternal{FileInfoFields: storagedriver.FileInfoFields{
+				Path:    path,
+				Size:    blobProperties.ContentLength,
+				ModTime: time.Time(blobProperties.LastModified),
+				IsDir:   false,
+			}}, nil
+		}
 	}
 
 	// Check if path is a virtual container
@@ -270,9 +311,10 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 func (d *driver) List(ctx context.Context, path string) ([]string, error) {
 	prefix := d.pathToDirKey(path)
 
-	// Remove inital slash to list from the root of the container.
-	if path == "/" {
-		prefix = strings.TrimPrefix(prefix, "/")
+	// If we aren't using a particular root directory, we should not add the extra
+	// ending slash that pathToDirKey adds.
+	if d.rootDirectory == "" && path == "/" {
+		prefix = d.pathToKey(path)
 	}
 
 	list, err := d.list(prefix)
@@ -339,7 +381,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 	count := 0
 	for _, path := range paths {
-		if err := d.Delete(ctx, d.pathToKey(path)); err != nil {
+		if err := d.Delete(ctx, path); err != nil {
 			if _, ok := err.(storagedriver.PathNotFoundError); !ok {
 				return count, err
 			}
@@ -375,7 +417,7 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 // Walk traverses a filesystem defined within driver, starting
 // from the given path, calling f on each file
 func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	return storagedriver.WalkFallback(ctx, d, d.pathToDirKey(path), f)
+	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
 // WalkParallel traverses a filesystem defined within driver in parallel, starting
@@ -383,7 +425,7 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 func (d *driver) WalkParallel(ctx context.Context, path string, f storagedriver.WalkFn) error {
 	// TODO: Verify that this driver can reliably handle parallel workloads before
 	// using storagedriver.WalkFallbackParallel
-	return d.Walk(ctx, d.pathToDirKey(path), f)
+	return d.Walk(ctx, path, f)
 }
 
 func (d *driver) TransferTo(ctx context.Context, destDriver storagedriver.StorageDriver, src, dest string) error {
@@ -538,12 +580,7 @@ func (bw *blockWriter) Write(p []byte) (int, error) {
 func (d *driver) pathToKey(path string) string {
 	p := strings.TrimSpace(strings.TrimRight(d.rootDirectory+strings.TrimLeft(path, "/"), "/"))
 
-	// The Azure driver as it was originally released did not strip the leading
-	// slash from directories, resulting in a a directory structure containing
-	// an extra leading slash compared to other object storage drivers. For
-	// example: `/<no-name>/docker/registry/v2`. We need to preserve this behavior
-	// by default to support historical deployments of the registry using azure.
-	if d.rootDirectory == "" {
+	if d.legacyPath {
 		return "/" + p
 	}
 
@@ -555,5 +592,10 @@ func (d *driver) pathToDirKey(path string) string {
 }
 
 func (d *driver) keyToPath(key string) string {
-	return "/" + strings.Trim(strings.TrimPrefix(key, d.rootDirectory), "/")
+	root := d.rootDirectory
+	if d.legacyPath {
+		root = "/" + root
+	}
+
+	return "/" + strings.Trim(strings.TrimPrefix(key, root), "/")
 }

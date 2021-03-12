@@ -1,4 +1,7 @@
 ## [Unreleased]
+### Added
+- configuration: Add `rootdirectory` option to the azure storage driver
+- configuration: Add `trimlegacyrootprefix` option to the azure storage driver
 
 ## [v3.1.0-gitlab] - 2021-02-25
 ### Added
