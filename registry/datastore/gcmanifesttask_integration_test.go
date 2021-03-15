@@ -48,6 +48,12 @@ func TestGCManifestTaskStore_FindAll(t *testing.T) {
 			ReviewCount:  0,
 		},
 		{
+			RepositoryID: 4,
+			ManifestID:   4,
+			ReviewAfter:  testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", local),
+			ReviewCount:  0,
+		},
+		{
 			RepositoryID: 3,
 			ManifestID:   1,
 			ReviewAfter:  testutil.ParseTimestamp(t, "2020-03-03 17:50:26.461745", local),
@@ -149,6 +155,97 @@ func TestGCManifestTaskStore_FindAndLockBefore_NotFound(t *testing.T) {
 	require.Nil(t, r)
 }
 
+func TestGCManifestTaskStore_FindAndLockNBefore(t *testing.T) {
+	reloadGCManifestTaskFixtures(t)
+
+	ctx1, cancel1 := context.WithCancel(suite.ctx)
+	defer cancel1()
+
+	tx1, err := suite.db.BeginTx(ctx1, nil)
+	require.NoError(t, err)
+	defer tx1.Rollback()
+
+	s := datastore.NewGCManifestTaskStore(tx1)
+
+	// see testdata/fixtures/gc_manifest_review_queue.sql
+	date := testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", time.UTC).Add(1 * time.Minute)
+	ids := []int64{7, 4}
+	rr, err := s.FindAndLockNBefore(suite.ctx, 4, ids, date)
+	require.NoError(t, err)
+
+	local := rr[0].ReviewAfter.Location()
+	expected := []*models.GCManifestTask{
+		{
+			RepositoryID: 4,
+			ManifestID:   4,
+			ReviewAfter:  testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", local),
+			ReviewCount:  0,
+		},
+		{
+			RepositoryID: 4,
+			ManifestID:   7,
+			ReviewAfter:  testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", local),
+			ReviewCount:  2,
+		},
+	}
+
+	require.Equal(t, expected, rr)
+
+	// attempt to find the same records in a separate transaction, it should block and eventually timeout
+	ctx2, cancel2 := context.WithTimeout(suite.ctx, 500*time.Millisecond)
+	defer cancel2()
+
+	tx2, err := suite.db.BeginTx(ctx2, nil)
+	require.NoError(t, err)
+	defer tx2.Rollback()
+
+	s = datastore.NewGCManifestTaskStore(tx2)
+	rr, err = s.FindAndLockNBefore(ctx2, 4, ids, date)
+
+	var netError net.Error
+	ok := errors.As(err, &netError)
+	require.True(t, ok)
+	require.True(t, netError.Timeout())
+	require.Empty(t, rr)
+
+	// attempt again, but this time tx1 completes before the tx3 timeout and it gets to lock the row
+	ctx3, cancel3 := context.WithTimeout(suite.ctx, 1*time.Second)
+	defer cancel3()
+
+	tx3, err := suite.db.BeginTx(ctx3, nil)
+	require.NoError(t, err)
+	defer tx3.Rollback()
+
+	go time.AfterFunc(500*time.Millisecond, func() { tx1.Rollback() })
+
+	s = datastore.NewGCManifestTaskStore(tx3)
+	rr, err = s.FindAndLockNBefore(suite.ctx, 4, ids, date)
+	require.NoError(t, err)
+	require.Equal(t, expected, rr)
+}
+
+func TestGCManifestTaskStore_FindAndLockNBefore_NotFound(t *testing.T) {
+	reloadGCManifestTaskFixtures(t)
+
+	tx, err := suite.db.BeginTx(suite.ctx, nil)
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	s := datastore.NewGCManifestTaskStore(tx)
+
+	// when there is no such (repository_id, manifest_id) pair
+	date := testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", time.UTC).Add(1 * time.Minute)
+	rr, err := s.FindAndLockNBefore(suite.ctx, 400, []int64{7, 4}, date)
+	require.NoError(t, err)
+	require.Empty(t, rr)
+
+	// when the review_after is not before the given date
+	date = testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", time.UTC)
+	rr, err = s.FindAndLockNBefore(suite.ctx, 4, []int64{7, 4}, date)
+	require.NoError(t, err)
+	require.Empty(t, rr)
+}
+
 func TestGcManifestTaskStore_Count(t *testing.T) {
 	reloadGCManifestTaskFixtures(t)
 
@@ -157,7 +254,7 @@ func TestGcManifestTaskStore_Count(t *testing.T) {
 	require.NoError(t, err)
 
 	// see testdata/fixtures/gc_manifest_review_queue.sql
-	require.Equal(t, 3, count)
+	require.Equal(t, 4, count)
 }
 
 func nextGCManifestTask(t *testing.T) (datastore.Transactor, *models.GCManifestTask) {
@@ -203,17 +300,29 @@ func TestGcManifestTaskStore_Next(t *testing.T) {
 	}
 	require.Equal(t, expectedM2, m2)
 
-	// Calling Next again yields nothing and does not block, as the remaining unlocked record has a review_after in
-	// the future.
+	// The 3rd call should yield the unlocked record with the 3rd oldest review_after.
 	tx3, m3 := nextGCManifestTask(t)
 	defer tx3.Rollback()
-	require.Nil(t, m3)
 
-	// unlocking m2 and calling Next returns m2 once again
-	require.NoError(t, tx2.Rollback())
+	expectedM3 := &models.GCManifestTask{
+		RepositoryID: 4,
+		ManifestID:   4,
+		ReviewAfter:  testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", local),
+		ReviewCount:  0,
+	}
+	require.Equal(t, expectedM3, m3)
+
+	// Calling Next again yields nothing and does not block, as the remaining unlocked record has a review_after in
+	// the future.
 	tx4, m4 := nextGCManifestTask(t)
 	defer tx4.Rollback()
-	require.Equal(t, expectedM2, m4)
+	require.Nil(t, m4)
+
+	// unlocking m3 and calling Next returns m3 once again
+	require.NoError(t, tx3.Rollback())
+	tx5, m5 := nextGCManifestTask(t)
+	defer tx5.Rollback()
+	require.Equal(t, expectedM3, m5)
 }
 
 func TestGcManifestTaskStore_Next_None(t *testing.T) {

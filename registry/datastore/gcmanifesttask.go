@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/registry/datastore/metrics"
@@ -16,6 +18,7 @@ import (
 type GCManifestTaskStore interface {
 	FindAll(ctx context.Context) ([]*models.GCManifestTask, error)
 	FindAndLockBefore(ctx context.Context, repositoryID, manifestID int64, date time.Time) (*models.GCManifestTask, error)
+	FindAndLockNBefore(ctx context.Context, repositoryID int64, manifestIDs []int64, date time.Time) ([]*models.GCManifestTask, error)
 	Count(ctx context.Context) (int, error)
 	Next(ctx context.Context) (*models.GCManifestTask, error)
 	Postpone(ctx context.Context, b *models.GCManifestTask, d time.Duration) error
@@ -100,6 +103,40 @@ func (s *gcManifestTaskStore) FindAndLockBefore(ctx context.Context, repositoryI
 		FOR UPDATE`
 	row := s.db.QueryRowContext(ctx, q, repositoryID, manifestID, date)
 	return scanFullGCManifestTask(row)
+}
+
+// FindAndLockNBefore finds multiple GC manifest tasks scheduled for review before date and locks them against writes.
+// This query blocks if any row exists but is already locked by another process.
+func (s *gcManifestTaskStore) FindAndLockNBefore(ctx context.Context, repositoryID int64, manifestIDs []int64, date time.Time) ([]*models.GCManifestTask, error) {
+	defer metrics.StatementDuration("gc_manifest_task_find_and_lock_n_before")()
+	q := `SELECT
+			repository_id,
+			manifest_id,
+			review_after,
+			review_count
+		FROM
+			gc_manifest_review_queue
+		WHERE
+			repository_id = $1
+			AND manifest_id IN (%s)
+			AND review_after < $2
+		ORDER BY
+			repository_id,
+			manifest_id
+		FOR UPDATE`
+
+	ids := make([]string, 0, len(manifestIDs))
+	for _, id := range manifestIDs {
+		ids = append(ids, strconv.FormatInt(id, 10))
+	}
+	q = fmt.Sprintf(q, strings.Join(ids, ","))
+
+	rows, err := s.db.QueryContext(ctx, q, repositoryID, date)
+	if err != nil {
+		return nil, fmt.Errorf("finding and locking GC manifest tasks: %w", err)
+	}
+
+	return scanFullGCManifestTasks(rows)
 }
 
 // Count counts all GC manifest tasks.

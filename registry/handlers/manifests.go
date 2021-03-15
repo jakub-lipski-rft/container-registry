@@ -8,6 +8,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
@@ -1005,11 +1006,16 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 // TODO: Placeholder until https://gitlab.com/gitlab-org/container-registry/-/issues/109
 var errManifestNotFoundDB = errors.New("manifest not found in database")
 
+const (
+	manifestDeleteGCReviewWindow = 1 * time.Hour
+	manifestDeleteGCLockTimeout  = 5 * time.Second
+)
+
 // dbDeleteManifest replicates the DeleteManifest action in the metadata database. This method doesn't actually delete
 // a manifest from the database (that's a task for GC, if a manifest is unreferenced), it only deletes the record that
 // associates the manifest with a digest d with the repository with path repoPath. Any tags that reference the manifest
 // within the repository are also deleted.
-func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string, d digest.Digest) error {
+func dbDeleteManifest(ctx context.Context, db datastore.Handler, repoPath string, d digest.Digest) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": repoPath, "digest": d})
 	log.Debug("deleting manifest from repository in database")
 
@@ -1022,12 +1028,67 @@ func dbDeleteManifest(ctx context.Context, db datastore.Queryer, repoPath string
 		return fmt.Errorf("repository not found in database: %w", err)
 	}
 
+	// We need to find the manifest first and then lookup for any manifest it references (if it's a manifest list). This
+	// is needed to ensure we lock any related online GC tasks to prevent race conditions around the delete. See:
+	// https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs-gitlab/db/online-garbage-collection.md#deleting-the-last-referencing-manifest-list
+	m, err := rStore.FindManifestByDigest(ctx, r, d)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		return errManifestNotFoundDB
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create database transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	switch m.MediaType {
+	case manifestlist.MediaTypeManifestList, v1.MediaTypeImageIndex:
+		mStore := datastore.NewManifestStore(tx)
+		mm, err := mStore.References(ctx, m)
+		if err != nil {
+			return err
+		}
+
+		// This should never happen, as it's not possible to delete a child manifest if it's referenced by a list, which
+		// means that we'll always have at least one child manifest here. Nevertheless, log error if this ever happens.
+		if len(mm) == 0 {
+			log.Error("stored manifest list has no references")
+			break
+		}
+		ids := make([]int64, 0, len(mm))
+		for _, m := range mm {
+			ids = append(ids, m.ID)
+		}
+
+		// Prevent long running transactions by setting an upper limit of manifestDeleteGCLockTimeout. If the GC is
+		// holding the lock of a related review record, the processing there should be fast enough to avoid this.
+		// Regardless, we should not let transactions open (and clients waiting) for too long. If this sensible timeout
+		// is exceeded, abort the manifest delete and let the client retry. This will bubble up and lead to a 503
+		// Service Unavailable response.
+		ctx, cancel := context.WithTimeout(ctx, manifestDeleteGCLockTimeout)
+		defer cancel()
+
+		mts := datastore.NewGCManifestTaskStore(tx)
+		if _, err := mts.FindAndLockNBefore(ctx, r.ID, ids, time.Now().Add(manifestDeleteGCReviewWindow)); err != nil {
+			return err
+		}
+	}
+
+	rStore = datastore.NewRepositoryStore(tx)
 	found, err := rStore.DeleteManifest(ctx, r, d)
 	if err != nil {
 		return err
 	}
 	if !found {
 		return errManifestNotFoundDB
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit database transaction: %w", err)
 	}
 
 	return nil
