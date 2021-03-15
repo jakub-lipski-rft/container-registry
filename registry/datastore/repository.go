@@ -930,8 +930,6 @@ func (s *repositoryStore) DeleteTagByName(ctx context.Context, r *models.Reposit
 	return count == 1, nil
 }
 
-var ErrManifestReferencedInList = errors.New("manifest referenced by manifest list")
-
 // DeleteManifest deletes a manifest from a repository. A boolean is returned to denote whether the manifest was deleted
 // or not. This avoids the need for a separate preceding `SELECT` to find if it exists. A manifest cannot be deleted if
 // it is referenced by a manifest list.

@@ -541,25 +541,8 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if imh.Config.Database.Enabled {
-		// We're using the database and mirroring writes to the filesystem. We'll run
-		// a transaction so we can revert any changes to the database in case that
-		// any part of this multi-phase database operation fails.
-		tx, err := imh.App.db.BeginTx(imh.Context, nil)
-		if err != nil {
-			imh.Errors = append(imh.Errors,
-				errcode.FromUnknownError(fmt.Errorf("failed to create database transaction: %w", err)))
-			return
-		}
-		defer tx.Rollback()
-
 		if err := dbPutManifest(imh, manifest, jsonBuf.Bytes()); err != nil {
 			imh.appendPutError(err)
-			return
-		}
-
-		if err := tx.Commit(); err != nil {
-			imh.Errors = append(imh.Errors,
-				errcode.FromUnknownError(fmt.Errorf("failed to commit manifest to database: %w", err)))
 			return
 		}
 	}
@@ -577,23 +560,32 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 		// Associate tag with manifest in database.
 		if imh.Config.Database.Enabled {
-			tx, err := imh.App.db.BeginTx(imh.Context, nil)
-			if err != nil {
-				e := fmt.Errorf("failed to create database transaction: %w", err)
-				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
-				return
-			}
-			defer tx.Rollback()
-
-			if err := dbTagManifest(imh, tx, imh.Digest, imh.Tag, imh.Repository.Named().Name()); err != nil {
-				e := fmt.Errorf("failed to create tag in database: %w", err)
-				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
-				return
-			}
-			if err := tx.Commit(); err != nil {
-				e := fmt.Errorf("failed to commit tag to database: %v", err)
-				imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
-				return
+			repoName := imh.Repository.Named().Name()
+			if err := dbTagManifest(imh, imh.db, imh.Digest, imh.Tag, repoName); err != nil {
+				if errors.Is(err, datastore.ErrManifestNotFound) {
+					// If online GC was already reviewing the manifest that we want to tag, and that manifest had no
+					// tags before the review start, the API is unable to stop the GC from deleting the manifest (as
+					// the GC already acquired the lock on the corresponding queue row). This means that once the API
+					// is unblocked and tries to create the tag, a foreign key violation error will occur (because we're
+					// trying to create a tag for a manifest that no longer exists) and lead to this specific error.
+					// This should be extremely rare, if it ever occurs, but if it does, we should recreate the manifest
+					// and tag it, instead of returning a "manifest not found response" to clients. It's expected that
+					// this route handles the creation of a manifest if it doesn't exist already.
+					if err := dbPutManifest(imh, manifest, jsonBuf.Bytes()); err != nil {
+						e := fmt.Errorf("failed to recreate manifest in database: %w", err)
+						imh.appendPutError(e)
+						return
+					}
+					if err := dbTagManifest(imh, imh.db, imh.Digest, imh.Tag, repoName); err != nil {
+						e := fmt.Errorf("failed to create tag in database after manifest recreate: %w", err)
+						imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
+						return
+					}
+				} else {
+					e := fmt.Errorf("failed to create tag in database: %w", err)
+					imh.Errors = append(imh.Errors, errcode.FromUnknownError(e))
+					return
+				}
 			}
 		}
 	}
@@ -653,7 +645,7 @@ func (imh *manifestHandler) appendPutError(err error) {
 				if verificationError == digest.ErrDigestInvalidFormat {
 					imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
 				} else {
-					imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown, verificationError)
+					imh.Errors = append(imh.Errors, errcode.FromUnknownError(verificationError))
 				}
 			}
 		}
@@ -677,7 +669,12 @@ func dbPutManifest(imh *manifestHandler, manifest distribution.Manifest, payload
 	}
 }
 
-func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest, tagName, path string) error {
+const (
+	manifestTagGCReviewWindow = 1 * time.Hour
+	manifestTagGCLockTimeout  = 5 * time.Second
+)
+
+func dbTagManifest(ctx context.Context, db datastore.Handler, dgst digest.Digest, tagName, path string) error {
 	log := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{"repository": path, "manifest_digest": dgst, "tag": tagName})
 	log.Debug("tagging manifest")
 
@@ -697,14 +694,42 @@ func dbTagManifest(ctx context.Context, db datastore.Queryer, dgst digest.Digest
 		return fmt.Errorf("manifest %s not found in database", dgst)
 	}
 
-	tagStore := datastore.NewTagStore(db)
-
 	log.Debug("creating tag")
-	return tagStore.CreateOrUpdate(ctx, &models.Tag{
+
+	// We need to find and lock a GC manifest task that is related with the manifest that we're about to tag. This
+	// is needed to ensure we lock any related online GC tasks to prevent race conditions around the tag creation. See:
+	// https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs-gitlab/db/online-garbage-collection.md#creating-a-tag-for-an-untagged-manifest
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create database transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Prevent long running transactions by setting an upper limit of manifestTagGCLockTimeout. If the GC is holding
+	// the lock of a related review record, the processing there should be fast enough to avoid this. Regardless, we
+	// should not let transactions open (and clients waiting) for too long. If this sensible timeout is exceeded, abort
+	// the tag creation and let the client retry. This will bubble up and lead to a 503 Service Unavailable response.
+	ctx, cancel := context.WithTimeout(ctx, manifestTagGCLockTimeout)
+	defer cancel()
+
+	mts := datastore.NewGCManifestTaskStore(tx)
+	if _, err := mts.FindAndLockBefore(ctx, dbRepo.ID, dbManifest.ID, time.Now().Add(manifestTagGCReviewWindow)); err != nil {
+		return err
+	}
+
+	tagStore := datastore.NewTagStore(tx)
+	if err := tagStore.CreateOrUpdate(ctx, &models.Tag{
 		Name:         tagName,
 		RepositoryID: dbRepo.ID,
 		ManifestID:   dbManifest.ID,
-	})
+	}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing database transaction: %w", err)
+	}
+	return nil
 }
 
 func dbPutManifestOCI(imh *manifestHandler, manifest *ocischema.DeserializedManifest, payload []byte) error {
@@ -1003,9 +1028,6 @@ func (imh *manifestHandler) applyResourcePolicy(manifest distribution.Manifest) 
 	return nil
 }
 
-// TODO: Placeholder until https://gitlab.com/gitlab-org/container-registry/-/issues/109
-var errManifestNotFoundDB = errors.New("manifest not found in database")
-
 const (
 	manifestDeleteGCReviewWindow = 1 * time.Hour
 	manifestDeleteGCLockTimeout  = 5 * time.Second
@@ -1036,7 +1058,7 @@ func dbDeleteManifest(ctx context.Context, db datastore.Handler, repoPath string
 		return err
 	}
 	if m == nil {
-		return errManifestNotFoundDB
+		return datastore.ErrManifestNotFound
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -1084,7 +1106,7 @@ func dbDeleteManifest(ctx context.Context, db datastore.Handler, repoPath string
 		return err
 	}
 	if !found {
-		return errManifestNotFoundDB
+		return datastore.ErrManifestNotFound
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -1145,7 +1167,7 @@ func (imh *manifestHandler) appendManifestDeleteError(err error) {
 	switch {
 	case errors.Is(err, digest.ErrDigestUnsupported), errors.Is(err, digest.ErrDigestInvalidFormat):
 		imh.Errors = append(imh.Errors, v2.ErrorCodeDigestInvalid)
-	case errors.Is(err, distribution.ErrBlobUnknown), errors.Is(err, errManifestNotFoundDB):
+	case errors.Is(err, distribution.ErrBlobUnknown), errors.Is(err, datastore.ErrManifestNotFound):
 		imh.Errors = append(imh.Errors, v2.ErrorCodeManifestUnknown)
 	case errors.Is(err, distribution.ErrUnsupported):
 		imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
