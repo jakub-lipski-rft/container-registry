@@ -4819,6 +4819,21 @@ func newTestEnvWithConfig(t *testing.T, config *configuration.Configuration) *te
 		if _, err = m.Up(); err != nil {
 			t.Fatal(err)
 		}
+
+		// online GC workers are noisy and not required for the API test, so we disable them globally here
+		config.GC.Disabled = true
+
+		if config.GC.ReviewAfter != 0 {
+			d := config.GC.ReviewAfter
+			// -1 means no review delay, so set it to 0 here
+			if d == -1 {
+				d = 0
+			}
+			s := datastore.NewGCSettingsStore(db)
+			if _, err := s.UpdateAllReviewAfterDefaults(ctx, d); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 
 	app := registryhandlers.NewApp(ctx, config)
