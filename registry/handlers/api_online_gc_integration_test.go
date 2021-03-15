@@ -3,6 +3,7 @@
 package handlers_test
 
 import (
+	"bytes"
 	"math/rand"
 	"net/http"
 	"testing"
@@ -209,4 +210,144 @@ func TestManifestsAPI_DeleteList_OnlineGC_TimeoutOnProlongedReview(t *testing.T)
 
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 	require.WithinDuration(t, start, end, 5*time.Second+100*time.Millisecond)
+}
+
+// TestManifestsAPI_Tag_OnlineGC_BlocksAndResumesAfterGCReview tests that when we try to tag a manifest that is being
+// reviewed by the online GC, the API is not able to tag until GC completes.
+// https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs-gitlab/db/online-garbage-collection.md#creating-a-tag-for-an-untagged-manifest
+func TestManifestsAPI_Tag_OnlineGC_BlocksAndResumesAfterGCReview(t *testing.T) {
+	env := newTestEnv(t, withDelete, withoutOnlineGCReviewDelay)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create test repo and manifest with no tag
+	repoName, err := reference.WithName("test")
+	require.NoError(t, err)
+	m := seedRandomSchema2Manifest(t, env, repoName.String(), putByDigest)
+	_, payload, err := m.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+
+	// simulate GC process by locking the manifest review record indefinitely
+	mt, tx := findAndLockGCManifestTask(t, env, repoName, dgst)
+	defer tx.Rollback()
+
+	// simulate GC manifest review happening in the background while we make the API request
+	lockDuration := 2 * time.Second
+	time.AfterFunc(lockDuration, func() {
+		// the manifest is not dangling, so we delete the GC tasks and commit transaction, as the GC would do
+		mts := datastore.NewGCManifestTaskStore(tx)
+		require.NoError(t, mts.Delete(env.ctx, mt))
+		require.NoError(t, tx.Commit())
+	})
+
+	// attempt to tag manifest through the API, this should succeed after waiting for lockDuration
+	u := buildManifestTagURL(t, env, repoName.String(), "latest")
+	req, err := http.NewRequest("PUT", u, bytes.NewReader(payload))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", m.MediaType)
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(req)
+	end := time.Now()
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.WithinDuration(t, start, end, lockDuration+100*time.Millisecond)
+}
+
+// TestManifestsAPI_Tag_OnlineGC_BlocksAndResumesAfterGCReview_DanglingManifest tests that when we try to tag a manifest
+// that is being reviewed by the online GC, and it ends up being deleted because it was dangling, the API is not able to
+// tag until GC completes. Once unblocked, the API should handle the "manifest not found" error gracefully and create
+// and tag the manifest.
+// https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs-gitlab/db/online-garbage-collection.md#creating-a-tag-for-an-untagged-manifest
+func TestManifestsAPI_Tag_OnlineGC_BlocksAndResumesAfterGCReview_DanglingManifest(t *testing.T) {
+	env := newTestEnv(t, withDelete, withoutOnlineGCReviewDelay)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create test repo and manifest with no tag
+	repoName, err := reference.WithName("test")
+	require.NoError(t, err)
+	m := seedRandomSchema2Manifest(t, env, repoName.String(), putByDigest)
+	_, payload, err := m.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+
+	// simulate GC process by locking the manifest review record indefinitely
+	mt, tx := findAndLockGCManifestTask(t, env, repoName, dgst)
+	defer tx.Rollback()
+
+	// simulate GC manifest review happening in the background while we make the API request
+	lockDuration := 2 * time.Second
+	time.AfterFunc(lockDuration, func() {
+		// the manifest is dangling, so we delete it and commit the transaction, as the GC would do
+		ms := datastore.NewManifestStore(tx)
+		found, err := ms.Delete(env.ctx, &models.Manifest{RepositoryID: mt.RepositoryID, ID: mt.ManifestID})
+		require.NoError(t, err)
+		require.True(t, found)
+		require.NoError(t, tx.Commit())
+	})
+
+	// attempt to tag manifest through the API, this should resume after lockDuration and recreate and tag the manifest
+	u := buildManifestTagURL(t, env, repoName.String(), "latest")
+	req, err := http.NewRequest("PUT", u, bytes.NewReader(payload))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", m.MediaType)
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(req)
+	end := time.Now()
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	require.WithinDuration(t, start, end, lockDuration+500*time.Millisecond)
+}
+
+// TestManifestsAPI_Tag_OnlineGC_TimeoutOnProlongedReview tests that when we try to tag a manifest that is being
+// reviewed by the online GC, and for some reason the review does not end within manifestTagGCLockTimeout, the API
+// request is aborted and a 503 Service Unavailable response is returned.
+// https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs-gitlab/db/online-garbage-collection.md#creating-a-tag-for-an-untagged-manifest
+func TestManifestsAPI_Tag_OnlineGC_TimeoutOnProlongedReview(t *testing.T) {
+	env := newTestEnv(t, withoutOnlineGCReviewDelay)
+	defer env.Shutdown()
+
+	if !env.config.Database.Enabled {
+		t.Skip("skipping test because the metadata database is not enabled")
+	}
+
+	// create test repo and manifest with no tag
+	repoName, err := reference.WithName("test")
+	require.NoError(t, err)
+	m := seedRandomSchema2Manifest(t, env, repoName.String(), putByDigest)
+	_, payload, err := m.Payload()
+	require.NoError(t, err)
+	dgst := digest.FromBytes(payload)
+
+	// simulate GC process by locking the manifest review record indefinitely
+	_, tx := findAndLockGCManifestTask(t, env, repoName, dgst)
+	defer tx.Rollback()
+
+	// attempt to tag manifest through the API, this should fail after waiting for manifestTagGCLockTimeout (5 seconds)
+	u := buildManifestTagURL(t, env, repoName.String(), "latest")
+	req, err := http.NewRequest("PUT", u, bytes.NewReader(payload))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", m.MediaType)
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(req)
+	end := time.Now()
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+	require.WithinDuration(t, start, end, 5*time.Second+200*time.Millisecond)
 }

@@ -3,10 +3,13 @@ package datastore
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/docker/distribution/registry/datastore/metrics"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 )
 
 // TagReader is the interface that defines read operations for a tag store.
@@ -184,6 +187,11 @@ func (s *tagStore) CreateOrUpdate(ctx context.Context, t *models.Tag) error {
 
 	row := s.db.QueryRowContext(ctx, q, t.RepositoryID, t.ManifestID, t.Name)
 	if err := row.Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt); err != nil && err != sql.ErrNoRows {
+		var pgErr *pgconn.PgError
+		// this can happen if the manifest is deleted by the online GC while attempting to tag an untagged manifest
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
+			return ErrManifestNotFound
+		}
 		return fmt.Errorf("creating tag: %w", err)
 	}
 

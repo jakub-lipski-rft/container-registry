@@ -269,3 +269,19 @@ func TestTagStore_CreateOrUpdate_Idempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, tag.UpdatedAt)
 }
+
+func TestTagStore_CreateOrUpdate_ManifestNotFound(t *testing.T) {
+	reloadRepositoryFixtures(t)
+	reloadManifestFixtures(t)
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.TagsTable))
+
+	s := datastore.NewTagStore(suite.db)
+	tag := &models.Tag{
+		Name:         "3.0.0",
+		RepositoryID: 3,
+		ManifestID:   100,
+	}
+	err := s.CreateOrUpdate(suite.ctx, tag)
+
+	require.EqualError(t, err, datastore.ErrManifestNotFound.Error())
+}
