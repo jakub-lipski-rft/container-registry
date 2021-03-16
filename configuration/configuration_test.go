@@ -405,6 +405,19 @@ func (suite *ConfigSuite) TestParseInvalidLoglevel(c *C) {
 	c.Assert(err, NotNil)
 }
 
+// TestParseWithoutStorageValidation validates that the parser will not fail to parse a configuration if a storage
+// driver was not set but WithoutStorageValidation was passed as an option.
+func (suite *ConfigSuite) TestParseWithoutStorageValidation(c *C) {
+	configYaml := "version: 0.1"
+
+	_, err := Parse(bytes.NewReader([]byte(configYaml)))
+	c.Assert(err, NotNil)
+	c.Assert(err.Error(), Equals, "no storage configuration provided")
+
+	_, err = Parse(bytes.NewReader([]byte(configYaml)), WithoutStorageValidation())
+	c.Assert(err, IsNil)
+}
+
 type parameterTest struct {
 	name    string
 	value   string

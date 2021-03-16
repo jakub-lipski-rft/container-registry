@@ -446,7 +446,7 @@ func alive(path string, handler http.Handler) http.Handler {
 	})
 }
 
-func resolveConfiguration(args []string) (*configuration.Configuration, error) {
+func resolveConfiguration(args []string, opts ...configuration.ParseOption) (*configuration.Configuration, error) {
 	var configurationPath string
 
 	if len(args) > 0 {
@@ -466,7 +466,7 @@ func resolveConfiguration(args []string) (*configuration.Configuration, error) {
 
 	defer fp.Close()
 
-	config, err := configuration.Parse(fp)
+	config, err := configuration.Parse(fp, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", configurationPath, err)
 	}
