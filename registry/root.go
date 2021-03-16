@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	"github.com/docker/distribution/version"
-
 	"github.com/docker/libtrust"
 	"github.com/olekukonko/tablewriter"
 	"github.com/sirupsen/logrus"
@@ -196,7 +196,7 @@ var MigrateUpCmd = &cobra.Command{
 	Short: "Apply up migrations",
 	Long:  "Apply up migrations",
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := resolveConfiguration(args)
+		config, err := resolveConfiguration(args, configuration.WithoutStorageValidation())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 			cmd.Usage()
@@ -243,7 +243,7 @@ var MigrateDownCmd = &cobra.Command{
 	Short: "Apply down migrations",
 	Long:  "Apply down migrations",
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := resolveConfiguration(args)
+		config, err := resolveConfiguration(args, configuration.WithoutStorageValidation())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 			cmd.Usage()
@@ -300,7 +300,7 @@ var MigrateVersionCmd = &cobra.Command{
 	Short: "Show current migration version",
 	Long:  "Show current migration version",
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := resolveConfiguration(args)
+		config, err := resolveConfiguration(args, configuration.WithoutStorageValidation())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 			cmd.Usage()
@@ -333,7 +333,7 @@ var MigrateStatusCmd = &cobra.Command{
 	Short: "Show migration status",
 	Long:  "Show migration status",
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := resolveConfiguration(args)
+		config, err := resolveConfiguration(args, configuration.WithoutStorageValidation())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 			cmd.Usage()

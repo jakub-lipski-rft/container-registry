@@ -955,6 +955,20 @@ type Proxy struct {
 	Password string `yaml:"password"`
 }
 
+type parseOpts struct {
+	noStorageRequired bool
+}
+
+// ParseOption is used to pass options to Parse.
+type ParseOption func(*parseOpts)
+
+// WithoutStorageValidation configures Parse to disable the storage parameters validation.
+func WithoutStorageValidation() ParseOption {
+	return func(opts *parseOpts) {
+		opts.noStorageRequired = true
+	}
+}
+
 // Parse parses an input configuration yaml document into a Configuration struct
 // This should generally be capable of handling old configuration format versions
 //
@@ -962,7 +976,12 @@ type Proxy struct {
 // following the scheme below:
 // Configuration.Abc may be replaced by the value of REGISTRY_ABC,
 // Configuration.Abc.Xyz may be replaced by the value of REGISTRY_ABC_XYZ, and so forth
-func Parse(rd io.Reader) (*Configuration, error) {
+func Parse(rd io.Reader, opts ...ParseOption) (*Configuration, error) {
+	options := parseOpts{}
+	for _, v := range opts {
+		v(&options)
+	}
+
 	in, err := ioutil.ReadAll(rd)
 	if err != nil {
 		return nil, err
@@ -982,8 +1001,10 @@ func Parse(rd io.Reader) (*Configuration, error) {
 					if v0_1.Loglevel != Loglevel("") {
 						v0_1.Loglevel = Loglevel("")
 					}
-					if v0_1.Storage.Type() == "" {
-						return nil, errors.New("no storage configuration provided")
+					if !options.noStorageRequired {
+						if v0_1.Storage.Type() == "" {
+							return nil, errors.New("no storage configuration provided")
+						}
 					}
 					return (*Configuration)(v0_1), nil
 				}
