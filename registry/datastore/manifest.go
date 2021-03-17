@@ -302,6 +302,11 @@ func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manife
 			DO NOTHING`
 
 	if _, err := s.db.ExecContext(ctx, q, ml.RepositoryID, ml.ID, m.ID); err != nil {
+		var pgErr *pgconn.PgError
+		// this can happen if the child manifest is deleted by the online GC while attempting to create the list
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
+			return ErrRefManifestNotFound
+		}
 		return fmt.Errorf("associating manifest: %w", err)
 	}
 

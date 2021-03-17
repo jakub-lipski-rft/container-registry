@@ -896,65 +896,114 @@ func dbFindManifestListManifest(
 	return dbManifest, nil
 }
 
+const (
+	manifestListCreateGCReviewWindow = 1 * time.Hour
+	manifestListCreateGCLockTimeout  = 5 * time.Second
+)
+
 func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.DeserializedManifestList, payload []byte) error {
 	repoPath := imh.Repository.Named().Name()
-
-	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{"repository": repoPath, "manifest_digest": imh.Digest})
+	log := dcontext.GetLoggerWithFields(imh, map[interface{}]interface{}{
+		"repository":      repoPath,
+		"manifest_digest": imh.Digest,
+	})
 	log.Debug("putting manifest list")
 
-	repoReader := datastore.NewRepositoryStore(imh.db)
-
-	v := validation.NewManifestListValidator(&datastore.RepositoryManifestService{RepositoryReader: repoReader, RepositoryPath: repoPath}, imh.App.isCache)
+	rStore := datastore.NewRepositoryStore(imh.db)
+	v := validation.NewManifestListValidator(&datastore.RepositoryManifestService{
+		RepositoryReader: rStore,
+		RepositoryPath:   repoPath,
+	}, imh.App.isCache)
 
 	if err := v.Validate(imh, manifestList); err != nil {
 		return err
 	}
 
 	// create or find target repository
-	repositoryStore := datastore.NewRepositoryStore(imh.App.db)
-	dbRepo, err := repositoryStore.CreateOrFindByPath(imh.Context, repoPath)
+	r, err := rStore.CreateOrFindByPath(imh.Context, repoPath)
 	if err != nil {
 		return err
 	}
 
-	dbManifestList, err := repositoryStore.FindManifestByDigest(imh.Context, dbRepo, imh.Digest)
+	ml, err := rStore.FindManifestByDigest(imh.Context, r, imh.Digest)
 	if err != nil {
 		return err
 	}
+	if ml != nil {
+		return nil
+	}
 
-	if dbManifestList == nil {
-		log.Debug("manifest list not found in database")
+	// Media type can be either Docker (`application/vnd.docker.distribution.manifest.list.v2+json`) or OCI (empty).
+	// We need to make it explicit if empty, otherwise we're not able to distinguish between media types.
+	mediaType := manifestList.MediaType
+	if mediaType == "" {
+		mediaType = v1.MediaTypeImageIndex
+	}
 
-		// Media type can be either Docker (`application/vnd.docker.distribution.manifest.list.v2+json`) or OCI (empty).
-		// We need to make it explicit if empty, otherwise we're not able to distinguish between media types.
-		mediaType := manifestList.MediaType
-		if mediaType == "" {
-			mediaType = v1.MediaTypeImageIndex
-		}
+	ml = &models.Manifest{
+		RepositoryID:  r.ID,
+		SchemaVersion: manifestList.SchemaVersion,
+		MediaType:     mediaType,
+		Digest:        imh.Digest,
+		Payload:       payload,
+	}
 
-		dbManifestList = &models.Manifest{
-			RepositoryID:  dbRepo.ID,
-			SchemaVersion: manifestList.SchemaVersion,
-			MediaType:     mediaType,
-			Digest:        imh.Digest,
-			Payload:       payload,
-		}
-		mStore := datastore.NewManifestStore(imh.App.db)
-		if err := mStore.Create(imh, dbManifestList); err != nil {
+	// We need to find and lock referenced manifests to ensure we lock any related online GC tasks to prevent race
+	// conditions around the manifest list insert. See:
+	// https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs-gitlab/db/online-garbage-collection.md#creating-a-manifest-list-referencing-an-unreferenced-manifest
+	mm := make([]*models.Manifest, 0, len(manifestList.Manifests))
+	ids := make([]int64, 0, len(mm))
+	for _, desc := range manifestList.Manifests {
+		m, err := dbFindManifestListManifest(imh.Context, imh.db, r, desc.Digest, r.Path)
+		if err != nil {
 			return err
 		}
+		mm = append(mm, m)
+		ids = append(ids, m.ID)
+	}
 
-		// Associate manifests to the manifest list.
-		for _, m := range manifestList.Manifests {
-			dbManifest, err := dbFindManifestListManifest(imh.Context, imh.App.db, dbRepo, m.Digest, dbRepo.Path)
-			if err != nil {
-				return err
-			}
+	tx, err := imh.db.BeginTx(imh.Context, nil)
+	if err != nil {
+		return fmt.Errorf("creating database transaction: %w", err)
+	}
+	defer tx.Rollback()
 
-			if err := mStore.AssociateManifest(imh.Context, dbManifestList, dbManifest); err != nil {
-				return err
+	// Prevent long running transactions by setting an upper limit of manifestListCreateGCLockTimeout. If the GC is
+	// holding the lock of a related review record, the processing there should be fast enough to avoid this.
+	// Regardless, we should not let transactions open (and clients waiting) for too long. If this sensible timeout
+	// is exceeded, abort the request and let the client retry. This will bubble up and lead to a 503 Service
+	// Unavailable response.
+	ctx, cancel := context.WithTimeout(imh.Context, manifestListCreateGCLockTimeout)
+	defer cancel()
+
+	mts := datastore.NewGCManifestTaskStore(tx)
+	if _, err := mts.FindAndLockNBefore(ctx, r.ID, ids, time.Now().Add(manifestListCreateGCReviewWindow)); err != nil {
+		return err
+	}
+
+	// create manifest list
+	mStore := datastore.NewManifestStore(tx)
+	if err := mStore.Create(imh, ml); err != nil {
+		return err
+	}
+
+	// Associate manifests to the manifest list.
+	for _, m := range mm {
+		if err := mStore.AssociateManifest(imh.Context, ml, m); err != nil {
+			if errors.Is(err, datastore.ErrRefManifestNotFound) {
+				// This can only happen if the online GC deleted one of the referenced manifests (because they were
+				// untagged/unreferenced) between the call to `FindAndLockNBefore` and `AssociateManifest`. For now
+				// we need to return this error to mimic the behaviour of the corresponding filesystem validation.
+				return distribution.ErrManifestVerification{
+					distribution.ErrManifestBlobUnknown{Digest: m.Digest},
+				}
 			}
+			return err
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit database transaction: %w", err)
 	}
 
 	return nil
