@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [v3.2.1-gitlab] - 2021-03-17
+### Fixed
+- configuration: Don't require storage section for the database migrate CLI
+
 ## [v3.2.0-gitlab] - 2021-03-15
 ### Added
 - configuration: Add `rootdirectory` option to the azure storage driver
