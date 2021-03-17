@@ -727,7 +727,7 @@ func TestDBFaultTolerance_ConnectionPoolSaturation(t *testing.T) {
 		})
 	}
 	// the connection pool should be saturated by now
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	require.Equal(t, poolMaxSize, env.app.DBStats().OpenConnections)
 	wg.Wait()
 	// the connection pool should be free by now
