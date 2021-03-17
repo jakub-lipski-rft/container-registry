@@ -438,6 +438,28 @@ func TestManifestStore_AssociateManifest_NestedLists(t *testing.T) {
 	require.Contains(t, assocManifestIDs, tmp.ID)
 }
 
+func TestManifestStore_AssociateManifest_ChildNotFound(t *testing.T) {
+	reloadManifestFixtures(t)
+	require.NoError(t, testutil.TruncateTables(suite.db, testutil.ManifestReferencesTable))
+
+	s := datastore.NewManifestStore(suite.db)
+
+	// create a new temporary manifest list
+	ml := &models.Manifest{
+		RepositoryID:  7,
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.docker.distribution.manifest.list.v2+json",
+		Digest:        "sha256:86b163863b462eadc1b17dca382ccbfb08a853cffc79e2049607f95455cc44fa",
+		Payload:       models.Payload(`{"schemaVersion":2,"mediaType":"...","config":{}}`),
+	}
+	err := s.Create(suite.ctx, ml)
+	require.NoError(t, err)
+
+	m := &models.Manifest{RepositoryID: 7, ID: 100}
+	err = s.AssociateManifest(suite.ctx, ml, m)
+	require.EqualError(t, err, datastore.ErrRefManifestNotFound.Error())
+}
+
 func TestManifestStore_DissociateManifest(t *testing.T) {
 	reloadManifestFixtures(t)
 
