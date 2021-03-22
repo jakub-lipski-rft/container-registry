@@ -500,9 +500,9 @@ Between determining the eligibility for deletion and the deletion of a blob `B`,
 - Upload a manifest which references `B` and will therefore link it to `R`;
 - Unlink `B` from `R`.
 
-The first two are by far the most common and would typically happen in sequence during an image push. The first would succeed, but then the blob would be deleted, and the second would fail because the blob no longer exists. In the worst case, this will lead to an image push retry. The chances of being in the process of deleting a specific blob and having an API request targeting that same blob at the same time should be negligible and inversely proportional to the registry size.
+The first two are by far the most common and would typically happen in sequence during an image push. The first would succeed, but then the blob would be deleted, and the second would fail because the blob no longer exists.
 
-Regardless, to avoid this, we need to synchronize the API and the garbage collector with explicit locks:
+To avoid this we would need to synchronize the API and the garbage collector with explicit locks as explained below:
 
 - The garbage collector attempts to pick and lock a record for review with:
 
@@ -566,6 +566,10 @@ With synchronization in place, depending on which process acquires the lock firs
 Serializing operations with locks on `gc_blob_review_queue` instead of `blobs` ensures that we do not need to acquire a lock for a blob unless it is in the process of being reviewed by the garbage collector. Because the review queue only contains references to a small subset of `blobs`, lookups are also faster this way.
 
 As a downside, the garbage collector needs to keep a transaction open (and the review record locked) for the run's duration, including the possible deletion from the remote storage backend. For this reason, we must ensure that the garbage collector will timeout and postpone the blob review if the delete from the storage backend takes more time than ideal. This will avoid keeping database transactions open and holding existence checks for too long. This timeout will be configurable and default to 2 seconds.
+
+Although this procedure would avoid the described race conditions, it could lead to several open transactions on the API side if the garbage collector is reviewing a blob heavily shared across many repositories. Furthermore, as a read-write connection is required to perform a `FOR UPDATE` query, by implementing this strategy, we would lose the ability to prioritize/fallback to read-only database replicas for existence checks. At least for GitLab.com, this route is heavily used, so this limitation could lead to lower availability/performance. Unlike the possible race conditions around manifests (described in the next section), these do not pose any integrity risks. In the worst-case scenario, they will lead to an image push retry. Furthermore, the chances of being in the process of deleting (not reviewing) a specific blob and having an API request targeting that same blob at roughly the same time should be negligible and inversely proportional to the registry size.
+
+For all these reasons, we decided not to implement this explicit locking from the start. The solution is documented here and so are the risks. We will revisit this approach if we do observe this pattern in production. At that point, we will have factual data around the deduplication ratio of blobs across all repositories and a real insight into the impact that this issue might produce. With that in hand, we can make an informed decision based on the pros and cons explained above.
 
 ### Manifests
 
