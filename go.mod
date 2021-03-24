@@ -33,7 +33,7 @@ require (
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rubenv/sql-migrate v0.0.0-20200616145509-8d140a17f351
 	github.com/sirupsen/logrus v1.7.0
-	github.com/spf13/cobra v0.0.5
+	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.6.1
 	gitlab.com/gitlab-org/labkit v1.2.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
@@ -41,5 +41,5 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.32.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.4.0
 )
