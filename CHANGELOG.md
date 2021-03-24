@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Changed
+- registry/storage: Upgrade Azure SDK to v52.5.0
 
 ## [v3.2.1-gitlab] - 2021-03-17
 ### Fixed
