@@ -16,18 +16,20 @@ sequenceDiagram
 	R1->>B1: The repository<br>with <name> exists?
 	B1->>R1: Yes/No
 	alt Yes
-    %%rect rgb(229, 255, 204)
-      R1->>B1: Fulfil request
-      R1->>C: Response
-    %%end
+    R1->>B1: Fulfil request
+    R1->>C: Response
 	else No
-		rect rgb(255, 255, 204)
-      R1-xR2: Proxy request
-      R2->>B2: Fulfil request
-      R2->>R1: Response
-      R1-xC: Proxy response
+    R1->>R1: Does <name> match against the include list<br>AND<br>not against the exclude list?
+    alt Yes
+    		R1->>R2: Proxy request
+        R2->>B2: Fulfil request
+        R2->>R1: Response
+        R1->>C: Proxy response
+    else No
+    	R1->>B1: Fulfil request
+      R1->>C: Response
     end
-end
+  end
 ```
 
 A registry configured as a proxy validates every incoming request and, based on the repository path embedded in every request URL, determines if the target repository is known to the instance or not.
@@ -38,6 +40,12 @@ The target registry instance only receives requests for repositories that are un
 
 The target registry remains hidden from clients, the proxy registry remains the only public and visible entry point for the platform, and handles the request/response proxying internally, without needing an external reverse proxy in front of the two registries.
 
+### Include/exclude lists
+
+To provide more control over which new repositories are proxied to the target registry, which is useful for a gradual migration of large registries, the proxy mode supports include/exclude lists of regular expressions.
+
+When configured, new repositories will only be proxied to the target registry if their name matches against the include list _and_ does not match against the exclude list. If both conditions are not true, the request will be served by the proxy registry. If no include/exclude lists are configured, all new repositories will be proxied to the target registry.
+
 ## Configuration
 
 ### Proxy instance(s)
@@ -45,6 +53,8 @@ The target registry remains hidden from clients, the proxy registry remains the 
 The migration proxy mode should be enabled in the existing registry instance(s) only. Settings can be configured in the `migration.proxy` section. Please see the [configuration docs](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#proxy) for a list of parameters and their possible values.
 
 The [HTTP secret](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#http) configuration parameter (`http.secret`) must be set to ensure that both proxy and target registries use the same piece of data to sign state. This should already be set for clustered environments.
+
+For development purposes an already ready [configuration file](https://gitlab.com/gitlab-org/container-registry/-/blob/master/config/proxy.yml) is present in the config folder.
 
 #### Example
 
@@ -57,7 +67,23 @@ migration:
     url: https://registry2.example.com
 ```
 
-For development purposes an already ready [configuration file](https://gitlab.com/gitlab-org/container-registry/-/blob/master/config/proxy.yml) is present in the config folder.
+#### Example with include and exclude lists
+
+```yaml
+http:
+  secret: registrysecret
+migration:
+  proxy:
+    enabled: true
+    url: https://registry2.example.com
+    include:
+      - '^myrepo$'
+      - '^mygroup/.*$'
+    exclude:
+      - '^mygroup/keep$'
+```
+
+With this configuration, new repositories will only be proxied to the target registry if their name matches `^myrepo$` or `^mygroup/.*$`, but not `^mygroup/keep$`.
 
 ### Target instance(s)
 
