@@ -333,3 +333,40 @@ func TestImporter_Import_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
 	err := imp.Import(suite.ctx, "a-simple")
 	require.EqualError(t, err, "non-empty database")
 }
+
+func TestImporter_PreImport(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporter(t, suite.db)
+	require.NoError(t, imp.PreImport(suite.ctx, "f-dangling-manifests"))
+	validateImport(t, suite.db)
+}
+
+func TestImporter_PreImport_Import(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporter(t, suite.db)
+	require.NoError(t, imp.PreImport(suite.ctx, "f-dangling-manifests"))
+	require.NoError(t, imp.Import(suite.ctx, "f-dangling-manifests"))
+	validateImport(t, suite.db)
+}
+
+func TestImporter_PreImport_DryRun(t *testing.T) {
+	require.NoError(t, testutil.TruncateAllTables(suite.db))
+
+	imp := newImporter(t, suite.db, datastore.WithDryRun)
+	require.NoError(t, imp.PreImport(suite.ctx, "a-simple"))
+	validateImport(t, suite.db)
+}
+
+func TestImporter_PreImport_AbortsIfDatabaseIsNotEmpty(t *testing.T) {
+	driver := newFilesystemStorageDriver(t)
+	registry := newRegistry(t, driver)
+
+	// load some fixtures
+	reloadRepositoryFixtures(t)
+
+	imp := datastore.NewImporter(suite.db, registry, datastore.WithImportDanglingManifests, datastore.WithRequireEmptyDatabase)
+	err := imp.PreImport(suite.ctx, "a-simple")
+	require.EqualError(t, err, "non-empty database")
+}

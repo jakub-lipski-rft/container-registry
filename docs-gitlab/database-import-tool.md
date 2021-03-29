@@ -54,12 +54,34 @@ repository path each time.
 
 Note: The `--dangling-blobs` option is ignored when this option is specified.
 
-### Blob Transfer Destination
+#### Blob Transfer Destination
 The `--blob-transfer-destination` option allows the user to copy imported blobs to
 another storage location. This option is only available for GCS and filesystem
 drivers. For GCS, the name of the new bucket should be passed to this flag. For
 the filesystem driver, this should be the new root directory. In both cases,
 the configured storage driver must have read and write access to the new storage.
+
+#### Pre Import
+The `--pre-import` option will only import immutable registry data. When running
+with this flag, it is not necessary to switch the repository to read-only mode.
+This, in conjunction with a normal import command ran afterward, should enable
+administrators to limit the amount of time a repository must be read-only, as
+much of the import work can be handled by the pre-import phase.
+
+While it is not necessary to switch the repository to read-only mode,
+administrators should take care not to use the [blob delete API
+endpoint](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/spec/api.md#delete-blob)
+during the pre-import phase. This endpoint is not used by any of the Docker
+client commands. If a blob is deleted after one of its associated manifests was
+pre-imported, the import step would import the manifest with the deleted blob
+still linked.
+
+Since tags are mutable data, all objects imported during the pre import step
+are subject to online garbage collection, and therefore it is important to
+ensure that the subsequent import step is completed within the configured
+garbage collector workers
+[`reviewafter`](https://gitlab.com/gitlab-org/container-registry/-/blob/master/docs/configuration.md#gc)
+delay.
 
 ## Prerequisites
 
