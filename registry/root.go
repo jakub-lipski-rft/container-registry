@@ -55,6 +55,7 @@ func init() {
 	ImportCmd.Flags().BoolVarP(&importDanglingBlobs, "dangling-blobs", "b", false, "import all blobs, regardless of whether they are referenced by a manifest or not")
 	ImportCmd.Flags().BoolVarP(&importDanglingManifests, "dangling-manifests", "m", false, "import all manifests, regardless of whether they are tagged or not")
 	ImportCmd.Flags().BoolVarP(&requireEmptyDatabase, "require-empty-database", "e", false, "abort import if the database is not empty")
+	ImportCmd.Flags().BoolVarP(&preImport, "pre-import", "p", false, "import immutable data to speed up a following full import, may only be used in conjunction with the `--repository` option")
 }
 
 var (
@@ -71,6 +72,7 @@ var (
 	showVersion             bool
 	skipPostDeployment      bool
 	upToDateCheck           bool
+	preImport               bool
 )
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
@@ -513,9 +515,14 @@ var ImportCmd = &cobra.Command{
 
 		p := datastore.NewImporter(db, registry, opts...)
 
-		if repoPath == "" {
+		switch {
+		case repoPath == "" && preImport:
+			err = errors.New("pre-import is only supported with the `--repository` flag")
+		case repoPath == "" && !preImport:
 			err = p.ImportAll(ctx)
-		} else {
+		case repoPath != "" && preImport:
+			err = p.PreImport(ctx, repoPath)
+		case repoPath != "" && !preImport:
 			err = p.Import(ctx, repoPath)
 		}
 		if err != nil {

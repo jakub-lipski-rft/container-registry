@@ -18,6 +18,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"gitlab.com/gitlab-org/labkit/log"
 )
 
 // Importer populates the registry database with filesystem metadata. This is only meant to be used for an initial
@@ -463,7 +464,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 	total := len(fsTags)
 
 	for i, fsTag := range fsTags {
-		log := logrus.WithFields(logrus.Fields{"name": fsTag, "count": i + 0, "total": total})
+		log := logrus.WithFields(logrus.Fields{"name": fsTag, "count": i + 1, "total": total})
 
 		// read tag details from the filesystem
 		desc, err := tagService.Get(ctx, fsTag)
@@ -547,6 +548,89 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 	// import repository tags and associated manifests
 	if err := imp.importTags(ctx, fsRepo, dbRepo); err != nil {
 		return fmt.Errorf("importing tags: %w", err)
+	}
+
+	return nil
+}
+
+func (imp *Importer) preImportTaggedManifests(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository) error {
+	tagService := fsRepo.Tags(ctx)
+	fsTags, err := tagService.All(ctx)
+	if err != nil {
+		return fmt.Errorf("reading tags: %w", err)
+	}
+
+	total := len(fsTags)
+
+	for i, fsTag := range fsTags {
+		log := logrus.WithFields(logrus.Fields{"name": fsTag, "count": i + 1, "total": total})
+
+		// read tag details from the filesystem
+		desc, err := tagService.Get(ctx, fsTag)
+		if err != nil {
+			log.WithError(err).Error("reading tag details")
+			continue
+		}
+
+		// Find corresponding manifest in DB or filesystem.
+		var dbManifest *models.Manifest
+		dbManifest, err = imp.repositoryStore.FindManifestByDigest(ctx, dbRepo, desc.Digest)
+		if err != nil {
+			log.WithError(err).Error("finding tag manifest")
+			continue
+		}
+		if dbManifest == nil {
+			if err := imp.preImportManifest(ctx, fsRepo, dbRepo, desc.Digest); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (imp *Importer) preImportManifest(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dgst digest.Digest) error {
+	var tx Transactor
+
+	manifestService, err := fsRepo.Manifests(ctx)
+	if err != nil {
+		return fmt.Errorf("constructing manifest service: %w", err)
+	}
+
+	m, err := manifestService.Get(ctx, dgst)
+	if err != nil {
+		log.WithError(err).Errorf("retrieving manifest %q", dgst)
+	}
+
+	if !imp.dryRun {
+		tx, err = imp.beginTx(ctx)
+		if err != nil {
+			return fmt.Errorf("begin manifest transaction: %w", err)
+		}
+		defer func() {
+			tx.Rollback()
+			imp.loadStores(imp.db)
+		}()
+	}
+
+	log := logrus.WithField("digest", dgst)
+
+	switch fsManifest := m.(type) {
+	case *manifestlist.DeserializedManifestList:
+		log.Info("pre-importing manifest list")
+		_, err = imp.importManifestList(ctx, fsRepo, dbRepo, fsManifest, dgst)
+	default:
+		log.Info("pre-importing manifest")
+		_, err = imp.importManifest(ctx, fsRepo, dbRepo, fsManifest, dgst)
+	}
+	if err != nil {
+		log.WithError(err).Error("pre-importing manifest")
+	}
+
+	if !imp.dryRun {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -748,7 +832,6 @@ func (imp *Importer) Import(ctx context.Context, path string) error {
 
 	log := logrus.WithField("path", path)
 	log.Info("importing repository")
-
 	if err := imp.importRepository(ctx, path); err != nil {
 		log.WithError(err).Error("error importing repository")
 		return err
@@ -774,4 +857,83 @@ func (imp *Importer) Import(ctx context.Context, path string) error {
 	}
 
 	return err
+}
+
+// PreImport populates repository data without including any tag information.
+// Running pre-import can reduce the runtime of an Import against the same
+// repository and, with online garbage collection enabled, does not require a
+// repository to be read-only.
+func (imp *Importer) PreImport(ctx context.Context, path string) error {
+	var tx Transactor
+	var err error
+
+	// Create a single transaction and roll it back at the end for dry runs.
+	if imp.dryRun {
+		tx, err = imp.beginTx(ctx)
+		if err != nil {
+			return fmt.Errorf("begin dry run transaction: %w", err)
+		}
+		defer tx.Rollback()
+	}
+
+	if imp.requireEmptyDatabase {
+		empty, err := imp.isDatabaseEmpty(ctx)
+		if err != nil {
+			return fmt.Errorf("checking if database is empty: %w", err)
+		}
+		if !empty {
+			return errors.New("non-empty database")
+		}
+	}
+
+	start := time.Now()
+	log := logrus.WithField("path", path)
+	log.Info("starting repository pre-import")
+
+	named, err := reference.WithName(path)
+	if err != nil {
+		return fmt.Errorf("parsing repository name: %w", err)
+	}
+	fsRepo, err := imp.registry.Repository(ctx, named)
+	if err != nil {
+		return fmt.Errorf("constructing repository: %w", err)
+	}
+
+	// Find or create repository.
+	var dbRepo *models.Repository
+
+	dbRepo, err = imp.repositoryStore.FindByPath(ctx, path)
+	if err != nil {
+		return fmt.Errorf("checking for existence of repository: %w", err)
+	}
+
+	if dbRepo == nil {
+		if dbRepo, err = imp.repositoryStore.CreateByPath(ctx, path); err != nil {
+			return fmt.Errorf("importing repository: %w", err)
+		}
+	}
+
+	if err = imp.preImportTaggedManifests(ctx, fsRepo, dbRepo); err != nil {
+		return fmt.Errorf("importing tags: %w", err)
+	}
+
+	if !imp.dryRun {
+		// reset stores to use the main connection handler instead of the last (committed/rolled back) transaction
+		imp.loadStores(imp.db)
+	}
+
+	counters, err := imp.countRows(ctx)
+	if err != nil {
+		logrus.WithError(err).Error("error counting table rows")
+	}
+
+	logCounters := make(map[string]interface{}, len(counters))
+	for t, n := range counters {
+		logCounters[t] = n
+	}
+
+	t := time.Since(start).Seconds()
+	log.WithField("duration_s", t).WithFields(logCounters).Info("pre-import complete")
+
+	return nil
 }
