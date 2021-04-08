@@ -8,35 +8,52 @@ import (
 )
 
 var (
-	statementDurationHist *prometheus.HistogramVec
-	timeSince             = time.Since // for test purposes only
+	queryDurationHist *prometheus.HistogramVec
+	queryTotal        *prometheus.CounterVec
+	timeSince         = time.Since // for test purposes only
 )
 
 const (
-	subsystem              = "database"
-	statementDurationName  = "statement_duration_seconds"
-	statementDurationDesc  = "Histogram of database statement durations in seconds"
-	statementDurationLabel = "statement"
+	subsystem      = "database"
+	queryNameLabel = "name"
+
+	queryDurationName = "query_duration_seconds"
+	queryDurationDesc = "A histogram of latencies for database queries."
+
+	queryTotalName = "queries_total"
+	queryTotalDesc = "A counter for database queries."
 )
 
 func init() {
-	statementDurationHist = prometheus.NewHistogramVec(
+	queryDurationHist = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: metrics.NamespacePrefix,
 			Subsystem: subsystem,
-			Name:      statementDurationName,
-			Help:      statementDurationDesc,
+			Name:      queryDurationName,
+			Help:      queryDurationDesc,
 			Buckets:   prometheus.DefBuckets,
 		},
-		[]string{statementDurationLabel},
+		[]string{queryNameLabel},
 	)
 
-	prometheus.MustRegister(statementDurationHist)
+	queryTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: metrics.NamespacePrefix,
+			Subsystem: subsystem,
+			Name:      queryTotalName,
+			Help:      queryTotalDesc,
+		},
+		[]string{queryNameLabel},
+	)
+
+	prometheus.MustRegister(queryDurationHist)
+	prometheus.MustRegister(queryTotal)
 }
 
-func StatementDuration(statementName string) func() {
+func InstrumentQuery(name string) func() {
 	start := time.Now()
 	return func() {
-		statementDurationHist.WithLabelValues(statementName).Observe(timeSince(start).Seconds())
+		queryTotal.WithLabelValues(name).Inc()
+		queryDurationHist.WithLabelValues(name).Observe(timeSince(start).Seconds())
 	}
 }

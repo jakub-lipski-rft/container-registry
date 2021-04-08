@@ -79,7 +79,7 @@ func scanFullGCBlobTask(row *sql.Row) (*models.GCBlobTask, error) {
 
 // FindAll finds all GC blob tasks.
 func (s *gcBlobTaskStore) FindAll(ctx context.Context) ([]*models.GCBlobTask, error) {
-	defer metrics.StatementDuration("gc_blob_task_find_all")()
+	defer metrics.InstrumentQuery("gc_blob_task_find_all")()
 
 	q := `SELECT
 			review_after,
@@ -97,7 +97,7 @@ func (s *gcBlobTaskStore) FindAll(ctx context.Context) ([]*models.GCBlobTask, er
 
 // Count counts all GC blob tasks.
 func (s *gcBlobTaskStore) Count(ctx context.Context) (int, error) {
-	defer metrics.StatementDuration("gc_blob_task_count")()
+	defer metrics.InstrumentQuery("gc_blob_task_count")()
 
 	q := "SELECT COUNT(*) FROM gc_blob_review_queue"
 	var count int
@@ -115,7 +115,7 @@ func (s *gcBlobTaskStore) Count(ctx context.Context) (int, error) {
 // ensure that callers don't get the same record. The operation does not block, and no error is returned if there are
 // no rows or none is available (i.e., all locked by other processes). A `nil` record is returned in this situation.
 func (s *gcBlobTaskStore) Next(ctx context.Context) (*models.GCBlobTask, error) {
-	defer metrics.StatementDuration("gc_blob_task_next")()
+	defer metrics.InstrumentQuery("gc_blob_task_next")()
 
 	q := `SELECT
 			review_after,
@@ -146,7 +146,7 @@ func (s *gcBlobTaskStore) Next(ctx context.Context) (*models.GCBlobTask, error) 
 // Postpone moves the review_after of a blob task forward by a given amount of time. The review_count is automatically
 // incremented.
 func (s *gcBlobTaskStore) Postpone(ctx context.Context, b *models.GCBlobTask, d time.Duration) error {
-	defer metrics.StatementDuration("gc_blob_task_postpone")()
+	defer metrics.InstrumentQuery("gc_blob_task_postpone")()
 
 	q := `UPDATE
 			gc_blob_review_queue
@@ -183,7 +183,7 @@ func (s *gcBlobTaskStore) Postpone(ctx context.Context, b *models.GCBlobTask, d 
 
 // Delete deletes a blob task from the blob review queue.
 func (s *gcBlobTaskStore) Delete(ctx context.Context, b *models.GCBlobTask) error {
-	defer metrics.StatementDuration("gc_blob_task_delete")()
+	defer metrics.InstrumentQuery("gc_blob_task_delete")()
 
 	q := "DELETE FROM gc_blob_review_queue WHERE digest = decode($1, 'hex')"
 	dgst, err := NewDigest(b.Digest)
@@ -207,7 +207,7 @@ func (s *gcBlobTaskStore) Delete(ctx context.Context, b *models.GCBlobTask) erro
 
 // IsDangling determines if the blob referenced by the GC blob task is eligible for deletion or not.
 func (s *gcBlobTaskStore) IsDangling(ctx context.Context, b *models.GCBlobTask) (bool, error) {
-	defer metrics.StatementDuration("gc_blob_task_is_dangling")()
+	defer metrics.InstrumentQuery("gc_blob_task_is_dangling")()
 
 	q := `SELECT
 			EXISTS (

@@ -25,7 +25,7 @@ func NewGCSettingsStore(db Queryer) GCSettingsStore {
 // UpdateAllReviewAfterDefaults updates all review after defaults, regardless of the event type. Returns a bool to
 // signal if any rows were updated.
 func (s *gcSettingsStore) UpdateAllReviewAfterDefaults(ctx context.Context, d time.Duration) (bool, error) {
-	defer metrics.StatementDuration("gc_settings_update_all_review_after_defaults")()
+	defer metrics.InstrumentQuery("gc_settings_update_all_review_after_defaults")()
 
 	q := `UPDATE gc_review_after_defaults
 		SET

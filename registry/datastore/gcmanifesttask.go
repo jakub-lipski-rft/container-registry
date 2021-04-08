@@ -69,7 +69,7 @@ func scanFullGCManifestTask(row *sql.Row) (*models.GCManifestTask, error) {
 
 // FindAll finds all GC manifest tasks.
 func (s *gcManifestTaskStore) FindAll(ctx context.Context) ([]*models.GCManifestTask, error) {
-	defer metrics.StatementDuration("gc_manifest_task_find_all")()
+	defer metrics.InstrumentQuery("gc_manifest_task_find_all")()
 	q := `SELECT
 			repository_id,
 			manifest_id,
@@ -88,7 +88,7 @@ func (s *gcManifestTaskStore) FindAll(ctx context.Context) ([]*models.GCManifest
 // FindAndLockBefore finds a GC manifest task scheduled for review before date and locks it against writes. This query
 // blocks if the row exists but is already locked by another process.
 func (s *gcManifestTaskStore) FindAndLockBefore(ctx context.Context, repositoryID, manifestID int64, date time.Time) (*models.GCManifestTask, error) {
-	defer metrics.StatementDuration("gc_manifest_task_find_and_lock_before")()
+	defer metrics.InstrumentQuery("gc_manifest_task_find_and_lock_before")()
 	q := `SELECT
 			repository_id,
 			manifest_id,
@@ -108,7 +108,7 @@ func (s *gcManifestTaskStore) FindAndLockBefore(ctx context.Context, repositoryI
 // FindAndLockNBefore finds multiple GC manifest tasks scheduled for review before date and locks them against writes.
 // This query blocks if any row exists but is already locked by another process.
 func (s *gcManifestTaskStore) FindAndLockNBefore(ctx context.Context, repositoryID int64, manifestIDs []int64, date time.Time) ([]*models.GCManifestTask, error) {
-	defer metrics.StatementDuration("gc_manifest_task_find_and_lock_n_before")()
+	defer metrics.InstrumentQuery("gc_manifest_task_find_and_lock_n_before")()
 	q := `SELECT
 			repository_id,
 			manifest_id,
@@ -141,7 +141,7 @@ func (s *gcManifestTaskStore) FindAndLockNBefore(ctx context.Context, repository
 
 // Count counts all GC manifest tasks.
 func (s *gcManifestTaskStore) Count(ctx context.Context) (int, error) {
-	defer metrics.StatementDuration("gc_manifest_task_count")()
+	defer metrics.InstrumentQuery("gc_manifest_task_count")()
 	q := "SELECT COUNT(*) FROM gc_manifest_review_queue"
 	var count int
 
@@ -158,7 +158,7 @@ func (s *gcManifestTaskStore) Count(ctx context.Context) (int, error) {
 // ensure that callers don't get the same record. The operation does not block, and no error is returned if there are
 // no rows or none is available (i.e., all locked by other processes). A `nil` record is returned in this situation.
 func (s *gcManifestTaskStore) Next(ctx context.Context) (*models.GCManifestTask, error) {
-	defer metrics.StatementDuration("gc_manifest_task_next")()
+	defer metrics.InstrumentQuery("gc_manifest_task_next")()
 	q := `SELECT
 			repository_id,
 			manifest_id,
@@ -189,7 +189,7 @@ func (s *gcManifestTaskStore) Next(ctx context.Context) (*models.GCManifestTask,
 // Postpone moves the review_after of a manifest task forward by a given amount of time. The review_count is
 // automatically incremented.
 func (s *gcManifestTaskStore) Postpone(ctx context.Context, m *models.GCManifestTask, d time.Duration) error {
-	defer metrics.StatementDuration("gc_manifest_task_postpone")()
+	defer metrics.InstrumentQuery("gc_manifest_task_postpone")()
 	q := `UPDATE
 			gc_manifest_review_queue
 		SET
@@ -222,7 +222,7 @@ func (s *gcManifestTaskStore) Postpone(ctx context.Context, m *models.GCManifest
 
 // IsDangling determines if the manifest referenced by the GC manifest task is eligible for deletion or not.
 func (s *gcManifestTaskStore) IsDangling(ctx context.Context, m *models.GCManifestTask) (bool, error) {
-	defer metrics.StatementDuration("gc_manifest_task_is_dangling")()
+	defer metrics.InstrumentQuery("gc_manifest_task_is_dangling")()
 	q := `SELECT
 			 EXISTS (
 				 SELECT
@@ -251,7 +251,7 @@ func (s *gcManifestTaskStore) IsDangling(ctx context.Context, m *models.GCManife
 
 // Delete deletes a manifest task from the manifest review queue.
 func (s *gcManifestTaskStore) Delete(ctx context.Context, m *models.GCManifestTask) error {
-	defer metrics.StatementDuration("gc_manifest_task_delete")()
+	defer metrics.InstrumentQuery("gc_manifest_task_delete")()
 	q := "DELETE FROM gc_manifest_review_queue WHERE repository_id = $1 AND manifest_id = $2"
 	res, err := s.db.ExecContext(ctx, q, m.RepositoryID, m.ManifestID)
 	if err != nil {
