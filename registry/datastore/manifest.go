@@ -129,7 +129,7 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 
 // FindAll finds all manifests.
 func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
-	defer metrics.StatementDuration("manifest_find_all")()
+	defer metrics.InstrumentQuery("manifest_find_all")()
 	q := `SELECT
 			m.id,
 			m.repository_id,
@@ -158,7 +158,7 @@ func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
 
 // Count counts all manifests.
 func (s *manifestStore) Count(ctx context.Context) (int, error) {
-	defer metrics.StatementDuration("manifest_count")()
+	defer metrics.InstrumentQuery("manifest_count")()
 	q := "SELECT COUNT(*) FROM manifests"
 	var count int
 
@@ -171,7 +171,7 @@ func (s *manifestStore) Count(ctx context.Context) (int, error) {
 
 // LayerBlobs finds layer blobs associated with a manifest, through the `layers` relationship entity.
 func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (models.Blobs, error) {
-	defer metrics.StatementDuration("manifest_layer_blobs")()
+	defer metrics.InstrumentQuery("manifest_layer_blobs")()
 	q := `SELECT
 			mt.media_type,
 			encode(b.digest, 'hex') as digest,
@@ -195,7 +195,7 @@ func (s *manifestStore) LayerBlobs(ctx context.Context, m *models.Manifest) (mod
 
 // References finds all manifests directly referenced by a manifest (if any).
 func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (models.Manifests, error) {
-	defer metrics.StatementDuration("manifest_references")()
+	defer metrics.InstrumentQuery("manifest_references")()
 	q := `SELECT DISTINCT
 			m.id,
 			m.repository_id,
@@ -246,7 +246,7 @@ func mapMediaType(ctx context.Context, db Queryer, mediaType string) (int, error
 
 // Create saves a new Manifest.
 func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
-	defer metrics.StatementDuration("manifest_create")()
+	defer metrics.InstrumentQuery("manifest_create")()
 	q := `INSERT INTO manifests (repository_id, schema_version, media_type_id, digest, payload,
 				configuration_media_type_id, configuration_blob_digest, configuration_payload)
 			VALUES ($1, $2, $3, decode($4, 'hex'), $5, $6, decode($7, 'hex'), $8)
@@ -291,7 +291,7 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 
 // AssociateManifest associates a manifest with a manifest list. It does nothing if already associated.
 func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manifest, m *models.Manifest) error {
-	defer metrics.StatementDuration("manifest_associate_manifest")()
+	defer metrics.InstrumentQuery("manifest_associate_manifest")()
 	if ml.ID == m.ID {
 		return fmt.Errorf("cannot associate a manifest with itself")
 	}
@@ -315,7 +315,7 @@ func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manife
 
 // DissociateManifest dissociates a manifest and a manifest list. It does nothing if not associated.
 func (s *manifestStore) DissociateManifest(ctx context.Context, ml *models.Manifest, m *models.Manifest) error {
-	defer metrics.StatementDuration("manifest_dissociate_manifest")()
+	defer metrics.InstrumentQuery("manifest_dissociate_manifest")()
 	q := "DELETE FROM manifest_references WHERE repository_id = $1 AND parent_id = $2 AND child_id = $3"
 
 	res, err := s.db.ExecContext(ctx, q, ml.RepositoryID, ml.ID, m.ID)
@@ -332,7 +332,7 @@ func (s *manifestStore) DissociateManifest(ctx context.Context, ml *models.Manif
 
 // AssociateLayerBlob associates a layer blob and a manifest. It does nothing if already associated.
 func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
-	defer metrics.StatementDuration("manifest_associate_layer_blob")()
+	defer metrics.InstrumentQuery("manifest_associate_layer_blob")()
 	q := `INSERT INTO layers (repository_id, manifest_id, digest, media_type_id, size)
 			VALUES ($1, $2, decode($3, 'hex'), $4, $5)
 		ON CONFLICT (repository_id, manifest_id, digest)
@@ -356,7 +356,7 @@ func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manife
 
 // DissociateLayerBlob dissociates a layer blob and a manifest. It does nothing if not associated.
 func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
-	defer metrics.StatementDuration("manifest_dissociate_layer_blob")()
+	defer metrics.InstrumentQuery("manifest_dissociate_layer_blob")()
 	q := "DELETE FROM layers WHERE repository_id = $1 AND manifest_id = $2 AND digest = decode($3, 'hex')"
 
 	dgst, err := NewDigest(b.Digest)
@@ -380,7 +380,7 @@ func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manif
 // need for a separate preceding `SELECT` to find if it exists. A manifest cannot be deleted if it is referenced by a
 // manifest list.
 func (s *manifestStore) Delete(ctx context.Context, m *models.Manifest) (bool, error) {
-	defer metrics.StatementDuration("manifest_delete")()
+	defer metrics.InstrumentQuery("manifest_delete")()
 	q := "DELETE FROM manifests WHERE repository_id = $1 AND id = $2"
 
 	res, err := s.db.ExecContext(ctx, q, m.RepositoryID, m.ID)
