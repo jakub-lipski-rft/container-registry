@@ -1,4 +1,9 @@
 ## [Unreleased]
+
+## [v3.3.0-gitlab] - 2021-04-09
+### Added
+- registry: Add Prometheus counter for database queries
+
 ### Changed
 - registry/storage: Upgrade Azure SDK to v52.5.0
 
