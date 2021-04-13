@@ -24,6 +24,7 @@ require (
 	github.com/jackc/pgconn v1.8.1
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
 	github.com/jackc/pgx/v4 v4.11.0
+	github.com/jszwec/csvutil v1.5.0
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/mitchellh/mapstructure v1.1.2
