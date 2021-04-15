@@ -218,7 +218,7 @@ func (registry *Registry) ListenAndServe() error {
 		return err
 	case s := <-quit:
 		log := log.WithFields(log.Fields{
-			"quit_signal":            s,
+			"quit_signal":            s.String(),
 			"http_drain_timeout":     registry.config.HTTP.DrainTimeout,
 			"database_drain_timeout": registry.config.Database.DrainTimeout,
 		})

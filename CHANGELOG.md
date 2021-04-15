@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Fixed
+- registry: Log operating system quit signal as string
 
 ## [v3.3.0-gitlab] - 2021-04-09
 ### Added
