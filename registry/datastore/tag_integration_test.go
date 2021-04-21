@@ -96,6 +96,13 @@ func TestTagStore_FindAll(t *testing.T) {
 			},
 		},
 		{
+			ID:           7,
+			Name:         "0.2.0",
+			RepositoryID: 3,
+			ManifestID:   6,
+			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
+		},
+		{
 			ID:           4,
 			Name:         "1.0.0",
 			RepositoryID: 4,
@@ -114,13 +121,6 @@ func TestTagStore_FindAll(t *testing.T) {
 			Name:         "stable-91ac07a9",
 			RepositoryID: 4,
 			ManifestID:   4,
-			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
-		},
-		{
-			ID:           7,
-			Name:         "0.2.0",
-			RepositoryID: 3,
-			ManifestID:   6,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 		{

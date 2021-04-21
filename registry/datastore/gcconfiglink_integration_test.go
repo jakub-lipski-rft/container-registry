@@ -42,28 +42,10 @@ func TestGCConfigLinkStore_FindAll(t *testing.T) {
 	// see testdata/fixtures/gc_blobs_configurations.sql
 	expected := []*models.GCConfigLink{
 		{
-			ID:           1,
-			RepositoryID: 3,
-			ManifestID:   1,
-			Digest:       "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
-		},
-		{
 			ID:           2,
 			RepositoryID: 3,
 			ManifestID:   2,
 			Digest:       "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
-		},
-		{
-			ID:           3,
-			RepositoryID: 4,
-			ManifestID:   3,
-			Digest:       "sha256:33f3ef3322b28ecfc368872e621ab715a04865471c47ca7426f3e93846157780",
-		},
-		{
-			ID:           4,
-			RepositoryID: 6,
-			ManifestID:   5,
-			Digest:       "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
 		},
 		{
 			ID:           5,
@@ -72,16 +54,34 @@ func TestGCConfigLinkStore_FindAll(t *testing.T) {
 			Digest:       "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
 		},
 		{
+			ID:           7,
+			RepositoryID: 7,
+			ManifestID:   11,
+			Digest:       "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
+		},
+		{
+			ID:           1,
+			RepositoryID: 3,
+			ManifestID:   1,
+			Digest:       "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
+		},
+		{
+			ID:           4,
+			RepositoryID: 6,
+			ManifestID:   5,
+			Digest:       "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
+		},
+		{
 			ID:           6,
 			RepositoryID: 7,
 			ManifestID:   10,
 			Digest:       "sha256:ea8a54fd13889d3649d0a4e45735116474b8a650815a2cda4940f652158579b9",
 		},
 		{
-			ID:           7,
-			RepositoryID: 7,
-			ManifestID:   11,
-			Digest:       "sha256:9ead3a93fc9c9dd8f35221b1f22b155a513815b7b00425d6645b34d98e83b073",
+			ID:           3,
+			RepositoryID: 4,
+			ManifestID:   3,
+			Digest:       "sha256:33f3ef3322b28ecfc368872e621ab715a04865471c47ca7426f3e93846157780",
 		},
 	}
 
