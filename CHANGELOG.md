@@ -1,4 +1,7 @@
 ## [Unreleased]
+### Changed
+- registry/datastore: Switch from 1 to 64 partitions per table
+
 ### Fixed
 - registry: Log operating system quit signal as string
 

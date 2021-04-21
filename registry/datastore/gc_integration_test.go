@@ -123,7 +123,7 @@ func TestGC_TrackBlobUploads_PostponeReviewOnConflict(t *testing.T) {
 	require.Equal(t, rr[0].Digest, rr2[0].Digest)
 	// this is fast, so review_after is only a few milliseconds ahead of the original time
 	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
-	require.WithinDuration(t, rr[0].ReviewAfter, rr2[0].ReviewAfter, 100*time.Millisecond)
+	require.WithinDuration(t, rr[0].ReviewAfter, rr2[0].ReviewAfter, 200*time.Millisecond)
 }
 
 func TestGC_TrackBlobUploads_DoesNothingIfTriggerDisabled(t *testing.T) {
@@ -387,7 +387,7 @@ func TestGC_TrackDeletedManifests(t *testing.T) {
 	require.Equal(t, 0, tt[0].ReviewCount)
 	require.Equal(t, b.Digest, tt[0].Digest)
 	// ignore the few milliseconds between blob creation and queueing for review in response to the manifest delete
-	require.WithinDuration(t, tt[0].ReviewAfter, b.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+	require.WithinDuration(t, tt[0].ReviewAfter, b.CreatedAt.Add(24*time.Hour), 200*time.Millisecond)
 }
 
 func TestGC_TrackDeletedManifests_PostponeReviewOnConflict(t *testing.T) {
@@ -432,7 +432,7 @@ func TestGC_TrackDeletedManifests_PostponeReviewOnConflict(t *testing.T) {
 	require.Equal(t, rr[0].Digest, rr2[0].Digest)
 	// this is fast, so review_after is only a few milliseconds ahead of the original time
 	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
-	require.LessOrEqual(t, rr2[0].ReviewAfter.Sub(rr[0].ReviewAfter).Milliseconds(), int64(100))
+	require.LessOrEqual(t, rr2[0].ReviewAfter.Sub(rr[0].ReviewAfter).Milliseconds(), int64(200))
 }
 
 func TestGC_TrackDeletedManifests_DoesNothingIfTriggerDisabled(t *testing.T) {
@@ -530,7 +530,7 @@ func TestGC_TrackDeletedLayers(t *testing.T) {
 	require.Equal(t, 0, tt[0].ReviewCount)
 	require.Equal(t, b.Digest, tt[0].Digest)
 	// ignore the few milliseconds between blob creation and queueing for review in response to the layer dissociation
-	require.WithinDuration(t, tt[0].ReviewAfter, b.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+	require.WithinDuration(t, tt[0].ReviewAfter, b.CreatedAt.Add(24*time.Hour), 200*time.Millisecond)
 }
 
 func TestGC_TrackDeletedLayers_PostponeReviewOnConflict(t *testing.T) {
@@ -578,7 +578,7 @@ func TestGC_TrackDeletedLayers_PostponeReviewOnConflict(t *testing.T) {
 	require.Equal(t, rr[0].Digest, rr2[0].Digest)
 	// this is fast, so review_after is only a few milliseconds ahead of the original time
 	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
-	require.LessOrEqual(t, rr2[0].ReviewAfter.Sub(rr[0].ReviewAfter).Milliseconds(), int64(100))
+	require.LessOrEqual(t, rr2[0].ReviewAfter.Sub(rr[0].ReviewAfter).Milliseconds(), int64(200))
 }
 
 func TestGC_TrackDeletedLayers_DoesNothingIfTriggerDisabled(t *testing.T) {
@@ -723,7 +723,7 @@ func TestGC_TrackDeletedManifestLists_PostponeReviewOnConflict(t *testing.T) {
 	require.Equal(t, rr[0].ReviewCount, rr2[0].ReviewCount)
 	// review_after should be a few milliseconds ahead of the original time
 	require.True(t, rr2[0].ReviewAfter.After(rr[0].ReviewAfter))
-	require.WithinDuration(t, rr2[0].ReviewAfter, rr[0].ReviewAfter, 100*time.Millisecond)
+	require.WithinDuration(t, rr2[0].ReviewAfter, rr[0].ReviewAfter, 200*time.Millisecond)
 }
 
 func TestGC_TrackDeletedManifestLists_DoesNothingIfTriggerDisabled(t *testing.T) {
@@ -824,7 +824,7 @@ func TestGC_TrackSwitchedTags(t *testing.T) {
 	require.Equal(t, m.ID, rr[0].ManifestID)
 	require.Equal(t, 0, rr[0].ReviewCount)
 	// ignore the few milliseconds between manifest creation and queueing for review in response to the tag deletion
-	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 200*time.Millisecond)
 }
 
 func TestGC_TrackSwitchedTags_PostponeReviewOnConflict(t *testing.T) {
@@ -1043,7 +1043,7 @@ func TestGC_TrackDeletedTags_MultipleTags(t *testing.T) {
 	require.Equal(t, m.ID, rr[0].ManifestID)
 	require.Equal(t, 0, rr[0].ReviewCount)
 	// ignore the few milliseconds between manifest creation and queueing for review in response to the tag deletion
-	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 100*time.Millisecond)
+	require.WithinDuration(t, rr[0].ReviewAfter, m.CreatedAt.Add(24*time.Hour), 200*time.Millisecond)
 }
 
 func TestGC_TrackDeletedTags_ManifestDeleteCascade(t *testing.T) {

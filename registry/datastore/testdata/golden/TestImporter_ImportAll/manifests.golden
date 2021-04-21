@@ -14,6 +14,155 @@
       }
    ]
 },"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["sh"],"ArgsEscaped":true,"Image":"sha256:b0acc7ebf5092fcdd0fe097448529147e6619bd051f03ccf25b29bcae87e783f","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"f7e67f16a539f8bbf53aae18cdb5f8c53e6a56930e7660010d9396ae77f7acfa","container_config":{"Hostname":"f7e67f16a539","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"sh\"]"],"ArgsEscaped":true,"Image":"sha256:b0acc7ebf5092fcdd0fe097448529147e6619bd051f03ccf25b29bcae87e783f","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"created":"2020-04-14T19:19:53.590635493Z","docker_version":"18.09.7","history":[{"created":"2020-04-14T19:19:53.444488372Z","created_by":"/bin/sh -c #(nop) ADD file:09a89925137e1b768ef1f0e7d1d7325eb2b4f1a0895b3aa8dfc98b0c75f3f507 in / "},{"created":"2020-04-14T19:19:53.590635493Z","created_by":"/bin/sh -c #(nop)  CMD [\"sh\"]","empty_layer":true}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5b0d2d635df829f65d0ffb45eab2c3124a470c4f385d6602bda0c21c5248bcab"]}},"configuration_blob_digest":"01be5888e67be651f1fbb59006f0fd791b44ed3fceaa6323ab4e37d5928874345a"}, 
+ {"id":6,"repository_id":8,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01597bd5c319cc09d6bb295b4ef23cac50ec7c373fff5fe923cfd246ec09967b31","payload":{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "size": 1509,
+      "digest": "sha256:2ee122dcc32de080998a9e1ab8665445f621cd323d3ce6bdea2b8a58a921f312"
+   },
+   "layers": [
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 2723139,
+         "digest": "sha256:8a0637ca1ac98db4cf29f7632449c92801adc80cf0da2cd9c9e39882ce466561"
+      }
+   ]
+},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"arm64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:3b4c9bf302e38ec6706ebb5bcfd942afbba488ad0ad27583f0146018638e949e","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"93fce45805a181158be8fa78c882f776bbab3ca574861b7e38fed81eb0709c3b","container_config":{"Hostname":"93fce45805a1","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"ArgsEscaped":true,"Image":"sha256:3b4c9bf302e38ec6706ebb5bcfd942afbba488ad0ad27583f0146018638e949e","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"created":"2020-03-23T21:39:53.041338799Z","docker_version":"18.09.7","history":[{"created":"2020-03-23T21:39:52.296870342Z","created_by":"/bin/sh -c #(nop) ADD file:746a5c3838a898d6acf7877552ff13d1ab40d0036ace7a662e7c747018315ddb in / "},{"created":"2020-03-23T21:39:53.041338799Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:294ac687b5fcac6acedb9a20cc756ffe39ebc87e8a0214d3fb8ef3fc3189ee2a"]}},"configuration_blob_digest":"012ee122dcc32de080998a9e1ab8665445f621cd323d3ce6bdea2b8a58a921f312"}, 
+ {"id":7,"repository_id":8,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cb8a924afdf0229ef7515d9e5b3024e23b3eb03ddbba287f4a19c6ac90b8d221","payload":{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "size": 1509,
+      "digest": "sha256:a187dde48cd289ac374ad8539930628314bc581a481cdb41409c9289419ddb72"
+   },
+   "layers": [
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 2803255,
+         "digest": "sha256:aad63a9339440e7c3e1fff2b988991b9bfb81280042fa7f39a5e327023056819"
+      }
+   ]
+},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:74df73bb19fbfc7fb5ab9a8234b3d98ee2fb92df5b824496679802685205ab8c","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"fb71ddde5f6411a82eb056a9190f0cc1c80d7f77a8509ee90a2054428edb0024","container_config":{"Hostname":"fb71ddde5f64","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"ArgsEscaped":true,"Image":"sha256:74df73bb19fbfc7fb5ab9a8234b3d98ee2fb92df5b824496679802685205ab8c","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"created":"2020-03-23T21:19:34.196162891Z","docker_version":"18.09.7","history":[{"created":"2020-03-23T21:19:34.027725872Z","created_by":"/bin/sh -c #(nop) ADD file:0c4555f363c2672e350001f1293e689875a3760afe7b3f9146886afe67121cba in / "},{"created":"2020-03-23T21:19:34.196162891Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:beee9f30bc1f711043e78d4a2be0668955d4b761d587d6f60c2c8dc081efb203"]}},"configuration_blob_digest":"01a187dde48cd289ac374ad8539930628314bc581a481cdb41409c9289419ddb72"}, 
+ {"id":8,"repository_id":8,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01f8f5ca4728269ef4eecd49db2345a03f8ab9244e049fc2af96f7b422dd6df009","payload":{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
+   "manifests": [
+      {
+         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+         "size": 528,
+         "digest": "sha256:cb8a924afdf0229ef7515d9e5b3024e23b3eb03ddbba287f4a19c6ac90b8d221",
+         "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+         "size": 528,
+         "digest": "sha256:597bd5c319cc09d6bb295b4ef23cac50ec7c373fff5fe923cfd246ec09967b31",
+         "platform": {
+            "architecture": "arm64",
+            "os": "linux"
+         }
+      }
+   ]
+},"media_type_id":4,"configuration_media_type_id":null,"configuration_payload":null,"configuration_blob_digest":null}, 
+ {"id":10,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01673315e9c0cad797587b6bc0c1e2b9a1903c15b521f26acc5364fcf034c0cfbd","payload":{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "size": 2049,
+      "digest": "sha256:b265c63feef2db2365adab2b8f9cfdc4f8fef20f623a2c171bc3ef4d61779c91"
+   },
+   "layers": [
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 2802957,
+         "digest": "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 149,
+         "digest": "sha256:38927b8c2bae0bb9f6782a3fd7a22496f7f6dd8612c8bb5f30ab8b42edb75e76"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 524679,
+         "digest": "sha256:a2fb90fbbeba5363762b4daf4a4d9a925e5a18a58f8cb1571d2e33c2ffc6b437"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 163,
+         "digest": "sha256:924c56d4299dfd204bb44564604124e503d6a6f7c15cba4d444ad569012ffab9"
+      }
+   ]
+},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:5f03622470a5aefdce94305e23a8cfe9d9752a8d4b2a98428dcb8f7c4b207f74","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"9c3c36f3577df262d96c658cbf0571fa5521b3b9ed45b9bc363c16d415afcb3c","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:5f03622470a5aefdce94305e23a8cfe9d9752a8d4b2a98428dcb8f7c4b207f74","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T23:01:16.487846531Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T23:01:15.146632113Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T23:01:15.777141013Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T23:01:16.487846531Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:c3160d09ac4830a1d6bc456f3f5ca63845ea1eccd92b97a5b2e2d1796fb441c1","sha256:8d2462cf19579c4a452d3aa7f833b0f49f6c6412f5ef8c287acc03ff56ba3652","sha256:461b4a829431171ebb1031c6096c742d1c9ac82a2d858e8dcb892318ee409e56"]}},"configuration_blob_digest":"01b265c63feef2db2365adab2b8f9cfdc4f8fef20f623a2c171bc3ef4d61779c91"}, 
+ {"id":11,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01a848997f1caa7406fa148e184820f1ff55076eb3e5b33a8c09d1bb34cf335e7e","payload":{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "size": 2049,
+      "digest": "sha256:3ef776e71635d79e5b6b8b6317b3adeda3b0c8aca61c4537678cc02eab466b17"
+   },
+   "layers": [
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 2802957,
+         "digest": "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 149,
+         "digest": "sha256:a50d1d359d8caefdca616daf1cd30f9e07c7bcfbfcdc37ced801ba341ab8e9e5"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 524671,
+         "digest": "sha256:75543ad505259af72704dd911f8ec2cddc01ce9abc79345afbbdb1b7778a6310"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 164,
+         "digest": "sha256:e2d30fbdb0781e04de442a7c3eca67d997e5c87da3bd4286c274cc6c4ec707c7"
+      }
+   ]
+},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:68a21ae57e89f9e0cc52d3ae7b1b10537fac2cfb6df18c8be54fde2f7d7fc143","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"b7cb81ac842c2510da89e7360dbc172eabea07469456cfe8524a2da322ef6e8d","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:68a21ae57e89f9e0cc52d3ae7b1b10537fac2cfb6df18c8be54fde2f7d7fc143","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T22:53:27.894237452Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T22:53:26.499152738Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T22:53:27.174345842Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T22:53:27.894237452Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:f2c7fc57862bed9c3682e62475a71177eb58cfdaf7461a17bf18a3c4a285e78f","sha256:2f8386f2895dd28a7603bbfe3d82f10a06a550fb8fd7a24d26e8b4b82dac704f","sha256:8d134234be46c44163cf5d46f4d00ea17bf5d74baf7e0a610db1ee9d76c8163c"]}},"configuration_blob_digest":"013ef776e71635d79e5b6b8b6317b3adeda3b0c8aca61c4537678cc02eab466b17"}, 
+ {"id":12,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01efdb07f074a5cfb25547c0cf1ddac509a10ec9eb15e565584988c913ccaa344a","payload":{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "size": 2048,
+      "digest": "sha256:bda9e8f07268fe2c2e97833c721102739f7d6ff9401b7f03aaec176e772bbd8b"
+   },
+   "layers": [
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 2802957,
+         "digest": "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 149,
+         "digest": "sha256:5042ef227578477784ce48d26f549739d919223ca9a511efb2be091cd6e7c957"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 524674,
+         "digest": "sha256:ba44d9d3f13a26d49ec4e53f8b69092d61c7f7fd9d4abd07ae086d96958fdb13"
+      },
+      {
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 164,
+         "digest": "sha256:04f2d9b76105721fac9b03445f164e585457002aa69a36f84bda78e848e48ebe"
+      }
+   ]
+},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:9d6b6d46491e1405e1b7203140a29800e3b134db3cc539f29b7a4636dd1d8286","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"7399108be765ff6baec06f1645ec97e95dc99f9640e579b307da5148b877224f","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:9d6b6d46491e1405e1b7203140a29800e3b134db3cc539f29b7a4636dd1d8286","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T23:01:30.585662893Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T23:01:29.10717021Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T23:01:29.797630922Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T23:01:30.585662893Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:33a35dd1887305f24f8c37b10e568cd7761652bf9bc8e8915ae896f45bf472de","sha256:df1f7117a5b99687e61ac677473d91fa86ed401f83f9be6944d4464b9211b909","sha256:c8c7a284da6ac23da3d33edb505224646cbabb9bf7c2accaaca121e930ad581f"]}},"configuration_blob_digest":"01bda9e8f07268fe2c2e97833c721102739f7d6ff9401b7f03aaec176e772bbd8b"}, 
  {"id":2,"repository_id":2,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cda5d02e4ea900a8d52e834bc3158e83b8a87a5b44ae081885aecf9b156dcff1","payload":{
    "schemaVersion": 2,
    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -178,153 +327,4 @@
       }
    ]
 },"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"ExposedPorts":{"6379/tcp":{}},"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","REDIS_VERSION=3.2.11","REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-3.2.11.tar.gz","REDIS_DOWNLOAD_SHA=31ae927cab09f90c9ca5954aab7aeecc3bb4da6087d3d12ba0a929ceb54081b5"],"Cmd":["redis-server"],"ArgsEscaped":true,"Image":"sha256:69868e872ba136071f7f89a106ba83e4ae742a3244af26bec521bfa2facea0a6","Volumes":{"/data":{}},"WorkingDir":"/data","Entrypoint":["docker-entrypoint.sh"],"OnBuild":[],"Labels":null},"container":"9e1b6083cde627172a467907882ad67de452b08b0701076681a899dd0b4e4d55","container_config":{"Hostname":"9e1b6083cde6","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"ExposedPorts":{"6379/tcp":{}},"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","REDIS_VERSION=3.2.11","REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-3.2.11.tar.gz","REDIS_DOWNLOAD_SHA=31ae927cab09f90c9ca5954aab7aeecc3bb4da6087d3d12ba0a929ceb54081b5"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"redis-server\"]"],"ArgsEscaped":true,"Image":"sha256:69868e872ba136071f7f89a106ba83e4ae742a3244af26bec521bfa2facea0a6","Volumes":{"/data":{}},"WorkingDir":"/data","Entrypoint":["docker-entrypoint.sh"],"OnBuild":[],"Labels":{}},"created":"2018-05-21T21:30:18.104069469Z","docker_version":"17.06.2-ce","history":[{"created":"2018-01-09T21:10:58.365737589Z","created_by":"/bin/sh -c #(nop) ADD file:093f0723fa46f6cdbd6f7bd146448bb70ecce54254c35701feeceb956414622f in / "},{"created":"2018-01-09T21:10:58.579708634Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2018-01-24T00:17:37.903111265Z","created_by":"/bin/sh -c addgroup -S redis \u0026\u0026 adduser -S -G redis redis"},{"created":"2018-01-24T00:17:41.612579248Z","created_by":"/bin/sh -c apk add --no-cache 'su-exec\u003e=0.2'"},{"created":"2018-01-24T00:17:41.97397235Z","created_by":"/bin/sh -c #(nop)  ENV REDIS_VERSION=3.2.11","empty_layer":true},{"created":"2018-01-24T00:17:42.356241455Z","created_by":"/bin/sh -c #(nop)  ENV REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-3.2.11.tar.gz","empty_layer":true},{"created":"2018-01-24T00:17:42.73271852Z","created_by":"/bin/sh -c #(nop)  ENV REDIS_DOWNLOAD_SHA=31ae927cab09f90c9ca5954aab7aeecc3bb4da6087d3d12ba0a929ceb54081b5","empty_layer":true},{"created":"2018-05-21T21:30:15.913873377Z","created_by":"/bin/sh -c set -ex; \t\tapk add --no-cache --virtual .build-deps \t\tcoreutils \t\tgcc \t\tjemalloc-dev \t\tlinux-headers \t\tmake \t\tmusl-dev \t; \t\twget -O redis.tar.gz \"$REDIS_DOWNLOAD_URL\"; \techo \"$REDIS_DOWNLOAD_SHA *redis.tar.gz\" | sha256sum -c -; \tmkdir -p /usr/src/redis; \ttar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \trm redis.tar.gz; \t\tgrep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 1$' /usr/src/redis/src/server.h; \tsed -ri 's!^(#define CONFIG_DEFAULT_PROTECTED_MODE) 1$!\\1 0!' /usr/src/redis/src/server.h; \tgrep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 0$' /usr/src/redis/src/server.h; \t\tmake -C /usr/src/redis -j \"$(nproc)\"; \tmake -C /usr/src/redis install; \t\trm -r /usr/src/redis; \t\trunDeps=\"$( \t\tscanelf --needed --nobanner --format '%n#p' --recursive /usr/local \t\t\t| tr ',' '\\n' \t\t\t| sort -u \t\t\t| awk 'system(\"[ -e /usr/local/lib/\" $1 \" ]\") == 0 { next } { print \"so:\" $1 }' \t)\"; \tapk add --virtual .redis-rundeps $runDeps; \tapk del .build-deps; \t\tredis-server --version"},{"created":"2018-05-21T21:30:16.591737355Z","created_by":"/bin/sh -c mkdir /data \u0026\u0026 chown redis:redis /data"},{"created":"2018-05-21T21:30:16.817652051Z","created_by":"/bin/sh -c #(nop)  VOLUME [/data]","empty_layer":true},{"created":"2018-05-21T21:30:17.096241959Z","created_by":"/bin/sh -c #(nop) WORKDIR /data","empty_layer":true},{"created":"2018-05-21T21:30:17.425331146Z","created_by":"/bin/sh -c #(nop) COPY file:9b596974f478088dc2d2bf2906046f6c8872ecff3c716abd89850fd50ec90c47 in /usr/local/bin/ "},{"created":"2018-05-21T21:30:17.641811717Z","created_by":"/bin/sh -c #(nop)  ENTRYPOINT [\"docker-entrypoint.sh\"]","empty_layer":true},{"created":"2018-05-21T21:30:17.865752306Z","created_by":"/bin/sh -c #(nop)  EXPOSE 6379/tcp","empty_layer":true},{"created":"2018-05-21T21:30:18.104069469Z","created_by":"/bin/sh -c #(nop)  CMD [\"redis-server\"]","empty_layer":true}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:cd7100a72410606589a54b932cabd804a17f9ae5b42a1882bd56d263e02b6215","sha256:ad9247fe8c639c4b643c3c9ba1cf48f0f0ecbbe9ebdff61134ce4278a3cfec77","sha256:c3d2785637343250f39cc5f824bf7d03d8a586ae701b0d9ec9ea7dfce3d059b3","sha256:e3b89804d966d76c2c4f28ec83439cfc0172a5a4b39c7e97c9f3204ea39aaa5b","sha256:938588d29d17f373ecab9ea9e110b99783bae458e13833d5416f9f45be483340","sha256:a521e34fcf3d296742422b730056665464dca384f377b68218a56657f0180a33"]}},"configuration_blob_digest":"01ca0b6709748d024a67c502558ea88dc8a1f8a858d380f5ddafa1504126a3b018"}, 
- {"id":6,"repository_id":8,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01597bd5c319cc09d6bb295b4ef23cac50ec7c373fff5fe923cfd246ec09967b31","payload":{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-   "config": {
-      "mediaType": "application/vnd.docker.container.image.v1+json",
-      "size": 1509,
-      "digest": "sha256:2ee122dcc32de080998a9e1ab8665445f621cd323d3ce6bdea2b8a58a921f312"
-   },
-   "layers": [
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 2723139,
-         "digest": "sha256:8a0637ca1ac98db4cf29f7632449c92801adc80cf0da2cd9c9e39882ce466561"
-      }
-   ]
-},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"arm64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:3b4c9bf302e38ec6706ebb5bcfd942afbba488ad0ad27583f0146018638e949e","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"93fce45805a181158be8fa78c882f776bbab3ca574861b7e38fed81eb0709c3b","container_config":{"Hostname":"93fce45805a1","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"ArgsEscaped":true,"Image":"sha256:3b4c9bf302e38ec6706ebb5bcfd942afbba488ad0ad27583f0146018638e949e","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"created":"2020-03-23T21:39:53.041338799Z","docker_version":"18.09.7","history":[{"created":"2020-03-23T21:39:52.296870342Z","created_by":"/bin/sh -c #(nop) ADD file:746a5c3838a898d6acf7877552ff13d1ab40d0036ace7a662e7c747018315ddb in / "},{"created":"2020-03-23T21:39:53.041338799Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:294ac687b5fcac6acedb9a20cc756ffe39ebc87e8a0214d3fb8ef3fc3189ee2a"]}},"configuration_blob_digest":"012ee122dcc32de080998a9e1ab8665445f621cd323d3ce6bdea2b8a58a921f312"}, 
- {"id":7,"repository_id":8,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cb8a924afdf0229ef7515d9e5b3024e23b3eb03ddbba287f4a19c6ac90b8d221","payload":{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-   "config": {
-      "mediaType": "application/vnd.docker.container.image.v1+json",
-      "size": 1509,
-      "digest": "sha256:a187dde48cd289ac374ad8539930628314bc581a481cdb41409c9289419ddb72"
-   },
-   "layers": [
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 2803255,
-         "digest": "sha256:aad63a9339440e7c3e1fff2b988991b9bfb81280042fa7f39a5e327023056819"
-      }
-   ]
-},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:74df73bb19fbfc7fb5ab9a8234b3d98ee2fb92df5b824496679802685205ab8c","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"fb71ddde5f6411a82eb056a9190f0cc1c80d7f77a8509ee90a2054428edb0024","container_config":{"Hostname":"fb71ddde5f64","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","#(nop) ","CMD [\"/bin/sh\"]"],"ArgsEscaped":true,"Image":"sha256:74df73bb19fbfc7fb5ab9a8234b3d98ee2fb92df5b824496679802685205ab8c","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":{}},"created":"2020-03-23T21:19:34.196162891Z","docker_version":"18.09.7","history":[{"created":"2020-03-23T21:19:34.027725872Z","created_by":"/bin/sh -c #(nop) ADD file:0c4555f363c2672e350001f1293e689875a3760afe7b3f9146886afe67121cba in / "},{"created":"2020-03-23T21:19:34.196162891Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:beee9f30bc1f711043e78d4a2be0668955d4b761d587d6f60c2c8dc081efb203"]}},"configuration_blob_digest":"01a187dde48cd289ac374ad8539930628314bc581a481cdb41409c9289419ddb72"}, 
- {"id":8,"repository_id":8,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01f8f5ca4728269ef4eecd49db2345a03f8ab9244e049fc2af96f7b422dd6df009","payload":{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.list.v2+json",
-   "manifests": [
-      {
-         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-         "size": 528,
-         "digest": "sha256:cb8a924afdf0229ef7515d9e5b3024e23b3eb03ddbba287f4a19c6ac90b8d221",
-         "platform": {
-            "architecture": "amd64",
-            "os": "linux"
-         }
-      },
-      {
-         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-         "size": 528,
-         "digest": "sha256:597bd5c319cc09d6bb295b4ef23cac50ec7c373fff5fe923cfd246ec09967b31",
-         "platform": {
-            "architecture": "arm64",
-            "os": "linux"
-         }
-      }
-   ]
-},"media_type_id":4,"configuration_media_type_id":null,"configuration_payload":null,"configuration_blob_digest":null}, 
- {"id":9,"repository_id":10,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cc2f7914532f430d4e5d75b5c855ec4b46feb893bbd2974456f0bf46015b7621","payload":{"schemaVersion":2,"config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"sha256:cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a","size":139},"layers":[{"mediaType":"application/tar+gzip","digest":"sha256:50723273cfd47a0e6222d64e993b1bd1bb97f84b4e0d1336bc0e24596c72b631","size":1371}]},"media_type_id":17,"configuration_media_type_id":19,"configuration_payload":{"name":"e-helm","version":"latest","description":"Sample Helm Chart","apiVersion":"v2","appVersion":"1.16.0","type":"application"},"configuration_blob_digest":"01cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a"}, 
- {"id":10,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01673315e9c0cad797587b6bc0c1e2b9a1903c15b521f26acc5364fcf034c0cfbd","payload":{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-   "config": {
-      "mediaType": "application/vnd.docker.container.image.v1+json",
-      "size": 2049,
-      "digest": "sha256:b265c63feef2db2365adab2b8f9cfdc4f8fef20f623a2c171bc3ef4d61779c91"
-   },
-   "layers": [
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 2802957,
-         "digest": "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 149,
-         "digest": "sha256:38927b8c2bae0bb9f6782a3fd7a22496f7f6dd8612c8bb5f30ab8b42edb75e76"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 524679,
-         "digest": "sha256:a2fb90fbbeba5363762b4daf4a4d9a925e5a18a58f8cb1571d2e33c2ffc6b437"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 163,
-         "digest": "sha256:924c56d4299dfd204bb44564604124e503d6a6f7c15cba4d444ad569012ffab9"
-      }
-   ]
-},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:5f03622470a5aefdce94305e23a8cfe9d9752a8d4b2a98428dcb8f7c4b207f74","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"9c3c36f3577df262d96c658cbf0571fa5521b3b9ed45b9bc363c16d415afcb3c","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:5f03622470a5aefdce94305e23a8cfe9d9752a8d4b2a98428dcb8f7c4b207f74","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T23:01:16.487846531Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T23:01:15.146632113Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T23:01:15.777141013Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T23:01:16.487846531Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:c3160d09ac4830a1d6bc456f3f5ca63845ea1eccd92b97a5b2e2d1796fb441c1","sha256:8d2462cf19579c4a452d3aa7f833b0f49f6c6412f5ef8c287acc03ff56ba3652","sha256:461b4a829431171ebb1031c6096c742d1c9ac82a2d858e8dcb892318ee409e56"]}},"configuration_blob_digest":"01b265c63feef2db2365adab2b8f9cfdc4f8fef20f623a2c171bc3ef4d61779c91"}, 
- {"id":11,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01a848997f1caa7406fa148e184820f1ff55076eb3e5b33a8c09d1bb34cf335e7e","payload":{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-   "config": {
-      "mediaType": "application/vnd.docker.container.image.v1+json",
-      "size": 2049,
-      "digest": "sha256:3ef776e71635d79e5b6b8b6317b3adeda3b0c8aca61c4537678cc02eab466b17"
-   },
-   "layers": [
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 2802957,
-         "digest": "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 149,
-         "digest": "sha256:a50d1d359d8caefdca616daf1cd30f9e07c7bcfbfcdc37ced801ba341ab8e9e5"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 524671,
-         "digest": "sha256:75543ad505259af72704dd911f8ec2cddc01ce9abc79345afbbdb1b7778a6310"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 164,
-         "digest": "sha256:e2d30fbdb0781e04de442a7c3eca67d997e5c87da3bd4286c274cc6c4ec707c7"
-      }
-   ]
-},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:68a21ae57e89f9e0cc52d3ae7b1b10537fac2cfb6df18c8be54fde2f7d7fc143","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"b7cb81ac842c2510da89e7360dbc172eabea07469456cfe8524a2da322ef6e8d","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:68a21ae57e89f9e0cc52d3ae7b1b10537fac2cfb6df18c8be54fde2f7d7fc143","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T22:53:27.894237452Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T22:53:26.499152738Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T22:53:27.174345842Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T22:53:27.894237452Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:f2c7fc57862bed9c3682e62475a71177eb58cfdaf7461a17bf18a3c4a285e78f","sha256:2f8386f2895dd28a7603bbfe3d82f10a06a550fb8fd7a24d26e8b4b82dac704f","sha256:8d134234be46c44163cf5d46f4d00ea17bf5d74baf7e0a610db1ee9d76c8163c"]}},"configuration_blob_digest":"013ef776e71635d79e5b6b8b6317b3adeda3b0c8aca61c4537678cc02eab466b17"}, 
- {"id":12,"repository_id":11,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01efdb07f074a5cfb25547c0cf1ddac509a10ec9eb15e565584988c913ccaa344a","payload":{
-   "schemaVersion": 2,
-   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-   "config": {
-      "mediaType": "application/vnd.docker.container.image.v1+json",
-      "size": 2048,
-      "digest": "sha256:bda9e8f07268fe2c2e97833c721102739f7d6ff9401b7f03aaec176e772bbd8b"
-   },
-   "layers": [
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 2802957,
-         "digest": "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 149,
-         "digest": "sha256:5042ef227578477784ce48d26f549739d919223ca9a511efb2be091cd6e7c957"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 524674,
-         "digest": "sha256:ba44d9d3f13a26d49ec4e53f8b69092d61c7f7fd9d4abd07ae086d96958fdb13"
-      },
-      {
-         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-         "size": 164,
-         "digest": "sha256:04f2d9b76105721fac9b03445f164e585457002aa69a36f84bda78e848e48ebe"
-      }
-   ]
-},"media_type_id":3,"configuration_media_type_id":8,"configuration_payload":{"architecture":"amd64","config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh"],"ArgsEscaped":true,"Image":"sha256:9d6b6d46491e1405e1b7203140a29800e3b134db3cc539f29b7a4636dd1d8286","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"container":"7399108be765ff6baec06f1645ec97e95dc99f9640e579b307da5148b877224f","container_config":{"Hostname":"","Domainname":"","User":"","AttachStdin":false,"AttachStdout":false,"AttachStderr":false,"Tty":false,"OpenStdin":false,"StdinOnce":false,"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"],"Cmd":["/bin/sh","-c","date '+%s' \u003e /root/test/date.txt"],"Image":"sha256:9d6b6d46491e1405e1b7203140a29800e3b134db3cc539f29b7a4636dd1d8286","Volumes":null,"WorkingDir":"","Entrypoint":null,"OnBuild":null,"Labels":null},"created":"2020-08-24T23:01:30.585662893Z","docker_version":"19.03.12","history":[{"created":"2020-01-18T01:19:37.02673981Z","created_by":"/bin/sh -c #(nop) ADD file:e69d441d729412d24675dcd33e04580885df99981cec43de8c9b24015313ff8e in / "},{"created":"2020-01-18T01:19:37.187497623Z","created_by":"/bin/sh -c #(nop)  CMD [\"/bin/sh\"]","empty_layer":true},{"created":"2020-08-24T23:01:29.10717021Z","created_by":"/bin/sh -c mkdir -p /root/test/"},{"created":"2020-08-24T23:01:29.797630922Z","created_by":"/bin/sh -c head -c 524288 \u003c/dev/urandom \u003e /root/test/randfile.txt"},{"created":"2020-08-24T23:01:30.585662893Z","created_by":"/bin/sh -c date '+%s' \u003e /root/test/date.txt"}],"os":"linux","rootfs":{"type":"layers","diff_ids":["sha256:5216338b40a7b96416b8b9858974bbe4acc3096ee60acbc4dfb1ee02aecceb10","sha256:33a35dd1887305f24f8c37b10e568cd7761652bf9bc8e8915ae896f45bf472de","sha256:df1f7117a5b99687e61ac677473d91fa86ed401f83f9be6944d4464b9211b909","sha256:c8c7a284da6ac23da3d33edb505224646cbabb9bf7c2accaaca121e930ad581f"]}},"configuration_blob_digest":"01bda9e8f07268fe2c2e97833c721102739f7d6ff9401b7f03aaec176e772bbd8b"}]
+ {"id":9,"repository_id":10,"created_at":"2020-04-15T12:04:28.95584","schema_version":2,"digest":"01cc2f7914532f430d4e5d75b5c855ec4b46feb893bbd2974456f0bf46015b7621","payload":{"schemaVersion":2,"config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"sha256:cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a","size":139},"layers":[{"mediaType":"application/tar+gzip","digest":"sha256:50723273cfd47a0e6222d64e993b1bd1bb97f84b4e0d1336bc0e24596c72b631","size":1371}]},"media_type_id":17,"configuration_media_type_id":19,"configuration_payload":{"name":"e-helm","version":"latest","description":"Sample Helm Chart","apiVersion":"v2","appVersion":"1.16.0","type":"application"},"configuration_blob_digest":"01cbcce8ad7fdaea54f60aeef01f57f2f46f67382b5d391d63d2b55f536195935a"}]
