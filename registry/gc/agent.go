@@ -10,6 +10,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/gc/internal"
+	"github.com/docker/distribution/registry/gc/internal/metrics"
 	"github.com/docker/distribution/registry/gc/worker"
 	reginternal "github.com/docker/distribution/registry/internal"
 	"github.com/sirupsen/logrus"
@@ -125,13 +126,14 @@ func (a *Agent) Start(ctx context.Context) error {
 			start := systemClock.Now()
 			log.Info("running worker")
 
+			report := metrics.WorkerRun(a.worker.Name())
 			found, err := a.worker.Run(ctx)
 			if err != nil {
 				log.WithError(err).Error("failed run")
 			} else if found || a.noIdleBackoff {
 				b.Reset()
 			}
-
+			report(!found, err)
 			log.WithField("duration_s", systemClock.Since(start).Seconds()).Info("run complete")
 
 			sleep := b.NextBackOff()

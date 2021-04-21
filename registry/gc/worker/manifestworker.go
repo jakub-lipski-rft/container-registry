@@ -45,7 +45,7 @@ func WithManifestTxTimeout(d time.Duration) ManifestWorkerOption {
 	}
 }
 
-// NewBlobWorker creates a new BlobWorker.
+// NewManifestWorker creates a new BlobWorker.
 func NewManifestWorker(db datastore.Handler, opts ...ManifestWorkerOption) *ManifestWorker {
 	w := &ManifestWorker{baseWorker: &baseWorker{db: db}}
 	w.name = "registry.gc.worker.ManifestWorker"
