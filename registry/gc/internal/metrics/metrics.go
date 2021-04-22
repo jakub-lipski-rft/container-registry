@@ -9,17 +9,19 @@ import (
 )
 
 var (
-	runDurationHist *prometheus.HistogramVec
-	runCounter      *prometheus.CounterVec
-	postponeCounter *prometheus.CounterVec
-	timeSince       = time.Since // for test purposes only
+	runDurationHist           *prometheus.HistogramVec
+	runCounter                *prometheus.CounterVec
+	postponeCounter           *prometheus.CounterVec
+	storageDeleteBytesCounter *prometheus.CounterVec
+	timeSince                 = time.Since // for test purposes only
 )
 
 const (
-	subsystem   = "gc"
-	workerLabel = "worker"
-	errorLabel  = "error"
-	noopLabel   = "noop"
+	subsystem      = "gc"
+	workerLabel    = "worker"
+	errorLabel     = "error"
+	noopLabel      = "noop"
+	mediaTypeLabel = "media_type"
 
 	runDurationName = "run_duration_seconds"
 	runDurationDesc = "A histogram of latencies for online GC worker runs."
@@ -29,6 +31,9 @@ const (
 
 	postponeTotalName = "postpones_total"
 	postponeTotalDesc = "A counter for online GC review postpones."
+
+	storageDeleteBytesTotalName = "storage_deleted_bytes_total"
+	storageDeleteBytesTotalDesc = "A counter for bytes deleted from storage during online GC."
 )
 
 func init() {
@@ -63,9 +68,20 @@ func init() {
 		[]string{workerLabel},
 	)
 
+	storageDeleteBytesCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: metrics.NamespacePrefix,
+			Subsystem: subsystem,
+			Name:      storageDeleteBytesTotalName,
+			Help:      storageDeleteBytesTotalDesc,
+		},
+		[]string{mediaTypeLabel},
+	)
+
 	prometheus.MustRegister(runDurationHist)
 	prometheus.MustRegister(runCounter)
 	prometheus.MustRegister(postponeCounter)
+	prometheus.MustRegister(storageDeleteBytesCounter)
 }
 
 func WorkerRun(name string) func(noop bool, err error) {
@@ -81,4 +97,8 @@ func WorkerRun(name string) func(noop bool, err error) {
 
 func ReviewPostpone(workerName string) {
 	postponeCounter.WithLabelValues(workerName).Inc()
+}
+
+func StorageDeleteBytes(bytes int64, mediaType string) {
+	storageDeleteBytesCounter.WithLabelValues(mediaType).Add(float64(bytes))
 }

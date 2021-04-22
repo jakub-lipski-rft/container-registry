@@ -8,6 +8,7 @@
 ### Added
 - registry/gc: Add Prometheus counter and histogram for online GC runs
 - registry/gc: Add Prometheus counter for online GC review postpones
+- registry/gc: Add Prometheus counter for online GC deleted bytes
 
 ## [v3.3.0-gitlab] - 2021-04-09
 ### Added

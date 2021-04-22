@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution/registry/gc/internal/metrics"
-
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/docker/distribution/registry/gc/internal/metrics"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/hashicorp/go-multierror"
@@ -154,6 +153,7 @@ func (w *BlobWorker) processTask(ctx context.Context) (bool, error) {
 
 func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t *models.GCBlobTask) error {
 	log := dcontext.GetLogger(ctx)
+	bs := blobStoreConstructor(tx)
 
 	// delete blob from storage
 	ctx2, cancel := context.WithDeadline(ctx, systemClock.Now().Add(w.storageTimeout))
@@ -172,10 +172,23 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 			}
 			return err
 		}
+	} else {
+		// get blob media type and size for metrics purposes
+		b, err := bs.FindByDigest(ctx, t.Digest)
+		if err != nil {
+			// log and continue, try to delete the blob on the database and handle the failure there (if it persists)
+			log.WithError(err).Error("failed searching for blob on database")
+		} else {
+			if b == nil {
+				// this is unexpected, but it's not a show stopper for GC
+				log.Warn("blob no longer exists on database")
+				return nil
+			}
+			metrics.StorageDeleteBytes(b.Size, b.MediaType)
+		}
 	}
 
 	// delete blob from database
-	bs := blobStoreConstructor(tx)
 	if err := bs.Delete(ctx, t.Digest); err != nil {
 		switch {
 		case err == datastore.ErrNotFound:
