@@ -11,6 +11,7 @@ import (
 var (
 	runDurationHist *prometheus.HistogramVec
 	runCounter      *prometheus.CounterVec
+	postponeCounter *prometheus.CounterVec
 	timeSince       = time.Since // for test purposes only
 )
 
@@ -25,6 +26,9 @@ const (
 
 	runTotalName = "runs_total"
 	runTotalDesc = "A counter for online GC worker runs."
+
+	postponeTotalName = "postpones_total"
+	postponeTotalDesc = "A counter for online GC review postpones."
 )
 
 func init() {
@@ -49,8 +53,19 @@ func init() {
 		[]string{workerLabel, noopLabel, errorLabel},
 	)
 
+	postponeCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: metrics.NamespacePrefix,
+			Subsystem: subsystem,
+			Name:      postponeTotalName,
+			Help:      postponeTotalDesc,
+		},
+		[]string{workerLabel},
+	)
+
 	prometheus.MustRegister(runDurationHist)
 	prometheus.MustRegister(runCounter)
+	prometheus.MustRegister(postponeCounter)
 }
 
 func WorkerRun(name string) func(noop bool, err error) {
@@ -62,4 +77,8 @@ func WorkerRun(name string) func(noop bool, err error) {
 		runCounter.WithLabelValues(name, np, failed).Inc()
 		runDurationHist.WithLabelValues(name, np, failed).Observe(timeSince(start).Seconds())
 	}
+}
+
+func ReviewPostpone(workerName string) {
+	postponeCounter.WithLabelValues(workerName).Inc()
 }

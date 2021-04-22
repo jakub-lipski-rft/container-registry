@@ -108,3 +108,21 @@ registry_gc_runs_total{error="true",noop="true",worker="foo"} 2
 	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, durationFullName, totalFullName)
 	require.NoError(t, err)
 }
+
+func TestReviewPostpone(t *testing.T) {
+	ReviewPostpone("foo")
+	ReviewPostpone("foo")
+	ReviewPostpone("bar")
+
+	var expected bytes.Buffer
+	expected.WriteString(`
+# HELP registry_gc_postpones_total A counter for online GC review postpones.
+# TYPE registry_gc_postpones_total counter
+registry_gc_postpones_total{worker="bar"} 1
+registry_gc_postpones_total{worker="foo"} 2
+`)
+	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, postponeTotalName)
+
+	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, totalFullName)
+	require.NoError(t, err)
+}
