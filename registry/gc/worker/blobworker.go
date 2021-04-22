@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/docker/distribution/registry/gc/internal/metrics"
+
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
@@ -204,5 +206,7 @@ func (w *BlobWorker) postponeTaskAndCommit(ctx context.Context, tx datastore.Tra
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing database transaction: %w", err)
 	}
+
+	metrics.ReviewPostpone(w.name)
 	return nil
 }
