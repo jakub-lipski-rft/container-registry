@@ -121,6 +121,7 @@ func TestBlobWorker_processTask(t *testing.T) {
 		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
 		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
 		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(&models.Blob{}, nil).Times(1),
 		bsMock.EXPECT().Delete(dbCtx, bt.Digest).Return(nil).Times(1),
 		btsMock.EXPECT().Delete(dbCtx, bt).Return(nil).Times(1),
 		txMock.EXPECT().Commit().Return(nil).Times(1),
@@ -330,6 +331,7 @@ func TestBlobWorker_processTask_StoreDeleteNotFoundError(t *testing.T) {
 		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
 		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
 		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(&models.Blob{}, nil).Times(1),
 		bsMock.EXPECT().Delete(dbCtx, bt.Digest).Return(datastore.ErrNotFound).Times(1),
 		btsMock.EXPECT().Delete(dbCtx, bt).Return(nil).Times(1),
 		txMock.EXPECT().Commit().Return(nil).Times(1),
@@ -360,6 +362,7 @@ func TestBlobWorker_processTask_StoreDeleteDeadlineExceededError(t *testing.T) {
 		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
 		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
 		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(&models.Blob{}, nil).Times(1),
 		bsMock.EXPECT().Delete(dbCtx, bt.Digest).Return(context.DeadlineExceeded).Times(1),
 		txMock.EXPECT().Rollback().Return(sql.ErrTxDone).Times(1),
 	)
@@ -389,6 +392,7 @@ func TestBlobWorker_processTask_StoreDeleteUnknownError(t *testing.T) {
 		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
 		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
 		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(&models.Blob{}, nil).Times(1),
 		bsMock.EXPECT().Delete(dbCtx, bt.Digest).Return(fakeErrorA).Times(1),
 		btsMock.EXPECT().Postpone(dbCtx, bt, isDuration{10 * time.Minute}).Return(nil).Times(1),
 		txMock.EXPECT().Commit().Return(nil).Times(1),
@@ -420,6 +424,7 @@ func TestBlobWorker_processTask_StoreDeleteUnknownErrorAndPostponeError(t *testi
 		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
 		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
 		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(&models.Blob{}, nil).Times(1),
 		bsMock.EXPECT().Delete(dbCtx, bt.Digest).Return(fakeErrorA).Times(1),
 		btsMock.EXPECT().Postpone(dbCtx, bt, isDuration{10 * time.Minute}).Return(fakeErrorB).Times(1),
 		txMock.EXPECT().Rollback().Return(nil).Times(1),
@@ -494,6 +499,74 @@ func TestBlobWorker_processTask_VacuumUnknownError(t *testing.T) {
 
 	found, err := w.processTask(context.Background())
 	require.EqualError(t, err, fmt.Errorf("deleting blob from storage: %w", fakeErrorA).Error())
+	require.True(t, found)
+}
+
+func TestBlobWorker_processTask_FindByDigestError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockBlobStores(t, ctrl)
+	clockMock := stubClock(t, time.Now())
+
+	dbMock := storemock.NewMockHandler(ctrl)
+	txMock := storemock.NewMockTransactor(ctrl)
+	driverMock := drivermock.NewMockStorageDeleter(ctrl)
+
+	w := NewBlobWorker(dbMock, driverMock)
+
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
+	driverCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultStorageTimeout)}
+	bt := fakeBlobTask()
+
+	gomock.InOrder(
+		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
+		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
+		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
+		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(nil, fakeErrorA).Times(1),
+		bsMock.EXPECT().Delete(dbCtx, bt.Digest).Return(fakeErrorA).Times(1),
+		btsMock.EXPECT().Postpone(dbCtx, bt, isDuration{10 * time.Minute}).Return(fakeErrorB).Times(1),
+		txMock.EXPECT().Rollback().Return(nil).Times(1),
+	)
+
+	found, err := w.processTask(context.Background())
+	expectedErr := multierror.Error{
+		Errors: []error{
+			fakeErrorA,
+			fakeErrorB,
+		},
+	}
+	require.EqualError(t, err, expectedErr.Error())
+	require.True(t, found)
+}
+
+func TestBlobWorker_processTask_FindByDigestNotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockBlobStores(t, ctrl)
+	clockMock := stubClock(t, time.Now())
+
+	dbMock := storemock.NewMockHandler(ctrl)
+	txMock := storemock.NewMockTransactor(ctrl)
+	driverMock := drivermock.NewMockStorageDeleter(ctrl)
+
+	w := NewBlobWorker(dbMock, driverMock)
+
+	dbCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultTxTimeout)}
+	driverCtx := testutil.IsContextWithDeadline{Deadline: clockMock.Now().Add(defaultStorageTimeout)}
+	bt := fakeBlobTask()
+
+	gomock.InOrder(
+		dbMock.EXPECT().BeginTx(dbCtx, nil).Return(txMock, nil).Times(1),
+		btsMock.EXPECT().Next(dbCtx).Return(bt, nil).Times(1),
+		btsMock.EXPECT().IsDangling(dbCtx, bt).Return(true, nil).Times(1),
+		driverMock.EXPECT().Delete(driverCtx, blobPath(bt.Digest)).Return(nil).Times(1),
+		bsMock.EXPECT().FindByDigest(dbCtx, bt.Digest).Return(nil, nil).Times(1),
+		btsMock.EXPECT().Delete(dbCtx, bt).Return(nil).Times(1),
+		txMock.EXPECT().Commit().Return(nil).Times(1),
+		txMock.EXPECT().Rollback().Return(sql.ErrTxDone).Times(1),
+	)
+
+	found, err := w.processTask(context.Background())
+	require.NoError(t, err)
 	require.True(t, found)
 }
 

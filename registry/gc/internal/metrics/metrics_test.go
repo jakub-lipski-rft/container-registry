@@ -126,3 +126,21 @@ registry_gc_postpones_total{worker="foo"} 2
 	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, totalFullName)
 	require.NoError(t, err)
 }
+
+func TestStorageDeleteBytes(t *testing.T) {
+	StorageDeleteBytes(123, "foo")
+	StorageDeleteBytes(321, "foo")
+	StorageDeleteBytes(1, "bar")
+
+	var expected bytes.Buffer
+	expected.WriteString(`
+# HELP registry_gc_storage_deleted_bytes_total A counter for bytes deleted from storage during online GC.
+# TYPE registry_gc_storage_deleted_bytes_total counter
+registry_gc_storage_deleted_bytes_total{media_type="bar"} 1
+registry_gc_storage_deleted_bytes_total{media_type="foo"} 444
+`)
+	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, storageDeleteBytesTotalName)
+
+	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, totalFullName)
+	require.NoError(t, err)
+}
