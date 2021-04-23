@@ -138,6 +138,7 @@ func (a *Agent) Start(ctx context.Context) error {
 
 			sleep := b.NextBackOff()
 			log.WithField("duration_s", sleep.Seconds()).Info("sleeping")
+			metrics.WorkerSleep(a.worker.Name(), sleep)
 			systemClock.Sleep(sleep)
 		}
 	}

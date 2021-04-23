@@ -15,6 +15,7 @@ var (
 	deleteCounter             *prometheus.CounterVec
 	storageDeleteBytesCounter *prometheus.CounterVec
 	postponeCounter           *prometheus.CounterVec
+	sleepDurationHist         *prometheus.HistogramVec
 
 	timeSince = time.Since // for test purposes only
 )
@@ -49,6 +50,9 @@ const (
 
 	postponeTotalName = "postpones_total"
 	postponeTotalDesc = "A counter for online GC review postpones."
+
+	sleepDurationName = "sleep_duration_seconds"
+	sleepDurationDesc = "A histogram of sleep durations between online GC worker runs."
 )
 
 func init() {
@@ -114,12 +118,25 @@ func init() {
 		[]string{workerLabel},
 	)
 
+	sleepDurationHist = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: metrics.NamespacePrefix,
+			Subsystem: subsystem,
+			Name:      sleepDurationName,
+			Help:      sleepDurationDesc,
+			// 500ms to 24h
+			Buckets: []float64{.5, 1, 5, 15, 30, 60, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400},
+		},
+		[]string{workerLabel},
+	)
+
 	prometheus.MustRegister(runDurationHist)
 	prometheus.MustRegister(runCounter)
 	prometheus.MustRegister(deleteDurationHist)
 	prometheus.MustRegister(deleteCounter)
 	prometheus.MustRegister(postponeCounter)
 	prometheus.MustRegister(storageDeleteBytesCounter)
+	prometheus.MustRegister(sleepDurationHist)
 }
 
 func WorkerRun(name string) func(noop bool, err error) {
@@ -166,4 +183,8 @@ func StorageDeleteBytes(bytes int64, mediaType string) {
 
 func ReviewPostpone(workerName string) {
 	postponeCounter.WithLabelValues(workerName).Inc()
+}
+
+func WorkerSleep(name string, d time.Duration) {
+	sleepDurationHist.WithLabelValues(name).Observe(d.Seconds())
 }
