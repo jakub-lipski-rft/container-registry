@@ -159,7 +159,9 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 	ctx2, cancel := context.WithDeadline(ctx, systemClock.Now().Add(w.storageTimeout))
 	defer cancel()
 
-	if err := w.vacuum.RemoveBlob(ctx2, t.Digest); err != nil {
+	report := metrics.BlobStorageDelete()
+	var err error
+	if err = w.vacuum.RemoveBlob(ctx2, t.Digest); err != nil {
 		switch {
 		case errors.As(err, &driver.PathNotFoundError{}):
 			// this is unexpected, but it's not a show stopper for GC
@@ -170,6 +172,7 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 			if innerErr := w.postponeTaskAndCommit(ctx, tx, t); innerErr != nil {
 				err = multierror.Append(err, innerErr)
 			}
+			report(err)
 			return err
 		}
 	} else {
@@ -187,9 +190,11 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 			metrics.StorageDeleteBytes(b.Size, b.MediaType)
 		}
 	}
+	report(nil)
 
 	// delete blob from database
-	if err := bs.Delete(ctx, t.Digest); err != nil {
+	report = metrics.BlobDatabaseDelete()
+	if err = bs.Delete(ctx, t.Digest); err != nil {
 		switch {
 		case err == datastore.ErrNotFound:
 			// this is unexpected, but it's not a show stopper for GC
@@ -203,9 +208,11 @@ func (w *BlobWorker) deleteBlob(ctx context.Context, tx datastore.Transactor, t 
 				err = multierror.Append(err, innerErr)
 			}
 		}
+		report(err)
 		return err
 	}
 
+	report(nil)
 	return nil
 }
 

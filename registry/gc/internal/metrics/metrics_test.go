@@ -109,21 +109,195 @@ registry_gc_runs_total{error="true",noop="true",worker="foo"} 2
 	require.NoError(t, err)
 }
 
-func TestReviewPostpone(t *testing.T) {
-	ReviewPostpone("foo")
-	ReviewPostpone("foo")
-	ReviewPostpone("bar")
+func TestBlobDatabaseDelete(t *testing.T) {
+	restore := mockTimeSince(10 * time.Millisecond)
+	defer restore()
+
+	// Cleanup metrics from previous tests (there are multiple making use of deleteDurationHist and deleteCounter) and
+	// create local prometheus registry
+	deleteDurationHist.Reset()
+	deleteCounter.Reset()
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(deleteDurationHist)
+	reg.MustRegister(deleteCounter)
+
+	report := BlobDatabaseDelete()
+	report(errors.New("foo"))
+	report(errors.New("foo")) // to see the aggregated counter increase to 2
+	report(nil)
+
+	mockTimeSince(20 * time.Millisecond)
+	report = BlobDatabaseDelete()
+	report(nil)
 
 	var expected bytes.Buffer
 	expected.WriteString(`
-# HELP registry_gc_postpones_total A counter for online GC review postpones.
-# TYPE registry_gc_postpones_total counter
-registry_gc_postpones_total{worker="bar"} 1
-registry_gc_postpones_total{worker="foo"} 2
+# HELP registry_gc_delete_duration_seconds A histogram of latencies for artifact deletions during online GC.
+# TYPE registry_gc_delete_duration_seconds histogram
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.005"} 0
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.01"} 1
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.025"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.05"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.25"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="0.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="2.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="10"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="false",le="+Inf"} 2
+registry_gc_delete_duration_seconds_sum{artifact="blob",backend="database",error="false"} 0.03
+registry_gc_delete_duration_seconds_count{artifact="blob",backend="database",error="false"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.005"} 0
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.01"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.025"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.05"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.25"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="0.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="2.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="10"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="database",error="true",le="+Inf"} 2
+registry_gc_delete_duration_seconds_sum{artifact="blob",backend="database",error="true"} 0.02
+registry_gc_delete_duration_seconds_count{artifact="blob",backend="database",error="true"} 2
+# HELP registry_gc_deletes_total A counter of artifacts deleted during online GC.
+# TYPE registry_gc_deletes_total counter
+registry_gc_deletes_total{artifact="blob",backend="database"} 2
 `)
-	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, postponeTotalName)
+	durationFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, deleteDurationName)
+	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, deleteTotalName)
 
-	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, totalFullName)
+	err := testutil.GatherAndCompare(reg, &expected, durationFullName, totalFullName)
+	require.NoError(t, err)
+}
+
+func TestBlobStorageDelete(t *testing.T) {
+	restore := mockTimeSince(10 * time.Millisecond)
+	defer restore()
+
+	// Cleanup metrics from previous tests (there are multiple making use of deleteDurationHist and deleteCounter) and
+	// create local prometheus registry
+	deleteDurationHist.Reset()
+	deleteCounter.Reset()
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(deleteDurationHist)
+	reg.MustRegister(deleteCounter)
+
+	report := BlobStorageDelete()
+	report(errors.New("foo"))
+	report(errors.New("foo")) // to see the aggregated counter increase to 2
+	report(nil)
+
+	mockTimeSince(20 * time.Millisecond)
+	report = BlobStorageDelete()
+	report(nil)
+
+	var expected bytes.Buffer
+	expected.WriteString(`
+# HELP registry_gc_delete_duration_seconds A histogram of latencies for artifact deletions during online GC.
+# TYPE registry_gc_delete_duration_seconds histogram
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.005"} 0
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.01"} 1
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.025"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.05"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.25"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="0.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="2.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="10"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="false",le="+Inf"} 2
+registry_gc_delete_duration_seconds_sum{artifact="blob",backend="storage",error="false"} 0.03
+registry_gc_delete_duration_seconds_count{artifact="blob",backend="storage",error="false"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.005"} 0
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.01"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.025"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.05"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.25"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="0.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="2.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="10"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="blob",backend="storage",error="true",le="+Inf"} 2
+registry_gc_delete_duration_seconds_sum{artifact="blob",backend="storage",error="true"} 0.02
+registry_gc_delete_duration_seconds_count{artifact="blob",backend="storage",error="true"} 2
+# HELP registry_gc_deletes_total A counter of artifacts deleted during online GC.
+# TYPE registry_gc_deletes_total counter
+registry_gc_deletes_total{artifact="blob",backend="storage"} 2
+`)
+	durationFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, deleteDurationName)
+	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, deleteTotalName)
+
+	err := testutil.GatherAndCompare(reg, &expected, durationFullName, totalFullName)
+	require.NoError(t, err)
+}
+
+func TestManifestDelete(t *testing.T) {
+	restore := mockTimeSince(10 * time.Millisecond)
+	defer restore()
+
+	// Cleanup metrics from previous tests (there are multiple making use of deleteDurationHist and deleteCounter) and
+	// create local prometheus registry
+	deleteDurationHist.Reset()
+	deleteCounter.Reset()
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(deleteDurationHist)
+	reg.MustRegister(deleteCounter)
+
+	report := ManifestDelete()
+	report(errors.New("foo"))
+	report(errors.New("foo")) // to see the aggregated counter increase to 2
+	report(nil)
+
+	mockTimeSince(20 * time.Millisecond)
+	report = ManifestDelete()
+	report(nil)
+
+	var expected bytes.Buffer
+	expected.WriteString(`
+# HELP registry_gc_delete_duration_seconds A histogram of latencies for artifact deletions during online GC.
+# TYPE registry_gc_delete_duration_seconds histogram
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.005"} 0
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.01"} 1
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.025"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.05"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.25"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="0.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="2.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="10"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="false",le="+Inf"} 2
+registry_gc_delete_duration_seconds_sum{artifact="manifest",backend="database",error="false"} 0.03
+registry_gc_delete_duration_seconds_count{artifact="manifest",backend="database",error="false"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.005"} 0
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.01"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.025"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.05"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.25"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="0.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="1"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="2.5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="5"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="10"} 2
+registry_gc_delete_duration_seconds_bucket{artifact="manifest",backend="database",error="true",le="+Inf"} 2
+registry_gc_delete_duration_seconds_sum{artifact="manifest",backend="database",error="true"} 0.02
+registry_gc_delete_duration_seconds_count{artifact="manifest",backend="database",error="true"} 2
+# HELP registry_gc_deletes_total A counter of artifacts deleted during online GC.
+# TYPE registry_gc_deletes_total counter
+registry_gc_deletes_total{artifact="manifest",backend="database"} 2
+`)
+	durationFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, deleteDurationName)
+	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, deleteTotalName)
+
+	err := testutil.GatherAndCompare(reg, &expected, durationFullName, totalFullName)
 	require.NoError(t, err)
 }
 
@@ -140,6 +314,24 @@ registry_gc_storage_deleted_bytes_total{media_type="bar"} 1
 registry_gc_storage_deleted_bytes_total{media_type="foo"} 444
 `)
 	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, storageDeleteBytesTotalName)
+
+	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, totalFullName)
+	require.NoError(t, err)
+}
+
+func TestReviewPostpone(t *testing.T) {
+	ReviewPostpone("foo")
+	ReviewPostpone("foo")
+	ReviewPostpone("bar")
+
+	var expected bytes.Buffer
+	expected.WriteString(`
+# HELP registry_gc_postpones_total A counter for online GC review postpones.
+# TYPE registry_gc_postpones_total counter
+registry_gc_postpones_total{worker="bar"} 1
+registry_gc_postpones_total{worker="foo"} 2
+`)
+	totalFullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, postponeTotalName)
 
 	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, totalFullName)
 	require.NoError(t, err)

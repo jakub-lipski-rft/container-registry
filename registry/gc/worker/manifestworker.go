@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution/registry/gc/internal/metrics"
-
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/datastore"
 	"github.com/docker/distribution/registry/datastore/models"
+	"github.com/docker/distribution/registry/gc/internal/metrics"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 )
@@ -135,8 +134,12 @@ func (w *ManifestWorker) processTask(ctx context.Context) (bool, error) {
 func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transactor, t *models.GCManifestTask) error {
 	log := dcontext.GetLogger(ctx)
 
+	var err error
+	var found bool
 	ms := manifestStoreConstructor(tx)
-	found, err := ms.Delete(ctx, &models.Manifest{RepositoryID: t.RepositoryID, ID: t.ManifestID})
+
+	report := metrics.ManifestDelete()
+	found, err = ms.Delete(ctx, &models.Manifest{RepositoryID: t.RepositoryID, ID: t.ManifestID})
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
@@ -147,6 +150,7 @@ func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transa
 				err = multierror.Append(err, innerErr)
 			}
 		}
+		report(err)
 		return err
 	}
 	if !found {
@@ -154,6 +158,7 @@ func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transa
 		log.Warn("manifest no longer exists on database")
 	}
 
+	report(nil)
 	return nil
 }
 
