@@ -223,6 +223,7 @@ func TestAgent_Start_NoTaskFound(t *testing.T) {
 		workerMock.EXPECT().Run(ctx).Return(false, nil).Times(1),
 		clockMock.EXPECT().Since(startTime).Return(100*time.Millisecond).Times(1),
 		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		workerMock.EXPECT().Name().Times(1),
 		clockMock.EXPECT().Sleep(backOff).Do(func(_ time.Duration) { cancel() }).Times(1),
 	)
 
@@ -260,6 +261,7 @@ func TestAgent_Start_NoTaskFoundWithoutIdleBackoff(t *testing.T) {
 		backoffMock.EXPECT().Reset().Times(1), // ensure backoff reset
 		clockMock.EXPECT().Since(startTime).Return(100*time.Millisecond).Times(1),
 		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		workerMock.EXPECT().Name().Times(1),
 		clockMock.EXPECT().Sleep(backOff).Do(func(_ time.Duration) { cancel() }).Times(1),
 	)
 
@@ -297,6 +299,7 @@ func TestAgent_Start_RunFound(t *testing.T) {
 		backoffMock.EXPECT().Reset().Times(1), // ensure backoff reset
 		clockMock.EXPECT().Since(startTime).Return(100*time.Millisecond).Times(1),
 		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		workerMock.EXPECT().Name().Times(1),
 		clockMock.EXPECT().Sleep(backOff).Do(func(_ time.Duration) { cancel() }).Times(1),
 	)
 
@@ -334,6 +337,7 @@ func TestAgent_Start_RunError(t *testing.T) {
 		workerMock.EXPECT().Run(ctx).Return(false, errors.New("fake error")).Times(1),
 		clockMock.EXPECT().Since(startTime).Return(100*time.Millisecond).Times(1),
 		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		workerMock.EXPECT().Name().Times(1),
 		clockMock.EXPECT().Sleep(backOff).Do(func(_ time.Duration) { cancel() }).Times(1),
 	)
 
@@ -371,6 +375,7 @@ func TestAgent_Start_RunLoopSurvivesError(t *testing.T) {
 		workerMock.EXPECT().Run(ctx).Return(false, errors.New("fake error")).Times(1),
 		clockMock.EXPECT().Since(startTime).Return(100*time.Millisecond).Times(1),
 		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		workerMock.EXPECT().Name().Times(1),
 		clockMock.EXPECT().Sleep(backOff).Times(1),
 		// 2nd loop iteration
 		clockMock.EXPECT().Now().Return(startTime).Times(1),
@@ -379,6 +384,7 @@ func TestAgent_Start_RunLoopSurvivesError(t *testing.T) {
 		backoffMock.EXPECT().Reset().Times(1), // ensure backoff reset
 		clockMock.EXPECT().Since(startTime).Return(100*time.Millisecond).Times(1),
 		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		workerMock.EXPECT().Name().Times(1),
 		clockMock.EXPECT().Sleep(backOff).Do(func(_ time.Duration) {
 			// cancel context here to avoid a 3rd worker run
 			cancel()
