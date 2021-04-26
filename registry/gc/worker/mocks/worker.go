@@ -48,6 +48,35 @@ func (mr *MockWorkerMockRecorder) Name() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockWorker)(nil).Name))
 }
 
+// QueueName mocks base method.
+func (m *MockWorker) QueueName() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QueueName")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// QueueName indicates an expected call of QueueName.
+func (mr *MockWorkerMockRecorder) QueueName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueueName", reflect.TypeOf((*MockWorker)(nil).QueueName))
+}
+
+// QueueSize mocks base method.
+func (m *MockWorker) QueueSize(arg0 context.Context) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QueueSize", arg0)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// QueueSize indicates an expected call of QueueSize.
+func (mr *MockWorkerMockRecorder) QueueSize(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueueSize", reflect.TypeOf((*MockWorker)(nil).QueueSize), arg0)
+}
+
 // Run mocks base method.
 func (m *MockWorker) Run(arg0 context.Context) (bool, error) {
 	m.ctrl.T.Helper()

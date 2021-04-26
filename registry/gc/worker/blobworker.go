@@ -74,6 +74,7 @@ func NewBlobWorker(db datastore.Handler, storageDeleter driver.StorageDeleter, o
 		vacuum:     storage.NewVacuum(storageDeleter),
 	}
 	w.name = "registry.gc.worker.BlobWorker"
+	w.queueName = "gc_blob_review_queue"
 	w.applyDefaults()
 	for _, opt := range opts {
 		opt(w)
@@ -86,6 +87,11 @@ func NewBlobWorker(db datastore.Handler, storageDeleter driver.StorageDeleter, o
 // Run implements Worker.
 func (w *BlobWorker) Run(ctx context.Context) (bool, error) {
 	return w.run(ctx, w)
+}
+
+// QueueSize implements Worker.
+func (w *BlobWorker) QueueSize(ctx context.Context) (int, error) {
+	return blobTaskStoreConstructor(w.db).Count(ctx)
 }
 
 func (w *BlobWorker) processTask(ctx context.Context) (bool, error) {

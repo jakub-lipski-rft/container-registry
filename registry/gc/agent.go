@@ -2,8 +2,10 @@ package gc
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/benbjohnson/clock"
@@ -14,6 +16,7 @@ import (
 	"github.com/docker/distribution/registry/gc/worker"
 	reginternal "github.com/docker/distribution/registry/internal"
 	"github.com/sirupsen/logrus"
+	"gitlab.com/gitlab-org/labkit/errortracking"
 )
 
 const (
@@ -22,10 +25,13 @@ const (
 )
 
 var (
-	defaultInitialInterval = 5 * time.Second
-	defaultMaxBackoff      = 24 * time.Hour
-	backoffJitterFactor    = 0.33
-	startJitterMaxSeconds  = 60
+	defaultInitialInterval   = 5 * time.Second
+	defaultMaxBackoff        = 24 * time.Hour
+	backoffJitterFactor      = 0.33
+	startJitterMaxSeconds    = 60
+	queueSizeMonitorInterval = 10 * time.Minute
+	queueSizeMonitorTimeout  = 100 * time.Millisecond
+
 	// for testing purposes (mocks)
 	backoffConstructor                   = newBackoff
 	systemClock        reginternal.Clock = clock.New()
@@ -117,6 +123,9 @@ func (a *Agent) Start(ctx context.Context) error {
 	log.WithField("jitter_s", jitter.Seconds()).Info("starting online GC agent")
 	systemClock.Sleep(jitter)
 
+	quit := a.startQueueSizeMonitoring(ctx, log)
+	defer quit.close()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -142,6 +151,61 @@ func (a *Agent) Start(ctx context.Context) error {
 			systemClock.Sleep(sleep)
 		}
 	}
+}
+
+// For testing purposes, so that we can close the channel there without causing a panic when attempting to do the same
+// in the deferred close on Start.
+type quitCh struct {
+	c chan struct{}
+	sync.Once
+}
+
+func (qc *quitCh) close() {
+	qc.Do(func() { close(qc.c) })
+}
+
+func (a *Agent) startQueueSizeMonitoring(ctx context.Context, log dcontext.Logger) *quitCh {
+	b := backoffConstructor(queueSizeMonitorInterval, a.maxBackoff)
+	quit := &quitCh{c: make(chan struct{})}
+
+	log.WithField("interval_s", queueSizeMonitorInterval.Seconds()).Info("starting online GC queue monitoring")
+
+	go func() {
+		time.Sleep(queueSizeMonitorInterval)
+		for {
+			select {
+			case <-ctx.Done():
+				log.WithError(ctx.Err()).Warn("context cancelled, stopping worker queue size monitoring")
+				return
+			case <-quit.c:
+				log.Info("stopping worker queue size monitoring")
+				return
+			default:
+				log.Info("measuring worker queue size")
+				// apply tight timeout, this is a non-critical lookup
+				ctx2, cancel := context.WithDeadline(ctx, systemClock.Now().Add(queueSizeMonitorTimeout))
+				count, err := a.worker.QueueSize(ctx2)
+				cancel()
+				if err != nil {
+					errortracking.Capture(
+						fmt.Errorf("failed to measure worker queue size: %w", err),
+						errortracking.WithContext(ctx),
+						errortracking.WithField(componentKey, agentName),
+					)
+					log.WithError(err).Error("failed to measure worker queue size, backing off")
+				} else {
+					b.Reset()
+					metrics.QueueSize(a.worker.QueueName(), count)
+				}
+				sleep := b.NextBackOff()
+				log.WithField("duration_s", sleep.Seconds()).Debug("sleeping before next queue measurement")
+				systemClock.Sleep(sleep)
+				time.Sleep(queueSizeMonitorInterval)
+			}
+		}
+	}()
+
+	return quit
 }
 
 func newBackoff(initInterval, maxInterval time.Duration) internal.Backoff {

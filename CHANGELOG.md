@@ -11,6 +11,7 @@
 - registry/gc: Add Prometheus counter for online GC deleted bytes
 - registry/gc: Add Prometheus counter for online GC review postpones
 - registry/gc: Add Prometheus histogram for sleep durations between online GC runs
+- registry/gc: Add Prometheus gauge for the online GC review queues size
 
 ## [v3.3.0-gitlab] - 2021-04-09
 ### Added

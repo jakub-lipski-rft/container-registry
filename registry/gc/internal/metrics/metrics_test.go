@@ -390,3 +390,21 @@ registry_gc_sleep_duration_seconds_count{worker="foo"} 2
 	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, durationFullName)
 	require.NoError(t, err)
 }
+
+func TestQueueSize(t *testing.T) {
+	QueueSize("foo", 100)
+	QueueSize("foo", 50)
+	QueueSize("bar", 2)
+
+	var expected bytes.Buffer
+	expected.WriteString(`
+# HELP registry_gc_queue_size The size of online GC review queues.
+# TYPE registry_gc_queue_size gauge
+registry_gc_queue_size{queue="bar"} 2
+registry_gc_queue_size{queue="foo"} 50
+`)
+	fullName := fmt.Sprintf("%s_%s_%s", metrics.NamespacePrefix, subsystem, queueSizeName)
+
+	err := testutil.GatherAndCompare(prometheus.DefaultGatherer, &expected, fullName)
+	require.NoError(t, err)
+}
