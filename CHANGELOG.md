@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [v3.4.0-gitlab] - 2021-04-26
 ### Changed
 - registry/datastore: Switch from 1 to 64 partitions per table
 
