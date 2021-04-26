@@ -16,6 +16,7 @@ var (
 	storageDeleteBytesCounter *prometheus.CounterVec
 	postponeCounter           *prometheus.CounterVec
 	sleepDurationHist         *prometheus.HistogramVec
+	queueSizeGauge            *prometheus.GaugeVec
 
 	timeSince = time.Since // for test purposes only
 )
@@ -29,6 +30,7 @@ const (
 	artifactLabel  = "artifact"
 	backendLabel   = "backend"
 	mediaTypeLabel = "media_type"
+	queueLabel     = "queue"
 
 	blobArtifact     = "blob"
 	manifestArtifact = "manifest"
@@ -53,6 +55,9 @@ const (
 
 	sleepDurationName = "sleep_duration_seconds"
 	sleepDurationDesc = "A histogram of sleep durations between online GC worker runs."
+
+	queueSizeName = "queue_size"
+	queueSizeDesc = "The size of online GC review queues."
 )
 
 func init() {
@@ -130,6 +135,16 @@ func init() {
 		[]string{workerLabel},
 	)
 
+	queueSizeGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: metrics.NamespacePrefix,
+			Subsystem: subsystem,
+			Name:      queueSizeName,
+			Help:      queueSizeDesc,
+		},
+		[]string{queueLabel},
+	)
+
 	prometheus.MustRegister(runDurationHist)
 	prometheus.MustRegister(runCounter)
 	prometheus.MustRegister(deleteDurationHist)
@@ -137,6 +152,7 @@ func init() {
 	prometheus.MustRegister(postponeCounter)
 	prometheus.MustRegister(storageDeleteBytesCounter)
 	prometheus.MustRegister(sleepDurationHist)
+	prometheus.MustRegister(queueSizeGauge)
 }
 
 func WorkerRun(name string) func(noop bool, err error) {
@@ -187,4 +203,8 @@ func ReviewPostpone(workerName string) {
 
 func WorkerSleep(name string, d time.Duration) {
 	sleepDurationHist.WithLabelValues(name).Observe(d.Seconds())
+}
+
+func QueueSize(queueName string, size int) {
+	queueSizeGauge.WithLabelValues(queueName).Set(float64(size))
 }

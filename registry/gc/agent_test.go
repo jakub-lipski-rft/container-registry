@@ -188,6 +188,7 @@ func TestAgent_Start_Jitter(t *testing.T) {
 			// cancel context here to avoid a subsequent worker run, which is not needed for the purpose of this test
 			cancel()
 		}).Times(1),
+		clockMock.EXPECT().Now().Return(now).Times(1), // startQueueSizeMonitoring
 	)
 
 	err := agent.Start(ctx)
@@ -394,6 +395,163 @@ func TestAgent_Start_RunLoopSurvivesError(t *testing.T) {
 	err := agent.Start(ctx)
 	require.NotNil(t, err)
 	require.EqualError(t, context.Canceled, err.Error())
+}
+
+func stubQueueSizeMonitorInterval(tb testing.TB, d time.Duration) {
+	tb.Helper()
+
+	bkp := queueSizeMonitorInterval
+	queueSizeMonitorInterval = d
+	tb.Cleanup(func() { queueSizeMonitorInterval = bkp })
+}
+
+func TestAgent_startQueueSizeMonitoring(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	workerMock := wmocks.NewMockWorker(ctrl)
+
+	monitorInterval := 10 * time.Millisecond
+	stubQueueSizeMonitorInterval(t, monitorInterval)
+
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	backoffMock := mocks.NewMockBackoff(ctrl)
+	stubBackoff(t, backoffMock)
+
+	log := logrus.New()
+	agent := NewAgent(workerMock, WithLogger(log))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	now := time.Time{}
+	queueSizeCtx := testutil.IsContextWithDeadline{Deadline: now.Add(queueSizeMonitorTimeout)}
+
+	gomock.InOrder(
+		// first
+		clockMock.EXPECT().Now().Return(now).Times(1),
+		workerMock.EXPECT().QueueSize(queueSizeCtx).Return(1, nil).Times(1),
+		backoffMock.EXPECT().Reset().Times(1),
+		workerMock.EXPECT().QueueName().Return("foo").Times(1),
+		backoffMock.EXPECT().NextBackOff().Return(monitorInterval).Times(1),
+		clockMock.EXPECT().Sleep(monitorInterval).Times(1),
+		// second
+		clockMock.EXPECT().Now().Return(now).Times(1),
+		workerMock.EXPECT().QueueSize(queueSizeCtx).Return(0, nil).Times(1),
+		backoffMock.EXPECT().Reset().Times(1),
+		workerMock.EXPECT().QueueName().Return("foo").Times(1),
+		backoffMock.EXPECT().NextBackOff().Return(monitorInterval).Times(1),
+		clockMock.EXPECT().Sleep(monitorInterval).Times(1),
+	)
+
+	quit := agent.startQueueSizeMonitoring(ctx, log)
+	require.NotNil(t, quit)
+
+	done := make(chan struct{})
+	time.AfterFunc(25*time.Millisecond, func() {
+		quit.close()
+		close(done)
+	})
+	<-done
+}
+
+func TestAgent_startQueueSizeMonitoring_Error(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	workerMock := wmocks.NewMockWorker(ctrl)
+
+	monitorInterval := 10 * time.Millisecond
+	backOff := monitorInterval
+	stubQueueSizeMonitorInterval(t, monitorInterval)
+
+	backoffMock := mocks.NewMockBackoff(ctrl)
+	stubBackoff(t, backoffMock)
+
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	log := logrus.New()
+	agent := NewAgent(workerMock, WithLogger(log))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	now := time.Time{}
+	queueSizeCtx := testutil.IsContextWithDeadline{Deadline: now.Add(queueSizeMonitorTimeout)}
+
+	gomock.InOrder(
+		// first: query fail
+		clockMock.EXPECT().Now().Return(now).Times(1),
+		workerMock.EXPECT().QueueSize(queueSizeCtx).Return(0, errors.New("foo")).Times(1),
+		backoffMock.EXPECT().NextBackOff().Return(backOff).Times(1),
+		clockMock.EXPECT().Sleep(backOff).Times(1),
+		// second: reset the backoff on success
+		clockMock.EXPECT().Now().Return(now).Times(1),
+		workerMock.EXPECT().QueueSize(queueSizeCtx).Return(0, nil).Times(1),
+		backoffMock.EXPECT().Reset().Times(1),
+		workerMock.EXPECT().QueueName().Return("foo").Times(1),
+		backoffMock.EXPECT().NextBackOff().Return(monitorInterval).Times(1),
+		clockMock.EXPECT().Sleep(monitorInterval).Times(1),
+	)
+
+	quit := agent.startQueueSizeMonitoring(ctx, log)
+	require.NotNil(t, quit)
+
+	done := make(chan struct{})
+	time.AfterFunc(25*time.Millisecond, func() {
+		quit.close()
+		close(done)
+	})
+	<-done
+}
+
+func TestAgent_startQueueSizeMonitoring_Quit(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	workerMock := wmocks.NewMockWorker(ctrl)
+
+	monitorInterval := 20 * time.Millisecond
+	stubQueueSizeMonitorInterval(t, monitorInterval)
+
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	log := logrus.New()
+	agent := NewAgent(workerMock, WithLogger(log))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// With an interval of 20ms, and closing the quit channel right after the initialization (below), this should be the
+	// only call done
+	gomock.InOrder(
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+	)
+
+	quit := agent.startQueueSizeMonitoring(ctx, log)
+	require.NotNil(t, quit)
+	quit.close()
+}
+
+func TestAgent_startQueueSizeMonitoring_ContextDone(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	workerMock := wmocks.NewMockWorker(ctrl)
+
+	monitorInterval := 20 * time.Millisecond
+	stubQueueSizeMonitorInterval(t, monitorInterval)
+
+	clockMock := regmocks.NewMockClock(ctrl)
+	testutil.StubClock(t, &systemClock, clockMock)
+
+	log := logrus.New()
+	agent := NewAgent(workerMock, WithLogger(log))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// With an interval of 20ms, and cancelling the context right after the initialization (below), this should be the
+	// only call done
+	gomock.InOrder(
+		clockMock.EXPECT().Now().Return(time.Time{}).Times(1),
+	)
+
+	quit := agent.startQueueSizeMonitoring(ctx, log)
+	require.NotNil(t, quit)
+	cancel()
 }
 
 func Test_newBackoff(t *testing.T) {
