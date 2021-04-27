@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/hashicorp/go-multierror"
+	"golang.org/x/time/rate"
 
 	"gopkg.in/check.v1"
 
@@ -209,7 +210,7 @@ func TestFromParameters(t *testing.T) {
 			t.Fatalf("unable to create a new S3 driver: %v", err)
 		}
 
-		pathStyle := d.baseEmbed.Base.StorageDriver.(*driver).S3.(*s3.S3).Client.Config.S3ForcePathStyle
+		pathStyle := d.baseEmbed.Base.StorageDriver.(*driver).S3.s3.(*s3.S3).Client.Config.S3ForcePathStyle
 		if pathStyle == nil {
 			t.Fatal("expected pathStyle not to be nil")
 		}
@@ -313,10 +314,12 @@ func TestStorageClass(t *testing.T) {
 	defer rrDriver.Delete(ctx, rrFilename)
 
 	standardDriverUnwrapped := standardDriver.Base.StorageDriver.(*driver)
-	resp, err := standardDriverUnwrapped.S3.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(standardDriverUnwrapped.Bucket),
-		Key:    aws.String(standardDriverUnwrapped.s3Path(standardFilename)),
-	})
+	resp, err := standardDriverUnwrapped.S3.GetObjectWithContext(
+		ctx,
+		&s3.GetObjectInput{
+			Bucket: aws.String(standardDriverUnwrapped.Bucket),
+			Key:    aws.String(standardDriverUnwrapped.s3Path(standardFilename)),
+		})
 	if err != nil {
 		t.Fatalf("unexpected error retrieving standard storage file: %v", err)
 	}
@@ -327,10 +330,12 @@ func TestStorageClass(t *testing.T) {
 	}
 
 	rrDriverUnwrapped := rrDriver.Base.StorageDriver.(*driver)
-	resp, err = rrDriverUnwrapped.S3.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(rrDriverUnwrapped.Bucket),
-		Key:    aws.String(rrDriverUnwrapped.s3Path(rrFilename)),
-	})
+	resp, err = rrDriverUnwrapped.S3.GetObjectWithContext(
+		ctx,
+		&s3.GetObjectInput{
+			Bucket: aws.String(rrDriverUnwrapped.Bucket),
+			Key:    aws.String(rrDriverUnwrapped.s3Path(rrFilename)),
+		})
 	if err != nil {
 		t.Fatalf("unexpected error retrieving reduced-redundancy storage file: %v", err)
 	}
@@ -434,7 +439,7 @@ type mockDeleteObjectsError struct {
 }
 
 // DeleteObjects mocks a serialization error while processing a DeleteObjects response.
-func (m *mockDeleteObjectsError) DeleteObjects(input *s3.DeleteObjectsInput) (*s3.DeleteObjectsOutput, error) {
+func (m *mockDeleteObjectsError) DeleteObjectsWithContext(ctx aws.Context, input *s3.DeleteObjectsInput, opts ...request.Option) (*s3.DeleteObjectsOutput, error) {
 	return nil, awserr.New(request.ErrCodeSerialization, "failed reading response body", nil)
 }
 
@@ -455,7 +460,7 @@ func testDeleteFilesError(t *testing.T, mock s3iface.S3API, numFiles int) (int, 
 	}
 
 	// mock the underlying S3 client
-	d.baseEmbed.Base.StorageDriver.(*driver).S3 = mock
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = &s3wrapper{mock, rate.NewLimiter(rate.Limit(defaultMaxRequestsPerSecond), defaultBurst)}
 
 	// simulate deleting numFiles files
 	paths := make([]string, 0, numFiles)
@@ -499,7 +504,7 @@ type mockDeleteObjectsPartialError struct {
 
 // DeleteObjects mocks an S3 DeleteObjects partial error. Half of the objects are successfully deleted, and the other
 // half fails due to an 'AccessDenied' error.
-func (m *mockDeleteObjectsPartialError) DeleteObjects(input *s3.DeleteObjectsInput) (*s3.DeleteObjectsOutput, error) {
+func (m *mockDeleteObjectsPartialError) DeleteObjectsWithContext(ctx aws.Context, input *s3.DeleteObjectsInput, opts ...request.Option) (*s3.DeleteObjectsOutput, error) {
 	var deleted []*s3.DeletedObject
 	var errored []*s3.Error
 	errCode := "AccessDenied"

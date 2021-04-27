@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Fixed
+- registry/storage: S3 driver now respects rate limits in all cases
 
 ## [v3.4.0-gitlab] - 2021-04-26
 ### Changed
