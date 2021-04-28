@@ -7,7 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v52.5.0+incompatible
 	github.com/Azure/go-autorest v10.8.1+incompatible // indirect
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
-	github.com/aws/aws-sdk-go v1.27.0
+	github.com/aws/aws-sdk-go v1.38.26
 	github.com/benbjohnson/clock v1.0.3
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/denverdino/aliyungo v0.0.0-20181224103910-6df11717a253
@@ -41,7 +41,7 @@ require (
 	gitlab.com/gitlab-org/labkit v1.3.0
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	google.golang.org/api v0.32.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/yaml.v2 v2.4.0
