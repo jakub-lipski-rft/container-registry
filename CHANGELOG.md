@@ -2,6 +2,10 @@
 ### Fixed
 - registry/storage: S3 driver now respects rate limits in all cases
 
+### Changed
+- registry/storage: Upgrade Amazon S3 SDK to v1.38.26
+- registry/storage: Upgrade golang.org/x/time to v0.0.0-20210220033141-f8bda1e9f3ba
+
 ## [v3.4.0-gitlab] - 2021-04-26
 ### Changed
 - registry/datastore: Switch from 1 to 64 partitions per table
