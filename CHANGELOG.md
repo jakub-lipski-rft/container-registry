@@ -5,6 +5,7 @@
 ### Changed
 - registry/storage: Upgrade Amazon S3 SDK to v1.38.26
 - registry/storage: Upgrade golang.org/x/time to v0.0.0-20210220033141-f8bda1e9f3ba
+- registry: Upgrade github.com/opencontainers/go-digest to v1.0.0
 
 ## [v3.4.0-gitlab] - 2021-04-26
 ### Changed
