@@ -30,7 +30,7 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/ncw/swift v1.0.52
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
+	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.0
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rivo/uniseg v0.2.0 // indirect
