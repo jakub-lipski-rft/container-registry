@@ -1,8 +1,6 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
 	"github.com/docker/distribution/registry"
 	_ "github.com/docker/distribution/registry/auth/htpasswd"
 	_ "github.com/docker/distribution/registry/auth/silly"
