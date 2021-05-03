@@ -1,3 +1,21 @@
+include:
+  - template: Security/License-Scanning.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
+# workflow rules are not extended by scanner jobs, need to override them manually
+# TODO: remove when https://gitlab.com/gitlab-org/gitlab/-/issues/218444 is done
+.rules-for-scanners: &rules-for-scanners
+  stage: validate
+  rules:
+    # For merge requests, create a pipeline.
+    - if: '$CI_MERGE_REQUEST_IID'
+    # For the default branch, create a pipeline (this includes on schedules, pushes, merges, etc.).
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    # For tags, create a pipeline.
+    - if: '$CI_COMMIT_TAG'
+
 workflow:
   rules:
     # For merge requests, create a pipeline.
@@ -6,6 +24,21 @@ workflow:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     # For tags, create a pipeline.
     - if: '$CI_COMMIT_TAG'
+
+license_scanning:
+  <<: *rules-for-scanners
+
+gemnasium-dependency_scanning:
+  <<: *rules-for-scanners
+
+secret_detection:
+  stage: validate
+  rules:
+    # For merge requests, create a pipeline.
+    - if: '$CI_MERGE_REQUEST_IID'
+
+gosec-sast:
+  <<: *rules-for-scanners
 
 default:
   image: golang:1.16-buster
