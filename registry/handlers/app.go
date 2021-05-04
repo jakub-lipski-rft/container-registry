@@ -452,6 +452,7 @@ func updateOnlineGCSettings(ctx context.Context, db datastore.Queryer, config *c
 
 	// execute DB update after a randomized jitter of up to 60 seconds to ease concurrency in clustered environments
 	rand.Seed(systemClock.Now().UnixNano())
+	/* #nosec G404 */
 	jitter := time.Duration(rand.Intn(onlineGCUpdateJitterMaxSeconds)) * time.Second
 
 	log.WithField("jitter_s", jitter.Seconds()).Info("preparing to update online GC settings")
@@ -1237,6 +1238,7 @@ func startUploadPurger(ctx context.Context, storageDriver storagedriver.StorageD
 
 	go func() {
 		rand.Seed(time.Now().Unix())
+		/* #nosec G404 */
 		jitter := time.Duration(rand.Int()%60) * time.Minute
 		log.Infof("Starting upload purge in %s", jitter)
 		time.Sleep(jitter)

@@ -525,7 +525,7 @@ func (suite *DriverSuite) TestList1200Files(c *check.C) {
 
 // testList checks the returned list of keys after populating a directory tree.
 func (suite *DriverSuite) testList(c *check.C, numFiles int) {
-	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	rootDirectory := "/" + randomFilenameRange(8, 8)
 	defer suite.deletePath(c, rootDirectory)
 
 	doesnotexist := path.Join(rootDirectory, "nonexistent")
@@ -535,10 +535,10 @@ func (suite *DriverSuite) testList(c *check.C, numFiles int) {
 		DriverName: suite.StorageDriver.Name(),
 	})
 
-	parentDirectory := rootDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
+	parentDirectory := rootDirectory + "/" + randomFilenameRange(8, 8)
 	childFiles := make([]string, numFiles)
 	for i := range childFiles {
-		childFile := parentDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
+		childFile := parentDirectory + "/" + randomFilenameRange(8, 8)
 		childFiles[i] = childFile
 		err := suite.StorageDriver.PutContent(suite.ctx, childFile, randomContents(8))
 		c.Assert(err, check.IsNil)
@@ -690,13 +690,13 @@ func (suite *DriverSuite) TestDeleteDir1200Files(c *check.C) {
 }
 
 func (suite *DriverSuite) testDeleteDir(c *check.C, numFiles int) {
-	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	rootDirectory := "/" + randomFilenameRange(8, 8)
 	defer suite.deletePath(c, rootDirectory)
 
-	parentDirectory := rootDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
+	parentDirectory := rootDirectory + "/" + randomFilenameRange(8, 8)
 	childFiles := make([]string, numFiles)
 	for i := range childFiles {
-		childFile := parentDirectory + "/" + randomFilename(int64(8+rand.Intn(8)))
+		childFile := parentDirectory + "/" + randomFilenameRange(8, 8)
 		childFiles[i] = childFile
 		err := suite.StorageDriver.PutContent(suite.ctx, childFile, randomContents(8))
 		c.Assert(err, check.IsNil)
@@ -762,6 +762,7 @@ func (suite *DriverSuite) TestDeleteFiles(c *check.C) {
 	parentDir := randomPath(8)
 	defer suite.deletePath(c, firstPart(parentDir))
 
+	/* #nosec G404 */
 	blobPaths := suite.buildFiles(c, parentDir, rand.Int63n(10), 32)
 
 	count, err := suite.StorageDriver.DeleteFiles(suite.ctx, blobPaths)
@@ -1064,6 +1065,7 @@ func (suite *DriverSuite) TestConcurrentStreamReads(c *check.C) {
 
 	readContents := func() {
 		defer wg.Done()
+		/* #nosec G404 */
 		offset := rand.Int63n(int64(len(contents)))
 		reader, err := suite.StorageDriver.Reader(suite.ctx, filename, offset)
 		c.Assert(err, check.IsNil)
@@ -1156,7 +1158,7 @@ func (suite *DriverSuite) TestConcurrentFileStreams(c *check.C) {
 
 // TestWalkParallel ensures that all files are visted by WalkParallel.
 func (suite *DriverSuite) TestWalkParallel(c *check.C) {
-	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	rootDirectory := "/" + randomFilenameRange(8, 8)
 	defer suite.deletePath(c, rootDirectory)
 
 	numWantedFiles := 10
@@ -1175,6 +1177,7 @@ func (suite *DriverSuite) TestWalkParallel(c *check.C) {
 			p = path.Dir(p)
 		}
 
+		/* #nosec G404 */
 		err := suite.StorageDriver.PutContent(suite.ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
 		c.Assert(err, check.IsNil)
 	}
@@ -1238,12 +1241,13 @@ func (suite *DriverSuite) TestWalkParallel(c *check.C) {
 
 // TestWalkParallelError ensures that walk reports WalkFn errors.
 func (suite *DriverSuite) TestWalkParallelError(c *check.C) {
-	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	rootDirectory := "/" + randomFilenameRange(8, 8)
 	defer suite.deletePath(c, rootDirectory)
 
 	wantedFiles := randomBranchingFiles(rootDirectory, 100)
 
 	for _, file := range wantedFiles {
+		/* #nosec G404 */
 		err := suite.StorageDriver.PutContent(suite.ctx, file, randomContents(int64(8+rand.Intn(8))))
 		c.Assert(err, check.IsNil)
 	}
@@ -1284,7 +1288,7 @@ func (suite *DriverSuite) TestWalkParallelStopsProcessingOnError(c *check.C) {
 		}
 	}
 
-	rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+	rootDirectory := "/" + randomFilenameRange(8, 8)
 	defer suite.deletePath(c, rootDirectory)
 
 	numWantedFiles := 1000
@@ -1292,10 +1296,11 @@ func (suite *DriverSuite) TestWalkParallelStopsProcessingOnError(c *check.C) {
 
 	// Add a file right under the root directory, so that processing is stopped
 	// early in the walk cycle.
-	errorFile := filepath.Join(rootDirectory, randomFilename(int64(8+rand.Intn(8))))
+	errorFile := filepath.Join(rootDirectory, randomFilenameRange(8, 8))
 	wantedFiles = append(wantedFiles, errorFile)
 
 	for _, file := range wantedFiles {
+		/* #nosec G404 */
 		err := suite.StorageDriver.PutContent(suite.ctx, file, randomContents(int64(8+rand.Intn(8))))
 		c.Assert(err, check.IsNil)
 	}
@@ -1484,7 +1489,7 @@ func (suite *DriverSuite) BenchmarkWalkParallelNop500Files(c *check.C) {
 
 func (suite *DriverSuite) benchmarkWalkParallel(c *check.C, numFiles int, f storagedriver.WalkFn) {
 	for i := 0; i < c.N; i++ {
-		rootDirectory := "/" + randomFilename(int64(8+rand.Intn(8)))
+		rootDirectory := "/" + randomFilenameRange(8, 8)
 		defer suite.deletePath(c, rootDirectory)
 
 		c.StopTimer()
@@ -1492,6 +1497,7 @@ func (suite *DriverSuite) benchmarkWalkParallel(c *check.C, numFiles int, f stor
 		wantedFiles := randomBranchingFiles(rootDirectory, numFiles)
 
 		for i := 0; i < numFiles; i++ {
+			/* #nosec G404 */
 			err := suite.StorageDriver.PutContent(suite.ctx, wantedFiles[i], randomContents(int64(8+rand.Intn(8))))
 			c.Assert(err, check.IsNil)
 		}
@@ -2013,6 +2019,7 @@ var separatorChars = []byte("._-")
 func randomPath(length int64) string {
 	path := "/"
 	for int64(len(path)) < length {
+		/* #nosec G404 */
 		chunkLength := rand.Int63n(length-int64(len(path))) + 1
 		chunk := randomFilename(chunkLength)
 		path += chunk
@@ -2030,6 +2037,7 @@ func randomFilename(length int64) string {
 	b := make([]byte, length)
 	wasSeparator := true
 	for i := range b {
+		/* #nosec G404 */
 		if !wasSeparator && i < len(b)-1 && rand.Intn(4) == 0 {
 			b[i] = separatorChars[rand.Intn(len(separatorChars))]
 			wasSeparator = true
@@ -2041,15 +2049,22 @@ func randomFilename(length int64) string {
 	return string(b)
 }
 
+// randomFilenameRange returns a random file with a length between min and max
+// chars long inclusive.
+func randomFilenameRange(min, max int) string {
+	/* #nosec G404 */
+	return randomFilename(int64(min + (rand.Intn(max + 1))))
+}
+
 // randomBranchingFiles creates n number of randomly named files at the end of
 // a binary tree of randomly named directories.
 func randomBranchingFiles(root string, n int) []string {
 	var files []string
 
-	subDirectory := path.Join(root, randomFilename(int64(8+(rand.Intn(8)))))
+	subDirectory := path.Join(root, randomFilenameRange(8, 8))
 
 	if n <= 1 {
-		files = append(files, path.Join(subDirectory, randomFilename(int64(8+rand.Intn(8)))))
+		files = append(files, path.Join(subDirectory, randomFilenameRange(8, 8)))
 		return files
 	}
 
@@ -2067,6 +2082,7 @@ func randomBranchingFiles(root string, n int) []string {
 var randomBytes = make([]byte, 128<<23)
 
 func init() {
+	/* #nosec G404*/
 	_, _ = rand.Read(randomBytes) // always returns len(randomBytes) and nil error
 }
 
