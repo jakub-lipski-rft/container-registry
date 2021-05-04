@@ -81,7 +81,7 @@ See [release instructions](https://gitlab.com/gitlab-org/container-registry/-/tr
 
 Bump the Container Registry version used in [CNG](https://gitlab.com/gitlab-org/build/CNG), [Omnibus](https://gitlab.com/gitlab-org/omnibus-gitlab), [Charts](https://gitlab.com/gitlab-org/charts) and [K8s Workloads](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com).
 
-The CNG image is the pre-requisite for the remaining version bumps. Only CNG and K8s Workloads version bumps are required for a GitLab.com deployment. Charts and Omnibus version bumps are required for self-managed releases.
+The CNG image is the pre-requisite for the remaining version bumps. Only CNG and K8s Workloads version bumps are required for a GitLab.com deployment. The deployment is then completed as documented [here](https://gitlab.com/gitlab-com/gl-infra/k8s-workloads/gitlab-com/-/blob/master/DEPLOYMENT.md). Charts and Omnibus version bumps are required for self-managed releases.
 
 Create a merge request for each project. Mark parent tasks as completed once the corresponding merge requests are merged.
 
