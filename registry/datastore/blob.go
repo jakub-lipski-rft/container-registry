@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/docker/distribution/registry/datastore/metrics"
 	"github.com/docker/distribution/registry/datastore/models"
 	"github.com/opencontainers/go-digest"
 )
@@ -91,6 +92,7 @@ func scanFullBlobs(rows *sql.Rows) (models.Blobs, error) {
 
 // FindByDigest finds a blob by digest.
 func (s *blobStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.Blob, error) {
+	defer metrics.InstrumentQuery("blob_find_by_digest")()
 	q := `SELECT
 			mt.media_type,
 			encode(b.digest, 'hex') as digest,
@@ -113,6 +115,7 @@ func (s *blobStore) FindByDigest(ctx context.Context, d digest.Digest) (*models.
 
 // FindAll finds all blobs.
 func (s *blobStore) FindAll(ctx context.Context) (models.Blobs, error) {
+	defer metrics.InstrumentQuery("blob_find_all")()
 	q := `SELECT
 			mt.media_type,
 			encode(b.digest, 'hex') as digest,
@@ -131,6 +134,7 @@ func (s *blobStore) FindAll(ctx context.Context) (models.Blobs, error) {
 
 // Count counts all blobs.
 func (s *blobStore) Count(ctx context.Context) (int, error) {
+	defer metrics.InstrumentQuery("blob_count")()
 	q := "SELECT COUNT(*) FROM blobs"
 	var count int
 
@@ -143,6 +147,7 @@ func (s *blobStore) Count(ctx context.Context) (int, error) {
 
 // Create saves a new blob.
 func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
+	defer metrics.InstrumentQuery("blob_create")()
 	q := `INSERT INTO blobs (digest, media_type_id, size)
 			VALUES (decode($1, 'hex'), $2, $3)
 		RETURNING
@@ -169,6 +174,7 @@ func (s *blobStore) Create(ctx context.Context, b *models.Blob) error {
 // on write operations between the corresponding read (FindByDigest) and write (Create) operations. Separate Find* and
 // Create method calls should be preferred to this when race conditions are not a concern.
 func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
+	defer metrics.InstrumentQuery("blob_create_or_find")()
 	q := `INSERT INTO blobs (digest, media_type_id, size)
 			VALUES (decode($1, 'hex'), $2, $3)
 		ON CONFLICT (digest)
@@ -203,6 +209,7 @@ func (s *blobStore) CreateOrFind(ctx context.Context, b *models.Blob) error {
 
 // Delete deletes a blob.
 func (s *blobStore) Delete(ctx context.Context, d digest.Digest) error {
+	defer metrics.InstrumentQuery("blob_delete")()
 	q := "DELETE FROM blobs WHERE digest = decode($1, 'hex')"
 
 	dgst, err := NewDigest(d)
