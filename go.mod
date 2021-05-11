@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	cloud.google.com/go/storage v1.12.0
-	github.com/Azure/azure-sdk-for-go v52.5.0+incompatible
+	github.com/Azure/azure-sdk-for-go v54.1.0+incompatible
 	github.com/Azure/go-autorest v10.8.1+incompatible // indirect
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/aws/aws-sdk-go v1.38.26
