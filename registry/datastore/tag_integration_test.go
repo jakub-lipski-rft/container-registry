@@ -16,7 +16,7 @@ func reloadTagFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		// A Tag has a foreign key for a Manifest, which in turn references a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable, testutil.TagsTable,
+		testutil.NamespacesTable, testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable, testutil.TagsTable,
 	)
 }
 
@@ -24,7 +24,7 @@ func unloadTagFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
 		// A Tag has a foreign key for a Manifest, which in turn references a Repository (insert order matters)
-		testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable, testutil.TagsTable,
+		testutil.NamespacesTable, testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable, testutil.TagsTable,
 	))
 }
 
@@ -43,6 +43,7 @@ func TestTagStore_FindByID(t *testing.T) {
 	// see testdata/fixtures/tags.sql
 	expected := &models.Tag{
 		ID:           1,
+		NamespaceID:  1,
 		Name:         "1.0.0",
 		RepositoryID: 3,
 		ManifestID:   1,
@@ -72,6 +73,7 @@ func TestTagStore_FindAll(t *testing.T) {
 	expected := models.Tags{
 		{
 			ID:           1,
+			NamespaceID:  1,
 			Name:         "1.0.0",
 			RepositoryID: 3,
 			ManifestID:   1,
@@ -79,6 +81,7 @@ func TestTagStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:           2,
+			NamespaceID:  1,
 			Name:         "2.0.0",
 			RepositoryID: 3,
 			ManifestID:   2,
@@ -86,6 +89,7 @@ func TestTagStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:           3,
+			NamespaceID:  1,
 			Name:         "latest",
 			RepositoryID: 3,
 			ManifestID:   2,
@@ -96,14 +100,8 @@ func TestTagStore_FindAll(t *testing.T) {
 			},
 		},
 		{
-			ID:           7,
-			Name:         "0.2.0",
-			RepositoryID: 3,
-			ManifestID:   6,
-			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
-		},
-		{
 			ID:           4,
+			NamespaceID:  1,
 			Name:         "1.0.0",
 			RepositoryID: 4,
 			ManifestID:   3,
@@ -111,6 +109,7 @@ func TestTagStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:           5,
+			NamespaceID:  1,
 			Name:         "stable-9ede8db0",
 			RepositoryID: 4,
 			ManifestID:   3,
@@ -118,13 +117,23 @@ func TestTagStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:           6,
+			NamespaceID:  1,
 			Name:         "stable-91ac07a9",
 			RepositoryID: 4,
 			ManifestID:   4,
 			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
 		},
 		{
+			ID:           7,
+			NamespaceID:  1,
+			Name:         "0.2.0",
+			RepositoryID: 3,
+			ManifestID:   6,
+			CreatedAt:    testutil.ParseTimestamp(t, "2020-04-15 09:47:26.461413", local),
+		},
+		{
 			ID:           8,
+			NamespaceID:  1,
 			Name:         "rc2",
 			RepositoryID: 4,
 			ManifestID:   7,
@@ -160,16 +169,17 @@ func TestTagStore_Repository(t *testing.T) {
 
 	s := datastore.NewTagStore(suite.db)
 
-	r, err := s.Repository(suite.ctx, &models.Tag{ID: 2, RepositoryID: 3})
+	r, err := s.Repository(suite.ctx, &models.Tag{ID: 2, NamespaceID: 1, RepositoryID: 3})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/tags.sql
 	excepted := &models.Repository{
-		ID:        3,
-		Name:      "backend",
-		Path:      "gitlab-org/gitlab-test/backend",
-		ParentID:  sql.NullInt64{Int64: 2, Valid: true},
-		CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", r.CreatedAt.Location()),
+		NamespaceID: 1,
+		ID:          3,
+		Name:        "backend",
+		Path:        "gitlab-org/gitlab-test/backend",
+		ParentID:    sql.NullInt64{Int64: 2, Valid: true},
+		CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", r.CreatedAt.Location()),
 	}
 	require.Equal(t, excepted, r)
 }
@@ -181,6 +191,7 @@ func TestTagStore_Manifest(t *testing.T) {
 
 	m, err := s.Manifest(suite.ctx, &models.Tag{
 		ID:           2,
+		NamespaceID:  1,
 		RepositoryID: 3,
 		ManifestID:   2,
 	})
@@ -189,6 +200,7 @@ func TestTagStore_Manifest(t *testing.T) {
 	// see testdata/fixtures/tags.sql
 	excepted := &models.Manifest{
 		ID:            2,
+		NamespaceID:   1,
 		RepositoryID:  3,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -211,6 +223,7 @@ func TestTagStore_CreateOrUpdate(t *testing.T) {
 
 	s := datastore.NewTagStore(suite.db)
 	tag := &models.Tag{
+		NamespaceID:  1,
 		Name:         "3.0.0",
 		RepositoryID: 3,
 		ManifestID:   1,
@@ -232,6 +245,7 @@ func TestTagStore_CreateOrUpdate_ManifestSwitch(t *testing.T) {
 
 	// create tag
 	tag := &models.Tag{
+		NamespaceID:  1,
 		Name:         "1.0.0",
 		RepositoryID: 3,
 		ManifestID:   1,
@@ -256,6 +270,7 @@ func TestTagStore_CreateOrUpdate_Idempotent(t *testing.T) {
 
 	// create tag
 	tag := &models.Tag{
+		NamespaceID:  1,
 		Name:         "1.0.0",
 		RepositoryID: 3,
 		ManifestID:   1,
@@ -277,6 +292,7 @@ func TestTagStore_CreateOrUpdate_ManifestNotFound(t *testing.T) {
 
 	s := datastore.NewTagStore(suite.db)
 	tag := &models.Tag{
+		NamespaceID:  1,
 		Name:         "3.0.0",
 		RepositoryID: 3,
 		ManifestID:   100,

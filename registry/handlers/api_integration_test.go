@@ -2536,6 +2536,7 @@ func TestManifestAPI_Get_Schema1(t *testing.T) {
 		mStore := datastore.NewManifestStore(env.db)
 
 		dbManifest := &models.Manifest{
+			NamespaceID:   dbRepo.NamespaceID,
 			RepositoryID:  dbRepo.ID,
 			SchemaVersion: 1,
 			MediaType:     schema1.MediaTypeManifest,
@@ -2550,6 +2551,7 @@ func TestManifestAPI_Get_Schema1(t *testing.T) {
 
 		dbTag := &models.Tag{
 			Name:         preseededSchema1TagName,
+			NamespaceID:  dbRepo.NamespaceID,
 			RepositoryID: dbRepo.ID,
 			ManifestID:   dbManifest.ID,
 		}

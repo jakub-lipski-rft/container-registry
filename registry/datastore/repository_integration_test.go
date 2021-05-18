@@ -20,11 +20,11 @@ import (
 )
 
 func reloadRepositoryFixtures(tb testing.TB) {
-	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.RepositoriesTable)
+	testutil.ReloadFixtures(tb, suite.db, suite.basePath, testutil.NamespacesTable, testutil.RepositoriesTable)
 }
 
 func unloadRepositoryFixtures(tb testing.TB) {
-	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.RepositoriesTable))
+	require.NoError(tb, testutil.TruncateTables(suite.db, testutil.NamespacesTable, testutil.RepositoriesTable))
 }
 
 func TestRepositoryStore_ImplementsReaderAndWriter(t *testing.T) {
@@ -40,10 +40,11 @@ func TestRepositoryStore_FindByID(t *testing.T) {
 
 	// see testdata/fixtures/repositories.sql
 	excepted := &models.Repository{
-		ID:        1,
-		Name:      "gitlab-org",
-		Path:      "gitlab-org",
-		CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:39.849864", r.CreatedAt.Location()),
+		ID:          1,
+		NamespaceID: 1,
+		Name:        "gitlab-org",
+		Path:        "gitlab-org",
+		CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:39.849864", r.CreatedAt.Location()),
 	}
 	require.Equal(t, excepted, r)
 }
@@ -64,18 +65,26 @@ func TestRepositoryStore_FindByPath(t *testing.T) {
 
 	// see testdata/fixtures/repositories.sql
 	excepted := &models.Repository{
-		ID:        2,
-		Name:      "gitlab-test",
-		Path:      "gitlab-org/gitlab-test",
-		ParentID:  sql.NullInt64{Int64: 1, Valid: true},
-		CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", r.CreatedAt.Location()),
+		ID:          2,
+		NamespaceID: 1,
+		Name:        "gitlab-test",
+		Path:        "gitlab-org/gitlab-test",
+		ParentID:    sql.NullInt64{Int64: 1, Valid: true},
+		CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", r.CreatedAt.Location()),
 	}
 	require.Equal(t, excepted, r)
 }
 
 func TestRepositoryStore_FindByPath_NotFound(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
-	r, err := s.FindByPath(suite.ctx, "foo/bar")
+	r, err := s.FindByPath(suite.ctx, "gitlab-org/bar")
+	require.Nil(t, r)
+	require.NoError(t, err)
+}
+
+func TestRepositoryStore_FindByPath_NamespaceNotFound(t *testing.T) {
+	s := datastore.NewRepositoryStore(suite.db)
+	r, err := s.FindByPath(suite.ctx, "foo/gitlab-org/gitlab-test")
 	require.Nil(t, r)
 	require.NoError(t, err)
 }
@@ -92,51 +101,58 @@ func TestRepositoryStore_FindAll(t *testing.T) {
 	local := rr[0].CreatedAt.Location()
 	expected := models.Repositories{
 		{
-			ID:        1,
-			Name:      "gitlab-org",
-			Path:      "gitlab-org",
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:39.849864", local),
+			ID:          1,
+			NamespaceID: 1,
+			Name:        "gitlab-org",
+			Path:        "gitlab-org",
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:39.849864", local),
 		},
 		{
-			ID:        2,
-			Name:      "gitlab-test",
-			Path:      "gitlab-org/gitlab-test",
-			ParentID:  sql.NullInt64{Int64: 1, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", local),
+			ID:          2,
+			NamespaceID: 1,
+			Name:        "gitlab-test",
+			Path:        "gitlab-org/gitlab-test",
+			ParentID:    sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", local),
 		},
 		{
-			ID:        3,
-			Name:      "backend",
-			Path:      "gitlab-org/gitlab-test/backend",
-			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
+			ID:          3,
+			NamespaceID: 1,
+			Name:        "backend",
+			Path:        "gitlab-org/gitlab-test/backend",
+			ParentID:    sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
 		},
 		{
-			ID:        4,
-			Name:      "frontend",
-			Path:      "gitlab-org/gitlab-test/frontend",
-			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
+			ID:          4,
+			NamespaceID: 1,
+			Name:        "frontend",
+			Path:        "gitlab-org/gitlab-test/frontend",
+			ParentID:    sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
 		},
 		{
-			ID:        5,
-			Name:      "a-test-group",
-			Path:      "a-test-group",
-			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+			ID:          5,
+			NamespaceID: 2,
+			Name:        "a-test-group",
+			Path:        "a-test-group",
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
 		},
 		{
-			ID:        6,
-			Name:      "foo",
-			Path:      "a-test-group/foo",
-			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+			ID:          6,
+			NamespaceID: 2,
+			Name:        "foo",
+			Path:        "a-test-group/foo",
+			ParentID:    sql.NullInt64{Int64: 5, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
 		},
 		{
-			ID:        7,
-			Name:      "bar",
-			Path:      "a-test-group/bar",
-			ParentID:  sql.NullInt64{Int64: 5, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
+			ID:          7,
+			NamespaceID: 2,
+			Name:        "bar",
+			Path:        "a-test-group/bar",
+			ParentID:    sql.NullInt64{Int64: 5, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-06-08 16:01:39.476421", local),
 		},
 	}
 
@@ -177,28 +193,32 @@ func TestRepositoryStore_FindAllPaginated(t *testing.T) {
 			lastPath: "",  // this is the equivalent to no last path, as all repository paths are non-empty
 			expectedRepos: models.Repositories{
 				{
-					ID:       7,
-					Name:     "bar",
-					Path:     "a-test-group/bar",
-					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+					ID:          7,
+					NamespaceID: 2,
+					Name:        "bar",
+					Path:        "a-test-group/bar",
+					ParentID:    sql.NullInt64{Int64: 5, Valid: true},
 				},
 				{
-					ID:       6,
-					Name:     "foo",
-					Path:     "a-test-group/foo",
-					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+					ID:          6,
+					NamespaceID: 2,
+					Name:        "foo",
+					Path:        "a-test-group/foo",
+					ParentID:    sql.NullInt64{Int64: 5, Valid: true},
 				},
 				{
-					ID:       3,
-					Name:     "backend",
-					Path:     "gitlab-org/gitlab-test/backend",
-					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:          3,
+					NamespaceID: 1,
+					Name:        "backend",
+					Path:        "gitlab-org/gitlab-test/backend",
+					ParentID:    sql.NullInt64{Int64: 2, Valid: true},
 				},
 				{
-					ID:       4,
-					Name:     "frontend",
-					Path:     "gitlab-org/gitlab-test/frontend",
-					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:          4,
+					NamespaceID: 1,
+					Name:        "frontend",
+					Path:        "gitlab-org/gitlab-test/frontend",
+					ParentID:    sql.NullInt64{Int64: 2, Valid: true},
 				},
 			},
 		},
@@ -208,16 +228,18 @@ func TestRepositoryStore_FindAllPaginated(t *testing.T) {
 			lastPath: "",
 			expectedRepos: models.Repositories{
 				{
-					ID:       7,
-					Name:     "bar",
-					Path:     "a-test-group/bar",
-					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+					ID:          7,
+					NamespaceID: 2,
+					Name:        "bar",
+					Path:        "a-test-group/bar",
+					ParentID:    sql.NullInt64{Int64: 5, Valid: true},
 				},
 				{
-					ID:       6,
-					Name:     "foo",
-					Path:     "a-test-group/foo",
-					ParentID: sql.NullInt64{Int64: 5, Valid: true},
+					ID:          6,
+					NamespaceID: 2,
+					Name:        "foo",
+					Path:        "a-test-group/foo",
+					ParentID:    sql.NullInt64{Int64: 5, Valid: true},
 				},
 			},
 		},
@@ -227,10 +249,11 @@ func TestRepositoryStore_FindAllPaginated(t *testing.T) {
 			lastPath: "a-test-group/foo",
 			expectedRepos: models.Repositories{
 				{
-					ID:       3,
-					Name:     "backend",
-					Path:     "gitlab-org/gitlab-test/backend",
-					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:          3,
+					NamespaceID: 1,
+					Name:        "backend",
+					Path:        "gitlab-org/gitlab-test/backend",
+					ParentID:    sql.NullInt64{Int64: 2, Valid: true},
 				},
 			},
 		},
@@ -240,10 +263,11 @@ func TestRepositoryStore_FindAllPaginated(t *testing.T) {
 			lastPath: "gitlab-org/gitlab-test/backend",
 			expectedRepos: models.Repositories{
 				{
-					ID:       4,
-					Name:     "frontend",
-					Path:     "gitlab-org/gitlab-test/frontend",
-					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:          4,
+					NamespaceID: 1,
+					Name:        "frontend",
+					Path:        "gitlab-org/gitlab-test/frontend",
+					ParentID:    sql.NullInt64{Int64: 2, Valid: true},
 				},
 			},
 		},
@@ -253,16 +277,18 @@ func TestRepositoryStore_FindAllPaginated(t *testing.T) {
 			lastPath: "does-not-exist",
 			expectedRepos: models.Repositories{
 				{
-					ID:       3,
-					Name:     "backend",
-					Path:     "gitlab-org/gitlab-test/backend",
-					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:          3,
+					NamespaceID: 1,
+					Name:        "backend",
+					Path:        "gitlab-org/gitlab-test/backend",
+					ParentID:    sql.NullInt64{Int64: 2, Valid: true},
 				},
 				{
-					ID:       4,
-					Name:     "frontend",
-					Path:     "gitlab-org/gitlab-test/frontend",
-					ParentID: sql.NullInt64{Int64: 2, Valid: true},
+					ID:          4,
+					NamespaceID: 1,
+					Name:        "frontend",
+					Path:        "gitlab-org/gitlab-test/frontend",
+					ParentID:    sql.NullInt64{Int64: 2, Valid: true},
 				},
 			},
 		},
@@ -307,25 +333,28 @@ func TestRepositoryStore_DescendantsOf(t *testing.T) {
 	local := rr[0].CreatedAt.Location()
 	expected := models.Repositories{
 		{
-			ID:        2,
-			Name:      "gitlab-test",
-			Path:      "gitlab-org/gitlab-test",
-			ParentID:  sql.NullInt64{Int64: 1, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", local),
+			ID:          2,
+			NamespaceID: 1,
+			Name:        "gitlab-test",
+			Path:        "gitlab-org/gitlab-test",
+			ParentID:    sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", local),
 		},
 		{
-			ID:        3,
-			Name:      "backend",
-			Path:      "gitlab-org/gitlab-test/backend",
-			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
+			ID:          3,
+			NamespaceID: 1,
+			Name:        "backend",
+			Path:        "gitlab-org/gitlab-test/backend",
+			ParentID:    sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:42:12.566212", local),
 		},
 		{
-			ID:        4,
-			Name:      "frontend",
-			Path:      "gitlab-org/gitlab-test/frontend",
-			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
+			ID:          4,
+			NamespaceID: 1,
+			Name:        "frontend",
+			Path:        "gitlab-org/gitlab-test/frontend",
+			ParentID:    sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
 		},
 	}
 
@@ -362,17 +391,19 @@ func TestRepositoryStore_AncestorsOf(t *testing.T) {
 	local := rr[0].CreatedAt.Location()
 	expected := models.Repositories{
 		{
-			ID:        2,
-			Name:      "gitlab-test",
-			Path:      "gitlab-org/gitlab-test",
-			ParentID:  sql.NullInt64{Int64: 1, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", local),
+			ID:          2,
+			NamespaceID: 1,
+			Name:        "gitlab-test",
+			Path:        "gitlab-org/gitlab-test",
+			ParentID:    sql.NullInt64{Int64: 1, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:40.866312", local),
 		},
 		{
-			ID:        1,
-			Name:      "gitlab-org",
-			Path:      "gitlab-org",
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:47:39.849864", local),
+			ID:          1,
+			NamespaceID: 1,
+			Name:        "gitlab-org",
+			Path:        "gitlab-org",
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:47:39.849864", local),
 		},
 	}
 
@@ -409,11 +440,12 @@ func TestRepositoryStore_SiblingsOf(t *testing.T) {
 	local := rr[0].CreatedAt.Location()
 	expected := models.Repositories{
 		{
-			ID:        4,
-			Name:      "frontend",
-			Path:      "gitlab-org/gitlab-test/frontend",
-			ParentID:  sql.NullInt64{Int64: 2, Valid: true},
-			CreatedAt: testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
+			ID:          4,
+			NamespaceID: 1,
+			Name:        "frontend",
+			Path:        "gitlab-org/gitlab-test/frontend",
+			ParentID:    sql.NullInt64{Int64: 2, Valid: true},
+			CreatedAt:   testutil.ParseTimestamp(t, "2020-03-02 17:43:39.476421", local),
 		},
 	}
 
@@ -442,7 +474,7 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
-	mm, err := s.Manifests(suite.ctx, &models.Repository{ID: 3})
+	mm, err := s.Manifests(suite.ctx, &models.Repository{NamespaceID: 1, ID: 3})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/repository_manifests.sql
@@ -450,6 +482,7 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 	expected := models.Manifests{
 		{
 			ID:            1,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -464,6 +497,7 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 		},
 		{
 			ID:            2,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -478,6 +512,7 @@ func TestRepositoryStore_Manifests(t *testing.T) {
 		},
 		{
 			ID:            6,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     manifestlist.MediaTypeManifestList,
@@ -493,7 +528,7 @@ func TestRepositoryStore_Tags(t *testing.T) {
 	reloadTagFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
-	tt, err := s.Tags(suite.ctx, &models.Repository{ID: 4})
+	tt, err := s.Tags(suite.ctx, &models.Repository{NamespaceID: 1, ID: 4})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/tags.sql
@@ -501,6 +536,7 @@ func TestRepositoryStore_Tags(t *testing.T) {
 	expected := models.Tags{
 		{
 			ID:           4,
+			NamespaceID:  1,
 			Name:         "1.0.0",
 			RepositoryID: 4,
 			ManifestID:   3,
@@ -508,6 +544,7 @@ func TestRepositoryStore_Tags(t *testing.T) {
 		},
 		{
 			ID:           5,
+			NamespaceID:  1,
 			Name:         "stable-9ede8db0",
 			RepositoryID: 4,
 			ManifestID:   3,
@@ -515,6 +552,7 @@ func TestRepositoryStore_Tags(t *testing.T) {
 		},
 		{
 			ID:           6,
+			NamespaceID:  1,
 			Name:         "stable-91ac07a9",
 			RepositoryID: 4,
 			ManifestID:   4,
@@ -522,6 +560,7 @@ func TestRepositoryStore_Tags(t *testing.T) {
 		},
 		{
 			ID:           8,
+			NamespaceID:  1,
 			Name:         "rc2",
 			RepositoryID: 4,
 			ManifestID:   7,
@@ -539,7 +578,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 	// rc2
 	// stable-91ac07a9
 	// stable-9ede8db0
-	r := &models.Repository{ID: 4}
+	r := &models.Repository{NamespaceID: 1, ID: 4}
 
 	tt := []struct {
 		name         string
@@ -554,24 +593,28 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 			expectedTags: models.Tags{
 				{
 					ID:           4,
+					NamespaceID:  1,
 					Name:         "1.0.0",
 					RepositoryID: 4,
 					ManifestID:   3,
 				},
 				{
 					ID:           8,
+					NamespaceID:  1,
 					Name:         "rc2",
 					RepositoryID: 4,
 					ManifestID:   7,
 				},
 				{
 					ID:           6,
+					NamespaceID:  1,
 					Name:         "stable-91ac07a9",
 					RepositoryID: 4,
 					ManifestID:   4,
 				},
 				{
 					ID:           5,
+					NamespaceID:  1,
 					Name:         "stable-9ede8db0",
 					RepositoryID: 4,
 					ManifestID:   3,
@@ -585,12 +628,14 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 			expectedTags: models.Tags{
 				{
 					ID:           4,
+					NamespaceID:  1,
 					Name:         "1.0.0",
 					RepositoryID: 4,
 					ManifestID:   3,
 				},
 				{
 					ID:           8,
+					NamespaceID:  1,
 					Name:         "rc2",
 					RepositoryID: 4,
 					ManifestID:   7,
@@ -604,6 +649,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 			expectedTags: models.Tags{
 				{
 					ID:           6,
+					NamespaceID:  1,
 					Name:         "stable-91ac07a9",
 					RepositoryID: 4,
 					ManifestID:   4,
@@ -617,6 +663,7 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 			expectedTags: models.Tags{
 				{
 					ID:           5,
+					NamespaceID:  1,
 					Name:         "stable-9ede8db0",
 					RepositoryID: 4,
 					ManifestID:   3,
@@ -630,18 +677,21 @@ func TestRepositoryStore_TagsPaginated(t *testing.T) {
 			expectedTags: models.Tags{
 				{
 					ID:           8,
+					NamespaceID:  1,
 					Name:         "rc2",
 					RepositoryID: 4,
 					ManifestID:   7,
 				},
 				{
 					ID:           6,
+					NamespaceID:  1,
 					Name:         "stable-91ac07a9",
 					RepositoryID: 4,
 					ManifestID:   4,
 				},
 				{
 					ID:           5,
+					NamespaceID:  1,
 					Name:         "stable-9ede8db0",
 					RepositoryID: 4,
 					ManifestID:   3,
@@ -675,7 +725,7 @@ func TestRepositoryStore_TagsCountAfterName(t *testing.T) {
 	// rc2
 	// stable-91ac07a9
 	// stable-9ede8db0
-	r := &models.Repository{ID: 4}
+	r := &models.Repository{NamespaceID: 1, ID: 4}
 
 	tt := []struct {
 		name          string
@@ -719,7 +769,7 @@ func TestRepositoryStore_ManifestTags(t *testing.T) {
 	reloadTagFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
-	tt, err := s.ManifestTags(suite.ctx, &models.Repository{ID: 3}, &models.Manifest{ID: 1})
+	tt, err := s.ManifestTags(suite.ctx, &models.Repository{NamespaceID: 1, ID: 3}, &models.Manifest{NamespaceID: 1, ID: 1})
 	require.NoError(t, err)
 
 	// see testdata/fixtures/tags.sql
@@ -727,6 +777,7 @@ func TestRepositoryStore_ManifestTags(t *testing.T) {
 	expected := models.Tags{
 		{
 			ID:           1,
+			NamespaceID:  1,
 			Name:         "1.0.0",
 			RepositoryID: 3,
 			ManifestID:   1,
@@ -818,12 +869,13 @@ func TestRepositoryStore_FindManifestByDigest(t *testing.T) {
 	d := digest.Digest("sha256:56b4b2228127fd594c5ab2925409713bd015ae9aa27eef2e0ddd90bcb2b1533f")
 	s := datastore.NewRepositoryStore(suite.db)
 
-	m, err := s.FindManifestByDigest(suite.ctx, &models.Repository{ID: 3}, d)
+	m, err := s.FindManifestByDigest(suite.ctx, &models.Repository{NamespaceID: 1, ID: 3}, d)
 	require.NoError(t, err)
 	require.NotNil(t, m)
 	// see testdata/fixtures/repository_manifests.sql
 	expected := &models.Manifest{
 		ID:            2,
+		NamespaceID:   1,
 		RepositoryID:  3,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -844,13 +896,14 @@ func TestRepositoryStore_FindManifestByTagName(t *testing.T) {
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	m, err := s.FindManifestByTagName(suite.ctx, &models.Repository{ID: 3}, "latest")
+	m, err := s.FindManifestByTagName(suite.ctx, &models.Repository{NamespaceID: 1, ID: 3}, "latest")
 	require.NoError(t, err)
 	require.NotNil(t, m)
 
 	// see testdata/fixtures/repository_manifests.sql
 	expected := &models.Manifest{
 		ID:            2,
+		NamespaceID:   1,
 		RepositoryID:  3,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -871,7 +924,7 @@ func TestRepositoryStore_FindManifestByTagName_NotFound(t *testing.T) {
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	m, err := s.FindManifestByTagName(suite.ctx, &models.Repository{ID: 3}, "foo")
+	m, err := s.FindManifestByTagName(suite.ctx, &models.Repository{NamespaceID: 1, ID: 3}, "foo")
 	require.NoError(t, err)
 	require.Nil(t, m)
 }
@@ -912,12 +965,13 @@ func TestRepositoryStore_FindTagByName(t *testing.T) {
 	reloadTagFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
-	tag, err := s.FindTagByName(suite.ctx, &models.Repository{ID: 4}, "1.0.0")
+	tag, err := s.FindTagByName(suite.ctx, &models.Repository{NamespaceID: 1, ID: 4}, "1.0.0")
 	require.NoError(t, err)
 
 	// see testdata/fixtures/tags.sql
 	expected := &models.Tag{
 		ID:           4,
+		NamespaceID:  1,
 		Name:         "1.0.0",
 		RepositoryID: 4,
 		ManifestID:   3,
@@ -1078,11 +1132,13 @@ func TestRepositoryBlobService_Stat_NotFound(t *testing.T) {
 
 func TestRepositoryStore_Create(t *testing.T) {
 	unloadRepositoryFixtures(t)
+	reloadNamespaceFixtures(t)
 
 	s := datastore.NewRepositoryStore(suite.db)
 	r := &models.Repository{
-		Name: "bar",
-		Path: "foo/bar",
+		NamespaceID: 1,
+		Name:        "bar",
+		Path:        "gitlab-org/bar",
 	}
 	err := s.Create(suite.ctx, r)
 
@@ -1096,9 +1152,10 @@ func TestRepositoryStore_Create_NonUniquePathFails(t *testing.T) {
 
 	s := datastore.NewRepositoryStore(suite.db)
 	r := &models.Repository{
-		Name:     "gitlab-test",
-		Path:     "gitlab-org/gitlab-test",
-		ParentID: sql.NullInt64{Int64: 1, Valid: true},
+		NamespaceID: 1,
+		Name:        "gitlab-test",
+		Path:        "gitlab-org/gitlab-test",
+		ParentID:    sql.NullInt64{Int64: 1, Valid: true},
 	}
 	err := s.Create(suite.ctx, r)
 	require.Error(t, err)
@@ -1113,6 +1170,7 @@ func TestRepositoryStore_CreateByPath_NewLeaf(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	require.NotEmpty(t, r.ID)
+	require.NotEmpty(t, r.NamespaceID)
 	require.Equal(t, "a", r.Name)
 	require.Equal(t, "a", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
@@ -1126,9 +1184,11 @@ func TestRepositoryStore_CreateByPath_NewLeaf(t *testing.T) {
 
 func TestRepositoryStore_CreateByPath_ExistingLeafFails(t *testing.T) {
 	unloadRepositoryFixtures(t)
+	reloadNamespaceFixtures(t)
+
 	s := datastore.NewRepositoryStore(suite.db)
 
-	r := &models.Repository{Name: "a", Path: "a"}
+	r := &models.Repository{NamespaceID: 1, Name: "a", Path: "a"}
 	err := s.Create(suite.ctx, r)
 	require.NoError(t, err)
 
@@ -1164,33 +1224,38 @@ func TestRepositoryStore_CreateByPath_NewNestedParents(t *testing.T) {
 
 	expected := []models.Repository{
 		{
-			ID:       int64(1),
-			Name:     "a",
-			Path:     "a",
-			ParentID: sql.NullInt64{},
+			ID:          int64(1),
+			NamespaceID: 1,
+			Name:        "a",
+			Path:        "a",
+			ParentID:    sql.NullInt64{},
 		},
 		{
-			ID:       int64(2),
-			Name:     "b",
-			Path:     "a/b",
-			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+			ID:          int64(2),
+			NamespaceID: 1,
+			Name:        "b",
+			Path:        "a/b",
+			ParentID:    sql.NullInt64{Int64: int64(1), Valid: true},
 		},
 		{
-			ID:       int64(3),
-			Name:     "c",
-			Path:     "a/b/c",
-			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+			ID:          int64(3),
+			NamespaceID: 1,
+			Name:        "c",
+			Path:        "a/b/c",
+			ParentID:    sql.NullInt64{Int64: int64(2), Valid: true},
 		},
 		{
-			ID:       int64(4),
-			Name:     "c",
-			Path:     "a/b/c/c",
-			ParentID: sql.NullInt64{Int64: int64(3), Valid: true},
+			ID:          int64(4),
+			NamespaceID: 1,
+			Name:        "c",
+			Path:        "a/b/c/c",
+			ParentID:    sql.NullInt64{Int64: int64(3), Valid: true},
 		},
 	}
 
 	for i, r := range actual {
 		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].NamespaceID, r.NamespaceID)
 		require.Equal(t, expected[i].Name, r.Name)
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
@@ -1200,13 +1265,9 @@ func TestRepositoryStore_CreateByPath_NewNestedParents(t *testing.T) {
 
 func TestRepositoryStore_CreateByPath_ExistingNestedParents(t *testing.T) {
 	unloadRepositoryFixtures(t)
+
 	s := datastore.NewRepositoryStore(suite.db)
-
-	r1 := &models.Repository{Name: "a", Path: "a"}
-	err := s.Create(suite.ctx, r1)
-
-	r2 := &models.Repository{Name: "b", Path: "a/b", ParentID: sql.NullInt64{Int64: r1.ID, Valid: true}}
-	err = s.Create(suite.ctx, r2)
+	_, err := s.CreateByPath(suite.ctx, "a/b")
 	require.NoError(t, err)
 
 	// validate return
@@ -1214,6 +1275,7 @@ func TestRepositoryStore_CreateByPath_ExistingNestedParents(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	require.NotEmpty(t, r.ID)
+	require.NotEmpty(t, r.NamespaceID)
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
@@ -1225,29 +1287,33 @@ func TestRepositoryStore_CreateByPath_ExistingNestedParents(t *testing.T) {
 
 	expected := []models.Repository{
 		{
-			ID:       int64(1),
-			Name:     "a",
-			Path:     "a",
-			ParentID: sql.NullInt64{},
+			ID:          int64(1),
+			NamespaceID: 1,
+			Name:        "a",
+			Path:        "a",
+			ParentID:    sql.NullInt64{},
 		},
 		{
-			ID:       int64(2),
-			Name:     "b",
-			Path:     "a/b",
-			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+			ID:          int64(2),
+			NamespaceID: 1,
+			Name:        "b",
+			Path:        "a/b",
+			ParentID:    sql.NullInt64{Int64: int64(1), Valid: true},
 		},
 		{
 			// Attempts to insert already existing repositories (we attempted to recreate `a` and `a/b`) increments the
 			// ID sequence by 1. Therefore the next success write has ID 5 instead of 3.
-			ID:       int64(5),
-			Name:     "c",
-			Path:     "a/b/c",
-			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+			ID:          int64(5),
+			NamespaceID: 1,
+			Name:        "c",
+			Path:        "a/b/c",
+			ParentID:    sql.NullInt64{Int64: int64(2), Valid: true},
 		},
 	}
 
 	for i, r := range actual {
 		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].NamespaceID, r.NamespaceID)
 		require.Equal(t, expected[i].Name, r.Name)
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
@@ -1264,6 +1330,7 @@ func TestRepositoryStore_CreateOrFindByPath_NewLeaf(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	require.NotEmpty(t, r.ID)
+	require.NotEmpty(t, r.NamespaceID)
 	require.Equal(t, "a", r.Name)
 	require.Equal(t, "a", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
@@ -1275,12 +1342,11 @@ func TestRepositoryStore_CreateOrFindByPath_NewLeaf(t *testing.T) {
 	require.Equal(t, r, actual[0])
 }
 
-func TestRepositoryStore_CreateByPath_ExistingLeafDoesNotFail(t *testing.T) {
+func TestRepositoryStore_CreateOrFindByPath_ExistingLeafDoesNotFail(t *testing.T) {
 	unloadRepositoryFixtures(t)
 	s := datastore.NewRepositoryStore(suite.db)
 
-	r := &models.Repository{Name: "a", Path: "a"}
-	err := s.Create(suite.ctx, r)
+	r, err := s.CreateByPath(suite.ctx, "a")
 	require.NoError(t, err)
 
 	// validate return
@@ -1288,6 +1354,7 @@ func TestRepositoryStore_CreateByPath_ExistingLeafDoesNotFail(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r2)
 	require.NotEmpty(t, r2.ID)
+	require.NotEmpty(t, r2.NamespaceID)
 	require.Equal(t, "a", r2.Name)
 	require.Equal(t, "a", r2.Path)
 	require.NotEmpty(t, r2.CreatedAt)
@@ -1308,6 +1375,7 @@ func TestRepositoryStore_CreateOrFindByPath_NewNestedParents(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	require.NotEmpty(t, r.ID)
+	require.NotEmpty(t, r.NamespaceID)
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
@@ -1319,28 +1387,32 @@ func TestRepositoryStore_CreateOrFindByPath_NewNestedParents(t *testing.T) {
 
 	expected := []models.Repository{
 		{
-			ID:       int64(1),
-			Name:     "a",
-			Path:     "a",
-			ParentID: sql.NullInt64{},
+			ID:          int64(1),
+			NamespaceID: 1,
+			Name:        "a",
+			Path:        "a",
+			ParentID:    sql.NullInt64{},
 		},
 		{
-			ID:       int64(2),
-			Name:     "b",
-			Path:     "a/b",
-			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+			ID:          int64(2),
+			NamespaceID: 1,
+			Name:        "b",
+			Path:        "a/b",
+			ParentID:    sql.NullInt64{Int64: int64(1), Valid: true},
 		},
 		{
-			ID:       int64(3),
-			Name:     "c",
-			Path:     "a/b/c",
-			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+			ID:          int64(3),
+			NamespaceID: 1,
+			Name:        "c",
+			Path:        "a/b/c",
+			ParentID:    sql.NullInt64{Int64: int64(2), Valid: true},
 		},
 		{
-			ID:       int64(4),
-			Name:     "c",
-			Path:     "a/b/c/c",
-			ParentID: sql.NullInt64{Int64: int64(3), Valid: true},
+			ID:          int64(4),
+			NamespaceID: 1,
+			Name:        "c",
+			Path:        "a/b/c/c",
+			ParentID:    sql.NullInt64{Int64: int64(3), Valid: true},
 		},
 	}
 
@@ -1357,18 +1429,15 @@ func TestRepositoryStore_CreateOrFindByPath_ExistingNestedParents(t *testing.T) 
 	unloadRepositoryFixtures(t)
 	s := datastore.NewRepositoryStore(suite.db)
 
-	r1 := &models.Repository{Name: "a", Path: "a"}
-	err := s.Create(suite.ctx, r1)
-
-	r2 := &models.Repository{Name: "b", Path: "a/b", ParentID: sql.NullInt64{Int64: r1.ID, Valid: true}}
-	err = s.Create(suite.ctx, r2)
-	require.NoError(t, err)
+	_, err := s.CreateByPath(suite.ctx, "a")
+	_, err = s.CreateByPath(suite.ctx, "a/b")
 
 	// validate return
 	r, err := s.CreateOrFindByPath(suite.ctx, "a/b/c")
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	require.NotEmpty(t, r.ID)
+	require.NotEmpty(t, r.NamespaceID)
 	require.Equal(t, "c", r.Name)
 	require.Equal(t, "a/b/c", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
@@ -1380,29 +1449,35 @@ func TestRepositoryStore_CreateOrFindByPath_ExistingNestedParents(t *testing.T) 
 
 	expected := []models.Repository{
 		{
-			ID:       int64(1),
-			Name:     "a",
-			Path:     "a",
-			ParentID: sql.NullInt64{},
+			ID:          int64(1),
+			NamespaceID: 1,
+			Name:        "a",
+			Path:        "a",
+			ParentID:    sql.NullInt64{},
 		},
 		{
-			ID:       int64(2),
-			Name:     "b",
-			Path:     "a/b",
-			ParentID: sql.NullInt64{Int64: int64(1), Valid: true},
+			// Attempts to insert already existing repositories (we attempted to recreate `a`) increments the
+			// ID sequence by 1. Therefore the next success write has ID 3 instead of 2.
+			ID:          int64(3),
+			NamespaceID: 1,
+			Name:        "b",
+			Path:        "a/b",
+			ParentID:    sql.NullInt64{Int64: int64(1), Valid: true},
 		},
 		{
 			// Attempts to insert already existing repositories (we attempted to recreate `a` and `a/b`) increments the
-			// ID sequence by 1. Therefore the next success write has ID 5 instead of 3.
-			ID:       int64(5),
-			Name:     "c",
-			Path:     "a/b/c",
-			ParentID: sql.NullInt64{Int64: int64(2), Valid: true},
+			// ID sequence by 1. Therefore the next success write has ID 6 instead of 4.
+			ID:          int64(6),
+			NamespaceID: 1,
+			Name:        "c",
+			Path:        "a/b/c",
+			ParentID:    sql.NullInt64{Int64: int64(3), Valid: true},
 		},
 	}
 
 	for i, r := range actual {
 		require.Equal(t, expected[i].ID, r.ID)
+		require.Equal(t, expected[i].NamespaceID, r.NamespaceID)
 		require.Equal(t, expected[i].Name, r.Name)
 		require.Equal(t, expected[i].Path, r.Path)
 		require.Equal(t, expected[i].ParentID, r.ParentID)
@@ -1423,6 +1498,7 @@ func TestRepositoryStore_CreateOrFind(t *testing.T) {
 	err := s.CreateOrFind(suite.ctx, r)
 	require.NoError(t, err)
 	require.NotEmpty(t, r.ID)
+	require.NotEmpty(t, r.NamespaceID)
 	require.Equal(t, "bar", r.Name)
 	require.Equal(t, "foo/bar", r.Path)
 	require.NotEmpty(t, r.CreatedAt)
@@ -1442,10 +1518,11 @@ func TestRepositoryStore_Update(t *testing.T) {
 
 	s := datastore.NewRepositoryStore(suite.db)
 	update := &models.Repository{
-		ID:       4,
-		Name:     "bar",
-		Path:     "bar",
-		ParentID: sql.NullInt64{Int64: 0, Valid: false},
+		NamespaceID: 1,
+		ID:          4,
+		Name:        "bar",
+		Path:        "bar",
+		ParentID:    sql.NullInt64{Int64: 0, Valid: false},
 	}
 	err := s.Update(suite.ctx, update)
 	require.NoError(t, err)
@@ -1474,8 +1551,8 @@ func TestRepositoryStore_UntagManifest(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/tags.sql
-	r := &models.Repository{ID: 3}
-	m := &models.Manifest{ID: 1}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
+	m := &models.Manifest{NamespaceID: 1, ID: 1}
 
 	tt, err := s.ManifestTags(suite.ctx, r, m)
 	require.NoError(t, err)
@@ -1505,7 +1582,7 @@ func TestRepositoryStore_LinkLayer(t *testing.T) {
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	d := digest.Digest("sha256:68ced04f60ab5c7a5f1d0b0b4e7572c5a4c8cce44866513d30d9df1a15277d6b")
 
 	err := s.LinkBlob(suite.ctx, r, d)
@@ -1520,7 +1597,7 @@ func TestRepositoryStore_LinkBlob_AlreadyLinkedDoesNotFail(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	d := digest.Digest("sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1")
 	require.True(t, isBlobLinked(t, r, d))
 
@@ -1534,7 +1611,7 @@ func TestRepositoryStore_UnlinkBlob(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	d := digest.Digest("sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1")
 	require.True(t, isBlobLinked(t, r, d))
 
@@ -1550,7 +1627,7 @@ func TestRepositoryStore_UnlinkBlob_NotLinkedDoesNotFail(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	d := digest.Digest("sha256:68ced04f60ab5c7a5f1d0b0b4e7572c5a4c8cce44866513d30d9df1a15277d6b")
 
 	found, err := s.UnlinkBlob(suite.ctx, r, d)
@@ -1565,7 +1642,7 @@ func TestRepositoryStore_DeleteTagByName(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/tags.sql
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	name := "1.0.0"
 
 	found, err := s.DeleteTagByName(suite.ctx, r, name)
@@ -1583,7 +1660,7 @@ func TestRepositoryStore_DeleteTagByName_NotFoundDoesNotFail(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/repository_blobs.sql
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	name := "10.0.0"
 
 	found, err := s.DeleteTagByName(suite.ctx, r, name)
@@ -1597,7 +1674,7 @@ func TestRepositoryStore_DeleteManifest(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/manifests.sql
-	r := &models.Repository{ID: 4}
+	r := &models.Repository{NamespaceID: 1, ID: 4}
 	d := digest.Digest("sha256:ea1650093606d9e76dfc78b986d57daea6108af2d5a9114a98d7198548bfdfc7")
 
 	found, err := s.DeleteManifest(suite.ctx, r, d)
@@ -1615,7 +1692,7 @@ func TestRepositoryStore_DeleteManifest_FailsIfReferencedInList(t *testing.T) {
 	s := datastore.NewRepositoryStore(suite.db)
 
 	// see testdata/fixtures/manifests.sql
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	d := digest.Digest("sha256:bd165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155")
 
 	ok, err := s.DeleteManifest(suite.ctx, r, d)
@@ -1633,7 +1710,7 @@ func TestRepositoryStore_DeleteManifest_NotFoundDoesNotFail(t *testing.T) {
 
 	s := datastore.NewRepositoryStore(suite.db)
 
-	r := &models.Repository{ID: 3}
+	r := &models.Repository{NamespaceID: 1, ID: 3}
 	d := digest.Digest("sha256:ad165db4bd480656a539e8e00db265377d162d6b98eebbfe5805d0fbd5144155")
 
 	found, err := s.DeleteManifest(suite.ctx, r, d)

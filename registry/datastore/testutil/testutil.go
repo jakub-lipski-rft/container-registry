@@ -27,6 +27,7 @@ type trigger struct {
 }
 
 const (
+	NamespacesTable            table = "top_level_namespaces"
 	RepositoriesTable          table = "repositories"
 	MediaTypesTable            table = "media_types"
 	ManifestsTable             table = "manifests"
@@ -46,6 +47,7 @@ const (
 // AllTables represents all tables in the test database.
 var (
 	AllTables = []table{
+		NamespacesTable,
 		RepositoriesTable,
 		ManifestsTable,
 		ManifestReferencesTable,

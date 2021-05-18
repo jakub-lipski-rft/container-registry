@@ -54,7 +54,7 @@ func scanFullManifest(row *sql.Row) (*models.Manifest, error) {
 	var cfgPayload *models.Payload
 	m := new(models.Manifest)
 
-	err := row.Scan(&m.ID, &m.RepositoryID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &cfgMediaType, &cfgDigest, &cfgPayload, &m.CreatedAt)
+	err := row.Scan(&m.ID, &m.NamespaceID, &m.RepositoryID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &cfgMediaType, &cfgDigest, &cfgPayload, &m.CreatedAt)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("scaning manifest: %w", err)
@@ -94,7 +94,8 @@ func scanFullManifests(rows *sql.Rows) (models.Manifests, error) {
 		var cfgPayload *models.Payload
 		m := new(models.Manifest)
 
-		err := rows.Scan(&m.ID, &m.RepositoryID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload, &cfgMediaType, &cfgDigest, &cfgPayload, &m.CreatedAt)
+		err := rows.Scan(&m.ID, &m.NamespaceID, &m.RepositoryID, &m.SchemaVersion, &m.MediaType, &dgst, &m.Payload,
+			&cfgMediaType, &cfgDigest, &cfgPayload, &m.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("scanning manifest: %w", err)
 		}
@@ -132,6 +133,7 @@ func (s *manifestStore) FindAll(ctx context.Context) (models.Manifests, error) {
 	defer metrics.InstrumentQuery("manifest_find_all")()
 	q := `SELECT
 			m.id,
+			m.top_level_namespace_id,
 			m.repository_id,
 			m.schema_version,
 			mt.media_type,
@@ -198,6 +200,7 @@ func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (mod
 	defer metrics.InstrumentQuery("manifest_references")()
 	q := `SELECT DISTINCT
 			m.id,
+			m.top_level_namespace_id,
 			m.repository_id,
 			m.schema_version,
 			mt.media_type,
@@ -209,14 +212,16 @@ func (s *manifestStore) References(ctx context.Context, m *models.Manifest) (mod
 			m.created_at
 		FROM
 			manifests AS m
-			JOIN manifest_references AS mr ON mr.child_id = m.id
+			JOIN manifest_references AS mr ON mr.top_level_namespace_id = m.top_level_namespace_id
+				AND mr.child_id = m.id
 			JOIN media_types AS mt ON mt.id = m.media_type_id
 			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
 		WHERE
-			mr.repository_id = $1 AND
-			mr.parent_id = $2`
+			m.top_level_namespace_id = $1
+			AND mr.repository_id = $2
+			AND mr.parent_id = $3`
 
-	rows, err := s.db.QueryContext(ctx, q, m.RepositoryID, m.ID)
+	rows, err := s.db.QueryContext(ctx, q, m.NamespaceID, m.RepositoryID, m.ID)
 	if err != nil {
 		return nil, fmt.Errorf("finding referenced manifests: %w", err)
 	}
@@ -247,9 +252,9 @@ func mapMediaType(ctx context.Context, db Queryer, mediaType string) (int, error
 // Create saves a new Manifest.
 func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 	defer metrics.InstrumentQuery("manifest_create")()
-	q := `INSERT INTO manifests (repository_id, schema_version, media_type_id, digest, payload,
+	q := `INSERT INTO manifests (top_level_namespace_id, repository_id, schema_version, media_type_id, digest, payload,
 				configuration_media_type_id, configuration_blob_digest, configuration_payload)
-			VALUES ($1, $2, $3, decode($4, 'hex'), $5, $6, decode($7, 'hex'), $8)
+			VALUES ($1, $2, $3, $4, decode($5, 'hex'), $6, $7, decode($8, 'hex'), $9)
 		RETURNING
 			id, created_at`
 
@@ -281,7 +286,8 @@ func (s *manifestStore) Create(ctx context.Context, m *models.Manifest) error {
 		configPayload = &m.Configuration.Payload
 	}
 
-	row := s.db.QueryRowContext(ctx, q, m.RepositoryID, m.SchemaVersion, mediaTypeID, dgst, m.Payload, configMediaTypeID, configDgst, configPayload)
+	row := s.db.QueryRowContext(ctx, q, m.NamespaceID, m.RepositoryID, m.SchemaVersion, mediaTypeID, dgst, m.Payload,
+		configMediaTypeID, configDgst, configPayload)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
 		return fmt.Errorf("creating manifest: %w", err)
 	}
@@ -296,12 +302,12 @@ func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manife
 		return fmt.Errorf("cannot associate a manifest with itself")
 	}
 
-	q := `INSERT INTO manifest_references (repository_id, parent_id, child_id)
-			VALUES ($1, $2, $3)
-		ON CONFLICT (repository_id, parent_id, child_id)
+	q := `INSERT INTO manifest_references (top_level_namespace_id, repository_id, parent_id, child_id)
+			VALUES ($1, $2, $3, $4)
+		ON CONFLICT (top_level_namespace_id, repository_id, parent_id, child_id)
 			DO NOTHING`
 
-	if _, err := s.db.ExecContext(ctx, q, ml.RepositoryID, ml.ID, m.ID); err != nil {
+	if _, err := s.db.ExecContext(ctx, q, ml.NamespaceID, ml.RepositoryID, ml.ID, m.ID); err != nil {
 		var pgErr *pgconn.PgError
 		// this can happen if the child manifest is deleted by the online GC while attempting to create the list
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation {
@@ -316,9 +322,13 @@ func (s *manifestStore) AssociateManifest(ctx context.Context, ml *models.Manife
 // DissociateManifest dissociates a manifest and a manifest list. It does nothing if not associated.
 func (s *manifestStore) DissociateManifest(ctx context.Context, ml *models.Manifest, m *models.Manifest) error {
 	defer metrics.InstrumentQuery("manifest_dissociate_manifest")()
-	q := "DELETE FROM manifest_references WHERE repository_id = $1 AND parent_id = $2 AND child_id = $3"
+	q := `DELETE FROM manifest_references
+		WHERE top_level_namespace_id = $1
+			AND repository_id = $2
+			AND parent_id = $3
+			AND child_id = $4`
 
-	res, err := s.db.ExecContext(ctx, q, ml.RepositoryID, ml.ID, m.ID)
+	res, err := s.db.ExecContext(ctx, q, ml.NamespaceID, ml.RepositoryID, ml.ID, m.ID)
 	if err != nil {
 		return fmt.Errorf("dissociating manifest: %w", err)
 	}
@@ -333,9 +343,9 @@ func (s *manifestStore) DissociateManifest(ctx context.Context, ml *models.Manif
 // AssociateLayerBlob associates a layer blob and a manifest. It does nothing if already associated.
 func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
 	defer metrics.InstrumentQuery("manifest_associate_layer_blob")()
-	q := `INSERT INTO layers (repository_id, manifest_id, digest, media_type_id, size)
-			VALUES ($1, $2, decode($3, 'hex'), $4, $5)
-		ON CONFLICT (repository_id, manifest_id, digest)
+	q := `INSERT INTO layers (top_level_namespace_id, repository_id, manifest_id, digest, media_type_id, size)
+			VALUES ($1, $2, $3, decode($4, 'hex'), $5, $6)
+		ON CONFLICT (top_level_namespace_id, repository_id, manifest_id, digest)
 			DO NOTHING`
 
 	dgst, err := NewDigest(b.Digest)
@@ -347,7 +357,7 @@ func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manife
 		return err
 	}
 
-	if _, err := s.db.ExecContext(ctx, q, m.RepositoryID, m.ID, dgst, mediaTypeID, b.Size); err != nil {
+	if _, err := s.db.ExecContext(ctx, q, m.NamespaceID, m.RepositoryID, m.ID, dgst, mediaTypeID, b.Size); err != nil {
 		return fmt.Errorf("associating layer blob: %w", err)
 	}
 
@@ -357,14 +367,18 @@ func (s *manifestStore) AssociateLayerBlob(ctx context.Context, m *models.Manife
 // DissociateLayerBlob dissociates a layer blob and a manifest. It does nothing if not associated.
 func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manifest, b *models.Blob) error {
 	defer metrics.InstrumentQuery("manifest_dissociate_layer_blob")()
-	q := "DELETE FROM layers WHERE repository_id = $1 AND manifest_id = $2 AND digest = decode($3, 'hex')"
+	q := `DELETE FROM layers
+		WHERE top_level_namespace_id = $1
+			AND repository_id = $2
+			AND manifest_id = $3
+			AND digest = decode($4, 'hex')`
 
 	dgst, err := NewDigest(b.Digest)
 	if err != nil {
 		return err
 	}
 
-	res, err := s.db.ExecContext(ctx, q, m.RepositoryID, m.ID, dgst)
+	res, err := s.db.ExecContext(ctx, q, m.NamespaceID, m.RepositoryID, m.ID, dgst)
 	if err != nil {
 		return fmt.Errorf("dissociating layer blob: %w", err)
 	}
@@ -381,9 +395,9 @@ func (s *manifestStore) DissociateLayerBlob(ctx context.Context, m *models.Manif
 // manifest list.
 func (s *manifestStore) Delete(ctx context.Context, m *models.Manifest) (bool, error) {
 	defer metrics.InstrumentQuery("manifest_delete")()
-	q := "DELETE FROM manifests WHERE repository_id = $1 AND id = $2"
+	q := "DELETE FROM manifests WHERE top_level_namespace_id = $1 AND repository_id = $2 AND id = $3"
 
-	res, err := s.db.ExecContext(ctx, q, m.RepositoryID, m.ID)
+	res, err := s.db.ExecContext(ctx, q, m.NamespaceID, m.RepositoryID, m.ID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.ForeignKeyViolation && pgErr.TableName == "manifest_references" {

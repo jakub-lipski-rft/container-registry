@@ -205,7 +205,7 @@ func dbDeleteTag(ctx context.Context, db datastore.Handler, repoPath string, tag
 	defer tx.Rollback()
 
 	mts := datastore.NewGCManifestTaskStore(tx)
-	if _, err := mts.FindAndLockBefore(txCtx, r.ID, t.ManifestID, time.Now().Add(tagDeleteGCReviewWindow)); err != nil {
+	if _, err := mts.FindAndLockBefore(txCtx, r.NamespaceID, r.ID, t.ManifestID, time.Now().Add(tagDeleteGCReviewWindow)); err != nil {
 		return err
 	}
 

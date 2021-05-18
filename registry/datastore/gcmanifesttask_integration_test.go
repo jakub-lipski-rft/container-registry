@@ -36,24 +36,28 @@ func TestGCManifestTaskStore_FindAll(t *testing.T) {
 	local := rr[0].ReviewAfter.Location()
 	expected := []*models.GCManifestTask{
 		{
+			NamespaceID:  1,
 			RepositoryID: 4,
 			ManifestID:   7,
 			ReviewAfter:  testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", local),
 			ReviewCount:  2,
 		},
 		{
+			NamespaceID:  1,
 			RepositoryID: 4,
 			ManifestID:   9,
 			ReviewAfter:  testutil.ParseTimestamp(t, "9999-12-31 23:59:59.999999", local),
 			ReviewCount:  0,
 		},
 		{
+			NamespaceID:  1,
 			RepositoryID: 4,
 			ManifestID:   4,
 			ReviewAfter:  testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", local),
 			ReviewCount:  0,
 		},
 		{
+			NamespaceID:  1,
 			RepositoryID: 3,
 			ManifestID:   1,
 			ReviewAfter:  testutil.ParseTimestamp(t, "2020-03-03 17:50:26.461745", local),
@@ -87,11 +91,12 @@ func TestGCManifestTaskStore_FindAndLockBefore(t *testing.T) {
 
 	// see testdata/fixtures/gc_manifest_review_queue.sql
 	date := testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", time.UTC).Add(1 * time.Minute)
-	r, err := s.FindAndLockBefore(suite.ctx, 4, 7, date)
+	r, err := s.FindAndLockBefore(suite.ctx, 1, 4, 7, date)
 	require.NoError(t, err)
 
 	local := r.ReviewAfter.Location()
 	expected := &models.GCManifestTask{
+		NamespaceID:  1,
 		RepositoryID: 4,
 		ManifestID:   7,
 		ReviewAfter:  testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", local),
@@ -109,7 +114,7 @@ func TestGCManifestTaskStore_FindAndLockBefore(t *testing.T) {
 	defer tx2.Rollback()
 
 	s = datastore.NewGCManifestTaskStore(tx2)
-	r, err = s.FindAndLockBefore(ctx2, 4, 7, date)
+	r, err = s.FindAndLockBefore(ctx2, 1, 4, 7, date)
 
 	var netError net.Error
 	ok := errors.As(err, &netError)
@@ -128,7 +133,7 @@ func TestGCManifestTaskStore_FindAndLockBefore(t *testing.T) {
 	go time.AfterFunc(500*time.Millisecond, func() { tx1.Rollback() })
 
 	s = datastore.NewGCManifestTaskStore(tx3)
-	r, err = s.FindAndLockBefore(ctx3, 4, 7, date)
+	r, err = s.FindAndLockBefore(ctx3, 1, 4, 7, date)
 	require.NoError(t, err)
 	require.Equal(t, expected, r)
 }
@@ -145,12 +150,12 @@ func TestGCManifestTaskStore_FindAndLockBefore_NotFound(t *testing.T) {
 	date := testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", time.UTC)
 
 	// when there is no such (repository_id, manifest_id) pair
-	r, err := s.FindAndLockBefore(suite.ctx, 400, 7, date.Add(1*time.Minute))
+	r, err := s.FindAndLockBefore(suite.ctx, 1, 400, 7, date.Add(1*time.Minute))
 	require.NoError(t, err)
 	require.Nil(t, r)
 
 	// when the review_after is not before the given date
-	r, err = s.FindAndLockBefore(suite.ctx, 4, 7, date)
+	r, err = s.FindAndLockBefore(suite.ctx, 1, 4, 7, date)
 	require.NoError(t, err)
 	require.Nil(t, r)
 }
@@ -170,18 +175,20 @@ func TestGCManifestTaskStore_FindAndLockNBefore(t *testing.T) {
 	// see testdata/fixtures/gc_manifest_review_queue.sql
 	date := testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", time.UTC).Add(1 * time.Minute)
 	ids := []int64{7, 4}
-	rr, err := s.FindAndLockNBefore(suite.ctx, 4, ids, date)
+	rr, err := s.FindAndLockNBefore(suite.ctx, 1, 4, ids, date)
 	require.NoError(t, err)
 
 	local := rr[0].ReviewAfter.Location()
 	expected := []*models.GCManifestTask{
 		{
+			NamespaceID:  1,
 			RepositoryID: 4,
 			ManifestID:   4,
 			ReviewAfter:  testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", local),
 			ReviewCount:  0,
 		},
 		{
+			NamespaceID:  1,
 			RepositoryID: 4,
 			ManifestID:   7,
 			ReviewAfter:  testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", local),
@@ -200,7 +207,7 @@ func TestGCManifestTaskStore_FindAndLockNBefore(t *testing.T) {
 	defer tx2.Rollback()
 
 	s = datastore.NewGCManifestTaskStore(tx2)
-	rr, err = s.FindAndLockNBefore(ctx2, 4, ids, date)
+	rr, err = s.FindAndLockNBefore(ctx2, 1, 4, ids, date)
 
 	var netError net.Error
 	ok := errors.As(err, &netError)
@@ -219,7 +226,7 @@ func TestGCManifestTaskStore_FindAndLockNBefore(t *testing.T) {
 	go time.AfterFunc(500*time.Millisecond, func() { tx1.Rollback() })
 
 	s = datastore.NewGCManifestTaskStore(tx3)
-	rr, err = s.FindAndLockNBefore(suite.ctx, 4, ids, date)
+	rr, err = s.FindAndLockNBefore(suite.ctx, 1, 4, ids, date)
 	require.NoError(t, err)
 	require.Equal(t, expected, rr)
 }
@@ -235,13 +242,13 @@ func TestGCManifestTaskStore_FindAndLockNBefore_NotFound(t *testing.T) {
 
 	// when there is no such (repository_id, manifest_id) pair
 	date := testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", time.UTC).Add(1 * time.Minute)
-	rr, err := s.FindAndLockNBefore(suite.ctx, 400, []int64{7, 4}, date)
+	rr, err := s.FindAndLockNBefore(suite.ctx, 1, 400, []int64{7, 4}, date)
 	require.NoError(t, err)
 	require.Empty(t, rr)
 
 	// when the review_after is not before the given date
 	date = testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", time.UTC)
-	rr, err = s.FindAndLockNBefore(suite.ctx, 4, []int64{7, 4}, date)
+	rr, err = s.FindAndLockNBefore(suite.ctx, 1, 4, []int64{7, 4}, date)
 	require.NoError(t, err)
 	require.Empty(t, rr)
 }
@@ -281,6 +288,7 @@ func TestGcManifestTaskStore_Next(t *testing.T) {
 
 	local := m1.ReviewAfter.Location()
 	require.Equal(t, &models.GCManifestTask{
+		NamespaceID:  1,
 		RepositoryID: 3,
 		ManifestID:   1,
 		ReviewAfter:  testutil.ParseTimestamp(t, "2020-03-03 17:50:26.461745", local),
@@ -293,6 +301,7 @@ func TestGcManifestTaskStore_Next(t *testing.T) {
 	defer tx2.Rollback()
 
 	expectedM2 := &models.GCManifestTask{
+		NamespaceID:  1,
 		RepositoryID: 4,
 		ManifestID:   7,
 		ReviewAfter:  testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", local),
@@ -305,6 +314,7 @@ func TestGcManifestTaskStore_Next(t *testing.T) {
 	defer tx3.Rollback()
 
 	expectedM3 := &models.GCManifestTask{
+		NamespaceID:  1,
 		RepositoryID: 4,
 		ManifestID:   4,
 		ReviewAfter:  testutil.ParseTimestamp(t, "2020-06-11 09:11:23.655121", local),
@@ -388,7 +398,7 @@ func TestExistsGCManifestTask(t *testing.T) {
 	require.False(t, existsGCManifestTask(t, suite.db, 6, 2))
 }
 
-func pickGCManifestTask(t *testing.T, db datastore.Queryer, repositoryID, manifestID int64) *models.GCManifestTask {
+func pickGCManifestTask(t *testing.T, db datastore.Queryer, namespaceID, repositoryID, manifestID int64) *models.GCManifestTask {
 	t.Helper()
 
 	q := `SELECT
@@ -397,12 +407,13 @@ func pickGCManifestTask(t *testing.T, db datastore.Queryer, repositoryID, manife
 		FROM
 			gc_manifest_review_queue
 		WHERE
-			repository_id = $1
-			AND manifest_id = $2
+			top_level_namespace_id = $1
+			AND repository_id = $2
+			AND manifest_id = $3
 		FOR UPDATE`
 
-	m := &models.GCManifestTask{RepositoryID: repositoryID, ManifestID: manifestID}
-	if err := db.QueryRowContext(suite.ctx, q, m.RepositoryID, m.ManifestID).Scan(&m.ReviewAfter, &m.ReviewCount); err != nil {
+	m := &models.GCManifestTask{NamespaceID: namespaceID, RepositoryID: repositoryID, ManifestID: manifestID}
+	if err := db.QueryRowContext(suite.ctx, q, m.NamespaceID, m.RepositoryID, m.ManifestID).Scan(&m.ReviewAfter, &m.ReviewCount); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
@@ -420,17 +431,19 @@ func TestPickGCManifestTask(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
+	namespaceID := int64(1)
 	repositoryID := int64(4)
 	manifestID := int64(7)
-	m := pickGCManifestTask(t, tx, repositoryID, manifestID)
+	m := pickGCManifestTask(t, tx, namespaceID, repositoryID, manifestID)
 
 	require.Equal(t, &models.GCManifestTask{
+		NamespaceID:  namespaceID,
 		RepositoryID: repositoryID,
 		ManifestID:   manifestID,
 		ReviewAfter:  testutil.ParseTimestamp(t, "2020-04-03 18:45:04.470711", m.ReviewAfter.Location()),
 		ReviewCount:  2,
 	}, m)
-	require.Nil(t, pickGCManifestTask(t, tx, 6, 2))
+	require.Nil(t, pickGCManifestTask(t, tx, 2, 6, 2))
 }
 
 func TestGcManifestTaskStore_Delete(t *testing.T) {
@@ -471,7 +484,7 @@ func TestGcManifestTaskStore_IsDangling_No_Tagged(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	m := pickGCManifestTask(t, tx, 4, 7)
+	m := pickGCManifestTask(t, tx, 1, 4, 7)
 	require.NotNil(t, m)
 
 	s := datastore.NewGCManifestTaskStore(tx)
@@ -488,7 +501,7 @@ func TestGcManifestTaskStore_IsDangling_No_ReferencedByList(t *testing.T) {
 	require.NoError(t, err)
 	defer tx.Rollback()
 
-	m := pickGCManifestTask(t, tx, 4, 9)
+	m := pickGCManifestTask(t, tx, 1, 4, 9)
 	require.NotNil(t, m)
 
 	s := datastore.NewGCManifestTaskStore(tx)
@@ -507,10 +520,10 @@ func TestGcManifestTaskStore_IsDangling_No_TaggedAndReferencedByList(t *testing.
 
 	// tag an (untagged) manifest referenced by a manifest list
 	ts := datastore.NewTagStore(tx)
-	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{RepositoryID: 4, ManifestID: 9, Name: "foo"})
+	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{NamespaceID: 1, RepositoryID: 4, ManifestID: 9, Name: "foo"})
 	require.NoError(t, err)
 
-	m := pickGCManifestTask(t, tx, 4, 9)
+	m := pickGCManifestTask(t, tx, 1, 4, 9)
 	require.NotNil(t, m)
 
 	s := datastore.NewGCManifestTaskStore(tx)

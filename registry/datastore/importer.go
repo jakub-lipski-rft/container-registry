@@ -312,6 +312,7 @@ func (imp *Importer) importV2Manifest(ctx context.Context, fsRepo distribution.R
 
 	// find or create DB manifest
 	dbManifest, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
+		NamespaceID:   dbRepo.NamespaceID,
 		RepositoryID:  dbRepo.ID,
 		SchemaVersion: m.version().SchemaVersion,
 		MediaType:     m.version().MediaType,
@@ -350,6 +351,7 @@ func (imp *Importer) importManifestList(ctx context.Context, fsRepo distribution
 
 	// create manifest list on DB
 	dbManifestList, err := imp.findOrCreateDBManifest(ctx, dbRepo, &models.Manifest{
+		NamespaceID:   dbRepo.NamespaceID,
 		RepositoryID:  dbRepo.ID,
 		SchemaVersion: ml.SchemaVersion,
 		MediaType:     mediaType,
@@ -476,7 +478,7 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 		log = log.WithField("target", desc.Digest)
 		log.Info("importing tag")
 
-		dbTag := &models.Tag{Name: fsTag, RepositoryID: dbRepo.ID}
+		dbTag := &models.Tag{Name: fsTag, NamespaceID: dbRepo.NamespaceID, RepositoryID: dbRepo.ID}
 
 		// Find corresponding manifest in DB or filesystem.
 		var dbManifest *models.Manifest
