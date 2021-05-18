@@ -25,7 +25,7 @@ func scanFullGCConfigLinks(rows *sql.Rows) ([]*models.GCConfigLink, error) {
 		var dgst Digest
 		r := new(models.GCConfigLink)
 
-		err := rows.Scan(&r.ID, &r.RepositoryID, &r.ManifestID, &dgst)
+		err := rows.Scan(&r.ID, &r.NamespaceID, &r.RepositoryID, &r.ManifestID, &dgst)
 		if err != nil {
 			return nil, fmt.Errorf("scanning GC configuration link: %w", err)
 		}
@@ -49,6 +49,7 @@ func scanFullGCConfigLinks(rows *sql.Rows) ([]*models.GCConfigLink, error) {
 func (s *gcConfigLinkStore) FindAll(ctx context.Context) ([]*models.GCConfigLink, error) {
 	q := `SELECT
 			id,
+			top_level_namespace_id,
 			repository_id,
 			manifest_id,
 			encode(digest, 'hex') as digest

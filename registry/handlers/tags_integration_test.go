@@ -27,6 +27,7 @@ func TestDeleteTagDB(t *testing.T) {
 	// add a manifest
 	mStore := datastore.NewManifestStore(env.db)
 	m := &models.Manifest{
+		NamespaceID:   r.NamespaceID,
 		RepositoryID:  r.ID,
 		SchemaVersion: 2,
 		MediaType:     schema2.MediaTypeManifest,
@@ -40,6 +41,7 @@ func TestDeleteTagDB(t *testing.T) {
 	tStore := datastore.NewTagStore(env.db)
 	tag := &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	}

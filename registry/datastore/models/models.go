@@ -18,13 +18,22 @@ func (p Payload) Value() (driver.Value, error) {
 	return json.RawMessage(p).MarshalJSON()
 }
 
-type Repository struct {
+// Namespace represents a root repository.
+type Namespace struct {
 	ID        int64
 	Name      string
-	Path      string
-	ParentID  sql.NullInt64
 	CreatedAt time.Time
 	UpdatedAt sql.NullTime
+}
+
+type Repository struct {
+	ID          int64
+	NamespaceID int64
+	Name        string
+	Path        string
+	ParentID    sql.NullInt64
+	CreatedAt   time.Time
+	UpdatedAt   sql.NullTime
 }
 
 // Repositories is a slice of Repository pointers.
@@ -38,6 +47,7 @@ type Configuration struct {
 
 type Manifest struct {
 	ID            int64
+	NamespaceID   int64
 	RepositoryID  int64
 	SchemaVersion int
 	MediaType     string
@@ -52,6 +62,7 @@ type Manifests []*Manifest
 
 type Tag struct {
 	ID           int64
+	NamespaceID  int64
 	Name         string
 	RepositoryID int64
 	ManifestID   int64
@@ -82,6 +93,7 @@ type GCBlobTask struct {
 // GCConfigLink represents a row in the gc_blobs_configurations table.
 type GCConfigLink struct {
 	ID           int64
+	NamespaceID  int64
 	RepositoryID int64
 	ManifestID   int64
 	Digest       digest.Digest
@@ -90,6 +102,7 @@ type GCConfigLink struct {
 // GCLayerLink represents a row in the gc_blobs_layers table.
 type GCLayerLink struct {
 	ID           int64
+	NamespaceID  int64
 	RepositoryID int64
 	LayerID      int64
 	Digest       digest.Digest
@@ -97,6 +110,7 @@ type GCLayerLink struct {
 
 // GCManifestTask represents a row in the gc_manifest_review_queue table.
 type GCManifestTask struct {
+	NamespaceID  int64
 	RepositoryID int64
 	ManifestID   int64
 	ReviewAfter  time.Time

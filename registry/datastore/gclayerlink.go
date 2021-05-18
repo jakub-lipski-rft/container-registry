@@ -25,7 +25,7 @@ func scanFullGCLayerLinks(rows *sql.Rows) ([]*models.GCLayerLink, error) {
 		var dgst Digest
 		r := new(models.GCLayerLink)
 
-		err := rows.Scan(&r.ID, &r.RepositoryID, &r.LayerID, &dgst)
+		err := rows.Scan(&r.ID, &r.NamespaceID, &r.RepositoryID, &r.LayerID, &dgst)
 		if err != nil {
 			return nil, fmt.Errorf("scanning GC layer link: %w", err)
 		}
@@ -49,6 +49,7 @@ func scanFullGCLayerLinks(rows *sql.Rows) ([]*models.GCLayerLink, error) {
 func (s *gcLayerLinkStore) FindAll(ctx context.Context) ([]*models.GCLayerLink, error) {
 	q := `SELECT
 			id,
+			top_level_namespace_id,
 			repository_id,
 			layer_id,
 			encode(digest, 'hex') as digest

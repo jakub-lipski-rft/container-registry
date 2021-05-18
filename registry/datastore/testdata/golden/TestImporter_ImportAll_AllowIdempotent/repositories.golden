@@ -1,8 +1,8 @@
-[{"id":1,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"f-dangling-manifests","path":"f-dangling-manifests"}, 
- {"id":2,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"a-simple","path":"a-simple"}, 
- {"id":3,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"b-nested","path":"b-nested"}, 
- {"id":5,"parent_id":3,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"older","path":"b-nested/older"}, 
- {"id":8,"parent_id":5,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"older","path":"b-nested/older/older"}, 
- {"id":9,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"c-manifest-list","path":"c-manifest-list"}, 
- {"id":10,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"d-schema1","path":"d-schema1"}, 
- {"id":11,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"e-helm","path":"e-helm"}]
+[{"id":1,"top_level_namespace_id":1,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"f-dangling-manifests","path":"f-dangling-manifests"}, 
+ {"id":3,"top_level_namespace_id":3,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"b-nested","path":"b-nested"}, 
+ {"id":5,"top_level_namespace_id":3,"parent_id":3,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"older","path":"b-nested/older"}, 
+ {"id":8,"top_level_namespace_id":3,"parent_id":5,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"older","path":"b-nested/older/older"}, 
+ {"id":11,"top_level_namespace_id":8,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"e-helm","path":"e-helm"}, 
+ {"id":2,"top_level_namespace_id":2,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"a-simple","path":"a-simple"}, 
+ {"id":9,"top_level_namespace_id":6,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"c-manifest-list","path":"c-manifest-list"}, 
+ {"id":10,"top_level_namespace_id":7,"parent_id":null,"created_at":"2020-04-15T12:04:28.95584","updated_at":null,"name":"d-schema1","path":"d-schema1"}]

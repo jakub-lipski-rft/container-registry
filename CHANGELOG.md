@@ -1,4 +1,6 @@
 ## [Unreleased]
+### Changed
+- registry/datastore: Partitioning by top-level namespace
 
 ## [v3.4.1-gitlab] - 2021-05-11
 ### Fixed

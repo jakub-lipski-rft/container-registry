@@ -81,33 +81,33 @@ func (mr *MockGCManifestTaskStoreMockRecorder) FindAll(arg0 interface{}) *gomock
 }
 
 // FindAndLockBefore mocks base method.
-func (m *MockGCManifestTaskStore) FindAndLockBefore(arg0 context.Context, arg1, arg2 int64, arg3 time.Time) (*models.GCManifestTask, error) {
+func (m *MockGCManifestTaskStore) FindAndLockBefore(arg0 context.Context, arg1, arg2, arg3 int64, arg4 time.Time) (*models.GCManifestTask, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindAndLockBefore", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "FindAndLockBefore", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(*models.GCManifestTask)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindAndLockBefore indicates an expected call of FindAndLockBefore.
-func (mr *MockGCManifestTaskStoreMockRecorder) FindAndLockBefore(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockGCManifestTaskStoreMockRecorder) FindAndLockBefore(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndLockBefore", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAndLockBefore), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndLockBefore", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAndLockBefore), arg0, arg1, arg2, arg3, arg4)
 }
 
 // FindAndLockNBefore mocks base method.
-func (m *MockGCManifestTaskStore) FindAndLockNBefore(arg0 context.Context, arg1 int64, arg2 []int64, arg3 time.Time) ([]*models.GCManifestTask, error) {
+func (m *MockGCManifestTaskStore) FindAndLockNBefore(arg0 context.Context, arg1, arg2 int64, arg3 []int64, arg4 time.Time) ([]*models.GCManifestTask, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindAndLockNBefore", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "FindAndLockNBefore", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].([]*models.GCManifestTask)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindAndLockNBefore indicates an expected call of FindAndLockNBefore.
-func (mr *MockGCManifestTaskStoreMockRecorder) FindAndLockNBefore(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockGCManifestTaskStoreMockRecorder) FindAndLockNBefore(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndLockNBefore", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAndLockNBefore), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindAndLockNBefore", reflect.TypeOf((*MockGCManifestTaskStore)(nil).FindAndLockNBefore), arg0, arg1, arg2, arg3, arg4)
 }
 
 // IsDangling mocks base method.

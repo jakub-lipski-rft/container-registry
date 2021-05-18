@@ -15,12 +15,12 @@ import (
 
 func reloadBlobFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(tb, suite.db, suite.basePath,
-		testutil.RepositoriesTable, testutil.BlobsTable, testutil.RepositoryBlobsTable)
+		testutil.NamespacesTable, testutil.RepositoriesTable, testutil.BlobsTable, testutil.RepositoryBlobsTable)
 }
 
 func unloadBlobFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(suite.db,
-		testutil.RepositoriesTable, testutil.BlobsTable, testutil.RepositoryBlobsTable))
+		testutil.NamespacesTable, testutil.RepositoriesTable, testutil.BlobsTable, testutil.RepositoryBlobsTable))
 }
 
 func TestBlobStore_ImplementsReaderAndWriter(t *testing.T) {

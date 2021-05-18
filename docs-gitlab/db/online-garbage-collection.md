@@ -119,8 +119,8 @@ CREATE FUNCTION gc_track_configuration_blobs ()
     AS $$
 BEGIN
     IF NEW.configuration_blob_digest IS NOT NULL THEN -- not all manifests have a configuration
-        INSERT INTO gc_blobs_configurations (repository_id, manifest_id, digest)
-            VALUES (NEW.repository_id, NEW.id, NEW.configuration_blob_digest)
+        INSERT INTO gc_blobs_configurations (top_level_namespace_id, repository_id, manifest_id, digest)
+            VALUES (NEW.top_level_namespace_id, NEW.repository_id, NEW.id, NEW.configuration_blob_digest)
         ON CONFLICT (digest, manifest_id)
             DO NOTHING;
     END IF;
@@ -144,8 +144,8 @@ CREATE FUNCTION gc_track_layer_blobs ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_blobs_layers (repository_id, layer_id, digest)
-        VALUES (NEW.repository_id, NEW.id, NEW.digest)
+    INSERT INTO gc_blobs_layers (top_level_namespace_id, repository_id, layer_id, digest)
+        VALUES (NEW.top_level_namespace_id, NEW.repository_id, NEW.id, NEW.digest)
     ON CONFLICT (digest, layer_id)
         DO NOTHING;
     RETURN NULL;
@@ -174,8 +174,8 @@ CREATE FUNCTION gc_track_manifest_uploads ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
-        VALUES (NEW.repository_id, NEW.id, gc_review_after('manifest_upload'));
+    INSERT INTO gc_manifest_review_queue (top_level_namespace_id, repository_id, manifest_id, review_after)
+        VALUES (NEW.top_level_namespace_id, NEW.repository_id, NEW.id, gc_review_after('manifest_upload'));
     RETURN NULL;
 END;
 $$
@@ -276,9 +276,9 @@ CREATE FUNCTION gc_track_deleted_manifest_lists ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
-        VALUES (OLD.repository_id, OLD.child_id, gc_review_after('manifest_list_delete'))
-    ON CONFLICT (repository_id, manifest_id)
+    INSERT INTO gc_manifest_review_queue (top_level_namespace_id, repository_id, manifest_id, review_after)
+        VALUES (OLD.top_level_namespace_id, OLD.repository_id, OLD.child_id, gc_review_after('manifest_list_delete'))
+    ON CONFLICT (top_level_namespace_id, repository_id, manifest_id)
         DO UPDATE SET
             review_after = gc_review_after('manifest_list_delete');
     RETURN NULL;
@@ -317,9 +317,9 @@ BEGIN
         WHERE
             repository_id = OLD.repository_id
             AND id = OLD.manifest_id) THEN
-        INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
-            VALUES (OLD.repository_id, OLD.manifest_id, gc_review_after('tag_delete'))
-        ON CONFLICT (repository_id, manifest_id)
+        INSERT INTO gc_manifest_review_queue (top_level_namespace_id, repository_id, manifest_id, review_after)
+            VALUES (OLD.top_level_namespace_id, OLD.repository_id, OLD.manifest_id, gc_review_after('tag_delete'))
+        ON CONFLICT (top_level_namespace_id, repository_id, manifest_id)
             DO UPDATE SET
                 review_after = gc_review_after('tag_delete');
     END IF;
@@ -362,9 +362,9 @@ CREATE FUNCTION gc_track_switched_tags ()
     RETURNS TRIGGER
     AS $$
 BEGIN
-    INSERT INTO gc_manifest_review_queue (repository_id, manifest_id, review_after)
-        VALUES (OLD.repository_id, OLD.manifest_id, gc_review_after('tag_switch'))
-    ON CONFLICT (repository_id, manifest_id)
+    INSERT INTO gc_manifest_review_queue (top_level_namespace_id, repository_id, manifest_id, review_after)
+        VALUES (OLD.top_level_namespace_id, OLD.repository_id, OLD.manifest_id, gc_review_after('tag_switch'))
+    ON CONFLICT (top_level_namespace_id, repository_id, manifest_id)
         DO UPDATE SET
             review_after = gc_review_after('tag_switch');
     RETURN NULL;
@@ -580,6 +580,7 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
    ```sql
    BEGIN;
    SELECT
+       top_level_namespace_id,
        repository_id,
        manifest_id
    FROM
@@ -603,24 +604,27 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
             FROM
                 tags
             WHERE
-                repository_id = $1
-                AND manifest_id = $2
+                top_level_namespace_id = $1
+                AND repository_id = $2
+                AND manifest_id = $3
             UNION ALL
             SELECT
                 1
             FROM
                 manifest_references
             WHERE
-                repository_id = $1
-                AND child_id = $2);
+                top_level_namespace_id = $1
+                AND repository_id = $2
+                AND child_id = $3);
    ```
 
 3. If it's not eligible for deletion, remove it from the review queue and commit the transaction:
 
    ```sql
    DELETE FROM gc_manifest_review_queue
-   WHERE repository_id = $1
-       AND manifest_id = $2;
+   WHERE top_level_namespace_id = $1
+       AND repository_id = $2
+       AND manifest_id = $3;
    
    COMMIT;
    ```
@@ -629,8 +633,9 @@ The process of reviewing and possibly deleting a manifest or a manifest list (it
 
    ```sql
    DELETE FROM manifests
-   WHERE repository_id = $1
-       AND id = $2;
+   WHERE top_level_namespace_id = $1
+       AND repository_id = $2
+       AND id = $3;
   
    COMMIT;
    ```
@@ -657,7 +662,8 @@ To avoid this, we need to synchronize the API and the garbage collector with exp
   FROM
       gc_manifest_review_queue
   WHERE
-      repository_id = ?
+      top_level_namespace_id = ?
+      AND repository_id = ?
       AND manifest_id = ?
       AND review_after < NOW() + INTERVAL '1 hour'
   FOR UPDATE;
@@ -693,10 +699,12 @@ To avoid this, we need to synchronize the API and the garbage collector with exp
   FROM
       gc_manifest_review_queue
   WHERE
-      repository_id = ?
+      top_level_namespace_id = ?
+      AND repository_id = ?
       AND manifest_id IN (?)
       AND review_after < NOW() + INTERVAL '1 hour'
   ORDER BY
+      top_level_namespace_id,
       repository_id,
       manifest_id
   FOR UPDATE;

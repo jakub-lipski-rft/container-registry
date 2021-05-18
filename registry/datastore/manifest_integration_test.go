@@ -17,7 +17,7 @@ func reloadManifestFixtures(tb testing.TB) {
 	testutil.ReloadFixtures(
 		tb, suite.db, suite.basePath,
 		// Manifest has a relationship with Repository and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable,
+		testutil.NamespacesTable, testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable,
 		testutil.TagsTable, testutil.ManifestReferencesTable, testutil.LayersTable,
 	)
 }
@@ -26,7 +26,7 @@ func unloadManifestFixtures(tb testing.TB) {
 	require.NoError(tb, testutil.TruncateTables(
 		suite.db,
 		// Manifest has a relationship with Repository and ManifestLayer (insert order matters)
-		testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable,
+		testutil.NamespacesTable, testutil.RepositoriesTable, testutil.BlobsTable, testutil.ManifestsTable,
 		testutil.TagsTable, testutil.ManifestReferencesTable, testutil.LayersTable,
 	))
 }
@@ -48,6 +48,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 	expected := models.Manifests{
 		{
 			ID:            1,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -62,6 +63,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            2,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -76,6 +78,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            3,
+			NamespaceID:   1,
 			RepositoryID:  4,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -90,6 +93,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            4,
+			NamespaceID:   1,
 			RepositoryID:  4,
 			SchemaVersion: 1,
 			MediaType:     "application/vnd.docker.distribution.manifest.v1+json",
@@ -99,6 +103,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            5,
+			NamespaceID:   2,
 			RepositoryID:  6,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -113,6 +118,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            6,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     manifestlist.MediaTypeManifestList,
@@ -122,6 +128,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            7,
+			NamespaceID:   1,
 			RepositoryID:  4,
 			SchemaVersion: 2,
 			MediaType:     manifestlist.MediaTypeManifestList,
@@ -131,6 +138,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            8,
+			NamespaceID:   2,
 			RepositoryID:  7,
 			SchemaVersion: 2,
 			MediaType:     manifestlist.MediaTypeManifestList,
@@ -140,6 +148,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            9,
+			NamespaceID:   1,
 			RepositoryID:  4,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -154,6 +163,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            10,
+			NamespaceID:   2,
 			RepositoryID:  7,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -168,6 +178,7 @@ func TestManifestStore_FindAll(t *testing.T) {
 		},
 		{
 			ID:            11,
+			NamespaceID:   2,
 			RepositoryID:  7,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -237,7 +248,7 @@ func TestManifestStore_References(t *testing.T) {
 	s := datastore.NewManifestStore(suite.db)
 
 	// see testdata/fixtures/manifest_references.sql
-	ml := &models.Manifest{RepositoryID: 3, ID: 6}
+	ml := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 6}
 	mm, err := s.References(suite.ctx, ml)
 	require.NoError(t, err)
 
@@ -245,6 +256,7 @@ func TestManifestStore_References(t *testing.T) {
 	expected := models.Manifests{
 		{
 			ID:            1,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -259,6 +271,7 @@ func TestManifestStore_References(t *testing.T) {
 		},
 		{
 			ID:            2,
+			NamespaceID:   1,
 			RepositoryID:  3,
 			SchemaVersion: 2,
 			MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -281,10 +294,10 @@ func TestManifestStore_References_None(t *testing.T) {
 	s := datastore.NewManifestStore(suite.db)
 
 	// see testdata/fixtures/manifest_references.sql
-	ml := &models.Manifest{ID: 5}
-	err := s.DissociateManifest(suite.ctx, ml, &models.Manifest{ID: 1})
+	ml := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 6}
+	err := s.DissociateManifest(suite.ctx, ml, &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 1})
 	require.NoError(t, err)
-	err = s.DissociateManifest(suite.ctx, ml, &models.Manifest{ID: 2})
+	err = s.DissociateManifest(suite.ctx, ml, &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 2})
 	require.NoError(t, err)
 
 	mm, err := s.References(suite.ctx, ml)
@@ -298,6 +311,7 @@ func TestManifestStore_Create(t *testing.T) {
 
 	s := datastore.NewManifestStore(suite.db)
 	m := &models.Manifest{
+		NamespaceID:   2,
 		RepositoryID:  7,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -318,6 +332,7 @@ func TestManifestStore_Create_NonUniqueDigestFails(t *testing.T) {
 
 	// see testdata/fixtures/manifests.sql
 	m := &models.Manifest{
+		NamespaceID:   1,
 		RepositoryID:  3,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -333,7 +348,7 @@ func TestManifestStore_AssociateLayerBlob(t *testing.T) {
 	require.NoError(t, testutil.TruncateTables(suite.db, testutil.LayersTable))
 
 	s := datastore.NewManifestStore(suite.db)
-	m := &models.Manifest{RepositoryID: 3, ID: 1}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 1}
 	b := &models.Blob{
 		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 		Digest:    "sha256:f01256086224ded321e042e74135d72d5f108089a1cda03ab4820dfc442807c1",
@@ -366,8 +381,8 @@ func TestManifestStore_AssociateManifest(t *testing.T) {
 	s := datastore.NewManifestStore(suite.db)
 
 	// see testdata/fixtures/manifest_references.sql
-	ml := &models.Manifest{RepositoryID: 4, ID: 7}
-	m := &models.Manifest{RepositoryID: 4, ID: 4}
+	ml := &models.Manifest{NamespaceID: 1, RepositoryID: 4, ID: 7}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 4, ID: 4}
 	err := s.AssociateManifest(suite.ctx, ml, m)
 	require.NoError(t, err)
 
@@ -387,8 +402,8 @@ func TestManifestStore_AssociateManifest_AlreadyAssociatedDoesNotFail(t *testing
 	s := datastore.NewManifestStore(suite.db)
 
 	// see testdata/fixtures/manifest_references.sql
-	ml := &models.Manifest{RepositoryID: 4, ID: 7}
-	m := &models.Manifest{RepositoryID: 4, ID: 3}
+	ml := &models.Manifest{NamespaceID: 1, RepositoryID: 4, ID: 7}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 4, ID: 3}
 	err := s.AssociateManifest(suite.ctx, ml, m)
 	require.NoError(t, err)
 }
@@ -398,8 +413,8 @@ func TestManifestStore_AssociateManifest_WithItselfFails(t *testing.T) {
 
 	s := datastore.NewManifestStore(suite.db)
 
-	ml := &models.Manifest{ID: 5}
-	m := &models.Manifest{ID: 5}
+	ml := &models.Manifest{NamespaceID: 2, RepositoryID: 6, ID: 5}
+	m := &models.Manifest{NamespaceID: 2, RepositoryID: 6, ID: 5}
 	err := s.AssociateManifest(suite.ctx, ml, m)
 	require.Error(t, err)
 }
@@ -412,6 +427,7 @@ func TestManifestStore_AssociateManifest_NestedLists(t *testing.T) {
 
 	// create a new temporary manifest list
 	tmp := &models.Manifest{
+		NamespaceID:   2,
 		RepositoryID:  7,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.list.v2+json",
@@ -423,8 +439,8 @@ func TestManifestStore_AssociateManifest_NestedLists(t *testing.T) {
 	require.NotEmpty(t, tmp.ID)
 
 	// see testdata/fixtures/manifests.sql
-	ml1 := &models.Manifest{RepositoryID: 7, ID: 8}
-	ml2 := &models.Manifest{RepositoryID: 7, ID: tmp.ID}
+	ml1 := &models.Manifest{NamespaceID: 2, RepositoryID: 7, ID: 8}
+	ml2 := &models.Manifest{NamespaceID: 2, RepositoryID: 7, ID: tmp.ID}
 	err = s.AssociateManifest(suite.ctx, ml1, ml2)
 	require.NoError(t, err)
 
@@ -446,6 +462,7 @@ func TestManifestStore_AssociateManifest_ChildNotFound(t *testing.T) {
 
 	// create a new temporary manifest list
 	ml := &models.Manifest{
+		NamespaceID:   2,
 		RepositoryID:  7,
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.list.v2+json",
@@ -455,7 +472,7 @@ func TestManifestStore_AssociateManifest_ChildNotFound(t *testing.T) {
 	err := s.Create(suite.ctx, ml)
 	require.NoError(t, err)
 
-	m := &models.Manifest{RepositoryID: 7, ID: 100}
+	m := &models.Manifest{NamespaceID: 2, RepositoryID: 7, ID: 100}
 	err = s.AssociateManifest(suite.ctx, ml, m)
 	require.EqualError(t, err, datastore.ErrRefManifestNotFound.Error())
 }
@@ -464,8 +481,8 @@ func TestManifestStore_DissociateManifest(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
-	ml := &models.Manifest{ID: 6}
-	m := &models.Manifest{ID: 1}
+	ml := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 6}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 1}
 
 	err := s.DissociateManifest(suite.ctx, ml, m)
 	require.NoError(t, err)
@@ -485,8 +502,8 @@ func TestManifestStore_DissociateManifest_NotAssociatedDoesNotFail(t *testing.T)
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
-	ml := &models.Manifest{ID: 6}
-	m := &models.Manifest{ID: 3}
+	ml := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 6}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 4, ID: 3}
 
 	err := s.DissociateManifest(suite.ctx, ml, m)
 	require.NoError(t, err)
@@ -498,7 +515,7 @@ func TestManifestStore_AssociateLayerBlob_AlreadyAssociatedDoesNotFail(t *testin
 	s := datastore.NewManifestStore(suite.db)
 
 	// see testdata/fixtures/layers.sql
-	m := &models.Manifest{RepositoryID: 3, ID: 1}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 1}
 	b := &models.Blob{
 		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 		Digest:    "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9",
@@ -512,7 +529,7 @@ func TestManifestStore_DissociateLayerBlob(t *testing.T) {
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
-	m := &models.Manifest{RepositoryID: 3, ID: 1}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 1}
 	b := &models.Blob{
 		MediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip",
 		Digest:    "sha256:c9b1b535fdd91a9855fb7f82348177e5f019329a58c53c47272962dd60f71fc9",
@@ -541,7 +558,7 @@ func TestManifestStore_DissociateLayerBlob_NotAssociatedDoesNotFail(t *testing.T
 	reloadManifestFixtures(t)
 
 	s := datastore.NewManifestStore(suite.db)
-	m := &models.Manifest{RepositoryID: 3, ID: 1}
+	m := &models.Manifest{NamespaceID: 1, RepositoryID: 3, ID: 1}
 	b := &models.Blob{Digest: "sha256:c4039fd85dccc8e267c98447f8f1b27a402dbb4259d86586f4097acb5e6634af"}
 
 	err := s.DissociateLayerBlob(suite.ctx, m, b)
@@ -556,6 +573,7 @@ func TestManifestStore_DeleteManifest(t *testing.T) {
 	// see testdata/fixtures/manifests.sql
 	m := &models.Manifest{
 		ID:           4,
+		NamespaceID:  1,
 		RepositoryID: 4,
 	}
 
@@ -577,6 +595,7 @@ func TestManifestStore_DeleteManifest_FailsIfReferencedInList(t *testing.T) {
 	// see testdata/fixtures/manifests.sql
 	m := &models.Manifest{
 		ID:           1,
+		NamespaceID:  1,
 		RepositoryID: 3,
 	}
 
@@ -601,6 +620,7 @@ func TestManifestStore_DeleteManifest_NotFoundDoesNotFail(t *testing.T) {
 
 	m := &models.Manifest{
 		ID:           100,
+		NamespaceID:  1,
 		RepositoryID: 3,
 	}
 	found, err := s.Delete(suite.ctx, m)

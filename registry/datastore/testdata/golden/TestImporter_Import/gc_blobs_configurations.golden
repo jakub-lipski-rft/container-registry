@@ -1,2 +1,2 @@
-[{"id":1,"repository_id":2,"manifest_id":1,"digest":"\\x01c59f425529b7d5d3fb646a0a5288878d27a16fee361d86ab89d3be36c1e6e560"}, 
- {"id":2,"repository_id":2,"manifest_id":2,"digest":"\\x01631bf69df08e11fff62ae65c901ba312618056a197b8e44a8c8b5a14e19599f2"}]
+[{"id":1,"top_level_namespace_id":1,"repository_id":2,"manifest_id":1,"digest":"\\x01c59f425529b7d5d3fb646a0a5288878d27a16fee361d86ab89d3be36c1e6e560"}, 
+ {"id":2,"top_level_namespace_id":1,"repository_id":2,"manifest_id":2,"digest":"\\x01631bf69df08e11fff62ae65c901ba312618056a197b8e44a8c8b5a14e19599f2"}]

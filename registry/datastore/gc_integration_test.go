@@ -53,6 +53,7 @@ func randomManifest(t testing.TB, r *models.Repository, configBlob *models.Blob)
 	t.Helper()
 
 	m := &models.Manifest{
+		NamespaceID:   r.NamespaceID,
 		RepositoryID:  r.ID,
 		SchemaVersion: 2,
 		MediaType:     schema2.MediaTypeManifest,
@@ -152,7 +153,7 @@ func TestGC_TrackConfigurationBlobs(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create config blob
@@ -189,7 +190,7 @@ func TestGC_TrackConfigurationBlobs_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create config blob
@@ -217,7 +218,7 @@ func TestGC_TrackLayerBlobs(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create layer blob
@@ -257,7 +258,7 @@ func TestGC_TrackLayerBlobs_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create layer blob
@@ -289,7 +290,7 @@ func TestGC_TrackManifestUploads(t *testing.T) {
 	// create repository
 	rs := datastore.NewRepositoryStore(suite.db)
 	r := randomRepository(t)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -305,6 +306,7 @@ func TestGC_TrackManifestUploads(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(tt))
 	require.Equal(t, &models.GCManifestTask{
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 		ReviewAfter:  m.CreatedAt.Add(24 * time.Hour),
@@ -322,7 +324,7 @@ func TestGC_TrackManifestUploads_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repository
 	rs := datastore.NewRepositoryStore(suite.db)
 	r := randomRepository(t)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -352,7 +354,7 @@ func TestGC_TrackDeletedManifests(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create config blob
@@ -396,7 +398,7 @@ func TestGC_TrackDeletedManifests_PostponeReviewOnConflict(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create config blob
@@ -452,7 +454,7 @@ func TestGC_TrackDeletedManifests_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create config blob
@@ -492,7 +494,7 @@ func TestGC_TrackDeletedLayers(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create layer blob
@@ -539,7 +541,7 @@ func TestGC_TrackDeletedLayers_PostponeReviewOnConflict(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create layer blob
@@ -595,7 +597,7 @@ func TestGC_TrackDeletedLayers_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create layer blob
@@ -638,7 +640,7 @@ func TestGC_TrackDeletedManifestLists(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -683,7 +685,7 @@ func TestGC_TrackDeletedManifestLists_PostponeReviewOnConflict(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -740,7 +742,7 @@ func TestGC_TrackDeletedManifestLists_DoesNothingIfTriggerDisabled(t *testing.T)
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -779,7 +781,7 @@ func TestGC_TrackSwitchedTags(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -792,6 +794,7 @@ func TestGC_TrackSwitchedTags(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})
@@ -811,6 +814,7 @@ func TestGC_TrackSwitchedTags(t *testing.T) {
 	// switch tag to new manifest
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m2.ID,
 	})
@@ -833,7 +837,7 @@ func TestGC_TrackSwitchedTags_PostponeReviewOnConflict(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -846,6 +850,7 @@ func TestGC_TrackSwitchedTags_PostponeReviewOnConflict(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})
@@ -870,6 +875,7 @@ func TestGC_TrackSwitchedTags_PostponeReviewOnConflict(t *testing.T) {
 	// switch tag to new manifest
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m2.ID,
 	})
@@ -901,7 +907,7 @@ func TestGC_TrackSwitchedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -914,6 +920,7 @@ func TestGC_TrackSwitchedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})
@@ -927,6 +934,7 @@ func TestGC_TrackSwitchedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// switch tag to new manifest
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m2.ID,
 	})
@@ -950,7 +958,7 @@ func TestGC_TrackDeletedTags(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -963,6 +971,7 @@ func TestGC_TrackDeletedTags(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})
@@ -1001,7 +1010,7 @@ func TestGC_TrackDeletedTags_MultipleTags(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -1016,6 +1025,7 @@ func TestGC_TrackDeletedTags_MultipleTags(t *testing.T) {
 	for _, tag := range tags {
 		err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 			Name:         tag,
+			NamespaceID:  r.NamespaceID,
 			RepositoryID: r.ID,
 			ManifestID:   m.ID,
 		})
@@ -1057,7 +1067,7 @@ func TestGC_TrackDeletedTags_ManifestDeleteCascade(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -1070,6 +1080,7 @@ func TestGC_TrackDeletedTags_ManifestDeleteCascade(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})
@@ -1093,7 +1104,7 @@ func TestGC_TrackDeletedTags_PostponeReviewOnConflict(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err := rs.Create(suite.ctx, r)
+	r, err := rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -1106,6 +1117,7 @@ func TestGC_TrackDeletedTags_PostponeReviewOnConflict(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})
@@ -1148,7 +1160,7 @@ func TestGC_TrackDeletedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 	// create repo
 	r := randomRepository(t)
 	rs := datastore.NewRepositoryStore(suite.db)
-	err = rs.Create(suite.ctx, r)
+	r, err = rs.CreateByPath(suite.ctx, r.Path)
 	require.NoError(t, err)
 
 	// create manifest
@@ -1161,6 +1173,7 @@ func TestGC_TrackDeletedTags_DoesNothingIfTriggerDisabled(t *testing.T) {
 	ts := datastore.NewTagStore(suite.db)
 	err = ts.CreateOrUpdate(suite.ctx, &models.Tag{
 		Name:         "latest",
+		NamespaceID:  r.NamespaceID,
 		RepositoryID: r.ID,
 		ManifestID:   m.ID,
 	})

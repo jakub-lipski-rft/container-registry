@@ -45,7 +45,7 @@ func NewTagStore(db Queryer) *tagStore {
 func scanFullTag(row *sql.Row) (*models.Tag, error) {
 	t := new(models.Tag)
 
-	if err := row.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
+	if err := row.Scan(&t.ID, &t.NamespaceID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 		if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("scaning tag: %w", err)
 		}
@@ -61,7 +61,7 @@ func scanFullTags(rows *sql.Rows) (models.Tags, error) {
 
 	for rows.Next() {
 		t := new(models.Tag)
-		if err := rows.Scan(&t.ID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.NamespaceID, &t.Name, &t.RepositoryID, &t.ManifestID, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning tag: %w", err)
 		}
 		tt = append(tt, t)
@@ -78,6 +78,7 @@ func (s *tagStore) FindByID(ctx context.Context, id int64) (*models.Tag, error) 
 	defer metrics.InstrumentQuery("tag_find_by_id")()
 	q := `SELECT
 			id,
+			top_level_namespace_id,
 			name,
 			repository_id,
 			manifest_id,
@@ -97,6 +98,7 @@ func (s *tagStore) FindAll(ctx context.Context) (models.Tags, error) {
 	defer metrics.InstrumentQuery("tag_find_all")()
 	q := `SELECT
 			id,
+			top_level_namespace_id,
 			name,
 			repository_id,
 			manifest_id,
@@ -130,6 +132,7 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 	defer metrics.InstrumentQuery("tag_repository")()
 	q := `SELECT
 			id,
+			top_level_namespace_id,
 			name,
 			path,
 			parent_id,
@@ -138,8 +141,9 @@ func (s *tagStore) Repository(ctx context.Context, t *models.Tag) (*models.Repos
 		FROM
 			repositories
 		WHERE
-			id = $1`
-	row := s.db.QueryRowContext(ctx, q, t.RepositoryID)
+			top_level_namespace_id = $1
+			AND id = $2`
+	row := s.db.QueryRowContext(ctx, q, t.NamespaceID, t.RepositoryID)
 
 	return scanFullRepository(row)
 }
@@ -149,6 +153,7 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 	defer metrics.InstrumentQuery("tag_manifest")()
 	q := `SELECT
 			m.id,
+			m.top_level_namespace_id,
 			m.repository_id,
 			m.schema_version,
 			mt.media_type,
@@ -163,9 +168,10 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 			JOIN media_types AS mt ON mt.id = m.media_type_id
 			LEFT JOIN media_types AS mtc ON mtc.id = m.configuration_media_type_id
 		WHERE
-			m.repository_id = $1
-			AND m.id = $2`
-	row := s.db.QueryRowContext(ctx, q, t.RepositoryID, t.ManifestID)
+			m.top_level_namespace_id = $1
+			AND m.repository_id = $2
+			AND m.id = $3`
+	row := s.db.QueryRowContext(ctx, q, t.NamespaceID, t.RepositoryID, t.ManifestID)
 
 	return scanFullManifest(row)
 }
@@ -175,9 +181,9 @@ func (s *tagStore) Manifest(ctx context.Context, t *models.Tag) (*models.Manifes
 // points to a different manifest (in which case it should be updated).
 func (s *tagStore) CreateOrUpdate(ctx context.Context, t *models.Tag) error {
 	defer metrics.InstrumentQuery("tag_create_or_update")()
-	q := `INSERT INTO tags (repository_id, manifest_id, name)
-		   VALUES ($1, $2, $3)
-	   ON CONFLICT (repository_id, name)
+	q := `INSERT INTO tags (top_level_namespace_id, repository_id, manifest_id, name)
+		   VALUES ($1, $2, $3, $4)
+	   ON CONFLICT (top_level_namespace_id, repository_id, name)
 		   DO UPDATE SET
 			   manifest_id = EXCLUDED.manifest_id, updated_at = now()
 		   WHERE
@@ -185,7 +191,7 @@ func (s *tagStore) CreateOrUpdate(ctx context.Context, t *models.Tag) error {
 	   RETURNING
 		   id, created_at, updated_at`
 
-	row := s.db.QueryRowContext(ctx, q, t.RepositoryID, t.ManifestID, t.Name)
+	row := s.db.QueryRowContext(ctx, q, t.NamespaceID, t.RepositoryID, t.ManifestID, t.Name)
 	if err := row.Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt); err != nil && err != sql.ErrNoRows {
 		var pgErr *pgconn.PgError
 		// this can happen if the manifest is deleted by the online GC while attempting to tag an untagged manifest

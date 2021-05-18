@@ -713,13 +713,14 @@ func dbTagManifest(ctx context.Context, db datastore.Handler, dgst digest.Digest
 	defer cancel()
 
 	mts := datastore.NewGCManifestTaskStore(tx)
-	if _, err := mts.FindAndLockBefore(ctx, dbRepo.ID, dbManifest.ID, time.Now().Add(manifestTagGCReviewWindow)); err != nil {
+	if _, err := mts.FindAndLockBefore(ctx, dbRepo.NamespaceID, dbRepo.ID, dbManifest.ID, time.Now().Add(manifestTagGCReviewWindow)); err != nil {
 		return err
 	}
 
 	tagStore := datastore.NewTagStore(tx)
 	if err := tagStore.CreateOrUpdate(ctx, &models.Tag{
 		Name:         tagName,
+		NamespaceID:  dbRepo.NamespaceID,
 		RepositoryID: dbRepo.ID,
 		ManifestID:   dbManifest.ID,
 	}); err != nil {
@@ -811,6 +812,7 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 		log.Debug("manifest not found in database")
 
 		m := &models.Manifest{
+			NamespaceID:   dbRepo.NamespaceID,
 			RepositoryID:  dbRepo.ID,
 			SchemaVersion: versioned.SchemaVersion,
 			MediaType:     versioned.MediaType,
@@ -941,6 +943,7 @@ func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.Deserial
 	}
 
 	ml = &models.Manifest{
+		NamespaceID:   r.NamespaceID,
 		RepositoryID:  r.ID,
 		SchemaVersion: manifestList.SchemaVersion,
 		MediaType:     mediaType,
@@ -977,7 +980,7 @@ func dbPutManifestList(imh *manifestHandler, manifestList *manifestlist.Deserial
 	defer cancel()
 
 	mts := datastore.NewGCManifestTaskStore(tx)
-	if _, err := mts.FindAndLockNBefore(ctx, r.ID, ids, time.Now().Add(manifestListCreateGCReviewWindow)); err != nil {
+	if _, err := mts.FindAndLockNBefore(ctx, r.NamespaceID, r.ID, ids, time.Now().Add(manifestListCreateGCReviewWindow)); err != nil {
 		return err
 	}
 
@@ -1144,7 +1147,7 @@ func dbDeleteManifest(ctx context.Context, db datastore.Handler, repoPath string
 		defer cancel()
 
 		mts := datastore.NewGCManifestTaskStore(tx)
-		if _, err := mts.FindAndLockNBefore(ctx, r.ID, ids, time.Now().Add(manifestDeleteGCReviewWindow)); err != nil {
+		if _, err := mts.FindAndLockNBefore(ctx, r.NamespaceID, r.ID, ids, time.Now().Add(manifestDeleteGCReviewWindow)); err != nil {
 			return err
 		}
 	}
