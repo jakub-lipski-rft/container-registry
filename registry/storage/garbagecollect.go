@@ -7,18 +7,22 @@ import (
 	"time"
 
 	dcontext "github.com/docker/distribution/context"
+	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/hashicorp/go-multierror"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
+	"golang.org/x/sync/errgroup"
 )
 
 // GCOpts contains options for garbage collector
 type GCOpts struct {
-	DryRun         bool
-	RemoveUntagged bool
+	DryRun                  bool
+	RemoveUntagged          bool
+	MaxParallelManifestGets int
 }
 
 // ManifestDel contains manifest structure which will be deleted
@@ -79,6 +83,10 @@ func (s *syncDigestSet) len() int {
 
 // MarkAndSweep performs a mark and sweep of registry data
 func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, registry distribution.Namespace, opts GCOpts) error {
+	if opts.MaxParallelManifestGets < 1 {
+		opts.MaxParallelManifestGets = 1
+	}
+
 	repositoryEnumerator, ok := registry.(distribution.RepositoryEnumerator)
 	if !ok {
 		return fmt.Errorf("unable to convert Namespace to RepositoryEnumerator")
@@ -93,6 +101,10 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 
 	err := repositoryEnumerator.Enumerate(ctx, func(repoName string) error {
 		dcontext.GetLoggerWithField(ctx, "repo", repoName).Info("marking repository")
+
+		taggedManifests := newSyncDigestSet()
+		unTaggedManifests := newSyncDigestSet()
+		referencedManifests := newSyncDigestSet()
 
 		var err error
 		named, err := reference.WithName(repoName)
@@ -154,46 +166,13 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 					return fmt.Errorf("failed to retrieve tags for digest %v: %v", dgst, err)
 				}
 				if len(tags) == 0 {
-					dcontext.GetLoggerWithField(ctx, "digest", dgst).Infof("manifest eligible for deletion")
-					// fetch all tags from repository
-					// all of these tags could contain manifest in history
-					// which means that we need check (and delete) those references when deleting manifest
-					allTags, err := cachedTagStore.All(ctx)
-					if err != nil {
-						switch err := err.(type) {
-						case distribution.ErrRepositoryUnknown:
-							// Ignore path not found error on missing tags folder
-						default:
-							return fmt.Errorf("failed to retrieve tags %v", err)
-						}
-					}
-					manifestArr.append(ManifestDel{Name: repoName, Digest: dgst, Tags: allTags})
+					unTaggedManifests.add(dgst)
 					return nil
 				}
+				taggedManifests.add(dgst)
+				return nil
 			}
-			// Mark the manifest's blob
-			dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
-				"digest_type": "manifest",
-				"digest":      dgst,
-				"repository":  repoName,
-			}).Info("marking manifest")
-			markSet.add(dgst)
-
-			manifest, err := manifestService.Get(ctx, dgst)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve manifest for digest %v: %v", dgst, err)
-			}
-
-			descriptors := manifest.References()
-			for _, descriptor := range descriptors {
-				dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
-					"digest_type": "layer",
-					"digest":      descriptor.Digest,
-					"repository":  repoName,
-				}).Info("marking manifest")
-				markSet.add(descriptor.Digest)
-			}
-
+			referencedManifests.add(dgst)
 			return nil
 		})
 
@@ -217,6 +196,129 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 			default:
 				return err
 			}
+		}
+
+		semaphore := make(chan struct{}, opts.MaxParallelManifestGets)
+
+		if opts.RemoveUntagged {
+			g, ctx := errgroup.WithContext(ctx)
+
+			for dgst := range taggedManifests.members {
+				semaphore <- struct{}{}
+				d := dgst
+
+				g.Go(func() error {
+					defer func() {
+						<-semaphore
+					}()
+
+					dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+						"referenced_by": "tag",
+						"digest_type":   "manifest",
+						"digest":        d,
+						"repository":    repoName,
+					}).Info("marking manifest")
+					markSet.add(d)
+
+					manifest, err := manifestService.Get(ctx, d)
+					if err != nil {
+						return fmt.Errorf("retrieving manifest for digest %v: %w", d, err)
+					}
+
+					if manifestList, ok := manifest.(*manifestlist.DeserializedManifestList); ok {
+						for _, r := range manifestList.References() {
+							referencedManifests.add(r.Digest)
+						}
+					} else {
+						for _, descriptor := range manifest.References() {
+							dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+								"referenced_by": "tag",
+								"digest_type":   "layer",
+								"digest":        descriptor.Digest,
+								"repository":    repoName,
+							}).Info("marking manifest")
+							markSet.add(descriptor.Digest)
+						}
+					}
+					return nil
+				})
+			}
+
+			if err := g.Wait(); err != nil {
+				return fmt.Errorf("marking tagged manifests: %w", err)
+			}
+
+			for dgst := range unTaggedManifests.members {
+				if referencedManifests.contains(dgst) {
+					continue
+				}
+
+				dcontext.GetLoggerWithField(ctx, "digest", dgst).Infof("manifest eligible for deletion")
+				// Fetch all tags from repository: all of these tags could contain the
+				// manifest in history which means that we need check (and delete) those
+				// references when deleting the manifest.
+				allTags, err := cachedTagStore.All(ctx)
+				if err != nil {
+					switch err := err.(type) {
+					case distribution.ErrRepositoryUnknown:
+						// Ignore path not found error on missing tags folder
+					default:
+						return fmt.Errorf("failed to retrieve tags %v", err)
+					}
+				}
+				manifestArr.append(ManifestDel{Name: repoName, Digest: dgst, Tags: allTags})
+			}
+		}
+
+		refType := "tagOrManifest"
+		// If we're removing untagged, any manifests left at this point were only
+		// referenced by a manifest list.
+		if opts.RemoveUntagged {
+			refType = "manifest_list"
+		}
+
+		markLog := dcontext.GetLoggerWithFields(ctx, map[interface{}]interface{}{
+			"repository":    repoName,
+			"referenced_by": refType,
+		})
+
+		g, ctx := errgroup.WithContext(ctx)
+
+		for dgst := range referencedManifests.members {
+			semaphore <- struct{}{}
+			d := dgst
+
+			g.Go(func() error {
+				defer func() {
+					<-semaphore
+				}()
+
+				// Mark the manifest's blob
+				markLog.WithFields(logrus.Fields{
+					"digest_type": "manifest",
+					"digest":      d,
+				}).Info("marking manifest")
+				markSet.add(d)
+
+				manifest, err := manifestService.Get(ctx, d)
+				if err != nil {
+					return fmt.Errorf("retrieving manifest for digest %v: %w", d, err)
+				}
+
+				for _, descriptor := range manifest.References() {
+					markLog.WithFields(logrus.Fields{
+						"digest_type": "layer",
+						"digest":      descriptor.Digest,
+					}).Info("marking manifest")
+					markSet.add(descriptor.Digest)
+				}
+
+				return nil
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			return fmt.Errorf("marking referenced manifests: %w", err)
 		}
 
 		return nil

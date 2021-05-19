@@ -66,6 +66,7 @@ func init() {
 	InventoryCmd.Flags().BoolVarP(&countTags, "tag-count", "t", true, "count repository tags, set this to false to increase inventory speed")
 }
 
+// Command flag vars
 var (
 	requireEmptyDatabase    bool
 	blobTransferDest        string
@@ -84,6 +85,8 @@ var (
 	format                  string
 	countTags               bool
 )
+
+var parallelwalkKey = "parallelwalk"
 
 // nullableInt implements spf13/pflag#Value as a custom nullable integer to capture spf13/cobra command flags.
 // https://pkg.go.dev/github.com/spf13/pflag?tab=doc#Value
@@ -138,7 +141,13 @@ var GCCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		driver, err := factory.Create(config.Storage.Type(), config.Storage.Parameters())
+		maxParallelManifestGets := 1
+		parameters := config.Storage.Parameters()
+		if parameters[parallelwalkKey] == true {
+			maxParallelManifestGets = 10
+		}
+
+		driver, err := factory.Create(config.Storage.Type(), parameters)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to construct %s driver: %v", config.Storage.Type(), err)
 			os.Exit(1)
@@ -150,6 +159,8 @@ var GCCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "unable to configure logging with config: %s", err)
 			os.Exit(1)
 		}
+
+		logrus.Debugf("getting a maximum of %d manifests in parallel per repository during the mark phase", maxParallelManifestGets)
 
 		k, err := libtrust.GenerateECP256PrivateKey()
 		if err != nil {
@@ -173,8 +184,9 @@ var GCCmd = &cobra.Command{
 		}
 
 		err = storage.MarkAndSweep(ctx, driver, registry, storage.GCOpts{
-			DryRun:         dryRun,
-			RemoveUntagged: removeUntagged,
+			DryRun:                  dryRun,
+			RemoveUntagged:          removeUntagged,
+			MaxParallelManifestGets: maxParallelManifestGets,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to garbage collect: %v", err)
@@ -432,8 +444,8 @@ var ImportCmd = &cobra.Command{
 		}
 
 		parameters := config.Storage.Parameters()
-		if parameters["parallelwalk"] == true {
-			parameters["parallelwalk"] = false
+		if parameters[parallelwalkKey] == true {
+			parameters[parallelwalkKey] = false
 			logrus.Info("the 'parallelwalk' configuration parameter has been disabled")
 		}
 

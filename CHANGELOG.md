@@ -2,6 +2,9 @@
 ### Changed
 - registry/datastore: Partitioning by top-level namespace
 
+### Fixed
+- registry/storage: Offline garbage collection no longer inappropriately removes untagged manifests referenced by a manifest list
+
 ## [v3.4.1-gitlab] - 2021-05-11
 ### Fixed
 - registry/storage: S3 driver now respects rate limits in all cases

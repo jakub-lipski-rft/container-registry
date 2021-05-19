@@ -3,6 +3,7 @@ package testutil
 import (
 	"fmt"
 	"io"
+	"testing"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
@@ -12,12 +13,19 @@ import (
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/require"
 )
 
 type Image struct {
 	manifest       distribution.Manifest
 	ManifestDigest digest.Digest
 	Layers         map[digest.Digest]io.ReadSeeker
+}
+
+type ImageList struct {
+	manifest       distribution.Manifest
+	ManifestDigest digest.Digest
+	Images         []Image
 }
 
 // MakeManifestList constructs a manifest list out of a list of manifest digests
@@ -147,6 +155,51 @@ func UploadRandomSchema2Image(repository distribution.Repository) (Image, error)
 		ManifestDigest: manifestDigest,
 		Layers:         randomLayers,
 	}, nil
+}
+
+func UploadRandomImageList(tb testing.TB, registry distribution.Namespace, repository distribution.Repository) ImageList {
+	ctx := context.Background()
+	var manifestDescriptors []manifestlist.ManifestDescriptor
+	images := make([]Image, 4)
+
+	for i := range images {
+		image, err := UploadRandomSchema2Image(repository)
+		require.NoError(tb, err)
+
+		images[i] = image
+
+		blobstatter := registry.BlobStatter()
+
+		descriptor, err := blobstatter.Stat(ctx, image.ManifestDigest)
+		require.NoError(tb, err)
+
+		platformSpec := manifestlist.PlatformSpec{
+			Architecture: "atari2600",
+			OS:           "CP/M",
+			Variant:      "ternary",
+			Features:     []string{"VLIW", "superscalaroutoforderdevnull"},
+		}
+		manifestDescriptor := manifestlist.ManifestDescriptor{
+			Descriptor: descriptor,
+			Platform:   platformSpec,
+		}
+		manifestDescriptors = append(manifestDescriptors, manifestDescriptor)
+	}
+
+	ml, err := manifestlist.FromDescriptors(manifestDescriptors)
+	require.NoError(tb, err)
+
+	manifestService, err := repository.Manifests(ctx)
+	require.NoError(tb, err)
+
+	dgst, err := manifestService.Put(ctx, ml)
+	require.NoError(tb, err)
+
+	return ImageList{
+		manifest:       ml,
+		ManifestDigest: dgst,
+		Images:         images,
+	}
 }
 
 func UploadImage(repository distribution.Repository, im Image) (digest.Digest, error) {
