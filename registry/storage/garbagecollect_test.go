@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"io"
 	"path"
 	"testing"
@@ -13,118 +14,88 @@ import (
 	"github.com/docker/distribution/testutil"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/stretchr/testify/require"
 )
 
-func createRegistry(t *testing.T, driver driver.StorageDriver, options ...RegistryOption) distribution.Namespace {
+func createRegistry(tb testing.TB, driver driver.StorageDriver, options ...RegistryOption) distribution.Namespace {
+	tb.Helper()
 	ctx := context.Background()
+
 	k, err := libtrust.GenerateECP256PrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(tb, err)
+
 	options = append([]RegistryOption{EnableDelete, Schema1SigningKey(k), EnableSchema1}, options...)
 	registry, err := NewRegistry(ctx, driver, options...)
-	if err != nil {
-		t.Fatalf("Failed to construct namespace")
-	}
+	require.NoError(tb, err)
+
 	return registry
 }
 
-func makeRepository(t *testing.T, registry distribution.Namespace, name string) distribution.Repository {
+func makeRepository(tb testing.TB, registry distribution.Namespace, name string) distribution.Repository {
+	tb.Helper()
 	ctx := context.Background()
 
 	// Initialize a dummy repository
 	named, err := reference.WithName(name)
-	if err != nil {
-		t.Fatalf("Failed to parse name %s:  %v", name, err)
-	}
+	require.NoError(tb, err)
 
 	repo, err := registry.Repository(ctx, named)
-	if err != nil {
-		t.Fatalf("Failed to construct repository: %v", err)
-	}
+	require.NoError(tb, err)
+
 	return repo
 }
 
-func allManifests(t *testing.T, manifestService distribution.ManifestService) map[digest.Digest]struct{} {
+func allManifests(tb testing.TB, manifestService distribution.ManifestService) map[digest.Digest]struct{} {
+	tb.Helper()
 	ctx := context.Background()
+
 	allManSet := newSyncDigestSet()
 	manifestEnumerator, ok := manifestService.(distribution.ManifestEnumerator)
-	if !ok {
-		t.Fatalf("unable to convert ManifestService into ManifestEnumerator")
-	}
+	require.True(tb, ok)
+
 	err := manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
 		allManSet.add(dgst)
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("Error getting all manifests: %v", err)
-	}
+	require.NoError(tb, err)
+
 	return allManSet.members
 }
 
-func allBlobs(t *testing.T, registry distribution.Namespace) map[digest.Digest]struct{} {
+func allBlobs(tb testing.TB, registry distribution.Namespace) map[digest.Digest]struct{} {
+	tb.Helper()
 	ctx := context.Background()
 	blobService := registry.Blobs()
 	allBlobsSet := newSyncDigestSet()
+
 	err := blobService.Enumerate(ctx, func(desc distribution.Descriptor) error {
 		allBlobsSet.add(desc.Digest)
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("Error getting all blobs: %v", err)
-	}
+	require.NoError(tb, err)
+
 	return allBlobsSet.members
 }
 
 func TestNoDeletionNoEffect(t *testing.T) {
-	ctx := context.Background()
 	inmemoryDriver := inmemory.New()
-
 	registry := createRegistry(t, inmemoryDriver)
 	repo := makeRepository(t, registry, "palailogos")
-	manifestService, _ := repo.Manifests(ctx)
 
-	image1, err := testutil.UploadRandomSchema1Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema1 image: %v", err)
-	}
-	image2, err := testutil.UploadRandomSchema1Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema1 image: %v", err)
-	}
-	_, err = testutil.UploadRandomSchema2Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema2 image: %v", err)
-	}
-
-	// construct manifestlist for fun.
-	blobstatter := registry.BlobStatter()
-	manifestList, err := testutil.MakeManifestList(blobstatter, []digest.Digest{
-		image1.ManifestDigest, image2.ManifestDigest})
-	if err != nil {
-		t.Fatalf("Failed to make manifest list: %v", err)
-	}
-
-	_, err = manifestService.Put(ctx, manifestList)
-	if err != nil {
-		t.Fatalf("Failed to add manifest list: %v", err)
-	}
+	testutil.UploadRandomImageList(t, registry, repo)
 
 	before := allBlobs(t, registry)
+	require.NotEmpty(t, before)
 
 	// Run GC
-	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
+	err := MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: false,
 	})
-	if err != nil {
-		t.Fatalf("Failed mark and sweep: %v", err)
-	}
+	require.NoError(t, err)
 
 	after := allBlobs(t, registry)
-	if len(before) != len(after) {
-		t.Fatalf("Garbage collection affected storage: %d != %d", len(before), len(after))
-	}
+	require.Equal(t, before, after)
 }
 
 func TestDeleteManifestIfTagNotFound(t *testing.T) {
@@ -137,90 +108,66 @@ func TestDeleteManifestIfTagNotFound(t *testing.T) {
 
 	// Create random layers
 	randomLayers1, err := testutil.CreateRandomLayers(3)
-	if err != nil {
-		t.Fatalf("failed to make layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	randomLayers2, err := testutil.CreateRandomLayers(3)
-	if err != nil {
-		t.Fatalf("failed to make layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Upload all layers
 	err = testutil.UploadBlobs(repo, randomLayers1)
-	if err != nil {
-		t.Fatalf("failed to upload layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = testutil.UploadBlobs(repo, randomLayers2)
-	if err != nil {
-		t.Fatalf("failed to upload layers: %v", err)
-	}
+	require.NoError(t, err)
 
-	// Construct manifests
-	manifest1, err := testutil.MakeSchema1Manifest(getKeys(randomLayers1))
-	if err != nil {
-		t.Fatalf("failed to make manifest: %v", err)
-	}
+	// Upload manifests
+	_, err = testutil.UploadRandomSchema2Image(repo)
+	require.NoError(t, err)
 
-	manifest2, err := testutil.MakeSchema1Manifest(getKeys(randomLayers2))
-	if err != nil {
-		t.Fatalf("failed to make manifest: %v", err)
-	}
-
-	_, err = manifestService.Put(ctx, manifest1)
-	if err != nil {
-		t.Fatalf("manifest upload failed: %v", err)
-	}
-
-	_, err = manifestService.Put(ctx, manifest2)
-	if err != nil {
-		t.Fatalf("manifest upload failed: %v", err)
-	}
+	_, err = testutil.UploadRandomSchema2Image(repo)
+	require.NoError(t, err)
 
 	manifestEnumerator, _ := manifestService.(distribution.ManifestEnumerator)
-	manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
+	err = manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
 		repo.Tags(ctx).Tag(ctx, "test", distribution.Descriptor{Digest: dgst})
 		return nil
 	})
+	require.NoError(t, err)
 
 	before1 := allBlobs(t, registry)
+	require.NotEmpty(t, before1)
+
 	before2 := allManifests(t, manifestService)
+	require.NotEmpty(t, before2)
 
 	// run GC with dry-run (should not remove anything)
 	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         true,
 		RemoveUntagged: true,
 	})
-	if err != nil {
-		t.Fatalf("Failed mark and sweep: %v", err)
-	}
+	require.NoError(t, err)
+
 	afterDry1 := allBlobs(t, registry)
 	afterDry2 := allManifests(t, manifestService)
-	if len(before1) != len(afterDry1) {
-		t.Fatalf("Garbage collection affected blobs storage: %d != %d", len(before1), len(afterDry1))
-	}
-	if len(before2) != len(afterDry2) {
-		t.Fatalf("Garbage collection affected manifest storage: %d != %d", len(before2), len(afterDry2))
-	}
+	require.Equal(t, before1, afterDry1)
+	require.Equal(t, before2, afterDry2)
 
-	// Run GC (removes everything because no manifests with tags exist)
+	// Run GC, removes all but one tagged manifest and its blobs.
 	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: true,
 	})
-	if err != nil {
-		t.Fatalf("Failed mark and sweep: %v", err)
-	}
+	require.NoError(t, err)
 
 	after1 := allBlobs(t, registry)
 	after2 := allManifests(t, manifestService)
-	if len(before1) == len(after1) {
-		t.Fatalf("Garbage collection affected blobs storage: %d == %d", len(before1), len(after1))
-	}
-	if len(before2) == len(after2) {
-		t.Fatalf("Garbage collection affected manifest storage: %d == %d", len(before2), len(after2))
-	}
+
+	// Should be only one tagged manifest by now.
+	require.Len(t, after2, 1)
+
+	// We should have removed some, but not all the blobs
+	require.NotEmpty(t, after2)
+	require.Less(t, len(after2), len(after1))
 }
 
 func TestGCWithMissingManifests(t *testing.T) {
@@ -230,34 +177,24 @@ func TestGCWithMissingManifests(t *testing.T) {
 	registry := createRegistry(t, d)
 	repo := makeRepository(t, registry, "testrepo")
 	_, err := testutil.UploadRandomSchema1Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema1 image: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Simulate a missing _manifests directory
 	revPath, err := pathFor(manifestRevisionsPathSpec{"testrepo"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_manifestsPath := path.Dir(revPath)
 	err = d.Delete(ctx, _manifestsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	err = MarkAndSweep(context.Background(), d, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: false,
 	})
-	if err != nil {
-		t.Fatalf("Failed mark and sweep: %v", err)
-	}
+	require.NoError(t, err)
 
 	blobs := allBlobs(t, registry)
-	if len(blobs) > 0 {
-		t.Errorf("unexpected blobs after gc")
-	}
+	require.Empty(t, blobs)
 }
 
 func TestDeletionHasEffect(t *testing.T) {
@@ -269,54 +206,43 @@ func TestDeletionHasEffect(t *testing.T) {
 	manifests, _ := repo.Manifests(ctx)
 
 	image1, err := testutil.UploadRandomSchema1Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema1 image: %v", err)
-	}
-	image2, err := testutil.UploadRandomSchema1Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema1 image: %v", err)
-	}
-	image3, err := testutil.UploadRandomSchema2Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema2 image: %v", err)
-	}
+	require.NoError(t, err)
 
-	manifests.Delete(ctx, image2.ManifestDigest)
-	manifests.Delete(ctx, image3.ManifestDigest)
+	image2, err := testutil.UploadRandomSchema1Image(repo)
+	require.NoError(t, err)
+
+	image3, err := testutil.UploadRandomSchema2Image(repo)
+	require.NoError(t, err)
+
+	err = manifests.Delete(ctx, image2.ManifestDigest)
+	require.NoError(t, err)
+
+	err = manifests.Delete(ctx, image3.ManifestDigest)
+	require.NoError(t, err)
 
 	// Run GC
 	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: false,
 	})
-	if err != nil {
-		t.Fatalf("Failed mark and sweep: %v", err)
-	}
+	require.NoError(t, err)
 
 	blobs := allBlobs(t, registry)
 
 	// check that the image1 manifest and all the layers are still in blobs
-	if _, ok := blobs[image1.ManifestDigest]; !ok {
-		t.Fatalf("First manifest is missing")
-	}
+	require.Contains(t, blobs, image1.ManifestDigest)
 
 	for layer := range image1.Layers {
-		if _, ok := blobs[layer]; !ok {
-			t.Fatalf("manifest 1 layer is missing: %v", layer)
-		}
+		require.Contains(t, blobs, layer)
 	}
 
 	// check that image2 and image3 layers are not still around
 	for layer := range image2.Layers {
-		if _, ok := blobs[layer]; ok {
-			t.Fatalf("manifest 2 layer is present: %v", layer)
-		}
+		require.NotContains(t, blobs, layer)
 	}
 
 	for layer := range image3.Layers {
-		if _, ok := blobs[layer]; ok {
-			t.Fatalf("manifest 3 layer is present: %v", layer)
-		}
+		require.NotContains(t, blobs, layer)
 	}
 }
 
@@ -343,66 +269,44 @@ func TestDeletionWithSharedLayer(t *testing.T) {
 
 	// Create random layers
 	randomLayers1, err := testutil.CreateRandomLayers(3)
-	if err != nil {
-		t.Fatalf("failed to make layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	randomLayers2, err := testutil.CreateRandomLayers(3)
-	if err != nil {
-		t.Fatalf("failed to make layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Upload all layers
 	err = testutil.UploadBlobs(repo, randomLayers1)
-	if err != nil {
-		t.Fatalf("failed to upload layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = testutil.UploadBlobs(repo, randomLayers2)
-	if err != nil {
-		t.Fatalf("failed to upload layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Construct manifests
 	manifest1, err := testutil.MakeSchema1Manifest(getKeys(randomLayers1))
-	if err != nil {
-		t.Fatalf("failed to make manifest: %v", err)
-	}
+	require.NoError(t, err)
 
 	sharedKey := getAnyKey(randomLayers1)
 	manifest2, err := testutil.MakeSchema2Manifest(repo, append(getKeys(randomLayers2), sharedKey))
-	if err != nil {
-		t.Fatalf("failed to make manifest: %v", err)
-	}
+	require.NoError(t, err)
 
 	manifestService, err := testutil.MakeManifestService(repo)
-	if err != nil {
-		t.Fatalf("failed to make manifest service: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Upload manifests
 	_, err = manifestService.Put(ctx, manifest1)
-	if err != nil {
-		t.Fatalf("manifest upload failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	manifestDigest2, err := manifestService.Put(ctx, manifest2)
-	if err != nil {
-		t.Fatalf("manifest upload failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// delete
 	err = manifestService.Delete(ctx, manifestDigest2)
-	if err != nil {
-		t.Fatalf("manifest deletion failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	// check that all of the layers in layer 1 are still there
 	blobs := allBlobs(t, registry)
 	for dgst := range randomLayers1 {
-		if _, ok := blobs[dgst]; !ok {
-			t.Fatalf("random layer 1 blob missing: %v", dgst)
-		}
+		require.Contains(t, blobs, dgst)
 	}
 }
 
@@ -413,36 +317,27 @@ func TestOrphanBlobDeleted(t *testing.T) {
 	repo := makeRepository(t, registry, "michael_z_doukas")
 
 	digests, err := testutil.CreateRandomLayers(1)
-	if err != nil {
-		t.Fatalf("Failed to create random digest: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err = testutil.UploadBlobs(repo, digests); err != nil {
-		t.Fatalf("Failed to upload blob: %v", err)
-	}
+	err = testutil.UploadBlobs(repo, digests)
+	require.NoError(t, err)
 
 	// formality to create the necessary directories
 	testutil.UploadRandomSchema2Image(repo)
-	if err != nil {
-		t.Fatalf("failed to upload random schema2 image: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Run GC
 	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: false,
 	})
-	if err != nil {
-		t.Fatalf("Failed mark and sweep: %v", err)
-	}
+	require.NoError(t, err)
 
 	blobs := allBlobs(t, registry)
 
 	// check that orphan blob layers are not still around
 	for dgst := range digests {
-		if _, ok := blobs[dgst]; ok {
-			t.Fatalf("Orphan layer is present: %v", dgst)
-		}
+		require.NotContains(t, blobs, dgst)
 	}
 }
 
@@ -458,66 +353,115 @@ func TestGarbageCollectAfterLastTagRemoved(t *testing.T) {
 	repo := makeRepository(t, registry, "testgarbagecollectafterlasttagremoved")
 
 	manifestService, err := repo.Manifests(ctx)
-	if err != nil {
-		t.Fatalf("Failed to initialize the manifestService: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Setup for tests
 	randomLayers1, err := testutil.CreateRandomLayers(3)
-	if err != nil {
-		t.Fatalf("failed to make layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = testutil.UploadBlobs(repo, randomLayers1)
-	if err != nil {
-		t.Fatalf("failed to upload layers: %v", err)
-	}
+	require.NoError(t, err)
 
 	manifest1, err := testutil.MakeSchema1Manifest(getKeys(randomLayers1))
-	if err != nil {
-		t.Fatalf("failed to make manifest: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = manifestService.Put(ctx, manifest1)
-	if err != nil {
-		t.Fatalf("manifest upload failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	manifestEnumerator, _ := manifestService.(distribution.ManifestEnumerator)
-	manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
+	err = manifestEnumerator.Enumerate(ctx, func(dgst digest.Digest) error {
 		repo.Tags(ctx).Tag(ctx, "testTag", distribution.Descriptor{Digest: dgst})
 		return nil
 	})
+	require.NoError(t, err)
 	// -- End setup
 
 	// Delete the repository's _manifests/tags path
 	tagsPath, err := pathFor(manifestTagsPathSpec{"testgarbagecollectafterlasttagremoved"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
 	t.Logf(tagsPath)
 	err = inmemoryDriver.Delete(ctx, tagsPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Run garbage collection with tags folder removed to validate error handling
 	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
 		DryRun:         false,
 		RemoveUntagged: true,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Assert that no blobs or manifests were left behind (because the only manifest has no tags path)
 	afterBlobs := allBlobs(t, registry)
-	if len(afterBlobs) != 0 {
-		t.Fatalf("No blobs should be left behind: %d remaining", len(afterBlobs))
-	}
+	require.Empty(t, afterBlobs)
 
 	afterManifests := allManifests(t, manifestService)
-	if len(afterManifests) != 0 {
-		t.Fatalf("No manifests should be left behind: %d remaining", len(afterManifests))
+	require.Empty(t, afterManifests)
+}
+
+func TestGarbageCollectManifestListReferences(t *testing.T) {
+	ctx := context.Background()
+	inmemoryDriver := inmemory.New()
+
+	registry := createRegistry(t, inmemoryDriver)
+	repo := makeRepository(t, registry, "testgarbagecollectkeeptaggedmanifestlistreferences")
+
+	// Create a manifest list and tag only the manifest list.
+	taggedList := testutil.UploadRandomImageList(t, registry, repo)
+
+	err := repo.Tags(ctx).Tag(ctx, "manifestlist-latest", distribution.Descriptor{Digest: taggedList.ManifestDigest})
+	require.NoError(t, err)
+
+	untaggedList := testutil.UploadRandomImageList(t, registry, repo)
+
+	// Create a manifest list and tag only the manifests refernced by the list.
+	untaggedListWithTaggedImages := testutil.UploadRandomImageList(t, registry, repo)
+	for i, img := range untaggedListWithTaggedImages.Images {
+		err := repo.Tags(ctx).Tag(ctx, fmt.Sprintf("tagged-img-%d", i), distribution.Descriptor{Digest: img.ManifestDigest})
+		require.NoError(t, err)
+	}
+
+	// Run garbage collection.
+	err = MarkAndSweep(context.Background(), inmemoryDriver, registry, GCOpts{
+		DryRun:         false,
+		RemoveUntagged: true,
+	})
+	require.NoError(t, err)
+
+	manifestService, err := repo.Manifests(ctx)
+	require.NoError(t, err)
+
+	// Tagged list and its manifests and their blobs should still exist.
+	ok, err := manifestService.Exists(ctx, taggedList.ManifestDigest)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	for _, img := range taggedList.Images {
+		_, err := manifestService.Exists(ctx, img.ManifestDigest)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	// Untagged list and its manifests should have been removed.
+	ok, err = manifestService.Exists(ctx, untaggedList.ManifestDigest)
+	require.NoError(t, err)
+	require.False(t, ok)
+
+	for _, img := range untaggedList.Images {
+		ok, err := manifestService.Exists(ctx, img.ManifestDigest)
+		require.NoError(t, err)
+		require.False(t, ok)
+	}
+
+	// Untagged list with tagged images should have been removed, while its
+	// manifests should still exist.
+	ok, err = manifestService.Exists(ctx, untaggedListWithTaggedImages.ManifestDigest)
+	require.NoError(t, err)
+	require.False(t, ok)
+
+	for _, img := range untaggedListWithTaggedImages.Images {
+		ok, err := manifestService.Exists(ctx, img.ManifestDigest)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 }
