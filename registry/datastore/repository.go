@@ -182,15 +182,6 @@ func (s *repositoryStore) FindByID(ctx context.Context, id int64) (*models.Repos
 
 // FindByPath finds a repository by path.
 func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.Repository, error) {
-	ns := NewNamespaceStore(s.db)
-	n, err := ns.FindByName(ctx, strings.SplitN(path, "/", 2)[0])
-	if err != nil {
-		return nil, err
-	}
-	if n == nil {
-		return nil, nil
-	}
-
 	defer metrics.InstrumentQuery("repository_find_by_path")()
 	q := `SELECT
 			id,
@@ -203,10 +194,9 @@ func (s *repositoryStore) FindByPath(ctx context.Context, path string) (*models.
 		FROM
 			repositories
 		WHERE
-			top_level_namespace_id = $1
-			AND path = $2`
+			path = $1`
 
-	row := s.db.QueryRowContext(ctx, q, n.ID, path)
+	row := s.db.QueryRowContext(ctx, q, path)
 
 	return scanFullRepository(row)
 }
@@ -763,7 +753,7 @@ func (s *repositoryStore) CreateOrFind(ctx context.Context, r *models.Repository
 	defer metrics.InstrumentQuery("repository_create_or_find")()
 	q := `INSERT INTO repositories (top_level_namespace_id, name, path, parent_id)
 			VALUES ($1, $2, $3, $4)
-		ON CONFLICT (top_level_namespace_id, path)
+		ON CONFLICT (path)
 			DO NOTHING
 		RETURNING
 			id, created_at`

@@ -6,27 +6,13 @@ Here we list queries used across several operations and refer to them from each 
 
 #### Check if repository with a given path exists and grab its ID
 
-First we check if the namespace exists and grab its ID:
-
-```sql
-SELECT
-    id
-FROM
-   top_level_namespaces
-WHERE
-   name = $1
-```
-
-Then we find the repository:
-
 ```sql
 SELECT
     id
 FROM
     repositories
 WHERE
-    top_level_namespace_id = $1
-    AND path = $2;
+    path = $1;
 ```
 
 #### Create or find repository by path
@@ -63,7 +49,7 @@ This is an idempotent and safe way to find or create a repository by path for hi
    ```sql
    INSERT INTO repositories (top_level_namespace_id, name, path, parent_id)
        VALUES ($1, $2, $3, $4)
-   ON CONFLICT (top_level_namespace_id, path)
+   ON CONFLICT (path)
        DO NOTHING
    RETURNING
        id, created_at;

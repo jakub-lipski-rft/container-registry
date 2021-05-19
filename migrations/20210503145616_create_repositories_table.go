@@ -18,11 +18,10 @@ func init() {
 					CONSTRAINT pk_repositories PRIMARY KEY (top_level_namespace_id, id),
 					CONSTRAINT fk_repositories_top_level_namespace_id_top_level_namespaces FOREIGN KEY (top_level_namespace_id) REFERENCES top_level_namespaces (id) ON DELETE CASCADE,
 					CONSTRAINT fk_repositories_top_lvl_namespace_id_and_parent_id_repositories FOREIGN KEY (top_level_namespace_id, parent_id) REFERENCES repositories (top_level_namespace_id, id) ON DELETE CASCADE,
-					CONSTRAINT unique_repositories_top_level_namespace_id_and_path UNIQUE (top_level_namespace_id, path),
+					CONSTRAINT unique_repositories_path UNIQUE (path),
 					CONSTRAINT check_repositories_name_length CHECK ((char_length(name) <= 255)),
 					CONSTRAINT check_repositories_path_length CHECK ((char_length(path) <= 255))
-				)
-				PARTITION BY HASH (top_level_namespace_id)`,
+				)`,
 				"CREATE INDEX IF NOT EXISTS index_repositories_on_top_level_namespace_id_and_parent_id ON repositories USING btree (top_level_namespace_id, parent_id)",
 			},
 			Down: []string{
