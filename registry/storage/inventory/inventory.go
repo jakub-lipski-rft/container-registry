@@ -58,7 +58,7 @@ func (iv *Inventory) Summary() *Summary {
 type Repository struct {
 	Group    string `json:"group" csv:"group"`
 	Path     string `json:"path" csv:"path"`
-	TagCount int    `json:"tagCount,omitempty" csv:"tagCount,omitempty"`
+	TagCount int    `json:"tagCount" csv:"tagCount"`
 }
 
 // Summary contains data which is calculated from a completed inventory.
