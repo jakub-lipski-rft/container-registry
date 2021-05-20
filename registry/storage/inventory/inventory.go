@@ -106,7 +106,9 @@ func (t *Taker) Run(ctx context.Context) (*Inventory, error) {
 	var index int32
 	err := repositoryEnumerator.Enumerate(ctx, func(repoName string) error {
 		atomic.AddInt32(&index, 1)
-		log.WithFields(logrus.Fields{"path": repoName, "count": index}).Info("inventoring repository")
+		log := log.WithFields(logrus.Fields{"path": repoName, "count": index})
+		log.Debug("inventoring repository start")
+		start := time.Now()
 
 		r := Repository{
 			Path:  repoName,
@@ -139,6 +141,13 @@ func (t *Taker) Run(ctx context.Context) (*Inventory, error) {
 
 			r.TagCount = len(tags)
 		}
+
+		log = log.WithFields(logrus.Fields{
+			"group":      r.Group,
+			"tag_count":  r.TagCount,
+			"duration_s": time.Since(start).Seconds(),
+		})
+		log.Info("inventoring repository complete")
 
 		iv.Lock()
 		defer iv.Unlock()
