@@ -363,7 +363,7 @@ func (th *tokenHandler) fetchTokenWithOAuth(realm *url.URL, refreshToken, servic
 
 	var tr postTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return "", time.Time{}, fmt.Errorf("unable to decode token response: %s", err)
+		return "", time.Time{}, fmt.Errorf("decoding token response: %w", err)
 	}
 
 	if tr.AccessToken == "" {
@@ -446,7 +446,7 @@ func (th *tokenHandler) fetchTokenWithBasicAuth(realm *url.URL, service string, 
 
 	var tr getTokenResponse
 	if err = decoder.Decode(&tr); err != nil {
-		return "", time.Time{}, fmt.Errorf("unable to decode token response: %s", err)
+		return "", time.Time{}, fmt.Errorf("decoding token response: %w", err)
 	}
 
 	if tr.RefreshToken != "" && th.creds != nil {
@@ -487,7 +487,7 @@ func (th *tokenHandler) fetchToken(params map[string]string, scopes []string) (t
 	// TODO(dmcgowan): Handle empty scheme and relative realm
 	realmURL, err := url.Parse(realm)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("invalid token auth challenge realm: %s", err)
+		return "", time.Time{}, fmt.Errorf("parsing token auth challenge realm url: %w", err)
 	}
 
 	service := params["service"]
