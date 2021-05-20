@@ -89,7 +89,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 
 	repositoryEnumerator, ok := registry.(distribution.RepositoryEnumerator)
 	if !ok {
-		return fmt.Errorf("unable to convert Namespace to RepositoryEnumerator")
+		return fmt.Errorf("converting Namespace to RepositoryEnumerator")
 	}
 
 	// mark
@@ -109,26 +109,26 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 		var err error
 		named, err := reference.WithName(repoName)
 		if err != nil {
-			return fmt.Errorf("failed to parse repo name %s: %v", repoName, err)
+			return fmt.Errorf("parsing repo name %s: %w", repoName, err)
 		}
 		repository, err := registry.Repository(ctx, named)
 		if err != nil {
-			return fmt.Errorf("failed to construct repository: %v", err)
+			return fmt.Errorf("constructing repository: %w", err)
 		}
 
 		manifestService, err := repository.Manifests(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to construct manifest service: %v", err)
+			return fmt.Errorf("constructing manifest service: %w", err)
 		}
 
 		manifestEnumerator, ok := manifestService.(distribution.ManifestEnumerator)
 		if !ok {
-			return fmt.Errorf("unable to convert ManifestService into ManifestEnumerator")
+			return fmt.Errorf("converting ManifestService into ManifestEnumerator")
 		}
 
 		t, ok := repository.Tags(ctx).(*tagStore)
 		if !ok {
-			return fmt.Errorf("unable to convert tagService into tagStore")
+			return fmt.Errorf("converting tagService into tagStore")
 		}
 
 		cachedTagStore := newCachedTagStore(t)
@@ -147,7 +147,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 				case distribution.ErrRepositoryUnknown:
 					// Ignore path not found error on missing tags folder
 				default:
-					return fmt.Errorf("failed to retrieve tags %v", err)
+					return fmt.Errorf("retrieving tags %w", err)
 				}
 			}
 
@@ -163,7 +163,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 				// fetch all tags where this manifest is the latest one
 				tags, err := cachedTagStore.Lookup(ctx, distribution.Descriptor{Digest: dgst})
 				if err != nil {
-					return fmt.Errorf("failed to retrieve tags for digest %v: %v", dgst, err)
+					return fmt.Errorf("retrieving tags for digest %v: %w", dgst, err)
 				}
 				if len(tags) == 0 {
 					unTaggedManifests.add(dgst)
@@ -263,7 +263,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 					case distribution.ErrRepositoryUnknown:
 						// Ignore path not found error on missing tags folder
 					default:
-						return fmt.Errorf("failed to retrieve tags %v", err)
+						return fmt.Errorf("retrieving tags %w", err)
 					}
 				}
 				manifestArr.append(ManifestDel{Name: repoName, Digest: dgst, Tags: allTags})
@@ -325,7 +325,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to mark: %v", err)
+		return fmt.Errorf("marking blobs: %w", err)
 	}
 
 	blobService := registry.Blobs()
@@ -357,7 +357,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("error enumerating blobs: %v", err)
+		return fmt.Errorf("enumerating blobs: %w", err)
 	}
 
 	close(sizeChan)
@@ -382,7 +382,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 
 	if len(manifestArr.manifestDels) > 0 {
 		if err := vacuum.RemoveManifests(ctx, manifestArr.manifestDels); err != nil {
-			return fmt.Errorf("failed to delete manifests: %v", err)
+			return fmt.Errorf("deleting manifests: %w", err)
 		}
 	}
 
@@ -396,7 +396,7 @@ func MarkAndSweep(ctx context.Context, storageDriver driver.StorageDriver, regis
 	}
 	if len(dgsts) > 0 {
 		if err := vacuum.RemoveBlobs(ctx, dgsts); err != nil {
-			return fmt.Errorf("failed to delete blobs: %v", err)
+			return fmt.Errorf("deleting blobs: %w", err)
 		}
 	}
 	dcontext.GetLoggerWithField(ctx, "duration_s", time.Since(sweepStart).Seconds()).Info("sweep stage complete")
