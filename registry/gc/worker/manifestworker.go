@@ -145,7 +145,7 @@ func (w *ManifestWorker) deleteManifest(ctx context.Context, tx datastore.Transa
 	ms := manifestStoreConstructor(tx)
 
 	report := metrics.ManifestDelete()
-	found, err = ms.Delete(ctx, &models.Manifest{RepositoryID: t.RepositoryID, ID: t.ManifestID})
+	found, err = ms.Delete(ctx, &models.Manifest{NamespaceID: t.NamespaceID, RepositoryID: t.RepositoryID, ID: t.ManifestID})
 	if err != nil {
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
