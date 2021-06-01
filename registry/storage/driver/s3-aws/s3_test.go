@@ -548,7 +548,7 @@ func TestDeleteFilesPartialError(t *testing.T) {
 		t.Errorf("expected the number of errors to be %d, got %d", half, errs.Len())
 	}
 
-	p := `failed to delete file '.*': 'Access Denied'`
+	p := `deleting file '.*': 'Access Denied'`
 	for _, e := range errs.Errors {
 		matched, err := regexp.MatchString(p, e.Error())
 		if err != nil {

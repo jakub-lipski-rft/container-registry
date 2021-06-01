@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -242,30 +243,34 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		regionEndpoint = ""
 	}
 
+	var result *multierror.Error
 	regionName := parameters["region"]
 	if regionName == nil || fmt.Sprint(regionName) == "" {
-		return nil, fmt.Errorf("no region parameter provided")
+		err := errors.New("no region parameter provided")
+		result = multierror.Append(result, err)
 	}
 	region := fmt.Sprint(regionName)
 	// Don't check the region value if a custom endpoint is provided.
 	if regionEndpoint == "" {
 		if _, ok := validRegions[region]; !ok {
-			return nil, fmt.Errorf("invalid region provided: %v", region)
+			err := fmt.Errorf("validating region provided: %v", region)
+
+			result = multierror.Append(result, err)
 		}
 	}
-
 	bucket := parameters["bucket"]
 	if bucket == nil || fmt.Sprint(bucket) == "" {
-		return nil, fmt.Errorf("no bucket parameter provided")
+		err := errors.New("no bucket parameter provided")
+		result = multierror.Append(result, err)
 	}
-
 	encryptBool := false
 	encrypt := parameters["encrypt"]
 	switch encrypt := encrypt.(type) {
 	case string:
 		b, err := strconv.ParseBool(encrypt)
 		if err != nil {
-			return nil, fmt.Errorf("the encrypt parameter should be a boolean")
+			err := errors.New("the encrypt parameter should be a boolean")
+			result = multierror.Append(result, err)
 		}
 		encryptBool = b
 	case bool:
@@ -273,16 +278,17 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case nil:
 		// do nothing
 	default:
-		return nil, fmt.Errorf("the encrypt parameter should be a boolean")
+		err := errors.New("the encrypt parameter should be a boolean")
+		result = multierror.Append(result, err)
 	}
-
 	secureBool := true
 	secure := parameters["secure"]
 	switch secure := secure.(type) {
 	case string:
 		b, err := strconv.ParseBool(secure)
 		if err != nil {
-			return nil, fmt.Errorf("the secure parameter should be a boolean")
+			err := errors.New("the secure parameter should be a boolean")
+			result = multierror.Append(result, err)
 		}
 		secureBool = b
 	case bool:
@@ -290,16 +296,17 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case nil:
 		// do nothing
 	default:
-		return nil, fmt.Errorf("the secure parameter should be a boolean")
+		err := errors.New("the secure parameter should be a boolean")
+		result = multierror.Append(result, err)
 	}
-
 	skipVerifyBool := false
 	skipVerify := parameters["skipverify"]
 	switch skipVerify := skipVerify.(type) {
 	case string:
 		b, err := strconv.ParseBool(skipVerify)
 		if err != nil {
-			return nil, fmt.Errorf("the skipVerify parameter should be a boolean")
+			err := errors.New("the skipVerify parameter should be a boolean")
+			result = multierror.Append(result, err)
 		}
 		skipVerifyBool = b
 	case bool:
@@ -307,16 +314,17 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case nil:
 		// do nothing
 	default:
-		return nil, fmt.Errorf("the skipVerify parameter should be a boolean")
+		err := errors.New("the skipVerify parameter should be a boolean")
+		result = multierror.Append(result, err)
 	}
-
 	v4Bool := true
 	v4auth := parameters["v4auth"]
 	switch v4auth := v4auth.(type) {
 	case string:
 		b, err := strconv.ParseBool(v4auth)
 		if err != nil {
-			return nil, fmt.Errorf("the v4auth parameter should be a boolean")
+			err := errors.New("the v4auth parameter should be a boolean")
+			result = multierror.Append(result, err)
 		}
 		v4Bool = b
 	case bool:
@@ -324,7 +332,8 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case nil:
 		// do nothing
 	default:
-		return nil, fmt.Errorf("the v4auth parameter should be a boolean")
+		err := errors.New("the v4auth parameter should be a boolean")
+		result = multierror.Append(result, err)
 	}
 
 	keyID := parameters["keyid"]
@@ -334,22 +343,26 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 
 	chunkSize, err := getParameterAsInt64(parameters, "chunksize", defaultChunkSize, minChunkSize, maxChunkSize)
 	if err != nil {
-		return nil, err
+		err := fmt.Errorf("converting chunksize to int64: %w", err)
+		result = multierror.Append(result, err)
 	}
 
 	multipartCopyChunkSize, err := getParameterAsInt64(parameters, "multipartcopychunksize", defaultMultipartCopyChunkSize, minChunkSize, maxChunkSize)
 	if err != nil {
-		return nil, err
+		err := fmt.Errorf("converting multipartcopychunksize to valid int64: %w", err)
+		result = multierror.Append(result, err)
 	}
 
 	multipartCopyMaxConcurrency, err := getParameterAsInt64(parameters, "multipartcopymaxconcurrency", defaultMultipartCopyMaxConcurrency, 1, math.MaxInt64)
 	if err != nil {
-		return nil, err
+		err := fmt.Errorf("converting multipartcopymaxconcurrency to valid int64: %w", err)
+		result = multierror.Append(result, err)
 	}
 
 	multipartCopyThresholdSize, err := getParameterAsInt64(parameters, "multipartcopythresholdsize", defaultMultipartCopyThresholdSize, 0, maxChunkSize)
 	if err != nil {
-		return nil, err
+		err := fmt.Errorf("converting multipartcopythresholdsize to valid int64: %w", err)
+		result = multierror.Append(result, err)
 	}
 
 	rootDirectory := parameters["rootdirectory"]
@@ -362,16 +375,18 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	if storageClassParam != nil {
 		storageClassString, ok := storageClassParam.(string)
 		if !ok {
-			return nil, fmt.Errorf("the storageclass parameter must be one of %v, %v invalid",
+			err := fmt.Errorf("the storageclass parameter must be one of %v, %v invalid",
 				[]string{s3.StorageClassStandard, s3.StorageClassReducedRedundancy}, storageClassParam)
+			result = multierror.Append(result, err)
 		}
 		// All valid storage class parameters are UPPERCASE, so be a bit more flexible here
 		storageClassString = strings.ToUpper(storageClassString)
 		if storageClassString != noStorageClass &&
 			storageClassString != s3.StorageClassStandard &&
 			storageClassString != s3.StorageClassReducedRedundancy {
-			return nil, fmt.Errorf("the storageclass parameter must be one of %v, %v invalid",
+			err := fmt.Errorf("the storageclass parameter must be one of %v, %v invalid",
 				[]string{noStorageClass, s3.StorageClassStandard, s3.StorageClassReducedRedundancy}, storageClassParam)
+			result = multierror.Append(result, err)
 		}
 		storageClass = storageClassString
 	}
@@ -381,11 +396,17 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	if objectACLParam != nil {
 		objectACLString, ok := objectACLParam.(string)
 		if !ok {
-			return nil, fmt.Errorf("invalid value for objectacl parameter: %v", objectACLParam)
+			err := fmt.Errorf("object ACL parameter should be a string: %v", objectACLParam)
+			result = multierror.Append(result, err)
 		}
 
 		if _, ok = validObjectACLs[objectACLString]; !ok {
-			return nil, fmt.Errorf("invalid value for objectacl parameter: %v", objectACLParam)
+			var objectACLkeys []string
+			for key := range validObjectACLs {
+				objectACLkeys = append(objectACLkeys, key)
+			}
+			err := fmt.Errorf("object ACL parameter should be one of %v: %v", objectACLkeys, objectACLParam)
+			result = multierror.Append(result, err)
 		}
 		objectACL = objectACLString
 	}
@@ -402,7 +423,9 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case string:
 		b, err := strconv.ParseBool(pathStyle)
 		if err != nil {
-			return nil, fmt.Errorf("the pathstyle parameter should be a boolean")
+			err := errors.New("the pathstyle parameter should be a boolean")
+			result = multierror.Append(result, err)
+
 		}
 		pathStyleBool = b
 	case bool:
@@ -410,7 +433,8 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case nil:
 		// do nothing
 	default:
-		return nil, fmt.Errorf("the pathstyle parameter should be a boolean")
+		err := errors.New("the pathstyle parameter should be a boolean")
+		result = multierror.Append(result, err)
 	}
 
 	var parallelWalkBool bool
@@ -420,7 +444,8 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case string:
 		b, err := strconv.ParseBool(parallelWalk)
 		if err != nil {
-			return nil, fmt.Errorf("the parallelwalk parameter should be a boolean")
+			err := errors.New("the parallelwalk parameter should be a boolean")
+			result = multierror.Append(result, err)
 		}
 		parallelWalkBool = b
 	case bool:
@@ -428,11 +453,18 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 	case nil:
 		// do nothing
 	default:
-		return nil, fmt.Errorf("the parallelwalk parameter should be a boolean")
+		err := errors.New("the parallelwalk parameter should be a boolean")
+		result = multierror.Append(result, err)
 	}
 
 	maxRequestsPerSecondInt64, err := getParameterAsInt64(parameters, "maxrequestspersecond", defaultMaxRequestsPerSecond, 0, math.MaxInt64)
 	if err != nil {
+		err := fmt.Errorf("converting maxrequestspersecond to valid int64: %w", err)
+		result = multierror.Append(result, err)
+	}
+
+	// multierror return
+	if err := result.ErrorOrNil(); err != nil {
 		return nil, err
 	}
 
@@ -469,7 +501,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 }
 
 // getParameterAsInt64 converts parameters[name] to an int64 value (using
-// defaultt if nil), verifies it is no smaller than min, and returns it.
+// default if nil), verifies it is no smaller than min, and returns it.
 func getParameterAsInt64(parameters map[string]interface{}, name string, defaultt int64, min int64, max int64) (int64, error) {
 	rv := defaultt
 	param := parameters[name]
@@ -487,7 +519,7 @@ func getParameterAsInt64(parameters map[string]interface{}, name string, default
 	case nil:
 		// do nothing
 	default:
-		return 0, fmt.Errorf("invalid value for %s: %#v", name, param)
+		return 0, fmt.Errorf("converting value for %s: %#v", name, param)
 	}
 
 	if rv < min || rv > max {
@@ -509,7 +541,7 @@ func New(params DriverParameters) (*Driver, error) {
 	awsConfig := aws.NewConfig().WithLogLevel(params.LogLevel)
 	sess, err := session.NewSession()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new session: %v", err)
+		return nil, fmt.Errorf("creating a new session: %w", err)
 	}
 	creds := credentials.NewChainCredentials([]credentials.Provider{
 		&credentials.StaticProvider{
@@ -543,7 +575,7 @@ func New(params DriverParameters) (*Driver, error) {
 
 	sess, err = session.NewSession(awsConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new session with aws config: %v", err)
+		return nil, fmt.Errorf("creating a new session with aws config: %w", err)
 	}
 
 	userAgentHandler := request.NamedHandler{
@@ -1060,7 +1092,7 @@ func (d *driver) DeleteFiles(ctx context.Context, paths []string) (int, error) {
 				// parse s3.Error errors and return a single storagedriver.MultiError
 				var errs error
 				for _, s3e := range resp.Errors {
-					err := fmt.Errorf("failed to delete file '%s': '%s'", *s3e.Key, *s3e.Message)
+					err := fmt.Errorf("deleting file '%s': '%s'", *s3e.Key, *s3e.Message)
 					errs = multierror.Append(errs, err)
 				}
 				errCh <- errs
