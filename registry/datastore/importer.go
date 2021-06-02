@@ -18,7 +18,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
-	"gitlab.com/gitlab-org/labkit/log"
 )
 
 // Importer populates the registry database with filesystem metadata. This is only meant to be used for an initial
@@ -121,77 +120,11 @@ func (imp *Importer) findOrCreateDBManifest(ctx context.Context, dbRepo *models.
 	return dbManifest, nil
 }
 
-func (imp *Importer) findOrCreateDBLayer(ctx context.Context, fsRepo distribution.Repository, l *models.Blob) (*models.Blob, error) {
-	dbLayer, err := imp.blobStore.FindByDigest(ctx, l.Digest)
-	if err != nil {
-		return nil, fmt.Errorf("searching for layer blob: %w", err)
+func (imp *Importer) importLayer(ctx context.Context, dbRepo *models.Repository, dbManifest *models.Manifest, dbLayer *models.Blob) error {
+	if err := imp.blobStore.CreateOrFind(ctx, dbLayer); err != nil {
+		return fmt.Errorf("creating layer blob: %w", err)
 	}
 
-	if dbLayer == nil {
-		// v1 manifests don't include the layers blob size and media type, so we must Stat the blob to know
-		if l.Size == 0 {
-			blobStore := fsRepo.Blobs(ctx)
-			desc, err := blobStore.Stat(ctx, digest.Digest(l.Digest))
-			if err != nil {
-				return nil, fmt.Errorf("obtaining blob layer size: %w", err)
-			}
-			l.Size = desc.Size
-			l.MediaType = desc.MediaType
-		}
-
-		if err := imp.blobStore.Create(ctx, l); err != nil {
-			return nil, fmt.Errorf("creating layer blob: %w", err)
-		}
-		dbLayer = l
-	}
-
-	return dbLayer, nil
-}
-
-func (imp *Importer) findOrCreateDBManifestConfigBlob(ctx context.Context, d distribution.Descriptor, payload []byte) (*models.Blob, error) {
-	dbBlob, err := imp.blobStore.FindByDigest(ctx, d.Digest)
-	if err != nil {
-		return nil, fmt.Errorf("searching for configuration blob: %w", err)
-	}
-	if dbBlob == nil {
-		dbBlob = &models.Blob{
-			MediaType: d.MediaType,
-			Digest:    d.Digest,
-			Size:      d.Size,
-		}
-		if err := imp.blobStore.Create(ctx, dbBlob); err != nil {
-			return nil, err
-		}
-	}
-
-	return dbBlob, nil
-}
-
-func (imp *Importer) findOrCreateDBTag(ctx context.Context, dbRepo *models.Repository, dbTag *models.Tag) {
-	log := logrus.WithField("tagName", dbTag.Name)
-
-	foundTag, err := imp.repositoryStore.FindTagByName(ctx, dbRepo, dbTag.Name)
-	if err != nil {
-		log.WithError(err).Error("finding repository tag")
-		return
-	}
-
-	if foundTag != nil {
-		log.Info("tag already present in database")
-		return
-	}
-
-	if err := imp.tagStore.CreateOrUpdate(ctx, dbTag); err != nil {
-		log.WithError(err).Error("creating tag")
-		return
-	}
-}
-
-func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, l *models.Blob) error {
-	dbLayer, err := imp.findOrCreateDBLayer(ctx, fsRepo, l)
-	if err != nil {
-		return err
-	}
 	if err := imp.manifestStore.AssociateLayerBlob(ctx, dbManifest, dbLayer); err != nil {
 		return fmt.Errorf("associating layer blob with manifest: %w", err)
 	}
@@ -200,14 +133,14 @@ func (imp *Importer) importLayer(ctx context.Context, fsRepo distribution.Reposi
 		return fmt.Errorf("linking layer blob to repository: %w", err)
 	}
 
-	if err := imp.transferBlob(ctx, l.Digest); err != nil {
+	if err := imp.transferBlob(ctx, dbLayer.Digest); err != nil {
 		return fmt.Errorf("transferring layer blob: %w", err)
 	}
 
 	return nil
 }
 
-func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repository, dbRepo *models.Repository, dbManifest *models.Manifest, fsLayers []distribution.Descriptor) error {
+func (imp *Importer) importLayers(ctx context.Context, dbRepo *models.Repository, dbManifest *models.Manifest, fsLayers []distribution.Descriptor) error {
 	total := len(fsLayers)
 	for i, fsLayer := range fsLayers {
 		log := logrus.WithFields(logrus.Fields{
@@ -219,7 +152,7 @@ func (imp *Importer) importLayers(ctx context.Context, fsRepo distribution.Repos
 		})
 		log.Info("importing layer")
 
-		err := imp.importLayer(ctx, fsRepo, dbRepo, dbManifest, &models.Blob{
+		err := imp.importLayer(ctx, dbRepo, dbManifest, &models.Blob{
 			MediaType: fsLayer.MediaType,
 			Digest:    fsLayer.Digest,
 			Size:      fsLayer.Size,
@@ -296,8 +229,12 @@ func (imp *Importer) importV2Manifest(ctx context.Context, fsRepo distribution.R
 		return nil, fmt.Errorf("error obtaining configuration payload: %w", err)
 	}
 
-	dbConfigBlob, err := imp.findOrCreateDBManifestConfigBlob(ctx, m.config(), configPayload)
-	if err != nil {
+	dbConfigBlob := &models.Blob{
+		MediaType: m.config().MediaType,
+		Digest:    m.config().Digest,
+		Size:      m.config().Size,
+	}
+	if err = imp.blobStore.CreateOrFind(ctx, dbConfigBlob); err != nil {
 		return nil, err
 	}
 
@@ -329,7 +266,7 @@ func (imp *Importer) importV2Manifest(ctx context.Context, fsRepo distribution.R
 	}
 
 	// import manifest layers
-	if err := imp.importLayers(ctx, fsRepo, dbRepo, dbManifest, m.layers()); err != nil {
+	if err := imp.importLayers(ctx, dbRepo, dbManifest, m.layers()); err != nil {
 		return nil, fmt.Errorf("error importing layers: %w", err)
 	}
 
@@ -510,7 +447,9 @@ func (imp *Importer) importTags(ctx context.Context, fsRepo distribution.Reposit
 
 		dbTag.ManifestID = dbManifest.ID
 
-		imp.findOrCreateDBTag(ctx, dbRepo, dbTag)
+		if err := imp.tagStore.CreateOrUpdate(ctx, dbTag); err != nil {
+			log.WithError(err).Error("creating tag")
+		}
 	}
 
 	return nil
@@ -529,15 +468,8 @@ func (imp *Importer) importRepository(ctx context.Context, path string) error {
 	// Find or create repository.
 	var dbRepo *models.Repository
 
-	dbRepo, err = imp.repositoryStore.FindByPath(ctx, path)
-	if err != nil {
-		return fmt.Errorf("checking for existence of repository: %w", err)
-	}
-
-	if dbRepo == nil {
-		if dbRepo, err = imp.repositoryStore.CreateByPath(ctx, path); err != nil {
-			return fmt.Errorf("importing repository: %w", err)
-		}
+	if dbRepo, err = imp.repositoryStore.CreateOrFindByPath(ctx, path); err != nil {
+		return fmt.Errorf("importing repository: %w", err)
 	}
 
 	if imp.importDanglingManifests {
@@ -599,6 +531,8 @@ func (imp *Importer) preImportManifest(ctx context.Context, fsRepo distribution.
 		return fmt.Errorf("constructing manifest service: %w", err)
 	}
 
+	log := logrus.WithField("digest", dgst)
+
 	m, err := manifestService.Get(ctx, dgst)
 	if err != nil {
 		log.WithError(err).Errorf("retrieving manifest %q", dgst)
@@ -614,8 +548,6 @@ func (imp *Importer) preImportManifest(ctx context.Context, fsRepo distribution.
 			imp.loadStores(imp.db)
 		}()
 	}
-
-	log := logrus.WithField("digest", dgst)
 
 	switch fsManifest := m.(type) {
 	case *manifestlist.DeserializedManifestList:
