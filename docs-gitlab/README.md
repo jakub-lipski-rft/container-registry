@@ -57,6 +57,11 @@ S3: https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html
 for use in production environments, as exceeding your request budget will result
 in errors from the Amazon S3 service.
 
+`maxretries`
+
+The maximum number of times the driver will attempt to retry failed requests.
+Set to `0` to disable retries entirely.
+
 #### Azure Storage Driver
 
 ##### Additional parameters

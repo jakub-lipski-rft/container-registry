@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/hashicorp/go-multierror"
 	log "github.com/sirupsen/logrus"
 
@@ -96,6 +97,17 @@ const defaultBurst = 1
 // noStorageClass defines the value to be used if storage class is not supported by the S3 endpoint
 const noStorageClass = "NONE"
 
+// defaults related to exponential backoff
+const (
+	// defaultMaxRetries is how many times the driver will retry failed requests.
+	defaultMaxRetries          = 5
+	defaultInitialInterval     = backoff.DefaultInitialInterval
+	defaultRandomizationFactor = backoff.DefaultRandomizationFactor
+	defaultMultiplier          = backoff.DefaultMultiplier
+	defaultMaxInterval         = backoff.DefaultMaxInterval
+	defaultMaxElapsedTime      = backoff.DefaultMaxElapsedTime
+)
+
 // validRegions maps known s3 region identifiers to region descriptors
 var validRegions = map[string]struct{}{}
 
@@ -124,6 +136,7 @@ type DriverParameters struct {
 	SessionToken                string
 	PathStyle                   bool
 	MaxRequestsPerSecond        int64
+	MaxRetries                  int64
 	ParallelWalk                bool
 	LogLevel                    aws.LogLevelType
 }
@@ -425,7 +438,6 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		if err != nil {
 			err := errors.New("the pathstyle parameter should be a boolean")
 			result = multierror.Append(result, err)
-
 		}
 		pathStyleBool = b
 	case bool:
@@ -457,7 +469,13 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		result = multierror.Append(result, err)
 	}
 
-	maxRequestsPerSecondInt64, err := getParameterAsInt64(parameters, "maxrequestspersecond", defaultMaxRequestsPerSecond, 0, math.MaxInt64)
+	maxRequestsPerSecond, err := getParameterAsInt64(parameters, "maxrequestspersecond", defaultMaxRequestsPerSecond, 0, math.MaxInt64)
+	if err != nil {
+		err = fmt.Errorf("converting maxrequestspersecond to valid int64: %w", err)
+		result = multierror.Append(result, err)
+	}
+
+	maxRetries, err := getParameterAsInt64(parameters, "maxretries", defaultMaxRetries, 0, math.MaxInt64)
 	if err != nil {
 		err := fmt.Errorf("converting maxrequestspersecond to valid int64: %w", err)
 		result = multierror.Append(result, err)
@@ -492,7 +510,8 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		objectACL,
 		fmt.Sprint(sessionToken),
 		pathStyleBool,
-		maxRequestsPerSecondInt64,
+		maxRequestsPerSecond,
+		maxRetries,
 		parallelWalkBool,
 		logLevel,
 	}
@@ -606,8 +625,17 @@ func New(params DriverParameters) (*Driver, error) {
 	// 	}
 	// }
 
+	w := newS3Wrapper(
+		s3obj,
+		withRateLimit(params.MaxRequestsPerSecond, defaultBurst),
+		withExponentialBackoff(params.MaxRetries),
+		withBackoffNotify(func(err error, t time.Duration) {
+			log.WithFields(log.Fields{"error": err, "delay_s": t.Seconds()}).Info("S3: retrying after error")
+		}),
+	)
+
 	d := &driver{
-		S3:                          newS3Wrapper(s3obj, params),
+		S3:                          w,
 		Bucket:                      params.Bucket,
 		ChunkSize:                   params.ChunkSize,
 		Encrypt:                     params.Encrypt,

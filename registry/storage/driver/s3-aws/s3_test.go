@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -15,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/hashicorp/go-multierror"
-	"golang.org/x/time/rate"
+	"github.com/stretchr/testify/require"
 
 	"gopkg.in/check.v1"
 
@@ -46,6 +48,7 @@ func init() {
 	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
 	pathStyle := os.Getenv("AWS_PATH_STYLE")
 	maxRequestsPerSecond := os.Getenv("S3_MAX_REQUESTS_PER_SEC")
+	maxRetries := os.Getenv("S3_MAX_RETRIES")
 	logLevel := os.Getenv("S3_LOG_LEVEL")
 
 	if err != nil {
@@ -108,6 +111,14 @@ func init() {
 			}
 		}
 
+		maxRetriesInt64 := int64(defaultMaxRetries)
+
+		if maxRetries != "" {
+			if maxRetriesInt64, err = strconv.ParseInt(maxRetries, 10, 64); err != nil {
+				return nil, err
+			}
+		}
+
 		parallelWalkBool := true
 
 		logLevelType := parseLogLevelParam(logLevel)
@@ -133,6 +144,7 @@ func init() {
 			sessionToken,
 			pathStyleBool,
 			maxRequestsPerSecondInt64,
+			maxRetriesInt64,
 			parallelWalkBool,
 			logLevelType,
 		}
@@ -352,29 +364,20 @@ func TestOverThousandBlobs(t *testing.T) {
 		t.Skip(skipS3())
 	}
 
-	rootDir, err := ioutil.TempDir("", "driver-")
-	if err != nil {
-		t.Fatalf("unexpected error creating temporary directory: %v", err)
-	}
-	defer os.Remove(rootDir)
-
-	standardDriver, err := s3DriverConstructor(rootDir, s3.StorageClassStandard)
-	if err != nil {
-		t.Fatalf("unexpected error creating driver with standard storage: %v", err)
-	}
+	standardDriver := newTempDirDriver(t)
 
 	ctx := context.Background()
 	for i := 0; i < 1005; i++ {
 		filename := "/thousandfiletest/file" + strconv.Itoa(i)
 		contents := []byte("contents")
-		err = standardDriver.PutContent(ctx, filename, contents)
+		err := standardDriver.PutContent(ctx, filename, contents)
 		if err != nil {
 			t.Fatalf("unexpected error creating content: %v", err)
 		}
 	}
 
 	// cant actually verify deletion because read-after-delete is inconsistent, but can ensure no errors
-	err = standardDriver.Delete(ctx, "/thousandfiletest")
+	err := standardDriver.Delete(ctx, "/thousandfiletest")
 	if err != nil {
 		t.Fatalf("unexpected error deleting thousand files: %v", err)
 	}
@@ -385,16 +388,7 @@ func TestMoveWithMultipartCopy(t *testing.T) {
 		t.Skip(skipS3())
 	}
 
-	rootDir, err := ioutil.TempDir("", "driver-")
-	if err != nil {
-		t.Fatalf("unexpected error creating temporary directory: %v", err)
-	}
-	defer os.Remove(rootDir)
-
-	d, err := s3DriverConstructor(rootDir, s3.StorageClassStandard)
-	if err != nil {
-		t.Fatalf("unexpected error creating driver: %v", err)
-	}
+	d := newTempDirDriver(t)
 
 	ctx := context.Background()
 	sourcePath := "/source"
@@ -408,7 +402,7 @@ func TestMoveWithMultipartCopy(t *testing.T) {
 	contents := make([]byte, 2*multipartCopyThresholdSize)
 	rand.Read(contents)
 
-	err = d.PutContent(ctx, sourcePath, contents)
+	err := d.PutContent(ctx, sourcePath, contents)
 	if err != nil {
 		t.Fatalf("unexpected error creating content: %v", err)
 	}
@@ -448,19 +442,10 @@ func testDeleteFilesError(t *testing.T, mock s3iface.S3API, numFiles int) (int, 
 		t.Skip(skipS3())
 	}
 
-	rootDir, err := ioutil.TempDir("", "driver-")
-	if err != nil {
-		t.Fatalf("unexpected error creating temporary directory: %v", err)
-	}
-	defer os.Remove(rootDir)
-
-	d, err := s3DriverConstructor(rootDir, s3.StorageClassStandard)
-	if err != nil {
-		t.Fatalf("unexpected error creating driver: %v", err)
-	}
+	d := newTempDirDriver(t)
 
 	// mock the underlying S3 client
-	d.baseEmbed.Base.StorageDriver.(*driver).S3 = &s3wrapper{mock, rate.NewLimiter(rate.Limit(defaultMaxRequestsPerSecond), defaultBurst)}
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = newS3Wrapper(mock)
 
 	// simulate deleting numFiles files
 	paths := make([]string, 0, numFiles)
@@ -558,4 +543,178 @@ func TestDeleteFilesPartialError(t *testing.T) {
 			t.Errorf("expected error %q to match %q", e, p)
 		}
 	}
+}
+
+type mockPutObjectWithContextRetryableError struct {
+	s3iface.S3API
+}
+
+func (m *mockPutObjectWithContextRetryableError) PutObjectWithContext(ctx aws.Context, input *s3.PutObjectInput, opts ...request.Option) (*s3.PutObjectOutput, error) {
+	return nil, awserr.New(request.ErrCodeRequestError, "expected test failure", nil)
+}
+
+func (m *mockPutObjectWithContextRetryableError) ListObjectsV2PagesWithContext(ctx aws.Context, input *s3.ListObjectsV2Input, f func(*s3.ListObjectsV2Output, bool) bool, opts ...request.Option) error {
+	return awserr.NewRequestFailure(nil, http.StatusInternalServerError, "expected test failure")
+}
+
+func TestBackoffDisabledByDefault(t *testing.T) {
+	if skipS3() != "" {
+		t.Skip(skipS3())
+	}
+
+	d := newTempDirDriver(t)
+
+	var retries int
+
+	notifyFn := func(err error, t time.Duration) {
+		retries++
+	}
+
+	// mock the underlying S3 client
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = newS3Wrapper(
+		&mockPutObjectWithContextRetryableError{},
+		withBackoffNotify(notifyFn),
+	)
+
+	err := d.PutContent(context.Background(), "/test/file", []byte{})
+	require.Error(t, err)
+	require.Zero(t, retries)
+}
+
+func TestBackoffDisabledBySettingZeroRetries(t *testing.T) {
+	if skipS3() != "" {
+		t.Skip(skipS3())
+	}
+
+	d := newTempDirDriver(t)
+
+	var retries int
+
+	notifyFn := func(err error, t time.Duration) {
+		retries++
+	}
+
+	// mock the underlying S3 client
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = newS3Wrapper(
+		&mockPutObjectWithContextRetryableError{},
+		withExponentialBackoff(0),
+		withBackoffNotify(notifyFn),
+	)
+
+	err := d.PutContent(context.Background(), "/test/file", []byte{})
+	require.Error(t, err)
+	require.Zero(t, retries)
+}
+
+func TestBackoffRetriesRetryableErrors(t *testing.T) {
+	if skipS3() != "" {
+		t.Skip(skipS3())
+	}
+
+	d := newTempDirDriver(t)
+
+	var retries int
+
+	notifyFn := func(err error, t time.Duration) {
+		retries++
+	}
+
+	// mock the underlying S3 client
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = newS3Wrapper(
+		&mockPutObjectWithContextRetryableError{},
+		withBackoffNotify(notifyFn),
+		withExponentialBackoff(defaultMaxRetries),
+	)
+
+	start := time.Now()
+	err := d.PutContent(context.Background(), "/test/file", []byte{})
+	require.Error(t, err)
+	require.Equal(t, defaultMaxRetries, retries)
+	require.WithinDuration(t, time.Now(), start, time.Second*10)
+
+	start = time.Now()
+	err = d.Walk(context.Background(), "test/", func(storagedriver.FileInfo) error { return nil })
+	require.Error(t, err)
+	require.Equal(t, defaultMaxRetries, retries)
+	require.WithinDuration(t, time.Now(), start, time.Second*10)
+}
+
+type mockPutObjectWithContextPermanentError struct {
+	s3iface.S3API
+}
+
+func (m *mockPutObjectWithContextPermanentError) PutObjectWithContext(ctx aws.Context, input *s3.PutObjectInput, opts ...request.Option) (*s3.PutObjectOutput, error) {
+	return nil, awserr.New(request.ErrCodeInvalidPresignExpire, "expected test failure", nil)
+}
+func (m *mockPutObjectWithContextPermanentError) ListObjectsV2WithContext(ctx aws.Context, input *s3.ListObjectsV2Input, opts ...request.Option) (*s3.ListObjectsV2Output, error) {
+	return nil, awserr.NewRequestFailure(nil, http.StatusForbidden, "expected test failure")
+}
+
+func TestBackoffDoesNotRetryPermanentErrors(t *testing.T) {
+	if skipS3() != "" {
+		t.Skip(skipS3())
+	}
+
+	d := newTempDirDriver(t)
+
+	var retries int
+
+	notifyFn := func(err error, t time.Duration) {
+		retries++
+	}
+
+	// mock the underlying S3 client
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = newS3Wrapper(
+		&mockPutObjectWithContextPermanentError{},
+		withBackoffNotify(notifyFn),
+		withExponentialBackoff(200),
+	)
+
+	err := d.PutContent(context.Background(), "/test/file", []byte{})
+	require.Error(t, err)
+	require.Zero(t, retries)
+
+	_, err = d.List(context.Background(), "/test/")
+	require.Error(t, err)
+	require.Zero(t, retries)
+}
+
+func TestBackoffDoesNotRetryNonRequestErrors(t *testing.T) {
+	if skipS3() != "" {
+		t.Skip(skipS3())
+	}
+
+	d := newTempDirDriver(t)
+
+	var retries int
+
+	notifyFn := func(err error, t time.Duration) {
+		retries++
+	}
+
+	// mock the underlying S3 client
+	d.baseEmbed.Base.StorageDriver.(*driver).S3 = newS3Wrapper(
+		&mockDeleteObjectsError{},
+		withBackoffNotify(notifyFn),
+		withExponentialBackoff(200),
+	)
+
+	_, err := d.DeleteFiles(context.Background(), []string{"/test/file1", "/test/file2"})
+	require.Error(t, err)
+	require.Zero(t, retries)
+}
+
+func newTempDirDriver(t *testing.T) *Driver {
+	t.Helper()
+
+	rootDir, err := ioutil.TempDir("", "driver-")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		os.Remove(rootDir)
+	})
+
+	d, err := s3DriverConstructor(rootDir, s3.StorageClassStandard)
+	require.NoError(t, err)
+
+	return d
 }

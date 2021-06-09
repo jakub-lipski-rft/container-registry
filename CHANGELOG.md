@@ -5,6 +5,9 @@
 ### Fixed
 - registry/storage: Offline garbage collection no longer inappropriately removes untagged manifests referenced by a manifest list
 
+### Added
+- registry/storage: S3 Driver will now use Exponential backoff to retry failed requests
+
 ## [v3.4.1-gitlab] - 2021-05-11
 ### Fixed
 - registry/storage: S3 driver now respects rate limits in all cases
