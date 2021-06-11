@@ -411,18 +411,6 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		log.Warn("registry does not implement RepositoryRemover. Will not be able to delete repos and tags")
 	}
 
-	if config.Migration.Proxy.Enabled && (len(config.Migration.Proxy.Include) > 0 || len(config.Migration.Proxy.Exclude) > 0) {
-		include := make([]string, len(config.Migration.Proxy.Include))
-		for _, r := range config.Migration.Proxy.Include {
-			include = append(include, r.String())
-		}
-		exclude := make([]string, len(config.Migration.Proxy.Exclude))
-		for _, r := range config.Migration.Proxy.Exclude {
-			exclude = append(exclude, r.String())
-		}
-		log.WithFields(logrus.Fields{"include": include, "exclude": exclude}).Info("migration proxy enabled with filters")
-	}
-
 	return app
 }
 

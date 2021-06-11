@@ -402,20 +402,6 @@ func (r *Regexp) MarshalText() ([]byte, error) {
 type Migration struct {
 	// DisableMirrorFS disables registry metadata writes to the filesystem.
 	DisableMirrorFS bool `yaml:"disablemirrorfs,omitempty"`
-	// Proxy configures the target registry for which requests that target new repositories (unknown to this instance)
-	// should be proxied to.
-	Proxy struct {
-		// Enabled enables the proxy mode. Please note that proxy and target registries should share the same secret,
-		// configured with HTTP.Secret. The target registry HTTP.Host should also be set with the hostname of the proxy
-		// registry (public), otherwise Location headers will have the target registry hostname (private).
-		Enabled bool `yaml:"enabled,omitempty"`
-		// URL is the URL of the target registry instance for where requests should be proxied to.
-		URL string `yaml:"url,omitempty"`
-		// Include allows filtering repositories that should be proxied by name, using a list of regular expressions.
-		Include []*Regexp `yaml:"include,omitempty"`
-		// Exclude allows filtering repositories that should not be proxied by name, using a list of regular expressions.
-		Exclude []*Regexp `yaml:"exclude,omitempty"`
-	} `yaml:"proxy,omitempty"`
 }
 
 // MailOptions provides the configuration sections to user, for specific handler.

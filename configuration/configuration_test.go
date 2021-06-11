@@ -1401,50 +1401,6 @@ reporting:
 	testParameter(t, yml, "REGISTRY_REPORTING_SENTRY_ENVIRONMENT", tt, validator)
 }
 
-func TestParseMigrationProxy_Enabled(t *testing.T) {
-	yml := `
-version: 0.1
-storage: inmemory
-migration:
-  proxy:
-    enabled: %s
-`
-	tt := boolParameterTests(false)
-
-	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, strconv.FormatBool(got.Migration.Proxy.Enabled))
-	}
-
-	testParameter(t, yml, "REGISTRY_MIGRATION_PROXY_ENABLED", tt, validator)
-}
-
-func TestParseMigrationProxy_URL(t *testing.T) {
-	yml := `
-version: 0.1
-storage: inmemory
-migration:
-  proxy:
-    url: %s
-`
-	tt := []parameterTest{
-		{
-			name:  "sample",
-			value: "https://127.0.0.1:5005",
-			want:  "https://127.0.0.1:5005",
-		},
-		{
-			name: "default",
-			want: "",
-		},
-	}
-
-	validator := func(t *testing.T, want interface{}, got *Configuration) {
-		require.Equal(t, want, got.Migration.Proxy.URL)
-	}
-
-	testParameter(t, yml, "REGISTRY_MIGRATION_PROXY_URL", tt, validator)
-}
-
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice {
 		t = t.Elem()

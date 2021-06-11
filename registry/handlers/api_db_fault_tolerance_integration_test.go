@@ -1013,6 +1013,16 @@ func asyncDo(f func()) chan struct{} {
 	return done
 }
 
+func createRepoWithBlob(t *testing.T, env *testEnv) (blobArgs, string) {
+	t.Helper()
+
+	args := makeBlobArgs(t)
+	uploadURLBase, _ := startPushLayer(t, env, args.imageName)
+	blobURL := pushLayer(t, env.builder, args.imageName, args.layerDigest, uploadURLBase, args.layerFile)
+
+	return args, blobURL
+}
+
 func assertEventuallyOpenAndInUseDBConnections(t *testing.T, env *testEnv, open, inUse int, deadline time.Duration) {
 	t.Helper()
 	require.Eventually(t, func() bool {
