@@ -44,7 +44,10 @@ The due date is set to the 12th of each month to create a buffer of 5 days befor
 ### 2. Release
 
 1. [ ] Create a merge request to add an entry to the [changelog](https://gitlab.com/gitlab-org/container-registry/blob/release/2.8-gitlab/CHANGELOG.md).
-1. [ ] Create a [tag](https://gitlab.com/gitlab-org/container-registry/-/tags) for the new release.
+1. [ ] Create a [tag](https://gitlab.com/gitlab-org/container-registry/-/tags) for the new release. Please fill in the `Release notes` with the following so that a release is automatically created:
+    ```md
+    See the [changelog](https://gitlab.com/gitlab-org/container-registry/-/blob/master/CHANGELOG.md#vXYZ-gitlab-YYYY-MM-DD).
+    ```
 
 <details>
 <summary><b>Instructions</b></summary>
