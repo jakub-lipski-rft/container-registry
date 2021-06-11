@@ -1,4 +1,8 @@
 ## [Unreleased]
+### Removed
+- configuration: Remove proxy configuration migration section
+- registry: Remove ability to migrate to remote registry
+
 ## [v3.5.0-gitlab] - 2021-06-10
 ### Changed
 - registry/datastore: Partitioning by top-level namespace

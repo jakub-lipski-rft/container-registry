@@ -47,7 +47,7 @@ func blobDispatcher(ctx *Context, r *http.Request) http.Handler {
 		mhandler["DELETE"] = http.HandlerFunc(blobHandler.DeleteBlob)
 	}
 
-	return migrationWrapper(ctx, mhandler)
+	return mhandler
 }
 
 // blobHandler serves http blob requests.

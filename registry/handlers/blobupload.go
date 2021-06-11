@@ -39,7 +39,7 @@ func blobUploadDispatcher(ctx *Context, r *http.Request) http.Handler {
 		handler["DELETE"] = http.HandlerFunc(buh.CancelBlobUpload)
 	}
 
-	return migrationWrapper(ctx, buh.validateUpload(handler))
+	return buh.validateUpload(handler)
 }
 
 func (buh *blobUploadHandler) validateUpload(handler http.Handler) http.Handler {

@@ -74,7 +74,7 @@ func manifestDispatcher(ctx *Context, r *http.Request) http.Handler {
 		mhandler["DELETE"] = http.HandlerFunc(manifestHandler.DeleteManifest)
 	}
 
-	return migrationWrapper(ctx, mhandler)
+	return mhandler
 }
 
 // manifestHandler handles http operations on image manifests.
