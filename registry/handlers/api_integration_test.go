@@ -1228,7 +1228,7 @@ func TestDeleteDisabled(t *testing.T) {
 }
 
 func TestDeleteReadOnly(t *testing.T) {
-	setupEnv := newTestEnv(t, withSharedInMemoryDriver("TestDeleteReadOnlyDriver"))
+	setupEnv := newTestEnv(t, withSharedInMemoryDriver(t.Name()))
 	defer setupEnv.Shutdown()
 
 	imageName, _ := reference.WithName("foo/bar")
@@ -1244,7 +1244,7 @@ func TestDeleteReadOnly(t *testing.T) {
 
 	// Reconfigure environment with withReadOnly enabled.
 	setupEnv.Shutdown()
-	env := newTestEnv(t, withSharedInMemoryDriver("TestDeleteReadOnlyDriver"), withReadOnly)
+	env := newTestEnv(t, withSharedInMemoryDriver(t.Name()), withReadOnly)
 	defer env.Shutdown()
 
 	layerURL, err := env.builder.BuildBlobURL(ref)
@@ -4691,7 +4691,7 @@ func tags_Delete_UnknownRepository(t *testing.T, opts ...configOpt) {
 }
 
 func tags_Delete_ReadOnly(t *testing.T, opts ...configOpt) {
-	opts = append(opts, withSharedInMemoryDriver("TestTagsAPITagDeleteReadOnly"))
+	opts = append(opts, withSharedInMemoryDriver(t.Name()))
 	setupEnv := newTestEnv(t, opts...)
 	defer setupEnv.Shutdown()
 
