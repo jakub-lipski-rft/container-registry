@@ -83,7 +83,7 @@ default.
 
 ```text
 $ make new-migration create_users_table
-OK: ./migrations/20200713143615_create_users_table.go
+OK: ./registry/datastore/migrations/20200713143615_create_users_table.go
 ```
 
 #### Disabling DDL Transactions

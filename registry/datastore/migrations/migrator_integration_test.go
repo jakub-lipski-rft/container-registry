@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/migrations"
-	testmigrations "github.com/docker/distribution/migrations/testdata/fixtures"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/migrations"
+	testmigrations "github.com/docker/distribution/registry/datastore/migrations/testdata/fixtures"
 	"github.com/docker/distribution/registry/datastore/testutil"
 	migrate "github.com/rubenv/sql-migrate"
 
