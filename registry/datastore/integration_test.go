@@ -10,8 +10,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/migrations"
 	"github.com/docker/distribution/registry/datastore/testutil"
 )
 

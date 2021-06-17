@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/docker/distribution/configuration"
-	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/migrations"
 	"github.com/docker/distribution/registry/datastore/models"
 	dbtestutil "github.com/docker/distribution/registry/datastore/testutil"
 	"github.com/stretchr/testify/require"

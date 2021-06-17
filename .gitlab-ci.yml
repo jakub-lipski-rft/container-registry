@@ -192,7 +192,7 @@ api:
 database:migrations:
   <<: *database
   before_script:
-    - export PACKAGE=github.com/docker/distribution/migrations
+    - export PACKAGE=github.com/docker/distribution/registry/datastore/migrations
 
 database:datastore:
   <<: *database

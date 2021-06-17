@@ -16,8 +16,8 @@ import (
 
 	"github.com/docker/distribution/configuration"
 	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/migrations"
 	"github.com/docker/distribution/registry/datastore"
+	"github.com/docker/distribution/registry/datastore/migrations"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/factory"
 	"github.com/docker/distribution/registry/storage/inventory"

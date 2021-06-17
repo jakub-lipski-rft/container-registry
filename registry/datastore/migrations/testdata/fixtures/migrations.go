@@ -3,7 +3,7 @@
 package migrationfixtures
 
 import (
-	"github.com/docker/distribution/migrations"
+	"github.com/docker/distribution/registry/datastore/migrations"
 )
 
 var allMigrations []*migrations.Migration
