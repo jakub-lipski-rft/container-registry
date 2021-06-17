@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# new-migration - A script to generate a new database migration from a template.
+# db-new-migration - A script to generate a new database migration from a template.
 
 set -euo pipefail
 
@@ -13,7 +13,7 @@ FILE_PATH=$MIGRATIONS_DIR/$ID.go
 
 # Show help message if no argument was provided
 if [ $# -eq 0 ]; then
-    echo "usage: new-migration [name]"
+    echo "usage: db-new-migration [name]"
     exit 0
 fi
 

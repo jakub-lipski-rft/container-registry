@@ -27,6 +27,12 @@ Long, complex or multi-line SQL statements must be formatted with
 There are plugins for several editors/IDEs and there is also an online version at
 [sqlformat.darold.net](http://sqlformat.darold.net/).
 
+## Schema DDL Script
+
+Whenever a schema migration is added, you must regenerate the DDL script at `registry/datastore/migrations/structure.sql`. This guarantees that we always have a coherent DDL script. This is useful to check the current state of the full database schema (and easily validate changes) as well as to bootstrap a database without having to compile the registry binary.
+
+Make sure to run `make db-structure-dump` to update the DDL script whenever you change the database schema. This will dump the current schema from your local registry database with `pg_dump` and format it with [pgFormatter](https://github.com/darold/pgFormatter) for consistency.
+
 ## Testing
 
 ### Golden Files

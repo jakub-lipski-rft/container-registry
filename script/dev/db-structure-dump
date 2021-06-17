@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# db-structure-dump - A script to dump the database DDL as SQL. Requires pg_dump v12 and pg_format v5.
+
+set -eo pipefail
+
+# Constants
+DB_DIR=./registry/datastore/migrations
+FILE_PATH=$DB_DIR/structure.sql
+PG_CLIENT_REQUIRED_MAJOR_VERSION="12"
+PG_FORMAT_REQUIRED_MAJOR_VERSION="5"
+DB_HOST=localhost
+DB_USER=postgres
+DB_NAME=registry
+
+# REGISTRY_DATABASE_HOST env var takes precedence over the default DB_HOST
+if [[ -n $REGISTRY_DATABASE_HOST ]]; then
+  DB_HOST=$REGISTRY_DATABASE_HOST
+fi
+
+# REGISTRY_DATABASE_USER env var takes precedence over the default DB_USER
+if [[ -n $REGISTRY_DATABASE_USER ]]; then
+  DB_USER=$REGISTRY_DATABASE_USER
+fi
+
+# REGISTRY_DATABASE_DBNAME env var takes precedence over the default DB_NAME
+if [[ -n $REGISTRY_DATABASE_DBNAME ]]; then
+  DB_NAME=$REGISTRY_DATABASE_DBNAME
+fi
+
+# Make sure dependencies are met
+if ! command -v pg_dump &> /dev/null; then
+  echo "pg_dump could not be found"
+  exit 1
+fi
+PG_DUMP_CURRENT_MAJOR_VERSION="$(pg_dump --version | cut -d' ' -f3 | cut -d. -f1)"
+if [[ $PG_DUMP_CURRENT_MAJOR_VERSION != "$PG_CLIENT_REQUIRED_MAJOR_VERSION" ]]; then
+  echo "The pg_dump major version is ${CURRENT_MAJOR_VERSION}, but ${PG_CLIENT_REQUIRED_MAJOR_VERSION} is required."
+  exit 1
+fi
+
+if ! command -v pg_format &> /dev/null; then
+  echo "pg_format could not be found"
+  exit 1
+fi
+PG_FORMAT_CURRENT_MAJOR_VERSION="$(pg_format --version | cut -d' ' -f3 | cut -d. -f1)"
+if [[ $PG_FORMAT_CURRENT_MAJOR_VERSION != "$PG_FORMAT_REQUIRED_MAJOR_VERSION" ]]; then
+  echo "The pg_format major version is ${PG_FORMAT_CURRENT_MAJOR_VERSION}, but ${PG_FORMAT_REQUIRED_MAJOR_VERSION} is required."
+  exit 1
+fi
+
+# Generate structure.sql file.
+pg_dump \
+  -U "$DB_USER" \
+  -h "$DB_HOST" \
+  --schema-only \
+  --no-privileges \
+  --no-owner \
+  --schema=public \
+  --schema=partitions \
+  "$DB_NAME" | sed -e '/^SET/d' | pg_format --nocomment > $FILE_PATH
+
+if [[ $? -eq 0 ]]; then
+  echo OK: "$FILE_PATH"
+  exit 0
+else
+  exit 1
+fi
