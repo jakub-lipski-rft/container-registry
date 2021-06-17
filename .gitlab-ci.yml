@@ -112,9 +112,8 @@ mocks:
     - go generate ./...
     - git diff --exit-code **/mocks/*.go
 
-database:schema-migrations:
-  stage: validate
-  needs: [build]
+.schema-migrations:
+  needs: [ build ]
   variables:
     FF_NETWORK_PER_BUILD: 1
     POSTGRES_PASSWORD: "secret"
@@ -132,9 +131,23 @@ database:schema-migrations:
       alias: "db"
   before_script:
     - "echo 'version: 0.1' > config.yml"
+
+database:schema-migrations:
+  extends: .schema-migrations
+  stage: validate
   script:
     - ./bin/registry database migrate up config.yml
     - ./bin/registry database migrate down --force config.yml
+
+database:schema-migrations:status:
+  extends: .schema-migrations
+  stage: validate
+  script:
+    - ./bin/registry database migrate status -u config.yml | grep -qw 'false' || exit 1
+    - ./bin/registry database migrate up -n 2 config.yml
+    - ./bin/registry database migrate status --up-to-date config.yml | grep -qw 'false' || exit 1
+    - ./bin/registry database migrate up config.yml
+    - ./bin/registry database migrate status -u config.yml | grep -qw 'true' || exit 1
 
 .go-version-matrix:
   image: golang:${GO_VERSION}-buster
