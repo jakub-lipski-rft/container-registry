@@ -48,15 +48,25 @@ default:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
       - $GOPATH/pkg/mod/
+      - bin/
 
 variables:
   BUILDTAGS: "include_gcs include_oss continuous_profiler_stackdriver"
   CGO_ENABLED: "1"
 
 stages:
+  - build
   - validate
   - test
   - integration
+
+build:
+  stage: build
+  needs: []
+  script:
+    - make build
+    - make binaries
+    - chmod +x ./bin/*
 
 static-analysis:
   cache: {}
@@ -102,20 +112,41 @@ mocks:
     - go generate ./...
     - git diff --exit-code **/mocks/*.go
 
+database:schema-migrations:
+  stage: validate
+  needs: [build]
+  variables:
+    FF_NETWORK_PER_BUILD: 1
+    POSTGRES_PASSWORD: "secret"
+    PGPASSWORD: "secret"
+    POSTGRES_DB: "registry"
+    REGISTRY_DATABASE_ENABLED: "true"
+    REGISTRY_DATABASE_HOST: "db"
+    REGISTRY_DATABASE_PORT: "5432"
+    REGISTRY_DATABASE_USER: "postgres"
+    REGISTRY_DATABASE_PASSWORD: "secret"
+    REGISTRY_DATABASE_DBNAME: "registry"
+    REGISTRY_DATABASE_SSLMODE: "disable"
+  services:
+    - name: postgres:12-alpine
+      alias: "db"
+  before_script:
+    - "echo 'version: 0.1' > config.yml"
+  script:
+    - ./bin/registry database migrate up config.yml
+    - ./bin/registry database migrate down --force config.yml
+
 .go-version-matrix:
   image: golang:${GO_VERSION}-buster
   parallel:
     matrix:
       - GO_VERSION: [ "1.14", "1.15", "1.16" ]
 
-verify:
+coverage:
   extends: .go-version-matrix
   stage: test
   needs: [mocks]
   script:
-    - go build -i .
-    - make build
-    - make binaries
     - make coverage
 
 .storage-driver-test: &storage-driver-test
