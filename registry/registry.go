@@ -20,6 +20,7 @@ import (
 	"github.com/docker/distribution/registry/listener"
 	"github.com/docker/distribution/uuid"
 	"github.com/docker/distribution/version"
+	"github.com/hashicorp/go-multierror"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gitlab.com/gitlab-org/labkit/correlation"
@@ -478,24 +479,44 @@ func resolveConfiguration(args []string, opts ...configuration.ParseOption) (*co
 }
 
 func validate(config *configuration.Configuration) error {
+	var errs *multierror.Error
+
 	if !config.Database.Enabled && config.Migration.DisableMirrorFS {
-		return fmt.Errorf("filesystem mirroring may only be disabled when database is enabled")
+		errs = multierror.Append(fmt.Errorf("filesystem mirroring may only be disabled when database is enabled"))
 	}
 
 	// Validate redirect section.
 	if redirectConfig, ok := config.Storage["redirect"]; ok {
 		v, ok := redirectConfig["disable"]
 		if !ok {
-			return fmt.Errorf("'storage.redirect' section must include 'disable' parameter (boolean)")
-		}
-		switch v := v.(type) {
-		case bool:
-		default:
-			return fmt.Errorf("invalid type %[1]T for 'storage.redirect.disable' (boolean)", v)
+			errs = multierror.Append(fmt.Errorf("'storage.redirect' section must include 'disable' parameter (boolean)"))
+		} else {
+			if _, ok := v.(bool); !ok {
+				errs = multierror.Append(fmt.Errorf("invalid type %[1]T for 'storage.redirect.disable' (boolean)", v))
+			}
 		}
 	}
 
-	return nil
+	// Validate migration section.
+	if config.Migration.Enabled {
+		if !config.Database.Enabled {
+			errs = multierror.Append(errs, fmt.Errorf("database must be enabled to migrate"))
+		}
+
+		storageParams := config.Storage.Parameters()
+		if storageParams == nil {
+			storageParams = make(configuration.Parameters)
+		}
+
+		// TODO: This is a temporary restraint while we are in Phase one of the migration proposal:
+		// https://gitlab.com/gitlab-org/container-registry/-/issues/374
+		if config.Migration.RootDirectory == fmt.Sprintf("%s", storageParams["rootdirectory"]) {
+			errs = multierror.Append(errs,
+				fmt.Errorf("migration requires a 'migration.rootdirectory` distinct from the root directory of primary storage driver"))
+		}
+	}
+
+	return errs.ErrorOrNil()
 }
 
 func nextProtos(config *configuration.Configuration) []string {

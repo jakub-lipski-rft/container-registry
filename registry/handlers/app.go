@@ -70,10 +70,13 @@ type App struct {
 
 	Config *configuration.Configuration
 
-	router           *mux.Router                    // main application router, configured with dispatchers
-	driver           storagedriver.StorageDriver    // driver maintains the app global storage driver instance.
-	db               *datastore.DB                  // db is the global database handle used across the app.
-	registry         distribution.Namespace         // registry is the primary registry backend for the app instance.
+	router            *mux.Router                 // main application router, configured with dispatchers
+	driver            storagedriver.StorageDriver // driver maintains the app global storage driver instance.
+	db                *datastore.DB               // db is the global database handle used across the app.
+	registry          distribution.Namespace      // registry is the primary registry backend for the app instance.
+	migrationRegistry distribution.Namespace      // migrationRegistry is the secondary registry backend for migration
+	migrationDriver   storagedriver.StorageDriver // migrationDriver is the secondary storage driver for migration
+
 	repoRemover      distribution.RepositoryRemover // repoRemover provides ability to delete repos
 	accessController auth.AccessController          // main access controller for application
 
@@ -385,6 +388,12 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		panic(err)
 	}
 
+	if config.Migration.Enabled {
+		app.migrationDriver = migrationDriver(config)
+
+		app.migrationRegistry = migrationRegistry(app.Context, app.migrationDriver, config, options...)
+	}
+
 	authType := config.Auth.Type()
 
 	if authType != "" && !strings.EqualFold(authType, "none") {
@@ -412,6 +421,77 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	}
 
 	return app
+}
+
+func migrationDriver(config *configuration.Configuration) storagedriver.StorageDriver {
+	storageParams := config.Storage.Parameters()
+	if storageParams == nil {
+		storageParams = make(configuration.Parameters)
+	}
+
+	if distinctMigrationRootDirectory(config) {
+		storageParams["rootdirectory"] = config.Migration.RootDirectory
+	}
+
+	driver, err := factory.Create(config.Storage.Type(), storageParams)
+	if err != nil {
+		panic(err)
+	}
+
+	return driver
+}
+
+func migrationRegistry(ctx context.Context, driver storagedriver.StorageDriver, config *configuration.Configuration, options ...storage.RegistryOption) distribution.Namespace {
+	if config.Migration.DisableMirrorFS {
+		options = append(options, storage.DisableMirrorFS)
+	}
+
+	registry, err := storage.NewRegistry(ctx, driver, options...)
+	if err != nil {
+		panic(err)
+	}
+
+	return registry
+}
+
+func distinctMigrationRootDirectory(config *configuration.Configuration) bool {
+	storageParams := config.Storage.Parameters()
+	if storageParams == nil {
+		storageParams = make(configuration.Parameters)
+	}
+
+	if config.Migration.RootDirectory != fmt.Sprintf("%s", storageParams["rootdirectory"]) {
+		return true
+	}
+
+	return false
+}
+
+func (app *App) shouldMigrate(repo distribution.Repository) (bool, error) {
+	if !(app.Config.Database.Enabled && app.Config.Migration.Enabled) {
+		return false, nil
+	}
+
+	validator, ok := repo.(storage.RepositoryValidator)
+	if !ok {
+		return false, errors.New("repository does not implement RepositoryValidator interface")
+	}
+
+	// check if repository exists in the old storage prefix, if not we should signal
+	// to use to the database and the migration storage prefix.
+	exists, err := validator.Exists(app.Context)
+	if err != nil {
+		return false, fmt.Errorf("unable to determine if repository exists: %w", err)
+	}
+
+	log := dcontext.GetLogger(app.Context)
+	if exists {
+		log.Info("repository will be served via the filesystem")
+		return false, nil
+	}
+
+	log.Info("repository will be served via the database")
+	return true, nil
 }
 
 var (
@@ -825,9 +905,11 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 
 		// Add username to request logging
 		context.Context = dcontext.WithLogger(context.Context, dcontext.GetLogger(context.Context, auth.UserNameKey))
-
 		// sync up context on the request.
 		r = r.WithContext(context)
+
+		// Save whether we're migrating a repo or not for logging later.
+		var migrateRepo bool
 
 		if app.nameRequired(r) {
 			nameRef, err := reference.WithName(getName(context))
@@ -842,8 +924,16 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 				}
 				return
 			}
-			repository, err := app.registry.Repository(context, nameRef)
 
+			bp, ok := app.registry.Blobs().(distribution.BlobProvider)
+			if !ok {
+				err = fmt.Errorf("unable to convert BlobEnumerator into BlobProvider")
+				dcontext.GetLogger(context).Error(err)
+				context.Errors = append(context.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			}
+			context.blobProvider = bp
+
+			repository, err := app.registry.Repository(context, nameRef)
 			if err != nil {
 				dcontext.GetLogger(context).Errorf("error resolving repository: %v", err)
 
@@ -862,6 +952,65 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 				return
 			}
 
+			migrateRepo, err = app.shouldMigrate(repository)
+			if err != nil {
+				err = fmt.Errorf("determining whether repository is eligible for migration: %v", err)
+				dcontext.GetLogger(context).Error(err)
+				context.Errors = append(context.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			}
+
+			context.writeFSMetadata = !app.Config.Migration.DisableMirrorFS
+
+			switch {
+			case migrateRepo:
+				// Prepare the migration side of filesystem storage and pass it to the Context.
+				bp, ok := app.migrationRegistry.Blobs().(distribution.BlobProvider)
+				if !ok {
+					err = fmt.Errorf("unable to convert BlobEnumerator into BlobProvider")
+					dcontext.GetLogger(context).Error(err)
+					context.Errors = append(context.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+				}
+				context.blobProvider = bp
+
+				repository, err = app.migrationRegistry.Repository(context, nameRef)
+				if err != nil {
+					dcontext.GetLogger(context).Errorf("error resolving repository: %v", err)
+
+					switch err := err.(type) {
+					case distribution.ErrRepositoryUnknown:
+						context.Errors = append(context.Errors, v2.ErrorCodeNameUnknown.WithDetail(err))
+					case distribution.ErrRepositoryNameInvalid:
+						context.Errors = append(context.Errors, v2.ErrorCodeNameInvalid.WithDetail(err))
+					case errcode.Error:
+						context.Errors = append(context.Errors, err)
+					}
+
+					if err = errcode.ServeJSON(w, context.Errors); err != nil {
+						dcontext.GetLogger(context).Errorf("error serving error json: %v (from %v)", err, context.Errors)
+					}
+					return
+				}
+
+				// We're writing the migrating repository to the database.
+				context.useDatabase = true
+			// We're not migrating and the database is enabled, read/write from the
+			// database except for writing blobs to common storage.
+			case !app.Config.Migration.Enabled && app.Config.Database.Enabled:
+				context.useDatabase = true
+			// We're either not migrating this repository, or we're not migrating at
+			// all and the database is not enabled. Either way, read/write from
+			// the filesystem alone.
+			case app.Config.Migration.Enabled && !migrateRepo,
+				!app.Config.Database.Enabled:
+				context.useDatabase = false
+				context.writeFSMetadata = true
+			default:
+				// this should never happen as we pre-validate all possible combinations before starting, nevertheless
+				err = errors.New("invalid database and migration configuration")
+				dcontext.GetLogger(context).Error(err)
+				context.Errors = append(context.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			}
+
 			// assign and decorate the authorized repository with an event bridge.
 			context.Repository, context.RepositoryRemover = notifications.Listen(
 				repository,
@@ -878,7 +1027,22 @@ func (app *App) dispatcher(dispatch dispatchFunc) http.Handler {
 				}
 				return
 			}
+		} else {
+			// This is not a repository-scoped request, so we must return resuts from
+			// either either the filesystem or the database, even if we're configured
+			// for migration.
+			if app.Config.Database.Enabled {
+				context.useDatabase = true
+			} else {
+				context.useDatabase = false
+			}
 		}
+
+		context.Context = dcontext.WithLogger(context.Context, dcontext.GetLoggerWithFields(context.Context, map[interface{}]interface{}{
+			"use_database":         context.useDatabase,
+			"write_fs_metadata":    context.writeFSMetadata,
+			"migrating_repository": migrateRepo,
+		}))
 
 		dispatch(context, r).ServeHTTP(w, r)
 		// Automated error response handling here. Handlers may return their

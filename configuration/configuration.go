@@ -400,8 +400,17 @@ func (r *Regexp) MarshalText() ([]byte, error) {
 
 // Migration configures behavior of features related with the migration from filesystem metadata to database metadata.
 type Migration struct {
-	// DisableMirrorFS disables registry metadata writes to the filesystem.
+	// Enabled enables migration mode, new repositories will be added to the
+	// database, while existing repositories will continue to use the filesystem.
+	Enabled bool `yaml:"enabled,omitempty"`
+	// DisableMirrorFS disables registry metadata writes to the filesystem for
+	// migrated repositories.
 	DisableMirrorFS bool `yaml:"disablemirrorfs,omitempty"`
+	// RootDirectory allows repositories that have been migrated to the database to use
+	// separate object storage paths by using a different root directory in the form of
+	// /<root-directory>/docker/registry/v2 Once the migration is complete, the
+	// storage driver configuration must be updated to use this root directory.
+	RootDirectory string `yaml:"rootdirectory,omitempty"`
 }
 
 // MailOptions provides the configuration sections to user, for specific handler.

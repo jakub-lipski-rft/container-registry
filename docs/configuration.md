@@ -178,7 +178,9 @@ database:
     maxopen: 25
     maxlifetime: 5m
 migration:
+  enabled: true
   disablemirrorfs: true
+  rootdirectory: /migration/root
 auth:
   silly:
     realm: silly-realm
@@ -643,12 +645,16 @@ registry from filesystem backed to database backed metadata storage.
 
 ```none
 migration:
+  enabled: true
   disablemirrorfs: true
+  rootdirectory: /migration/root
 ```
 
 | Parameter     | Required | Description                                                                                                                                                                                                                                          |
 |----------- |----------|------------------
+| `enabled`         | no       | When set to `true` migration mode is enabled, new repositories will be added to the database, while existing repositories will continue to use the filesystem.
 | `disablemirrorfs` | no       | When set to `true`, the registry does not write metadata to the filesystem. Defaults to `false`. Must be used in combination with the metadata database.
+| `rootdirectory`   | no       | RootDirectory allows repositories that have been migrated to the database to use separate object storage paths. Using a distinct rootdirectory from the main storage driver configuration allows online migrations.
 
 ## `auth`
 

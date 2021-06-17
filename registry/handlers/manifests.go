@@ -262,7 +262,7 @@ func (imh *manifestHandler) rewriteManifestList(manifestList *manifestlist.Deser
 var errETagMatches = errors.New("etag matches")
 
 func (imh *manifestHandler) newManifestGetter(req *http.Request) (manifestGetter, error) {
-	if imh.Config.Database.Enabled {
+	if imh.useDatabase {
 		return newDBManifestGetter(imh, req)
 	}
 
@@ -532,7 +532,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !imh.App.Config.Migration.DisableMirrorFS {
+	if imh.writeFSMetadata {
 		_, err = manifests.Put(imh, manifest, options...)
 		if err != nil {
 			imh.appendPutError(err)
@@ -540,7 +540,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	if imh.Config.Database.Enabled {
+	if imh.useDatabase {
 		if err := dbPutManifest(imh, manifest, jsonBuf.Bytes()); err != nil {
 			imh.appendPutError(err)
 			return
@@ -549,7 +549,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 
 	// Tag this manifest
 	if imh.Tag != "" {
-		if !imh.App.Config.Migration.DisableMirrorFS {
+		if imh.writeFSMetadata {
 			tags := imh.Repository.Tags(imh)
 			err = tags.Tag(imh, imh.Tag, desc)
 			if err != nil {
@@ -559,7 +559,7 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		}
 
 		// Associate tag with manifest in database.
-		if imh.Config.Database.Enabled {
+		if imh.useDatabase {
 			repoName := imh.Repository.Named().Name()
 			if err := dbTagManifest(imh, imh.db, imh.Digest, imh.Tag, repoName); err != nil {
 				if errors.Is(err, datastore.ErrManifestNotFound) {
@@ -794,12 +794,7 @@ func dbPutManifestOCIOrSchema2(imh *manifestHandler, versioned manifest.Versione
 	// repository scoped filesystem blob service will have a link to the
 	// configuration blob; however, since we check for repository scoped access
 	// via the database above, we may retrieve the blob directly common storage.
-	blobService, ok := imh.App.registry.Blobs().(distribution.BlobProvider)
-	if !ok {
-		return fmt.Errorf("unable to convert BlobEnumerator into BlobService")
-	}
-
-	cfgPayload, err := blobService.Get(imh, dbCfgBlob.Digest)
+	cfgPayload, err := imh.blobProvider.Get(imh, dbCfgBlob.Digest)
 	if err != nil {
 		return err
 	}
@@ -1172,7 +1167,7 @@ func dbDeleteManifest(ctx context.Context, db datastore.Handler, repoPath string
 func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Request) {
 	dcontext.GetLogger(imh).Debug("DeleteImageManifest")
 
-	if !imh.App.Config.Migration.DisableMirrorFS {
+	if imh.writeFSMetadata {
 		manifests, err := imh.Repository.Manifests(imh)
 		if err != nil {
 			imh.Errors = append(imh.Errors, err)
@@ -1200,7 +1195,7 @@ func (imh *manifestHandler) DeleteManifest(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	if imh.App.Config.Database.Enabled {
+	if imh.useDatabase {
 		if !deleteEnabled(imh.App.Config) {
 			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnsupported)
 			return
