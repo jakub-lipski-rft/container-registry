@@ -61,7 +61,7 @@ To create a new database migration run the following command from the root of
 the repository:
 
 ```text
-make new-migration [name]
+make db-new-migration [name]
 ```
 
 A new migration file, named `[timestamp]_[name].go`, will be created under
@@ -82,7 +82,7 @@ default.
 #### Example
 
 ```text
-$ make new-migration create_users_table
+$ make db-new-migration create_users_table
 OK: ./registry/datastore/migrations/20200713143615_create_users_table.go
 ```
 

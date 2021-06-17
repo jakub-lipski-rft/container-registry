@@ -149,6 +149,26 @@ database:schema-migrations:status:
     - ./bin/registry database migrate up config.yml
     - ./bin/registry database migrate status -u config.yml | grep -qw 'true' || exit 1
 
+database:structure-sql:
+  image: postgres:12-buster
+  extends: .schema-migrations
+  stage: validate
+  variables:
+    PG_FORMATTER_VERSION: "5.0"
+  script:
+    # Install build/make deps
+    - apt-get update && apt-get -y install wget perl make git
+    # Install pgFormatter
+    - wget -qO- https://github.com/darold/pgFormatter/archive/refs/tags/v$PG_FORMATTER_VERSION.tar.gz | tar xz
+    - cd pgFormatter-$PG_FORMATTER_VERSION
+    - perl Makefile.PL && make && make install
+    - cd ..
+    # Apply database migrations
+    - ./bin/registry database migrate up config.yml
+    # Dump and validate
+    - make db-structure-dump
+    - git diff --exit-code
+
 .go-version-matrix:
   image: golang:${GO_VERSION}-buster
   parallel:

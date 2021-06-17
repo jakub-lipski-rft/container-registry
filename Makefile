@@ -100,7 +100,10 @@ clean: ## clean up binaries
 	@echo "$(WHALE) $@"
 	@rm -f $(BINARIES)
 
-new-migration:
-	@./script/dev/new-migration $(filter-out $@,$(MAKECMDGOALS))
+db-new-migration:
+	@./script/dev/db-new-migration $(filter-out $@,$(MAKECMDGOALS))
 %:
 	@:
+
+db-structure-dump:
+	@./script/dev/db-structure-dump
