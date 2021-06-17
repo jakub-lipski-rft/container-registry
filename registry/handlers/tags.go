@@ -89,7 +89,7 @@ func (th *tagsHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 	var tags []string
 	var moreEntries bool
 
-	if th.Config.Database.Enabled {
+	if th.useDatabase {
 		tags, moreEntries, err = dbGetTags(th.Context, th.db, th.Repository.Named().Name(), maxEntries, lastEntry)
 		if err != nil {
 			th.Errors = append(th.Errors, errcode.FromUnknownError(err))
@@ -238,7 +238,7 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !th.App.Config.Migration.DisableMirrorFS {
+	if th.writeFSMetadata {
 		tagService := th.Repository.Tags(th)
 		if err := tagService.Untag(th.Context, th.Tag); err != nil {
 			th.appendDeleteTagError(err)
@@ -246,7 +246,7 @@ func (th *tagHandler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if th.App.Config.Database.Enabled {
+	if th.useDatabase {
 		if err := dbDeleteTag(th.Context, th.db, th.Repository.Named().Name(), th.Tag); err != nil {
 			th.appendDeleteTagError(err)
 			return

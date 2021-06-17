@@ -1401,6 +1401,50 @@ reporting:
 	testParameter(t, yml, "REGISTRY_REPORTING_SENTRY_ENVIRONMENT", tt, validator)
 }
 
+func TestParseMigration_Enabled(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+migration:
+  enabled: %s
+`
+	tt := boolParameterTests(false)
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, strconv.FormatBool(got.Migration.Enabled))
+	}
+
+	testParameter(t, yml, "REGISTRY_MIGRATION_ENABLED", tt, validator)
+}
+
+func TestParseMigration_RootDirectory(t *testing.T) {
+	yml := `
+version: 0.1
+storage: inmemory
+migration:
+  rootdirectory: %s
+`
+
+	tt := []parameterTest{
+		{
+			name:  "empty",
+			value: "",
+			want:  "",
+		},
+		{
+			name:  "custom",
+			value: "migration/root",
+			want:  "migration/root",
+		},
+	}
+
+	validator := func(t *testing.T, want interface{}, got *Configuration) {
+		require.Equal(t, want, got.Migration.RootDirectory)
+	}
+
+	testParameter(t, yml, "REGISTRY_MIGRATION_ROOTDIRECTORY", tt, validator)
+}
+
 func checkStructs(c *C, t reflect.Type, structsChecked map[string]struct{}) {
 	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Map || t.Kind() == reflect.Slice {
 		t = t.Elem()

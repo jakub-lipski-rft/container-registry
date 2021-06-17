@@ -35,6 +35,11 @@ type Context struct {
 
 	urlBuilder *v2.URLBuilder
 
+	useDatabase     bool
+	writeFSMetadata bool
+
+	blobProvider distribution.BlobProvider
+
 	// TODO(stevvooe): The goal is too completely factor this context and
 	// dispatching out of the web application. Ideally, we should lean on
 	// context.Context for injection of these resources.
