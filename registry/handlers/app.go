@@ -138,6 +138,10 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 		panic(err)
 	}
 
+	if config.Migration.Enabled {
+		app.migrationDriver = migrationDriver(config)
+	}
+
 	purgeConfig := uploadPurgeDefaultConfig()
 	if mc, ok := config.Storage["maintenance"]; ok {
 		if v, ok := mc["uploadpurging"]; ok {
@@ -329,7 +333,18 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 				log.WithError(err).Error("failed to update online GC settings")
 			}
 		}()
-		startOnlineGC(app.Context, app.db, app.driver, config)
+
+		// If we're migrating, then we'll use use the migration driver since that
+		// will contain the storage managed by the database, if not we need to use
+		// the main storage driver.
+		var gcDriver storagedriver.StorageDriver
+		if app.Config.Migration.Enabled {
+			gcDriver = app.migrationDriver
+		} else {
+			gcDriver = app.driver
+		}
+
+		startOnlineGC(app.Context, app.db, gcDriver, config)
 	}
 
 	// configure storage caches
@@ -389,8 +404,6 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	}
 
 	if config.Migration.Enabled {
-		app.migrationDriver = migrationDriver(config)
-
 		app.migrationRegistry = migrationRegistry(app.Context, app.migrationDriver, config, options...)
 	}
 
