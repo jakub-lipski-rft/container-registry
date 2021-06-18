@@ -131,6 +131,8 @@ mocks:
       alias: "db"
   before_script:
     - "echo 'version: 0.1' > config.yml"
+    # wait for cache to be mounted, avoiding flaky tests
+    - while [ ! -f ./bin/registry ]; do sleep 1; done
 
 database:schema-migrations:
   extends: .schema-migrations
