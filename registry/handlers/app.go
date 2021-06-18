@@ -168,6 +168,12 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 
 	startUploadPurger(app, app.driver, log, purgeConfig)
 
+	// Also start an upload purger for the new root directory if we're migrating
+	// to a different root directory.
+	if app.Config.Migration.Enabled && distinctMigrationRootDirectory(config) {
+		startUploadPurger(app, app.migrationDriver, log, purgeConfig)
+	}
+
 	app.driver, err = applyStorageMiddleware(app.driver, config.Middleware["storage"])
 	if err != nil {
 		panic(err)
@@ -437,16 +443,18 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 }
 
 func migrationDriver(config *configuration.Configuration) storagedriver.StorageDriver {
+	paramsCopy := make(configuration.Parameters)
 	storageParams := config.Storage.Parameters()
-	if storageParams == nil {
-		storageParams = make(configuration.Parameters)
+
+	for k := range storageParams {
+		paramsCopy[k] = storageParams[k]
 	}
 
 	if distinctMigrationRootDirectory(config) {
-		storageParams["rootdirectory"] = config.Migration.RootDirectory
+		paramsCopy["rootdirectory"] = config.Migration.RootDirectory
 	}
 
-	driver, err := factory.Create(config.Storage.Type(), storageParams)
+	driver, err := factory.Create(config.Storage.Type(), paramsCopy)
 	if err != nil {
 		panic(err)
 	}
