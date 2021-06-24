@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+    "os"
 	"reflect"
 	"runtime"
 	"sort"
@@ -34,9 +35,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+    "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -573,6 +576,7 @@ func New(params DriverParameters) (*Driver, error) {
 		&credentials.EnvProvider{},
 		&credentials.SharedCredentialsProvider{},
 		&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(sess)},
+        webIdentityProvider(sess),
 	})
 
 	if params.RegionEndpoint != "" {
@@ -656,6 +660,15 @@ func New(params DriverParameters) (*Driver, error) {
 			},
 		},
 	}, nil
+}
+
+func webIdentityProvider(sess client.ConfigProvider) credentials.Provider {
+	svc := sts.New(sess)
+
+	roleARN := os.Getenv("AWS_ROLE_ARN")
+	tokenFilepath := os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE")
+	roleSessionName := os.Getenv("AWS_ROLE_SESSION_NAME")
+	return stscreds.NewWebIdentityRoleProvider(svc, roleARN, roleSessionName, tokenFilepath)
 }
 
 // Implement the storagedriver.StorageDriver interface
