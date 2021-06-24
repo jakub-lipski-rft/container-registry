@@ -7,7 +7,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v54.1.0+incompatible
 	github.com/Azure/go-autorest v10.8.1+incompatible // indirect
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
-	github.com/aws/aws-sdk-go v1.38.26
+	github.com/aws/aws-sdk-go v1.38.39
 	github.com/benbjohnson/clock v1.0.3
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/denverdino/aliyungo v0.0.0-20181224103910-6df11717a253
